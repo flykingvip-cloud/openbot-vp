@@ -8,6 +8,8 @@ import {
   heartbeatFraction,
   visibleTenantCode,
   formatLinkCoverage,
+  formatQuota,
+  formatConcurrency,
   linkCoverageFraction,
   formatTenantCoverage,
   tenantGrantNote,
@@ -160,5 +162,21 @@ describe("exactRunMatches", () => {
 
   it("does not pick an arbitrary row when one identifier is shared", () => {
     expect(exactRunMatches(runs, "client_02")).toHaveLength(2);
+  });
+});
+
+describe("formatConcurrency and formatQuota", () => {
+  it("stays unknown without a positive denominator and never prints 0%", () => {
+    expect(formatConcurrency(null).value).toBe("未知");
+    expect(formatConcurrency({ activeRuns: 0, limit: 0 }).value).toBe("未知");
+    expect(formatQuota({ remaining: 0, allowance: 0 }).value).toBe("未知");
+    expect(formatConcurrency({ activeRuns: 0, limit: 0 }).value).not.toContain("0%");
+  });
+
+  it("formats confirmed counts and hides raw field names", () => {
+    expect(formatConcurrency({ activeRuns: 1, limit: 4 }).value).toBe("1/4");
+    expect(formatQuota({ remaining: 2, allowance: 10 }).value).toBe("2/10");
+    expect(formatConcurrency({ activeRuns: 1, limit: 4 }).detail).not.toContain("activeRuns");
+    expect(formatQuota({ remaining: 2, allowance: 10 }).detail).not.toContain("allowance");
   });
 });

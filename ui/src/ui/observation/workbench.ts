@@ -52,9 +52,11 @@ import {
 import {
   censusTenantGrants,
   exactRunMatches,
+  formatConcurrency,
   formatGrantCensus,
   formatHeartbeat,
   formatLinkCoverage,
+  formatQuota,
   heartbeatFraction,
   linkCoverageFraction,
   formatTenantCoverage,
@@ -62,6 +64,7 @@ import {
   visibleTenantCode,
   type HeartbeatInput,
   type LinkCoverageInput,
+  type PlatformFirstScreenSnapshot,
 } from "./platform-overview.ts";
 import { observationSamples, SAMPLE_ENTERPRISE_DIRECTORY } from "./samples.ts";
 import {
@@ -70,6 +73,11 @@ import {
   type ObservationStreamView,
 } from "./stream.ts";
 
+export type ObservationQueryClient = {
+  connected?: boolean;
+  request: (method: string, params?: unknown) => Promise<unknown>;
+};
+
 export type ObservationProps = {
   role: "platform" | "enterprise";
   tenantId: string | null;
@@ -77,6 +85,8 @@ export type ObservationProps = {
   connected: boolean;
   basePath?: string;
   observationHost: object | null;
+  client?: ObservationQueryClient | null;
+  gatewayMethods?: readonly string[] | null;
   targets?: readonly DiagnosisTargetOption[];
   onDiagnoseRun?: (input: { runId: string; sessionKey: string; agentId: string }) => void;
   onSessionKey?: (sessionKey: string) => void;
@@ -98,6 +108,7 @@ export function renderObservationWorkbench(props: ObservationProps) {
   return html`<openbot-observation-workbench
     .role=${props.role} .tenantId=${props.tenantId} .sessionKey=${props.sessionKey}
     .observationHost=${props.observationHost ?? null}
+    .client=${props.client ?? null} .gatewayMethods=${props.gatewayMethods ?? null}
     .connected=${props.connected} .onSessionKey=${props.onSessionKey ?? null} .basePath=${props.basePath ?? ""} .targets=${props.targets ?? []}
     .enterpriseDirectory=${props.enterpriseDirectory ?? []}
     .onComparisonRefs=${props.onComparisonRefs ?? null}
@@ -140,6 +151,8 @@ export class OpenBotObservationWorkbench extends LitElement {
   @state() private analysis: "tasks" | "models" | "executors" | "capacity" = "tasks";
   @property({ type: String }) source: "live" | "sample" = "live";
   @property({ attribute: false }) observationHost: object | null = null;
+  @property({ attribute: false }) client: ObservationQueryClient | null = null;
+  @property({ attribute: false }) gatewayMethods: readonly string[] | null = null;
   @state() private filter: (typeof OBSERVATION_TYPES)[number] = "全部";
   @state() private timeWindow: "7d" | "current" = "7d";
   @state() private tenantFilter: string = "all";
@@ -168,6 +181,9 @@ export class OpenBotObservationWorkbench extends LitElement {
   @property({ type: Boolean }) initialDrawer = false;
   private frozenView: ObservationView | null = null;
   private frozenStream: ObservationStreamView | null = null;
+  private frozenSnapshot: PlatformFirstScreenSnapshot | null = null;
+  @state() private windowSnapshot: PlatformFirstScreenSnapshot | null = null;
+  private snapshotGeneration = 0;
   private lastFingerprint = "";
   private pendingStreamUpdate = false;
   private requestedRunId: string | null = null;
@@ -183,7 +199,11 @@ export class OpenBotObservationWorkbench extends LitElement {
     this.captureDrawerRequest();
     this.poll = window.setInterval(() => {
       this.tick++;
+      if (this.tick % 10 === 0 && !this.paused) {
+        void this.pullPlatformSnapshot();
+      }
     }, 1000);
+    queueMicrotask(() => void this.pullPlatformSnapshot());
   }
   willUpdate(changed: Map<string | number | symbol, unknown>) {
     // Skip the first update: every property is "changed" on connect, including
@@ -192,7 +212,7 @@ export class OpenBotObservationWorkbench extends LitElement {
       return;
     }
     if (
-      ["role", "tenantId", "sessionKey", "scopes", "authorized", "tenantGrants"].some((key) =>
+      ["role", "tenantId", "sessionKey", "scopes", "authorized", "tenantGrants", "client", "gatewayMethods"].some((key) =>
         changed.has(key),
       )
     ) {
@@ -204,6 +224,9 @@ export class OpenBotObservationWorkbench extends LitElement {
       window.clearInterval(this.poll);
     }
     this.poll = undefined;
+    this.snapshotGeneration += 1;
+    this.windowSnapshot = null;
+    this.frozenSnapshot = null;
     super.disconnectedCallback();
   }
   private poll: number | undefined;
@@ -221,6 +244,103 @@ export class OpenBotObservationWorkbench extends LitElement {
   }
   private isAuthorized() {
     return resolveObservationAuthorized({ authorized: this.authorized, scopes: this.scopes });
+  }
+  private canReadPlatformSnapshot() {
+    return (
+      this.role === "platform" &&
+      this.source === "live" &&
+      this.connected &&
+      this.isAuthorized() === true &&
+      Boolean(this.client) &&
+      this.client?.connected !== false &&
+      Boolean(this.gatewayMethods?.includes("diagnosis.observation.query"))
+    );
+  }
+  private firstScreenSnapshot(): PlatformFirstScreenSnapshot | null {
+    if (this.paused && this.frozenSnapshot) {
+      return this.frozenSnapshot;
+    }
+    return this.windowSnapshot;
+  }
+  private parsePlatformSnapshot(value: unknown): PlatformFirstScreenSnapshot | null {
+    if (!value || typeof value !== "object" || (value as { ok?: unknown }).ok !== true) {
+      return null;
+    }
+    const row = value as {
+      coverage?: { fullyLinkedCount?: unknown; attemptedCount?: unknown; link?: unknown };
+      heartbeat?: { expectedSamples?: unknown; observedSamples?: unknown };
+      capacity?: {
+        concurrency?: { activeRuns?: unknown; limit?: unknown };
+        quota?: { remaining?: unknown; allowance?: unknown };
+      };
+    };
+    const count = (input: unknown): number | null =>
+      typeof input === "number" && Number.isFinite(input) ? input : null;
+    return {
+      coverage: row.coverage
+        ? {
+            fullyLinkedCount: count(row.coverage.fullyLinkedCount),
+            attemptedCount: count(row.coverage.attemptedCount),
+            link: count(row.coverage.link),
+          }
+        : null,
+      heartbeat: row.heartbeat
+        ? {
+            expectedSamples: count(row.heartbeat.expectedSamples),
+            observedSamples: count(row.heartbeat.observedSamples),
+          }
+        : null,
+      capacity: {
+        concurrency: row.capacity?.concurrency
+          ? {
+              activeRuns: count(row.capacity.concurrency.activeRuns),
+              limit: count(row.capacity.concurrency.limit),
+            }
+          : null,
+        quota: row.capacity?.quota
+          ? {
+              remaining: count(row.capacity.quota.remaining),
+              allowance: count(row.capacity.quota.allowance),
+            }
+          : null,
+      },
+    };
+  }
+  private async pullPlatformSnapshot() {
+    if (this.paused) {
+      return;
+    }
+    if (!this.canReadPlatformSnapshot() || !this.client) {
+      if (this.windowSnapshot !== null) {
+        this.windowSnapshot = null;
+      }
+      return;
+    }
+    const client = this.client;
+    const generation = ++this.snapshotGeneration;
+    const to = Date.now();
+    const from = to - 7 * 86_400_000;
+    try {
+      const result = await client.request("diagnosis.observation.query", {
+        platformWindow: true,
+        from,
+        to,
+      });
+      if (
+        generation !== this.snapshotGeneration ||
+        this.paused ||
+        client !== this.client ||
+        !this.canReadPlatformSnapshot()
+      ) {
+        return;
+      }
+      this.windowSnapshot = this.parsePlatformSnapshot(result);
+    } catch {
+      if (generation !== this.snapshotGeneration || this.paused) {
+        return;
+      }
+      this.windowSnapshot = null;
+    }
   }
   private currentTenantGrant(): TenantGrant {
     if (this.role !== "platform" || this.tenantFilter === "all") {
@@ -255,6 +375,9 @@ export class OpenBotObservationWorkbench extends LitElement {
     this.requestedDrawer = false;
     this.queryInput = "";
     this.queryResult = null;
+    this.windowSnapshot = null;
+    this.frozenSnapshot = null;
+    this.snapshotGeneration += 1;
     const authorized = this.isAuthorized();
     this.accessNotice =
       authorized === true ? null : authorized === false ? AUTH_INVALID_COPY : AUTH_UNCONFIRMED_COPY;
@@ -416,10 +539,14 @@ export class OpenBotObservationWorkbench extends LitElement {
       this.requestedDrawer = false;
       this.queryInput = "";
       this.queryResult = null;
+      this.windowSnapshot = null;
+      this.frozenSnapshot = null;
+      this.snapshotGeneration += 1;
       this.issueFilter = "all";
       this.sessionFilter = "current";
       this.agentFilter = "all";
       this.syncDrawerUrl({ runId: null, drawer: false });
+      void this.pullPlatformSnapshot();
     }
   }
   private directoryEntries(view: ObservationView): readonly ObservationEnterpriseEntry[] {
@@ -561,13 +688,18 @@ export class OpenBotObservationWorkbench extends LitElement {
     if (!this.paused) {
       this.frozenView = view;
       this.frozenStream = this.buildLiveStream(view);
+      this.frozenSnapshot = this.windowSnapshot;
       this.paused = true;
       this.pendingStreamUpdate = false;
+      this.snapshotGeneration += 1;
     } else {
       this.paused = false;
       this.frozenView = null;
       this.frozenStream = null;
+      this.frozenSnapshot = null;
       this.pendingStreamUpdate = false;
+      this.snapshotGeneration += 1;
+      void this.pullPlatformSnapshot();
     }
   }
   private openRun(row: ObservationRun, drawer: boolean) {
@@ -809,11 +941,28 @@ export class OpenBotObservationWorkbench extends LitElement {
     )}</nav>`;
   }
   private renderPlatformCapacity() {
+    const snapshot = this.firstScreenSnapshot();
+    const coverageInput = snapshot?.coverage ?? null;
+    const heartbeatInput = snapshot?.heartbeat ?? null;
+    const coverage = formatLinkCoverage(coverageInput);
+    const heartbeat = formatHeartbeat(heartbeatInput);
+    const concurrency = formatConcurrency(snapshot?.capacity?.concurrency ?? null);
+    const quota = formatQuota(snapshot?.capacity?.quota ?? null);
     const cards = [
-      { title: "采样覆盖", value: "未知", chart: true },
-      { title: "心跳时效", value: "未知", chart: true },
-      { title: "登记并发", value: "未知", chart: false },
-      { title: "额度", value: "未知", chart: false },
+      {
+        title: "采样覆盖",
+        value: coverage.value,
+        chart: true,
+        fraction: linkCoverageFraction(coverageInput),
+      },
+      {
+        title: "心跳时效",
+        value: heartbeat.value,
+        chart: true,
+        fraction: heartbeatFraction(heartbeatInput),
+      },
+      { title: "登记并发", value: concurrency.value, chart: false, fraction: null },
+      { title: "额度", value: quota.value, chart: false, fraction: null },
     ];
     return html`<section class="obs-plat-card" data-testid="obs-platform-capacity" aria-label="覆盖与容量">
       <div class="obs-plat-card__head"><div><h3>覆盖与容量</h3></div></div>
@@ -822,7 +971,7 @@ export class OpenBotObservationWorkbench extends LitElement {
           <h4>${card.title}</h4>
           ${
             card.chart
-              ? this.renderRatioMeter({ label: card.title, value: card.value, fraction: null })
+              ? this.renderRatioMeter({ label: card.title, value: card.value, fraction: card.fraction })
               : html`<div class="obs-cap-val">${card.value}</div>`
           }
         </div>`,
@@ -1430,7 +1579,15 @@ export class OpenBotObservationWorkbench extends LitElement {
     }
     return "当前连接窗口只读本机事件投影，不能标成 24 小时或近 7 天；目录健康仅作参考。";
   }
-  updated() {
+  updated(changed: Map<string | number | symbol, unknown>) {
+    if (
+      this.role === "platform" &&
+      ["client", "connected", "scopes", "authorized", "gatewayMethods", "source"].some((key) =>
+        changed.has(key),
+      )
+    ) {
+      queueMicrotask(() => void this.pullPlatformSnapshot());
+    }
     const view = this.updateStream(this.view());
     const runs = this.filteredRuns(view);
     const resolved = resolveDrawerSelection({
@@ -1492,10 +1649,10 @@ export class OpenBotObservationWorkbench extends LitElement {
   }
 
   private renderPlatformHealth(view: ObservationView) {
-    // Coverage and heartbeat stay unknown until a confirmed numerator and
-    // positive denominator are supplied; do not invent first-screen ratios.
-    const coverageInput: LinkCoverageInput | null = null;
-    const heartbeatInput: HeartbeatInput | null = null;
+    // Bind the platform window snapshot only; never a single precise-query result.
+    const snapshot = this.firstScreenSnapshot();
+    const coverageInput: LinkCoverageInput | null = snapshot?.coverage ?? null;
+    const heartbeatInput: HeartbeatInput | null = snapshot?.heartbeat ?? null;
     const coverage = formatLinkCoverage(coverageInput);
     const heartbeat = formatHeartbeat(heartbeatInput);
     const census = formatGrantCensus(

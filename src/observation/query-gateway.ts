@@ -17,6 +17,7 @@ import { createPlatformHeartbeatActivityQuery } from "./heartbeat-activity-query
 import type { startHeartbeatActivity } from "./heartbeat-activity.js";
 import { createMetricCompareGatewayHelper } from "./metric-compare-gateway.js";
 import { queryObservationWithJournal } from "./query.js";
+import { queryPlatformObservationSnapshot } from "./platform-window-snapshot.js";
 import { createReasoningGatewayAdapter } from "./reasoning-gateway.js";
 import type { ReasoningInput, ReasoningModelPort } from "./reasoning-pass.js";
 export const OBSERVATION_QUERY_METHOD = "diagnosis.observation.query";
@@ -86,6 +87,70 @@ export function createObservationQueryHandlers(
           return;
         }
         respond(true, activity, undefined);
+        return;
+      }
+      if (params.platformWindow !== undefined) {
+        if (params.platformWindow !== true) {
+          deny("invalid_platform_window_request");
+          return;
+        }
+        const allowedWindow = new Set(["platformWindow", "from", "to"]);
+        if (Object.keys(params).some((key) => !allowedWindow.has(key))) {
+          deny("invalid_platform_window_request");
+          return;
+        }
+        const scopes = client.connect.scopes ?? [];
+        const identityOk =
+          client.sessionDomain === "platform" &&
+          auth.trusted.tenantId === null &&
+          scopes.includes("operator.platform");
+        if (!identityOk) {
+          deny("unauthorized");
+          return;
+        }
+        const projectedAt = (options.now ?? Date.now)();
+        let from = params.from;
+        let to = params.to;
+        if (from === undefined && to === undefined) {
+          to = projectedAt;
+          from = to - 7 * 86_400_000;
+        }
+        if (
+          typeof from !== "number" ||
+          typeof to !== "number" ||
+          !Number.isFinite(from) ||
+          !Number.isFinite(to)
+        ) {
+          deny("invalid_platform_window_request");
+          return;
+        }
+        const snapshot = queryPlatformObservationSnapshot({
+          cfg: (options.loadConfig ?? loadConfig)(),
+          from,
+          to,
+          projectedAt,
+          activity: options.platformActivityCollector?.query() ?? null,
+        });
+        const fresh = await resolveDiagnosisProductionAuth(
+          client as unknown as DiagnosisGatewayAuthClient,
+          options.authDeps,
+        );
+        if (
+          !fresh ||
+          fresh.trusted.tenantId !== auth.trusted.tenantId ||
+          fresh.principal.principalId !== auth.principal.principalId ||
+          client.sessionDomain !== "platform" ||
+          fresh.trusted.tenantId !== null ||
+          !(client.connect.scopes ?? []).includes("operator.platform")
+        ) {
+          deny("unauthorized");
+          return;
+        }
+        if (!snapshot.ok) {
+          deny(snapshot.code);
+          return;
+        }
+        respond(true, snapshot, undefined);
         return;
       }
       const allowed = new Set([

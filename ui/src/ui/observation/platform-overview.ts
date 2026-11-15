@@ -20,6 +20,25 @@ export type HeartbeatInput = {
   observedSamples?: number | null;
 };
 
+export type ConcurrencyInput = {
+  activeRuns?: number | null;
+  limit?: number | null;
+};
+
+export type QuotaInput = {
+  remaining?: number | null;
+  allowance?: number | null;
+};
+
+export type PlatformFirstScreenSnapshot = {
+  coverage?: LinkCoverageInput | null;
+  heartbeat?: HeartbeatInput | null;
+  capacity?: {
+    concurrency?: ConcurrencyInput | null;
+    quota?: QuotaInput | null;
+  } | null;
+};
+
 export type GrantCensus = {
   granted: number;
   none: number;
@@ -122,6 +141,34 @@ export function formatHeartbeat(activity: HeartbeatInput | null | undefined): Fo
     detail: "",
     note: "心跳时效 · 不等于窗口覆盖",
   };
+}
+
+function ratioOrUnknown(
+  numerator: number | null | undefined,
+  denominator: number | null | undefined,
+  note: string,
+): FormattedMetric {
+  if (
+    numerator == null ||
+    denominator == null ||
+    !Number.isFinite(numerator) ||
+    !Number.isFinite(denominator) ||
+    denominator <= 0 ||
+    numerator < 0
+  ) {
+    return { value: "未知", detail: "", note };
+  }
+  return { value: `${numerator}/${denominator}`, detail: "", note };
+}
+
+export function formatConcurrency(
+  concurrency: ConcurrencyInput | null | undefined,
+): FormattedMetric {
+  return ratioOrUnknown(concurrency?.activeRuns, concurrency?.limit, "登记并发 · 无分母时未知");
+}
+
+export function formatQuota(quota: QuotaInput | null | undefined): FormattedMetric {
+  return ratioOrUnknown(quota?.remaining, quota?.allowance, "额度 · 无分母时未知");
 }
 
 /** Show a secondary tenant id only when it adds information; hide numeric aliases such as 001. */

@@ -446,3 +446,48 @@ describe("explicit reasoning side pass on actual observation handler", () => {
     expect(r.mock.calls[0][1]).toBeUndefined();
   });
 });
+
+describe("platform window snapshot gateway", () => {
+  const platformClient = (): GatewayClient =>
+    ({
+      platformUserId: "platform-user",
+      sessionDomain: "platform",
+      sessionKind: "platform-admin",
+      connect: { scopes: ["operator.read", "operator.platform"] },
+    }) as GatewayClient;
+  const platformHandler = () =>
+    createObservationQueryHandlers({
+      authDeps: { resolveMembership: async () => ({ tenantId: null, userId: "platform-user" }) },
+      loadConfig: () => ({}),
+      now: () => 7 * 86_400_000,
+    })[OBSERVATION_QUERY_METHOD];
+
+  it("rejects mixed or incomplete platform window requests and non-platform sessions", async () => {
+    const handler = platformHandler();
+    expect(
+      (await invoke(handler, platformClient(), { platformWindow: true, taskId: "task" } as never))
+        .mock.calls[0][0],
+    ).toBe(false);
+    expect(
+      (await invoke(handler, platformClient(), { platformWindow: true, from: 1 } as never)).mock
+        .calls[0][0],
+    ).toBe(false);
+    const enterprise = client(["operator.read", "operator.platform"]);
+    expect((await invoke(handler, enterprise, { platformWindow: true } as never)).mock.calls[0][0]).toBe(
+      false,
+    );
+  });
+
+  it("returns a window snapshot rather than a precise-task observation", async () => {
+    query.mockClear();
+    const respond = await invoke(platformHandler(), platformClient(), {
+      platformWindow: true,
+    } as never);
+    expect(respond.mock.calls[0][0]).toBe(true);
+    expect(respond.mock.calls[0][1].ok).toBe(true);
+    expect(respond.mock.calls[0][1].coverage.attemptedCount).toBe(0);
+    expect(respond.mock.calls[0][1].coverage.link).toBeNull();
+    expect(respond.mock.calls[0][1].window).toEqual({ from: 0, to: 7 * 86_400_000 });
+    expect(query).not.toHaveBeenCalled();
+  });
+});

@@ -343,6 +343,8 @@ export function renderPlatformSurface(props: PlatformSurfaceProps) {
         sessionKey: null,
         connected: props.connected === true,
         observationHost: props.observationHost ?? null,
+        client: props.client ?? null,
+        gatewayMethods: props.gatewayMethods ?? null,
         basePath: props.basePath,
         enterpriseDirectory: props.readModel.enterpriseDirectory ?? [],
         scopes: props.scopes ?? null,

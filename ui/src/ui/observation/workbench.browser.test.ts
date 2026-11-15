@@ -1,5 +1,5 @@
 import { render } from "lit";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   clearRuntimeObservations,
   readRuntimeObservations,
@@ -1011,6 +1011,115 @@ describe("R5 enterprise IA alignment", () => {
     await panel.updateComplete;
     expect(panel.querySelector(".obs-drawer")?.textContent).toContain("运行标识与状态");
     expect(panel.querySelector(".obs-drawer")?.textContent).toContain("improvementEligible：false");
+    container.remove();
+  });
+});
+
+describe("platform first-screen snapshot binding", () => {
+  const mount = async (request: (method: string, params?: unknown) => Promise<unknown>) => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    render(
+      renderObservationWorkbench({
+        role: "platform",
+        tenantId: null,
+        sessionKey: null,
+        connected: true,
+        authorized: true,
+        scopes: ["operator.read", "operator.platform"],
+        observationHost: {},
+        client: { connected: true, request },
+        gatewayMethods: ["diagnosis.observation.query"],
+        enterpriseDirectory: [
+          { tenantId: "tenant-a", label: "华东正式企业", status: "paid", tenantGrant: "granted" },
+        ],
+      }),
+      container,
+    );
+    await customElements.whenDefined("openbot-observation-workbench");
+    const panel = container.querySelector(
+      "openbot-observation-workbench",
+    ) as OpenBotObservationWorkbench;
+    await panel.updateComplete;
+    await Promise.resolve();
+    await Promise.resolve();
+    await panel.updateComplete;
+    return { container, panel };
+  };
+
+  it("renders a ring and ratio when the window snapshot supplies a real denominator", async () => {
+    const request = vi.fn(async (method: string, params: unknown) => {
+      expect(method).toBe("diagnosis.observation.query");
+      expect(params).toEqual(
+        expect.objectContaining({ platformWindow: true }),
+      );
+      expect(params).not.toEqual(expect.objectContaining({ agentId: expect.anything() }));
+      expect(params).not.toEqual(expect.objectContaining({ taskId: expect.anything() }));
+      return {
+        ok: true,
+        coverage: { attemptedCount: 5, fullyLinkedCount: 3, invalidCount: 1, link: 0.6 },
+        heartbeat: { expectedSamples: 4, observedSamples: 2 },
+      };
+    });
+    const { container, panel } = await mount(request);
+    expect(
+      panel.querySelector('[data-testid="obs-health-关联覆盖率"] .obs-cap-val')?.textContent,
+    ).toBe("3/5 · 60%");
+    expect(
+      panel.querySelector('[data-testid="obs-health-关联覆盖率"] .obs-coverage-meter__fill'),
+    ).not.toBeNull();
+    expect(
+      panel.querySelector('[data-testid="obs-health-心跳时效"] .obs-cap-val')?.textContent,
+    ).toBe("2/4");
+    expect(
+      panel.querySelector('[data-testid="obs-health-心跳时效"] .obs-coverage-meter__fill'),
+    ).not.toBeNull();
+    expect(panel.querySelector('[data-testid="obs-platform-health"]')?.textContent).not.toContain(
+      "expectedSamples",
+    );
+    panel.querySelector<HTMLButtonElement>('[data-platform-page="capacity"]')!.click();
+    await panel.updateComplete;
+    const capacity = panel.querySelector('[data-testid="obs-platform-capacity"]');
+    const values = [...capacity!.querySelectorAll(".obs-cap-val")].map((node) => node.textContent);
+    expect(values[0]).toBe("3/5 · 60%");
+    expect(values[1]).toBe("2/4");
+    expect(values[2]).toBe("未知");
+    expect(values[3]).toBe("未知");
+    expect(capacity?.querySelector(".obs-coverage-meter__fill")).not.toBeNull();
+    container.remove();
+  });
+
+  it("keeps first-screen coverage unknown when the snapshot has no denominator, and ignores precise-query evidence", async () => {
+    const request = vi.fn(async () => ({
+      ok: true,
+      coverage: { attemptedCount: 0, fullyLinkedCount: 0, link: null },
+      heartbeat: { expectedSamples: null, observedSamples: 1 },
+    }));
+    const { container, panel } = await mount(request);
+    expect(
+      panel.querySelector('[data-testid="obs-health-关联覆盖率"] .obs-cap-val')?.textContent,
+    ).toBe("未知");
+    expect(
+      panel.querySelector('[data-testid="obs-health-关联覆盖率"] .obs-coverage-meter__fill'),
+    ).toBeNull();
+    expect(
+      panel.querySelector('[data-testid="obs-health-心跳时效"] .obs-cap-val')?.textContent,
+    ).toBe("未知");
+    expect(panel.textContent).not.toContain("0%");
+    const query = panel.querySelector<HTMLInputElement>('input[aria-label="精确任务或运行标识"]')!;
+    query.value = "anything";
+    query.dispatchEvent(new Event("input"));
+    panel.querySelector<HTMLButtonElement>(".obs-query-submit")!.click();
+    await panel.updateComplete;
+    expect(
+      panel.querySelector('[data-testid="obs-health-关联覆盖率"] .obs-cap-val')?.textContent,
+    ).toBe("未知");
+    expect(request).toHaveBeenCalled();
+    expect(
+      request.mock.calls.every(([, params]) =>
+        Boolean(params && typeof params === "object" && "platformWindow" in (params as object)),
+      ),
+    ).toBe(true);
     container.remove();
   });
 });
