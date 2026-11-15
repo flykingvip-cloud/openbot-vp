@@ -2731,10 +2731,12 @@ export const en: TranslationMap = {
             noCrossDocRelations: "No cross-document relations yet; showing this document only",
             emptyLibraryPanorama:
               "No indexed documents in this space yet; external sources appear after sync/ingest",
+            loadingGraph: "Loading relation graph…",
             topologyHeading: "Relation topology",
             expandPanorama: "Expand panorama",
           },
           governanceActions: {
+            loading: "Loading recommendations and actions…",
             heading: "Governance actions",
             announcementHealthy: "No open governance signals in scope",
             announcementOpen: "{count} open governance signals",

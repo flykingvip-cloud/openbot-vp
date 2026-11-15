@@ -2625,10 +2625,12 @@ export const zh_CN: TranslationMap = {
             noAnchor: "从左侧选择知识文档或成果，聚焦其关系网络",
             noCrossDocRelations: "暂无跨文档关系，当前仅展示本文档",
             emptyLibraryPanorama: "该空间暂无已索引知识文档；外部知识源需同步/沉淀后才会进入关系图",
+            loadingGraph: "正在加载关系图…",
             topologyHeading: "关系拓扑",
             expandPanorama: "展开全景图",
           },
           governanceActions: {
+            loading: "正在加载推荐与待办…",
             heading: "治理行动",
             announcementHealthy: "当前范围未发现待处理治理信号",
             announcementOpen: "{count} 项待处理治理信号",

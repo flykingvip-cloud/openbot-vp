@@ -262,11 +262,15 @@ export function renderKnowledgeUniverseHomeGovernanceActions(
       aria-label=${t("frontstage.workbench.knowledgeUniverse.home.governanceActions.heading")}
     >
       ${
-        items.length === 0
-          ? html`<p class="ku-home-gov-ticker__empty" data-testid="ku-home-gov-empty">
+        surface.insightsLoading && items.length === 0
+          ? html`<p class="ku-home-gov-ticker__empty" data-testid="ku-home-gov-loading">
+              ${t("frontstage.workbench.knowledgeUniverse.home.governanceActions.loading")}
+            </p>`
+          : items.length === 0
+            ? html`<p class="ku-home-gov-ticker__empty" data-testid="ku-home-gov-empty">
               ${t("frontstage.workbench.knowledgeUniverse.home.governanceActions.noTrace")}
             </p>`
-          : html`
+            : html`
               <div
                 class="ku-home-gov-ticker${shouldAnimate ? " ku-home-gov-ticker--scroll" : ""}"
                 data-testid="ku-home-gov-ticker"

@@ -4947,6 +4947,8 @@ export function buildEmployeeWorkbenchProps(input: {
   const knowledgeRuntime = getKnowledgeUniverseRuntime(state);
   const knowledgeSurface: WorkbenchKnowledgeSurface = {
     loading: state.knowledgeUniverseLoading,
+    graphLoading: knowledgeRuntime.graphLoading,
+    insightsLoading: knowledgeRuntime.insightsLoading,
     error: state.knowledgeUniverseError,
     query: state.knowledgeUniverseQuery,
     searchScope: state.knowledgeUniverseSearchScope ?? "workspace",

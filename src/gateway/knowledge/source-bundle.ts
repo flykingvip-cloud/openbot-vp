@@ -21,6 +21,10 @@ import { openKnowledgeIndex, resolveKnowledgeIndexDbPath } from "./kb-index.js";
 import { listKnowledgeBases } from "./knowledge-base-store.js";
 import { buildDefaultKnowledgeObjects, buildDefaultKnowledgeSourceSummary } from "./mock-graph.js";
 import { buildIntelligentRelationshipGraph } from "./runtime/relationship-runtime.js";
+import {
+  formatKnowledgeSourceBundleCacheKey,
+  getKnowledgeSourceBundleCache,
+} from "./source-bundle-cache.js";
 import { loadDataCapabilityCatalog } from "./sources/capability-catalog.js";
 import { buildConfiguredChannelCapabilityDescriptors } from "./sources/channel-capability-source.js";
 import { buildEnterpriseSourceSummary } from "./sources/enterprise-source.js";
@@ -60,11 +64,16 @@ function loadMockBundle(): KnowledgeSourceBundle {
 
 async function loadEnterpriseStoreBundle(
   client: GatewayClient | null,
-  options?: { agentType?: import("../enterprise-data/types.js").KnowledgeAgentType | null },
+  options?: {
+    agentType?: import("../enterprise-data/types.js").KnowledgeAgentType | null;
+    context?: import("./sources/types.js").KnowledgeSourceContext;
+  },
 ): Promise<KnowledgeSourceBundle> {
-  const context = await resolveKnowledgeSourceContext(client, {
-    agentType: options?.agentType ?? undefined,
-  });
+  const context =
+    options?.context ??
+    (await resolveKnowledgeSourceContext(client, {
+      agentType: options?.agentType ?? undefined,
+    }));
   const storePath = await resolveControlPlaneStorePathForClient(
     client,
     TENANT_ENTERPRISE_DATA_FILE,
@@ -145,6 +154,11 @@ async function loadEnterpriseStoreBundle(
       } finally {
         index.close();
       }
+      // Yield after the (potentially large) index read so healthz is not stuck
+      // behind a fully synchronous sqlite + graph turn. The O(n²) graph build
+      // itself remains synchronous; connection reuse / incremental projection
+      // is a follow-up (t317 P2).
+      await new Promise<void>((resolve) => setImmediate(resolve));
     }
   }
   objects.push(...knowledgeIndexObjects);
@@ -212,30 +226,35 @@ export async function loadKnowledgeSourceBundle(
   if (options?.preferMock) {
     return loadMockBundle();
   }
-  try {
-    return await loadEnterpriseStoreBundle(client, { agentType: options?.agentType });
-  } catch {
-    let ownerUserId: string | null = null;
+  const context = await resolveKnowledgeSourceContext(client, {
+    agentType: options?.agentType ?? undefined,
+  });
+  const cacheKey = formatKnowledgeSourceBundleCacheKey({
+    userId: context.userId,
+    tenantId: context.tenantId,
+    seatId: context.seatId,
+    agentType: options?.agentType ?? context.agentType ?? null,
+  });
+  return getKnowledgeSourceBundleCache().getOrLoad(cacheKey, async () => {
     try {
-      const context = await resolveKnowledgeSourceContext(client, {
-        agentType: options?.agentType ?? undefined,
+      return await loadEnterpriseStoreBundle(client, {
+        agentType: options?.agentType,
+        context,
       });
-      ownerUserId = context.userId;
     } catch {
-      ownerUserId = null;
+      const personal = loadPersonalKnowledgeObjects({ ownerUserId: context.userId });
+      log.warn("knowledge source bundle fell back to personal-only", {
+        userId: context.userId,
+        personalObjectCount: personal.length,
+      });
+      return buildKnowledgeSourceBundle({
+        objects: personal,
+        sourceSummary: {
+          personal: buildPersonalSourceSummary(personal),
+          enterprise: { libraryCount: 0, accessibleCount: 0 },
+          data: { grantedCount: 0, requestableCount: 0, externalSourceCount: 0 },
+        },
+      });
     }
-    const personal = loadPersonalKnowledgeObjects({ ownerUserId });
-    log.warn("knowledge source bundle fell back to personal-only", {
-      userId: ownerUserId,
-      personalObjectCount: personal.length,
-    });
-    return buildKnowledgeSourceBundle({
-      objects: personal,
-      sourceSummary: {
-        personal: buildPersonalSourceSummary(personal),
-        enterprise: { libraryCount: 0, accessibleCount: 0 },
-        data: { grantedCount: 0, requestableCount: 0, externalSourceCount: 0 },
-      },
-    });
-  }
+  });
 }
