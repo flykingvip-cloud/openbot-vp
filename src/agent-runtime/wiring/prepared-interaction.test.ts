@@ -1,5 +1,6 @@
 import type { Api, Model } from "@earendil-works/pi-ai/compat";
 import { expect, it, vi } from "vitest";
+import type { FallbackAttempt } from "../../agents/model-fallback.types.js";
 import { makeZeroUsageSnapshot } from "../../agents/usage.js";
 import { runGovernedInteraction, runGovernedUnderstanding } from "../command/index.js";
 import { INTERACTION_TIMEOUT_TEXT } from "../model/interaction-resource-wait.js";
@@ -240,14 +241,20 @@ it("checkpoint A: fallbacks share one deadline and do not start once the budget 
         result: await p.run("test", "first"),
         provider: "test",
         model: "first",
-        attempts: [],
+        attempts: [] as FallbackAttempt[],
       };
     } catch (error) {
       return {
         result: await p.run("test", "second"),
         provider: "test",
         model: "second",
-        attempts: [error],
+        attempts: [
+          {
+            provider: "test",
+            model: "first",
+            error: error instanceof Error ? error.message : String(error),
+          },
+        ],
       };
     }
   });
