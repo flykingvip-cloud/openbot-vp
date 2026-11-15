@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { CURRENT_SESSION_VERSION } from "@earendil-works/pi-coding-agent";
 import { stopTaskAtGateway } from "../../agent-runtime/command/index.js";
 import type { FocusSwitchGateDecision } from "../../agent-runtime/contracts/task-control.js";
@@ -4444,7 +4445,7 @@ const UNREADABLE_GROUP_EXECUTION_STATE_TEXT =
 
 type GroupExecutionProposalSnapshot = {
   authEpoch: number;
-  updatedAtMs: number;
+  facts: unknown;
   currentTaskId: string | null;
   currentOperatingPhase: string | null;
   tenantId: string | null;
@@ -4466,10 +4467,12 @@ function captureGroupExecutionProposalSnapshot(params: {
       typeof operatingState?.authEpoch === "number" && Number.isFinite(operatingState.authEpoch)
         ? Math.floor(operatingState.authEpoch)
         : 0,
-    updatedAtMs:
-      typeof operatingState?.updatedAtMs === "number" && Number.isFinite(operatingState.updatedAtMs)
-        ? Math.floor(operatingState.updatedAtMs)
-        : 0,
+    // Top-level updatedAtMs is also refreshed by observation/housekeeping.
+    // Compare the complete persisted facts (including auth and task versions),
+    // rather than revoking a proposal because its own observation touched time.
+    facts: operatingState
+      ? Object.fromEntries(Object.entries(operatingState).filter(([key]) => key !== "updatedAtMs"))
+      : null,
     currentTaskId: typeof taskId === "string" && taskId.trim() ? taskId.trim() : null,
     currentOperatingPhase: typeof phase === "string" && phase.trim() ? phase.trim() : null,
     tenantId:
@@ -4486,7 +4489,7 @@ function isStaleGroupExecutionProposal(
   }
   return (
     expected.authEpoch !== current.authEpoch ||
-    expected.updatedAtMs !== current.updatedAtMs ||
+    !isDeepStrictEqual(expected.facts, current.facts) ||
     expected.currentTaskId !== current.currentTaskId ||
     expected.currentOperatingPhase !== current.currentOperatingPhase ||
     expected.tenantId !== current.tenantId
@@ -7406,7 +7409,6 @@ export const chatHandlers: GatewayRequestHandlers = {
               prepared,
               taskUpdate,
             });
-
           } else {
             // Agent run completed (tools may have edited workspace files): create
             // a rollback checkpoint + workspace snapshot from the current state.
@@ -7553,7 +7555,9 @@ export const chatHandlers: GatewayRequestHandlers = {
               ? String((err as { interactionPhase?: unknown }).interactionPhase)
               : "unknown";
           const usageRecorded =
-            err && typeof err === "object" && (err as { usageRecorded?: unknown }).usageRecorded === true;
+            err &&
+            typeof err === "object" &&
+            (err as { usageRecorded?: unknown }).usageRecorded === true;
           context.logGateway.warn(
             `webchat interaction dispatch failed: class=${errorClass} run=${shortChatRunId(clientRunId)} persisted=${terminal.persisted} phase=${phase} usageRecorded=${usageRecorded}`,
           );
