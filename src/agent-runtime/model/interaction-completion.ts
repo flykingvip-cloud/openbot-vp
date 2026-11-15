@@ -1,5 +1,11 @@
 /** One provider response; authorization, accounting and persistence stay with its caller. */
-import { complete, type Api, type Context, type Model } from "@earendil-works/pi-ai/compat";
+import {
+  complete,
+  type Api,
+  type AssistantMessage,
+  type Context,
+  type Model,
+} from "@earendil-works/pi-ai/compat";
 import { coerceToFailoverError, FailoverError } from "../../agents/failover-error.js";
 import { classifyFailoverReason } from "../../agents/pi-embedded-helpers/errors.js";
 import { makeZeroUsageSnapshot } from "../../agents/usage.js";
@@ -164,48 +170,49 @@ export async function invokeInteractionCompletion(params: {
     if (params.input.abortSignal?.aborted && !signalReasonIsTimeout(error, signal)) {
       throw error;
     }
-    const raw = error instanceof Error ? error : new Error(String(error ?? "timeout"));
+    const raw =
+      error instanceof Error ? error : new Error(typeof error === "string" ? error : "timeout");
     const timedOut = signalReasonIsTimeout(error, signal) || raw.message === "timeout";
     throw Object.assign(raw, {
       interactionPhase: "interpretation" as const,
       reason: timedOut ? "timeout" : ((raw as Error & { reason?: string }).reason ?? "unknown"),
     });
   };
-  let response;
+  let response: AssistantMessage | undefined;
   try {
     response = await withTimeout(
-    complete(params.model, buildInteractionCompletionContext(params.input, params.model), {
-      ...(params.apiKey ? { apiKey: params.apiKey } : {}),
-      signal,
-      // Interpretation is a machine protocol; authorization remains in command.
-      ...(params.model.api === "openai-completions"
-        ? {
-            onPayload: (payload: unknown) => {
-              if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-                throw new Error("Invalid interaction request payload");
-              }
-              if (usesNativeInteractionOutput(params.model)) {
-                const body = { ...payload } as Record<string, unknown>;
-                delete body.response_format;
+      complete(params.model, buildInteractionCompletionContext(params.input, params.model), {
+        ...(params.apiKey ? { apiKey: params.apiKey } : {}),
+        signal,
+        // Interpretation is a machine protocol; authorization remains in command.
+        ...(params.model.api === "openai-completions"
+          ? {
+              onPayload: (payload: unknown) => {
+                if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+                  throw new Error("Invalid interaction request payload");
+                }
+                if (usesNativeInteractionOutput(params.model)) {
+                  const body = { ...payload } as Record<string, unknown>;
+                  delete body.response_format;
+                  return {
+                    ...body,
+                    thinking: { type: "disabled" },
+                    tools: [INTERACTION_OUTPUT_TOOL],
+                    tool_choice: { type: "function", function: { name: INTERACTION_OUTPUT_NAME } },
+                  };
+                }
                 return {
-                  ...body,
-                  thinking: { type: "disabled" },
-                  tools: [INTERACTION_OUTPUT_TOOL],
-                  tool_choice: { type: "function", function: { name: INTERACTION_OUTPUT_NAME } },
+                  ...payload,
+                  response_format: { type: "json_object" },
                 };
-              }
-              return {
-                ...payload,
-                response_format: { type: "json_object" },
-              };
-            },
-          }
-        : {}),
+              },
+            }
+          : {}),
+        timeoutMs,
+        maxTokens: Math.max(1, Math.floor(Math.min(params.maxTokens, params.model.maxTokens))),
+      }),
       timeoutMs,
-      maxTokens: Math.max(1, Math.floor(Math.min(params.maxTokens, params.model.maxTokens))),
-    }),
-    timeoutMs,
-  );
+    );
   } catch (error) {
     tagInterpretationFailure(error);
   }
@@ -214,8 +221,10 @@ export async function invokeInteractionCompletion(params: {
   } catch (error) {
     tagInterpretationFailure(error);
   }
-  if (response.stopReason === "error") {
-    const raw = response.errorMessage || "Interaction provider request failed";
+  const completed =
+    response ?? tagInterpretationFailure(new Error("Interaction provider request failed"));
+  if (completed.stopReason === "error") {
+    const raw = completed.errorMessage || "Interaction provider request failed";
     const error =
       coerceToFailoverError(new Error(raw), {
         provider: params.model.provider,
@@ -226,7 +235,7 @@ export async function invokeInteractionCompletion(params: {
         provider: params.model.provider,
         model: params.model.id,
       });
-    // Error response is not a model decision. Existing model governance owns
+    // Error completed is not a model decision. Existing model governance owns
     // fallback/cooldown; no new retry or tool loop belongs in this adapter.
     console.warn("[interaction-provider-error]", {
       provider: params.model.provider,
@@ -240,39 +249,45 @@ export async function invokeInteractionCompletion(params: {
     throw Object.assign(error, { interactionPhase: "interpretation" as const });
   }
   return {
-    response,
+    response: completed,
     readDecision() {
       if (usesNativeInteractionOutput(params.model)) {
-        const calls = response.content.filter((part) => part.type === "toolCall");
+        const calls = completed.content.filter((part) => part.type === "toolCall");
         if (
-          response.stopReason !== "toolUse" ||
+          completed.stopReason !== "toolUse" ||
           calls.length !== 1 ||
           calls[0].name !== INTERACTION_OUTPUT_NAME ||
-          response.content.some((part) => part.type === "text" && part.text.trim())
+          completed.content.some((part) => part.type === "text" && part.text.trim())
         ) {
           console.warn("[interaction-native-output-rejected]", {
-            stopReason: response.stopReason,
-            contentTypes: response.content.map((part) => part.type),
+            stopReason: completed.stopReason,
+            contentTypes: completed.content.map((part) => part.type),
             callCount: calls.length,
             expectedNameMatches: calls.map((call) => call.name === INTERACTION_OUTPUT_NAME),
-            visibleTextCharacters: response.content.reduce(
+            visibleTextCharacters: completed.content.reduce(
               (count, part) => count + (part.type === "text" ? part.text.trim().length : 0),
               0,
             ),
-            outputTokens: response.usage.output,
+            outputTokens: completed.usage.output,
           });
-          throw Object.assign(new Error("Interaction did not return a final decision"), { interactionPhase: "interpretation" as const, reason: "empty" });
+          throw Object.assign(new Error("Interaction did not return a final decision"), {
+            interactionPhase: "interpretation" as const,
+            reason: "empty",
+          });
         }
         // Data only. Never dispatch this function through a runtime tool registry.
         return calls[0].arguments;
       }
       if (
-        response.stopReason !== "stop" ||
-        response.content.some((part) => part.type === "toolCall")
+        completed.stopReason !== "stop" ||
+        completed.content.some((part) => part.type === "toolCall")
       ) {
-        throw Object.assign(new Error("Interaction did not return a final decision"), { interactionPhase: "interpretation" as const, reason: "empty" });
+        throw Object.assign(new Error("Interaction did not return a final decision"), {
+          interactionPhase: "interpretation" as const,
+          reason: "empty",
+        });
       }
-      const text = response.content
+      const text = completed.content
         .filter((part) => part.type === "text")
         .map((part) => part.text)
         .join("");
@@ -281,12 +296,15 @@ export async function invokeInteractionCompletion(params: {
           provider: params.model.provider,
           model: params.model.id,
           api: params.model.api,
-          contentTypes: response.content.map((part) => part.type),
+          contentTypes: completed.content.map((part) => part.type),
           textCharacters: text.length,
-          outputTokens: response.usage.output,
+          outputTokens: completed.usage.output,
           maxTokens: params.maxTokens,
         });
-        throw Object.assign(new Error("本轮未取得有效的交互决定，没有启动或修改任务。"), { interactionPhase: "interpretation" as const, reason: "empty" });
+        throw Object.assign(new Error("本轮未取得有效的交互决定，没有启动或修改任务。"), {
+          interactionPhase: "interpretation" as const,
+          reason: "empty",
+        });
       }
       return readInteractionDecisionText(text);
     },
@@ -294,8 +312,11 @@ export async function invokeInteractionCompletion(params: {
 }
 
 function signalReasonIsTimeout(error: unknown, signal: AbortSignal): boolean {
-  const message = error instanceof Error ? error.message : String(error ?? "");
-  const name = error && typeof error === "object" && "name" in error ? String((error as { name?: unknown }).name) : "";
+  const message = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  const name =
+    error && typeof error === "object" && "name" in error
+      ? String((error as { name?: unknown }).name)
+      : "";
   return (
     message === "timeout" ||
     /timed? ?out/i.test(message) ||
@@ -303,4 +324,3 @@ function signalReasonIsTimeout(error: unknown, signal: AbortSignal): boolean {
     (name === "AbortError" && signal.aborted && !message.includes("user"))
   );
 }
-
