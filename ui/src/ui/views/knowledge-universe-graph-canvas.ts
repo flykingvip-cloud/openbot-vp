@@ -26,6 +26,25 @@ function categoryClass(category: GraphViewModel["nodes"][number]["category"]) {
 }
 
 /**
+ * Hovered nodes paint last so their on-demand name is not covered by a later neighbor.
+ * Positions come from the view-model; this only changes SVG paint order.
+ */
+function paintOrderGraphNodes<T extends { id: string }>(
+  nodes: readonly T[],
+  hoveredNodeId: string | null,
+): T[] {
+  if (!hoveredNodeId) {
+    return [...nodes];
+  }
+  const rest: T[] = [];
+  const hovered: T[] = [];
+  for (const node of nodes) {
+    (node.id === hoveredNodeId ? hovered : rest).push(node);
+  }
+  return rest.concat(hovered);
+}
+
+/**
  * Focus-driven auto-centering. When the home cockpit anchor (homeFocus) resolves to a graph node,
  * the canvas pans so that node sits at the viewport center. We measure real on-screen geometry and
  * feed the delta back through `onPan` (which is additive screen-px), so centering stays correct at
@@ -473,10 +492,11 @@ export function renderKnowledgeUniverseGraphCanvas(params: {
             })}
           </g>
           <g class="knowledge-universe__graph-nodes">
-            ${viewModel.nodes.map((node) => {
+            ${paintOrderGraphNodes(viewModel.nodes, params.hoveredNodeId).map((node) => {
+              const isHovered = node.id === params.hoveredNodeId;
               const active =
                 node.id === params.selectedNodeId ||
-                node.id === params.hoveredNodeId ||
+                isHovered ||
                 (focusId ? highlighted.has(node.id) : false);
               // Phase 2 → aligned overlay: the type hue stays the node fill; governance now shows
               // as a status ring (via --gov-* stroke) plus a corner badge dot, so a node reads as
@@ -514,17 +534,21 @@ export function renderKnowledgeUniverseGraphCanvas(params: {
                         ></circle>`
                       : nothing
                   }
-                  <text
-                    class="knowledge-universe__graph-node-label"
-                    y=${node.radius + 14}
-                    text-anchor="middle"
-                  >
-                    ${formatGraphNodeLabelLines(node.label).map(
-                      (line, lineIndex) => svg`
-                        <tspan x="0" dy=${lineIndex === 0 ? 0 : 13}>${line}</tspan>
-                      `,
-                    )}
-                  </text>
+                  ${
+                    isHovered
+                      ? svg`<text
+                          class="knowledge-universe__graph-node-label"
+                          y=${node.radius + 14}
+                          text-anchor="middle"
+                        >
+                          ${formatGraphNodeLabelLines(node.label).map(
+                            (line, lineIndex) => svg`
+                              <tspan x="0" dy=${lineIndex === 0 ? 0 : 13}>${line}</tspan>
+                            `,
+                          )}
+                        </text>`
+                      : nothing
+                  }
                 </g>
               `;
             })}
