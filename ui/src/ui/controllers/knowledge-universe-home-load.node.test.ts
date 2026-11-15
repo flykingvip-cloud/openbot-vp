@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import type { AppPortState } from "../app-port-state.ts";
+import type { KnowledgeUniverseRpcClient } from "../capability/knowledge-universe/gateway-client.ts";
 import {
   getKnowledgeUniverseRuntime,
   loadKnowledgeUniverseHome,
   refreshKnowledgeUniverseHome,
+  type KnowledgeUniverseSession,
 } from "./knowledge-universe.ts";
 
 function emptySummary() {
@@ -22,102 +23,101 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-function createState(client: unknown): AppPortState {
+function createState(client: KnowledgeUniverseSession["client"]): KnowledgeUniverseSession {
   return {
     requestUpdate: vi.fn(),
     client,
-    connected: true,
     knowledgeUniversePageTab: "workbench",
-    workbenchPrimaryModule: "knowledge",
-  } as AppPortState;
+  };
 }
 
 function createHomeClient(options: { relationships?: Promise<unknown> }) {
   const order: string[] = [];
-  const client = {
-    request: vi.fn((method: string) => {
-      order.push(method);
-      if (method === "knowledge.base.list") {
-        return Promise.resolve({
-          knowledgeBases: [
-            {
-              id: "kb-1",
-              title: "kb-1",
-              description: "",
-              documentCount: 0,
-              visibility: "private",
-              updatedAtMs: Date.now(),
-            },
-          ],
-        });
-      }
-      if (method === "knowledge.deliverables.list") {
-        return Promise.resolve({ deliverables: [] });
-      }
-      if (method === "knowledge.search") {
-        return Promise.resolve({
-          results: [],
-          sourceSummary: emptySummary(),
-          dataCapabilities: [],
-          sourceBrowse: { personal: [], enterprise: [], enterpriseRestricted: [] },
-          externalDataSources: [],
-        });
-      }
-      if (method === "knowledge.relationships") {
-        return options.relationships ?? Promise.resolve({ graph: { nodes: [], edges: [] } });
-      }
-      if (method === "knowledge.recommendations") {
-        return Promise.resolve({ recommendations: [] });
-      }
-      if (method === "knowledge.discovery.list") {
-        return Promise.resolve({ events: [] });
-      }
-      if (method === "knowledge.actions.list") {
-        return Promise.resolve({ actions: [] });
-      }
-      if (method === "knowledge.recent") {
-        return Promise.resolve({ visits: [] });
-      }
-      if (method === "knowledge.governance.summary") {
-        return Promise.resolve({
-          openConflictCount: 0,
-          openClaimConflictCount: 0,
-          openDuplicateCount: 0,
-          openOrphanCount: 0,
-          openStaleCount: 0,
-          suppressedChunkCount: 0,
-          indexedChunkCount: 0,
-          llmUsage: {
-            llmCallCount: 0,
-            inputTokens: 0,
-            outputTokens: 0,
-            totalTokens: 0,
-            creditsCharged: 0,
-            lastCallAt: null,
+  const request = vi.fn(async (method: string, _params?: unknown) => {
+    order.push(method);
+    if (method === "knowledge.base.list") {
+      return Promise.resolve({
+        knowledgeBases: [
+          {
+            id: "kb-1",
+            title: "kb-1",
+            description: "",
+            documentCount: 0,
+            visibility: "private",
+            updatedAtMs: Date.now(),
           },
-        });
-      }
-      if (method === "knowledge.governance.tasks.list") {
-        return Promise.resolve({ tasks: [] });
-      }
-      if (
-        method === "knowledge.base.sources.list" ||
-        method === "knowledge.base.snippets.list" ||
-        method === "knowledge.base.members.list" ||
-        method === "knowledge.base.documents.list"
-      ) {
-        return Promise.resolve({
-          knowledgeBaseId: "kb-1",
-          sources: [],
-          snippets: [],
-          members: [],
-          documents: [],
-        });
-      }
-      return Promise.resolve({});
-    }),
+        ],
+      });
+    }
+    if (method === "knowledge.deliverables.list") {
+      return Promise.resolve({ deliverables: [] });
+    }
+    if (method === "knowledge.search") {
+      return Promise.resolve({
+        results: [],
+        sourceSummary: emptySummary(),
+        dataCapabilities: [],
+        sourceBrowse: { personal: [], enterprise: [], enterpriseRestricted: [] },
+        externalDataSources: [],
+      });
+    }
+    if (method === "knowledge.relationships") {
+      return options.relationships ?? Promise.resolve({ graph: { nodes: [], edges: [] } });
+    }
+    if (method === "knowledge.recommendations") {
+      return Promise.resolve({ recommendations: [] });
+    }
+    if (method === "knowledge.discovery.list") {
+      return Promise.resolve({ events: [] });
+    }
+    if (method === "knowledge.actions.list") {
+      return Promise.resolve({ actions: [] });
+    }
+    if (method === "knowledge.recent") {
+      return Promise.resolve({ visits: [] });
+    }
+    if (method === "knowledge.governance.summary") {
+      return Promise.resolve({
+        openConflictCount: 0,
+        openClaimConflictCount: 0,
+        openDuplicateCount: 0,
+        openOrphanCount: 0,
+        openStaleCount: 0,
+        suppressedChunkCount: 0,
+        indexedChunkCount: 0,
+        llmUsage: {
+          llmCallCount: 0,
+          inputTokens: 0,
+          outputTokens: 0,
+          totalTokens: 0,
+          creditsCharged: 0,
+          lastCallAt: null,
+        },
+      });
+    }
+    if (method === "knowledge.governance.tasks.list") {
+      return Promise.resolve({ tasks: [] });
+    }
+    if (
+      method === "knowledge.base.sources.list" ||
+      method === "knowledge.base.snippets.list" ||
+      method === "knowledge.base.members.list" ||
+      method === "knowledge.base.documents.list"
+    ) {
+      return Promise.resolve({
+        knowledgeBaseId: "kb-1",
+        sources: [],
+        snippets: [],
+        members: [],
+        documents: [],
+      });
+    }
+    return {};
+  });
+  const client: KnowledgeUniverseRpcClient = {
+    request: request as KnowledgeUniverseRpcClient["request"],
   };
-  return { client, order };
+  return { client, request, order };
 }
 
 describe("knowledge universe home load scheduling", () => {
@@ -144,27 +144,65 @@ describe("knowledge universe home load scheduling", () => {
 
   it("merges overlapping home loads instead of starting three snapshots at once", async () => {
     const relationships = deferred<{ graph: { nodes: unknown[]; edges: unknown[] } }>();
-    const { client } = createHomeClient({ relationships: relationships.promise });
+    const { client, request } = createHomeClient({ relationships: relationships.promise });
     const state = createState(client);
     const first = loadKnowledgeUniverseHome(state, { force: true });
     const second = loadKnowledgeUniverseHome(state, { force: true });
     const third = refreshKnowledgeUniverseHome(state);
     await vi.waitFor(() => {
       expect(
-        client.request.mock.calls.filter((call) => call[0] === "knowledge.search").length,
+        request.mock.calls.filter((call) => call[0] === "knowledge.search").length,
       ).toBeGreaterThanOrEqual(1);
     });
-    const inFlightSearch = client.request.mock.calls.filter(
+    const inFlightSearch = request.mock.calls.filter(
       (call) => call[0] === "knowledge.search",
     ).length;
     expect(inFlightSearch).toBe(1);
     relationships.resolve({ graph: { nodes: [], edges: [] } });
     await Promise.all([first, second, third]);
-    const searchCalls = client.request.mock.calls.filter(
-      (call) => call[0] === "knowledge.search",
-    ).length;
+    const searchCalls = request.mock.calls.filter((call) => call[0] === "knowledge.search").length;
     // One in-flight snapshot plus at most one queued refresh after it settles.
     expect(searchCalls).toBeLessThanOrEqual(2);
     expect(searchCalls).toBeGreaterThanOrEqual(1);
+  });
+
+  it("releases a failed home load so a later load can run", async () => {
+    const failing: KnowledgeUniverseRpcClient = {
+      request: vi.fn(async () => {
+        throw new Error("home-load-failed");
+      }) as KnowledgeUniverseRpcClient["request"],
+    };
+    const state = createState(failing);
+    await loadKnowledgeUniverseHome(state, { force: true });
+    expect(getKnowledgeUniverseRuntime(state).error).toBeTruthy();
+    expect(getKnowledgeUniverseRuntime(state).loading).toBe(false);
+    const { client } = createHomeClient({});
+    state.client = client;
+    await loadKnowledgeUniverseHome(state, { force: true });
+    expect(getKnowledgeUniverseRuntime(state).error).toBeNull();
+    expect(getKnowledgeUniverseRuntime(state).knowledgeBases).toHaveLength(1);
+  });
+
+  it("keeps home-load coalescers isolated across different state objects", async () => {
+    const firstRel = deferred<{ graph: { nodes: unknown[]; edges: unknown[] } }>();
+    const secondRel = deferred<{ graph: { nodes: unknown[]; edges: unknown[] } }>();
+    const first = createHomeClient({ relationships: firstRel.promise });
+    const second = createHomeClient({ relationships: secondRel.promise });
+    const stateA = createState(first.client);
+    const stateB = createState(second.client);
+    const pendingA = loadKnowledgeUniverseHome(stateA, { force: true });
+    const pendingB = loadKnowledgeUniverseHome(stateB, { force: true });
+    await vi.waitFor(() => {
+      expect(getKnowledgeUniverseRuntime(stateA).knowledgeBases).toHaveLength(1);
+      expect(getKnowledgeUniverseRuntime(stateB).knowledgeBases).toHaveLength(1);
+    });
+    firstRel.resolve({ graph: { nodes: [{ id: "a" }], edges: [] } });
+    secondRel.resolve({ graph: { nodes: [{ id: "b" }], edges: [] } });
+    await Promise.all([pendingA, pendingB]);
+    expect(getKnowledgeUniverseRuntime(stateA).graph?.nodes[0]?.id).toBe("a");
+    expect(getKnowledgeUniverseRuntime(stateB).graph?.nodes[0]?.id).toBe("b");
+    expect(first.request).toHaveBeenCalled();
+    expect(second.request).toHaveBeenCalled();
+    expect(getKnowledgeUniverseRuntime(stateA)).not.toBe(getKnowledgeUniverseRuntime(stateB));
   });
 });
