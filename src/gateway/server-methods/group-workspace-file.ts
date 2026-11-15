@@ -13,6 +13,7 @@ import { renderOfficePreviewHtml } from "../office-render.js";
 import { ErrorCodes, errorShape } from "../protocol/index.js";
 import { resolveSecurityProfile } from "../security-profile.js";
 import { resolveTenantContext } from "../tenant-context.js";
+import { resolveExecutionWorkspace } from "../workspace-resolver/execution-workspace.js";
 import {
   getGatewayWorkspaceCutoverStore,
   InMemoryWorkspaceResourceCatalog,
@@ -167,12 +168,21 @@ async function resolveGroupAccessContext(params: {
 
   let locator: string;
   try {
-    locator = resolveTrustedGroupLocator({
-      groupId: params.groupId,
-      tenantId,
-      profile: profile.profile,
+    const bound = await resolveExecutionWorkspace({
       cfg,
+      client: params.client,
+      agentId: "",
+      groupId: params.groupId,
+      operation: "read",
     });
+    locator =
+      bound?.rootPath ??
+      resolveTrustedGroupLocator({
+        groupId: params.groupId,
+        tenantId,
+        profile: profile.profile,
+        cfg,
+      });
   } catch (error) {
     params.respond(
       false,

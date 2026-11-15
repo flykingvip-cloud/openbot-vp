@@ -69,15 +69,19 @@ vi.mock("../tenant-context.js", () => ({
   ),
 }));
 
-vi.mock("../agent-registry/store.js", () => ({
-  loadAgentRegistryStore: async () => ({
+const registryState = vi.hoisted(() => ({
+  store: {
     version: 1,
-    assets: {},
+    assets: {} as Record<string, unknown>,
     deployments: {},
     revisions: {},
-    ownerBindings: {},
+    ownerBindings: {} as Record<string, unknown>,
     quarantine: {},
-  }),
+  },
+}));
+
+vi.mock("../agent-registry/store.js", () => ({
+  loadAgentRegistryStore: async () => registryState.store,
 }));
 
 vi.mock("../../config/data-space.js", () => ({
@@ -104,6 +108,8 @@ vi.mock("../session-utils.js", () => ({
 }));
 
 const { stewardWorkspaceFileHandlers } = await import("./steward-workspace-file.js");
+const { upsertWorkspaceGovernanceRecord, resetSharedDataGovernanceCatalogForTests } =
+  await import("../data-governance/runtime-catalog.js");
 
 type InvokeResult = {
   ok: boolean;
@@ -142,14 +148,50 @@ function stewardWorkspace(): string {
   );
 }
 
-beforeEach(() => {
+async function seedCanonicalWorkspace(params: {
+  resourceId: string;
+  locator: string;
+  agentAssetId: string;
+}): Promise<void> {
+  const userId = state.userId ?? "";
+  await upsertWorkspaceGovernanceRecord({
+    resourceId: params.resourceId,
+    tenantId: state.tenantId,
+    ownerScope: {
+      kind: "user_owned",
+      userId,
+      agentAssetId: params.agentAssetId,
+      proof: {
+        source: "explicit_binding",
+        ownerType: "user",
+        ownerId: userId,
+        agentAssetId: params.agentAssetId,
+      },
+    },
+    locator: params.locator,
+    classification: "agent_workspace",
+    stateDir: tmpRoot,
+  });
+}
+
+beforeEach(async () => {
   state.userId = "90fed19a-1c8b-4420-87e0-bcc6165e32fa";
   state.tenantId = "001";
+  process.env.OPENBOT_STATE_DIR = tmpRoot;
+  registryState.store.assets = {};
+  registryState.store.ownerBindings = {};
+  resetSharedDataGovernanceCatalogForTests();
   fs.rmSync(tmpRoot, { recursive: true, force: true });
   fs.mkdirSync(stewardWorkspace(), { recursive: true });
+  await seedCanonicalWorkspace({
+    resourceId: `ws:001:user:${state.userId}:steward`,
+    locator: stewardWorkspace(),
+    agentAssetId: "steward:builtin",
+  });
 });
 
 afterEach(() => {
+  resetSharedDataGovernanceCatalogForTests();
   fs.rmSync(tmpRoot, { recursive: true, force: true });
 });
 
@@ -173,7 +215,7 @@ describe("workbench.steward-file.read managed steward session", () => {
     expect(String(res.error?.message ?? "")).not.toContain("builtin_steward_exception_required");
   });
 
-  it("opens a nested memory markdown file for an unmapped session agent", async () => {
+  it("opens a nested memory markdown file from the bot-skill canonical workspace", async () => {
     const skillWorkspace = path.join(
       tmpRoot,
       "tenants",
@@ -187,6 +229,30 @@ describe("workbench.steward-file.read managed steward session", () => {
     );
     fs.mkdirSync(path.join(skillWorkspace, "memory"), { recursive: true });
     fs.writeFileSync(path.join(skillWorkspace, "memory", "2026-08-15.md"), "# Skill memory\n");
+    registryState.store.assets["bot-skill"] = {
+      agentAssetId: "bot-skill",
+      enterpriseId: "001",
+      agentSlug: "skill-alias",
+      legacyAgentId: "bot-skill",
+      displayName: "Skill Bot",
+      status: "active",
+      createdAt: "now",
+      updatedAt: "now",
+    };
+    registryState.store.ownerBindings["bot-skill-owner"] = {
+      bindingId: "bot-skill-owner",
+      enterpriseId: "001",
+      agentAssetId: "bot-skill",
+      ownerType: "membership",
+      ownerId: state.userId,
+      isPrimary: true,
+      effectiveAt: "now",
+    };
+    await seedCanonicalWorkspace({
+      resourceId: `ws:001:user:${state.userId}:asset:bot-skill`,
+      locator: skillWorkspace,
+      agentAssetId: "bot-skill",
+    });
     const res = await invoke("memory/2026-08-15.md", { sessionKey: "agent:bot-skill:main" });
     expect(res.ok).toBe(true);
     expect(String(res.error?.message ?? "")).not.toContain("agent_id_unmapped");
@@ -196,5 +262,11 @@ describe("workbench.steward-file.read managed steward session", () => {
     expect(Buffer.from(String(res.payload?.base64), "base64").toString("utf8")).toBe(
       "# Skill memory\n",
     );
+  });
+
+  it("fail-closes when a session agent has no canonical workspace binding", async () => {
+    const res = await invoke("notes.md", { sessionKey: "agent:ghost-bot:main" });
+    expect(res.ok).toBe(false);
+    expect(String(res.error?.message ?? "")).toContain("workspace_binding_required");
   });
 });

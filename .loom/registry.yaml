@@ -14566,7 +14566,60 @@ tasks:
     ownerHistory: []
     since: 2026-11-13
     metadata: {}
+  - id: canonical-execution-workspace-20261114
+    owner: codex-observation
+    intent: []
+    paths:
+      - src/gateway/workspace-resolver/execution-workspace.ts
+      - src/gateway/workspace-resolver/execution-workspace.test.ts
+      - src/auto-reply/reply/get-reply.ts
+      - src/commands/agent.ts
+      - src/cron/isolated-agent/run.ts
+      - src/auto-reply/reply/followup-runner.ts
+      - src/gateway/server-methods/steward-workspace-file.ts
+      - src/gateway/server-methods/group-workspace-file.ts
+      - src/auto-reply/reply/get-reply-run.ts
+      - src/gateway/server-methods/group-workspace-file.test.ts
+      - src/commands/agent-item7-s03.test.ts
+      - src/auto-reply/reply/followup-runner.canonical-binding.test.ts
+      - src/gateway/server-methods/steward-workspace-file.managed.test.ts
+      - src/gateway/workspace-resolver/execution-workspace-entrypoints.test.ts
+    state: active
+    sessions:
+      - id: codex-canonical-20261114
+        taskId: canonical-execution-workspace-20261114
+        ide: codex
+        agent: codex-observation
+        status: active
+        lastSignalAt: 2026-11-14T14:03:38.339Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-14
+    metadata: {}
 landingStreams:
+  - id: canonical-execution-workspace-20261114
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - src/gateway/workspace-resolver/execution-workspace.ts
+      - src/gateway/workspace-resolver/execution-workspace.test.ts
+      - src/auto-reply/reply/get-reply.ts
+      - src/commands/agent.ts
+      - src/cron/isolated-agent/run.ts
+      - src/auto-reply/reply/followup-runner.ts
+      - src/gateway/server-methods/steward-workspace-file.ts
+      - src/gateway/server-methods/group-workspace-file.ts
+      - src/auto-reply/reply/get-reply-run.ts
+      - src/gateway/server-methods/group-workspace-file.test.ts
+      - src/commands/agent-item7-s03.test.ts
+      - src/auto-reply/reply/followup-runner.canonical-binding.test.ts
+      - src/gateway/server-methods/steward-workspace-file.managed.test.ts
+      - src/gateway/workspace-resolver/execution-workspace-entrypoints.test.ts
+    canLandWith: []
+    metadata:
+      owner: codex-observation
+      purpose: Unified canonical workspace selection across execution and preview; verified scoped takeover.
+
   - id: runtime-rule-adaptation
     landingPolicy: serial
     paths:
@@ -29734,6 +29787,66 @@ landingStreams:
       agent: codex-runtime-manager
       purpose: Three-way registry merge preserving tasks, sessions and landing history.
 sharedPaths:
+  - glob: src/auto-reply/reply/get-reply-run.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: Verified scoped takeover for canonical entry and regression alignment.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/group-workspace-file.test.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: Verified scoped takeover for canonical entry and regression alignment.
+    reviewAfter: 2026-11-30
+  - glob: src/commands/agent-item7-s03.test.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: Verified scoped takeover for canonical entry and regression alignment.
+    reviewAfter: 2026-11-30
+  - glob: .loom/registry.yaml
+    landerTask: canonical-execution-workspace-20261114
+    reason: Verified scoped takeover for user-requested unified canonical workspace repair.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/workspace-resolver/execution-workspace.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: Verified scoped takeover for user-requested unified canonical workspace repair.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/workspace-resolver/execution-workspace.test.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: Verified scoped takeover for user-requested unified canonical workspace repair.
+    reviewAfter: 2026-11-30
+  - glob: src/auto-reply/reply/get-reply.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: Verified scoped takeover for user-requested unified canonical workspace repair.
+    reviewAfter: 2026-11-30
+  - glob: src/commands/agent.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: Verified scoped takeover for user-requested unified canonical workspace repair.
+    reviewAfter: 2026-11-30
+  - glob: src/cron/isolated-agent/run.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: Verified scoped takeover for user-requested unified canonical workspace repair.
+    reviewAfter: 2026-11-30
+  - glob: src/auto-reply/reply/followup-runner.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: Verified scoped takeover for user-requested unified canonical workspace repair.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/steward-workspace-file.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: Verified scoped takeover for user-requested unified canonical workspace repair.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/group-workspace-file.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: Verified scoped takeover for user-requested unified canonical workspace repair.
+    reviewAfter: 2026-11-30
+  - glob: src/auto-reply/reply/followup-runner.canonical-binding.test.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: New regression tests for the canonical execution-workspace contract on this baseline.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/steward-workspace-file.managed.test.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: New regression tests for the canonical execution-workspace contract on this baseline.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/workspace-resolver/execution-workspace-entrypoints.test.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: New regression tests for the canonical execution-workspace contract on this baseline.
+    reviewAfter: 2026-11-30
   - glob: src/exec-protocol/**
     landerTask: exec-protocol-v1-min-loop
     reason: Human-authorized isolated PR-B execution protocol v1 minimal loop. Exact-path lander is

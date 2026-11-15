@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import path from "node:path";
 import { deliverQueuedReply } from "../../agent-runtime/delivery/index.js";
 import {
   assertControlledExecutionStages,
@@ -34,12 +35,15 @@ import {
 import type { TypingMode } from "../../config/types.js";
 import { drainUsageOutboxRecord } from "../../gateway/billing/usage-outbox-drain.js";
 import { enqueueUsageOutbox } from "../../gateway/billing/usage-outbox-store.js";
+import { toRestrictedGatewayClient } from "../../gateway/execution-identity-context.js";
+import { buildKnowledgeReplyGatewayClient } from "../../gateway/knowledge/reply-gateway-client.js";
 import {
   consumeCapabilityRoutingResult,
   formatCapabilityExecutionSurfaceLog,
 } from "../../gateway/model-entitlement/capability-entry-consume.js";
 import type { EmployeeModelGateResult } from "../../gateway/model-entitlement/employee-model-gate.js";
 import { buildRunContextEstimateParts } from "../../gateway/model-entitlement/run-context-estimate.js";
+import { resolveExecutionWorkspace } from "../../gateway/workspace-resolver/execution-workspace.js";
 import { logVerbose } from "../../globals.js";
 import { registerAgentRunContext } from "../../infra/agent-events.js";
 import { defaultRuntime } from "../../runtime.js";
@@ -157,6 +161,19 @@ export function createFollowupRunner(params: {
   };
 
   return async (queued: FollowupRun) => {
+    const boundWorkspace = await resolveExecutionWorkspace({
+      cfg: queued.run.config,
+      agentId: queued.run.agentId,
+      client: queued.run.executionIdentity
+        ? toRestrictedGatewayClient(queued.run.executionIdentity)
+        : buildKnowledgeReplyGatewayClient(queued.run),
+      groupId: queued.run.executionIdentity?.collaborationGroupId,
+      operation: "write",
+    });
+    if (boundWorkspace && path.resolve(queued.run.workspaceDir) !== boundWorkspace.rootPath) {
+      // A queued continuation cannot silently move its files to a new binding.
+      throw new Error("workspace_binding_changed: queued workspace requires revalidation");
+    }
     // Agent run correlation id (may differ across retries of the same queue item).
     const runId = crypto.randomUUID();
     // Package2 delivery-only retry: skip business claim/model; resend ORIGINAL payloads.

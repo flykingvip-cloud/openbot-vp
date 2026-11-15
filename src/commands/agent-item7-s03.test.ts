@@ -20,12 +20,17 @@ describe("Item 7 batch 7 S03 agent client lookup", () => {
     const lines = source.split(/\n/);
     expect(source).toContain("resolveWorkspaceLocator");
     expect(source).not.toContain("resolveAgentWorkspaceDirForClient");
-    expect(lines[775]).toContain("resolveWorkspaceLocator");
-    expect(lines[775]).toContain("r.ok");
-    expect(lines[775]).toContain('""');
-    expect(lines[775]).not.toContain("null");
-    expect(lines[778]).toContain("resolveAgentWorkspaceDir");
-    expect(lines[783]).toContain("resolveAgentWorkspaceDir");
+    const locatorLine = lines.find((line) => line.includes("r.ok ? r.handle.locator"));
+    expect(locatorLine).toContain("resolveWorkspaceLocator");
+    expect(locatorLine).toContain("r.ok");
+    expect(locatorLine).toContain('""');
+    expect(locatorLine).not.toContain("null");
+    expect(lines.some((line) => line.includes("workspaceDirRaw = resolveAgentWorkspaceDir"))).toBe(
+      true,
+    );
+    expect(lines.some((line) => line.includes("workspaceDirRaw = resolveAgentWorkspaceDir"))).toBe(
+      true,
+    );
     expect(
       resolveWorkspaceLocator({
         cfg: managedCfg,

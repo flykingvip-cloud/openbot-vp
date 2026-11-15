@@ -9,7 +9,10 @@ const { tmpRoot } = vi.hoisted(() => ({
   tmpRoot: `/tmp/openbot-group-file-${Math.random().toString(36).slice(2)}`,
 }));
 
-let contextValue: { userId: string | null } = { userId: "user-a" };
+let contextValue: { userId: string | null; tenantId?: string } = {
+  userId: "user-a",
+  tenantId: "t-a",
+};
 
 vi.mock("../knowledge/context.js", () => ({
   resolveKnowledgeSourceContext: vi.fn(async () => contextValue),
@@ -52,6 +55,8 @@ vi.mock("../agent-registry/store.js", () => ({
 
 const { groupWorkspaceFileHandlers, normalizeGroupWorkspaceRelativePath } =
   await import("./group-workspace-file.js");
+const { upsertWorkspaceGovernanceRecord, resetSharedDataGovernanceCatalogForTests } =
+  await import("../data-governance/runtime-catalog.js");
 
 type InvokeResult = {
   ok: boolean;
@@ -106,12 +111,15 @@ async function invoke(
 
 describe("workbench.group-file preview/open/write", () => {
   const previousTenants = process.env.OPENBOT_TENANTS_ROOT;
+  const previousState = process.env.OPENBOT_STATE_DIR;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     fs.rmSync(tmpRoot, { recursive: true, force: true });
     fs.mkdirSync(tmpRoot, { recursive: true });
     process.env.OPENBOT_TENANTS_ROOT = tmpRoot;
-    contextValue = { userId: "user-a" };
+    process.env.OPENBOT_STATE_DIR = path.join(tmpRoot, "state");
+    resetSharedDataGovernanceCatalogForTests();
+    contextValue = { userId: "user-a", tenantId: "t-a" };
     const membersPath = path.join(tmpRoot, "t-a", "collaboration", "groups", "g1", "members.json");
     fs.mkdirSync(path.dirname(membersPath), { recursive: true });
     fs.writeFileSync(
@@ -127,9 +135,23 @@ describe("workbench.group-file preview/open/write", () => {
         },
       ]),
     );
+    await upsertWorkspaceGovernanceRecord({
+      resourceId: "ws:t-a:group:g1",
+      tenantId: "t-a",
+      ownerScope: { kind: "group_owned", groupId: "g1" },
+      locator: path.dirname(membersPath),
+      classification: "group_workspace",
+      stateDir: process.env.OPENBOT_STATE_DIR,
+    });
   });
 
   afterEach(() => {
+    resetSharedDataGovernanceCatalogForTests();
+    if (previousState === undefined) {
+      delete process.env.OPENBOT_STATE_DIR;
+    } else {
+      process.env.OPENBOT_STATE_DIR = previousState;
+    }
     if (previousTenants === undefined) {
       delete process.env.OPENBOT_TENANTS_ROOT;
     } else {
