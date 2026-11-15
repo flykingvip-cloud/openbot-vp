@@ -2,7 +2,12 @@ import path from "node:path";
 import { resolveAgentDir } from "../../agents/agent-scope.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import { TASK_OUTCOME_STORE_DIRNAME } from "../../task-outcome/runtime-from-runner.js";
-import { isHumanInteractionIngress } from "../command/index.js";
+import {
+  isHumanInteractionIngress,
+  type GovernedInteractionResult,
+  type GovernedInteractionWithShadow,
+  type GovernedShadowHostInjection,
+} from "../command/index.js";
 import {
   buildReplyPayloads,
   completeReplyDelivery,
@@ -23,7 +28,7 @@ import {
 import { bindAdmittedTurnHost } from "./admitted-turn-host.js";
 import { confirmPendingTurnDelivery } from "./delivery-confirm.js";
 import { interruptInteractionTask, steerInteractionTask } from "./interaction-effects.js";
-import type { runGatewayInteraction } from "./interaction-turn.js";
+import type { GatewayInteractionParams } from "./interaction-turn.js";
 import { evaluateBoundTaskAcceptance } from "./task-acceptance.js";
 
 /** Compose the original reply-turn dependencies. The reply host owns transport and cleanup. */
@@ -31,9 +36,21 @@ export const replyTurnRuntime = {
   isHumanInteractionIngress,
   prepareReplacementSessionEntry,
   persistInteractionMessage,
-  async interaction(...params: Parameters<typeof runGatewayInteraction>) {
+  interaction: (async (
+    params: GatewayInteractionParams,
+    shadowHost?: GovernedShadowHostInjection,
+  ) => {
     const runtime = await import("./interaction-turn.runtime.js");
-    return runtime.runGatewayInteraction(...params);
+    if (shadowHost?.trigger === true) {
+      return runtime.runGatewayInteraction(params, shadowHost);
+    }
+    return runtime.runGatewayInteraction(params);
+  }) as {
+    (
+      params: GatewayInteractionParams,
+      shadowHost: GovernedShadowHostInjection,
+    ): Promise<GovernedInteractionWithShadow>;
+    (params: GatewayInteractionParams): Promise<GovernedInteractionResult>;
   },
   interrupt: interruptInteractionTask,
   steer: steerInteractionTask,

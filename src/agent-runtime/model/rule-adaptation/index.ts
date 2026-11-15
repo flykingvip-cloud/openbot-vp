@@ -9,6 +9,7 @@ export { createCombinedDeadline, type CombinedDeadline } from "./deadline.js";
 export { invokeLimitedCompletion, type LimitedCompletion } from "./completion-limits.js";
 export {
   createGovernedShadowModelPort,
+  createHostShadowCompletion,
   resolveShadowRuleAdaptationGovernance,
   type GovernedShadowModelPortDeps,
   type GovernedModelCompletion,

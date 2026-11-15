@@ -41,6 +41,8 @@ export function resolveShadowRuleAdaptationGovernance(
 export type ShadowModelCompleteFn = (
   input: Parameters<RuleAdaptationModelPort["complete"]>[0] & {
     governance: EmbeddedModelGovernanceParams;
+    selectedProvider?: string;
+    selectedModel?: string;
   },
 ) => Promise<ModelCompletion>;
 
@@ -217,12 +219,14 @@ export function createGovernedShadowModelPort(
             // LimitedCompletion (including whenUnderlyingSettled) and dispose
             // a still-running request immediately. The wait itself already
             // responds to the signal inside invokeLimitedCompletion.
-            run: async () =>
+            run: async (provider, model) =>
               invokeLimitedCompletion({
                 complete: (limited) =>
                   deps.complete({
                     ...limited,
                     governance,
+                    selectedProvider: provider,
+                    selectedModel: model,
                   }),
                 input: limitedInput(input),
                 createDeadline: deps.createDeadline,
@@ -367,4 +371,63 @@ function isCompletion(value: unknown): value is ModelCompletion {
     kind === "cancelled" ||
     kind === "protocol_failure"
   );
+}
+
+/** Reuse the host's resolved provider/credential; never load a second credential source. */
+export function createHostShadowCompletion(
+  resolveCandidate: (
+    provider: string,
+    model: string,
+  ) => Promise<{
+    model: import("@earendil-works/pi-ai/compat").Model<import("@earendil-works/pi-ai/compat").Api>;
+    apiKey?: string;
+  }>,
+): ShadowModelCompleteFn {
+  return async (input) => {
+    const { complete } = await import("@earendil-works/pi-ai/compat");
+    const { Type } = await import("@sinclair/typebox");
+    const candidate = await resolveCandidate(
+      input.selectedProvider ?? "",
+      input.selectedModel ?? "",
+    );
+    const response = await complete(
+      candidate.model,
+      {
+        systemPrompt: input.system,
+        messages: input.messages.map((message) => ({
+          role: "user" as const,
+          content: JSON.stringify({ source: message.role, content: message.content }),
+          timestamp: Date.now(),
+        })),
+        tools: input.tools.map((tool) => ({
+          name: tool.name,
+          description: tool.description,
+          parameters: Type.Object({}, { additionalProperties: true }),
+        })),
+      },
+      {
+        apiKey: candidate.apiKey,
+        signal: input.signal,
+        maxTokens: input.maxTokens,
+        timeoutMs: input.timeoutMs,
+      },
+    );
+    const usage = {
+      inputTokens: response.usage.input,
+      outputTokens: response.usage.output,
+      cost: response.usage.cost.total,
+    };
+    if (response.stopReason === "error" || response.stopReason === "aborted") {
+      return { kind: "protocol_failure", usage, detail: "host_shadow_completion_failed" };
+    }
+    const toolCalls = response.content.flatMap((part) =>
+      part.type === "toolCall" ? [{ id: part.id, name: part.name, arguments: part.arguments }] : [],
+    );
+    const text = response.content
+      .flatMap((part) => (part.type === "text" ? [part.text] : []))
+      .join("\n");
+    return toolCalls.length
+      ? { kind: "tool_calls", toolCalls, text, usage }
+      : { kind: "message", text, usage };
+  };
 }

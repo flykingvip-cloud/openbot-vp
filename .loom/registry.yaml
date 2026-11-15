@@ -14524,15 +14524,24 @@ tasks:
     since: 2026-11-13
     metadata: {}
   - id: rule-adaptation-shadow-host-min
-    owner: grok-dynamic-rules
+    owner: codex-runtime-manager
     intent:
-      - "Limited landing of the minimal advice-only shadow host hook in runGovernedInteraction
-        and required regression only. Exact file only. Independent acceptance: codex-runtime-manager.
-        Default off, explicit trigger, advice only, no auto-activation, no production config writes.
-        No merge or deploy until authorized. Does not include A/B fidelity files or #281 content."
+      - "Limited landing of the minimal advice-only shadow host hook in
+        runGovernedInteraction and required regression only. Exact file only.
+        Independent acceptance: codex-runtime-manager. Default off, explicit
+        trigger, advice only, no auto-activation, no production config writes.
+        No merge or deploy until authorized. Does not include A/B fidelity files
+        or #281 content."
     paths:
       - src/agent-runtime/command/governed-interaction.ts
       - src/agent-runtime/command/governed-interaction.test.ts
+      - src/agent-runtime/wiring/reply-turn.ts
+      - src/agent-runtime/wiring/interaction-turn.ts
+      - src/agent-runtime/command/index.ts
+      - src/agent-runtime/command/rule-adaptation/host-trigger-passthrough.test.ts
+      - src/agent-runtime/model/rule-adaptation/model-port.ts
+      - src/agent-runtime/model/rule-adaptation/index.ts
+      - src/agent-runtime/command/rule-adaptation/normal-task-host.test.ts
     state: active
     sessions:
       - id: 15da9024-c1b4-436c-ade5-53b9495b61d5
@@ -14567,6 +14576,22 @@ tasks:
     since: 2026-11-13
     metadata: {}
 landingStreams:
+  - id: rule-adaptation-shadow-host-min
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - src/agent-runtime/command/index.ts
+      - src/agent-runtime/wiring/reply-turn.ts
+      - src/agent-runtime/wiring/interaction-turn.ts
+      - src/agent-runtime/model/rule-adaptation/model-port.ts
+      - src/agent-runtime/model/rule-adaptation/index.ts
+      - src/agent-runtime/command/rule-adaptation/host-trigger-passthrough.test.ts
+      - src/agent-runtime/command/rule-adaptation/normal-task-host.test.ts
+    canLandWith: []
+    metadata:
+      task: rule-adaptation-shadow-host-min
+      owner: codex-runtime-manager
+      intent: Human-authorized limited takeover for existing normal-task shadow host wiring; no automatic activation.
   - id: runtime-rule-adaptation
     landingPolicy: serial
     paths:
