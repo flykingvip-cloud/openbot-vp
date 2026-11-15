@@ -69,7 +69,7 @@ export function createPreparedInteractionInference(
       await session.recordUsage({
         provider: result.provider,
         model: result.model,
-        usage: result.result.response.usage,
+        usage: result.result.response?.usage,
         agentId: params.agentId,
         creditUserId: params.creditUserId,
         durationMs: Date.now() - started,

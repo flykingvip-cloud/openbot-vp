@@ -44,7 +44,8 @@ async function withAuthorizedInteraction<T>(
     resourceBudget,
   };
 
-  const work = (async () => {
+  type Visible = T | { kind: "respond"; text: string; clarification: false };
+  const work: Promise<Visible> = (async () => {
     abortSignal.throwIfAborted();
     const gate = await ports.session.authorize(ports.authorization);
     if (!gate.acquired && !gate.skipped) {
@@ -61,7 +62,7 @@ async function withAuthorizedInteraction<T>(
     return await consume(bounded);
   })();
 
-  let visible: T | { kind: "respond"; text: string; clarification: false };
+  let visible: Visible;
   try {
     // Race the caller's cancel/deadline signal. A cooperative queue wait
     // already has its own bound and must be allowed to return that fact;

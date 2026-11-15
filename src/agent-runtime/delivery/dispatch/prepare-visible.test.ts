@@ -129,7 +129,7 @@ it.each([true, false])(
       commitOutcome: vi.fn(),
       publishPending: vi.fn(),
     });
-    const registration = mocks.register.mock.calls[0][0];
+    const registration = mocks.register.mock.calls[0][0] as { checkedTask?: unknown };
     expect(registration.checkedTask).toEqual({ sessionFile: "/tmp/test-session.jsonl", binding });
   },
 );
@@ -148,7 +148,9 @@ it("does not register an identity from another execution run", async () => {
     commitOutcome: vi.fn(),
     publishPending: vi.fn(),
   });
-  expect(mocks.register.mock.calls[0][0].checkedTask).toBeUndefined();
+  expect(
+    (mocks.register.mock.calls[0][0] as { checkedTask?: unknown }).checkedTask,
+  ).toBeUndefined();
 });
 
 it("never waives acceptance for a bound execution through a legacy chat classification", async () => {
