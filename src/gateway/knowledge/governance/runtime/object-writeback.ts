@@ -1,6 +1,10 @@
 import type { DatabaseSync } from "node:sqlite";
+import type { EventLoopYielder } from "../../event-loop-yield.js";
 import type { KnowledgeObject } from "../../types.js";
-import { listGovernanceTasks } from "../chunk-governance-store.js";
+import {
+  listChunkKnowledgeBaseIds,
+  listGovernanceTasks,
+} from "../chunk-governance-store.js";
 
 export type DocumentGovernanceOverlay = {
   openConflictCount: number;
@@ -36,15 +40,18 @@ function mergeOverlay(
 export function loadDocumentGovernanceOverlay(
   db: DatabaseSync,
 ): Map<string, DocumentGovernanceOverlay> {
-  const chunkToKnowledgeBase = new Map<string, string>();
-  const docRows = db.prepare(`SELECT chunk_id, kb_id FROM chunk_meta`).all() as Array<{
-    chunk_id: string;
-    kb_id: string;
-  }>;
-  for (const row of docRows) {
-    chunkToKnowledgeBase.set(row.chunk_id, row.kb_id);
-  }
+  return loadDocumentGovernanceOverlayFromTasks(db);
+}
 
+/**
+ * Incremental overlay: only look up chunk_meta rows for open-task chunk ids
+ * (at most 200 tasks) instead of projecting the entire index into memory.
+ * The suppressed/confirmed counts stay as a single grouped query.
+ */
+function loadDocumentGovernanceOverlayFromTasks(
+  db: DatabaseSync,
+  chunkToKnowledgeBase?: Map<string, string>,
+): Map<string, DocumentGovernanceOverlay> {
   const map = new Map<string, DocumentGovernanceOverlay>();
   const applyForKnowledgeBase = (
     knowledgeBaseId: string,
@@ -60,10 +67,16 @@ export function loadDocumentGovernanceOverlay(
   };
 
   const openTasks = listGovernanceTasks({ db, status: "open", limit: 200 });
+  const resolvedChunkToKnowledgeBase =
+    chunkToKnowledgeBase ??
+    listChunkKnowledgeBaseIds(
+      db,
+      openTasks.flatMap((task) => task.relatedChunkIds),
+    );
   for (const task of openTasks) {
     const knowledgeBaseIds = new Set<string>();
     for (const chunkId of task.relatedChunkIds) {
-      const knowledgeBaseId = chunkToKnowledgeBase.get(chunkId);
+      const knowledgeBaseId = resolvedChunkToKnowledgeBase.get(chunkId);
       if (knowledgeBaseId) {
         knowledgeBaseIds.add(knowledgeBaseId);
       }
@@ -97,6 +110,17 @@ export function loadDocumentGovernanceOverlay(
   }
 
   return map;
+}
+
+export async function loadDocumentGovernanceOverlayAsync(
+  db: DatabaseSync,
+  yieldFn?: EventLoopYielder,
+): Promise<Map<string, DocumentGovernanceOverlay>> {
+  const overlay = loadDocumentGovernanceOverlayFromTasks(db);
+  if (yieldFn) {
+    await yieldFn();
+  }
+  return overlay;
 }
 
 export function applyDocumentGovernanceOverlay(

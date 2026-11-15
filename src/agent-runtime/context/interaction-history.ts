@@ -2,6 +2,7 @@ import type { InteractionModelInput } from "../contracts/interaction.js";
 
 export type InteractionHistoryProjection = {
   context: InteractionModelInput["context"];
+  /** False when the budget dropped any authorized history. Empty history is complete. */
   complete: boolean;
 };
 

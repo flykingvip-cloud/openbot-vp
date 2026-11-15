@@ -15,6 +15,7 @@ import path from "node:path";
 import { CONFIG_DIR } from "../../utils.js";
 import { isRecord } from "../records.js";
 import { isSkillAssetDocumentId } from "./document-display-title.js";
+import { invalidateKnowledgeSourceBundleCache } from "./source-bundle-cache.js";
 
 export type KnowledgeBaseVisibility = "private" | "team" | "enterprise";
 /** Internal storage/compat field derived from visibility on create — not the UI space taxonomy. */
@@ -152,6 +153,7 @@ function readStore(storePath: string): KnowledgeBaseStoreData {
 function writeStore(store: KnowledgeBaseStoreData, storePath: string): void {
   fs.mkdirSync(path.dirname(storePath), { recursive: true });
   fs.writeFileSync(storePath, `${JSON.stringify(store, null, 2)}\n`, "utf-8");
+  invalidateKnowledgeSourceBundleCache();
 }
 
 export function readKnowledgeBaseStoreSnapshot(
@@ -171,10 +173,12 @@ export function restoreKnowledgeBaseStoreSnapshot(
     if (fs.existsSync(storePath)) {
       fs.unlinkSync(storePath);
     }
+    invalidateKnowledgeSourceBundleCache();
     return;
   }
   fs.mkdirSync(path.dirname(storePath), { recursive: true });
   fs.writeFileSync(storePath, snapshot, "utf-8");
+  invalidateKnowledgeSourceBundleCache();
 }
 
 function findBase(store: KnowledgeBaseStoreData, id: string): KnowledgeBase {

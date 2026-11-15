@@ -365,6 +365,8 @@ describe("runPreparedReply inbound depth router", () => {
     "amended_finished",
     "amended_reset",
     "amended_unreadable",
+    "amended_ended_during_abort",
+    "amended_drain_unconfirmed",
   ] as const)("Gateway interaction %s enters execution only after acceptance", async (kind) => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "runtime-ingress-reply-"));
     const file = path.join(dir, "session.jsonl");
@@ -392,13 +394,26 @@ describe("runPreparedReply inbound depth router", () => {
       kind === "resumed" ||
       kind === "amended" ||
       kind === "amended_active" ||
-      kind === "amended_steered";
-    const active = vi
-      .spyOn(executionRuntime, "isEmbeddedPiRunActive")
-      .mockReturnValue(kind === "amended_active");
+      kind === "amended_steered" ||
+      kind === "amended_ended_during_abort";
+    let activeChecks = 0;
+    const active = vi.spyOn(executionRuntime, "isEmbeddedPiRunActive").mockImplementation(() => {
+      if (kind === "amended_active" || kind === "amended_drain_unconfirmed") {
+        return true;
+      }
+      if (kind === "amended_ended_during_abort") {
+        activeChecks += 1;
+        return activeChecks === 1;
+      }
+      return false;
+    });
     const steer = vi.spyOn(replyTurnRuntime, "steer").mockReturnValue(kind === "amended_steered");
-    const abort = vi.spyOn(executionRuntime, "abortEmbeddedPiRun").mockReturnValue(true);
-    const wait = vi.spyOn(executionRuntime, "waitForEmbeddedPiRunEnd").mockResolvedValue(true);
+    const abort = vi
+      .spyOn(executionRuntime, "abortEmbeddedPiRun")
+      .mockReturnValue(kind !== "amended_ended_during_abort");
+    const wait = vi
+      .spyOn(executionRuntime, "waitForEmbeddedPiRunEnd")
+      .mockResolvedValue(kind !== "amended_drain_unconfirmed");
     const mutate = vi
       .spyOn(replyTurnRuntime.state, "applyInteractionProposal")
       .mockReturnValue(
@@ -545,9 +560,20 @@ describe("runPreparedReply inbound depth router", () => {
       );
       expect(readConversationPeerContext).toHaveBeenCalled();
       expect(runReplyAgent).toHaveBeenCalledTimes(executes ? 1 : 0);
-      if (kind === "amended_active") {
+      if (kind === "amended_active" || kind === "amended_drain_unconfirmed") {
         expect(abort).toHaveBeenCalledWith("ingress");
         expect(wait).toHaveBeenCalledWith("ingress");
+      }
+      if (kind === "amended_ended_during_abort") {
+        expect(abort).toHaveBeenCalledWith("ingress");
+        expect(wait).not.toHaveBeenCalled();
+      }
+      if (kind === "amended_drain_unconfirmed") {
+        expect(result).toMatchObject({
+          text: expect.stringContaining("未能确认旧执行已停止"),
+        });
+        expect(String((result as { text?: string }).text)).not.toContain("已生效");
+        expect(mutate).toHaveBeenCalledOnce();
       }
       if (kind === "corrupt_state" || kind === "transcript_failure") {
         expect(interaction.mock.calls[0]?.[0].input.availability).toMatchObject({
@@ -607,6 +633,75 @@ describe("runPreparedReply inbound depth router", () => {
       read.mockRestore();
       strictRead.mockRestore();
       persist.mockRestore();
+      vi.mocked(resolveSessionFilePath).mockReturnValue("/tmp/session.jsonl");
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("answers a mid-run progress query from the board without writing, resuming, or starting work", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "runtime-ingress-query-"));
+    const file = path.join(dir, "session.jsonl");
+    fs.writeFileSync(
+      file,
+      JSON.stringify({
+        type: "session",
+        version: CURRENT_SESSION_VERSION,
+        id: "ingress",
+        cwd: dir,
+        timestamp: new Date().toISOString(),
+      }) + "\n",
+    );
+    vi.mocked(resolveSessionFilePath).mockReturnValue(file);
+    const board = {
+      focusRevision: 2,
+      writeEpoch: 4,
+      parked: [],
+      current: {
+        taskId: "accepted-task",
+        title: "报告",
+        goalText: "生成报告",
+        unfinished: true,
+        createdAtMs: 1,
+        admittedGeneration: 0,
+        stop: { summary: "已核实资料", workspacePaths: [] },
+      },
+    };
+    const interaction = vi.spyOn(replyTurnRuntime, "interaction");
+    const mutate = vi.spyOn(replyTurnRuntime.state, "applyInteractionProposal");
+    const resume = vi.fn();
+    const read = vi.spyOn(replyTurnRuntime.state, "read").mockReturnValue(board);
+    const strictRead = vi
+      .spyOn(replyTurnRuntime.state, "readForInteraction")
+      .mockReturnValue(board);
+    try {
+      vi.mocked(runReplyAgent).mockClear();
+      const result = await runPreparedReply(
+        baseParams({
+          ...messageParams("进度如何？"),
+          sessionId: "ingress",
+          sessionEntry: { sessionId: "ingress", sessionFile: file, updatedAt: 1 },
+          opts: {
+            runId: "query-message",
+            interactionIngress: { userMessageId: "query-message", persistOwnTranscript: true },
+            onInteractionTaskResume: resume,
+          },
+        }),
+      );
+      expect(interaction).not.toHaveBeenCalled();
+      expect(mutate).not.toHaveBeenCalled();
+      expect(resume).not.toHaveBeenCalled();
+      expect(runReplyAgent).not.toHaveBeenCalled();
+      expect(result).toMatchObject({
+        text: expect.stringContaining("任务板最近记录：未完成"),
+      });
+      expect(String((result as { text?: string }).text)).toContain("来源：任务板");
+      expect(String((result as { text?: string }).text)).toContain("时点：");
+      expect(String((result as { text?: string }).text)).not.toContain("正在推进");
+    } finally {
+      interaction.mockRestore();
+      mutate.mockRestore();
+      read.mockRestore();
+      strictRead.mockRestore();
       vi.mocked(resolveSessionFilePath).mockReturnValue("/tmp/session.jsonl");
       fs.rmSync(dir, { recursive: true, force: true });
     }

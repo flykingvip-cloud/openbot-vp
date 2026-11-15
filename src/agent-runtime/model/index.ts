@@ -9,6 +9,21 @@ export { createAuthorizedModelSession, type ModelSessionPorts } from "./authoriz
 export type { InteractionPreparationPorts } from "./authorized-session.js";
 export type { ModelInferenceInput, ModelInferenceResult } from "./authorized-session.js";
 export { invokeInteractionCompletion } from "./interaction-completion.js";
+export {
+  resolveInteractionResourceWaitMs,
+  createInteractionResourceBudget,
+  formatInteractionFailureReply,
+  interactionTimeoutError,
+  isInteractionBudgetExhausted,
+  DEFAULT_INTERACTION_RESOURCE_WAIT_MS,
+  INTERACTION_BLOCKED_RECEIPT_MS,
+  INTERACTION_TIMEOUT_TEXT,
+  INTERACTION_MODEL_FAILURE_TEXT,
+  INTERACTION_QUEUE_TIMEOUT_TEXT,
+  INTERACTION_RECORD_UNAVAILABLE_TEXT,
+  CHAT_TURN_ERROR_UNCONFIRMED_TEXT,
+  type InteractionResourceBudget,
+} from "./interaction-resource-wait.js";
 
 export { createRunAdmissionLease } from "./admission-lease.js";
 

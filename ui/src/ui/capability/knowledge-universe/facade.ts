@@ -1,6 +1,8 @@
-import type { GatewayBrowserClient } from "../../gateway.ts";
 import type { KnowledgeUniverseHomeSnapshot } from "./endpoints.ts";
-import { createKnowledgeUniverseGateway } from "./gateway-client.ts";
+import {
+  createKnowledgeUniverseGateway,
+  type KnowledgeUniverseRpcClient,
+} from "./gateway-client.ts";
 import { buildHomeGraphViewModel } from "./graph-layout.ts";
 import type {
   KnowledgeActionSuggestion,
@@ -14,12 +16,34 @@ function isOptionalHomeInsightMethodError(error: unknown): boolean {
   return /unknown method:\s*knowledge\.(actions|discovery)\./i.test(message);
 }
 
+export type KnowledgeUniverseHomeSettledField =
+  | "search"
+  | "relationships"
+  | "recommendations"
+  | "discovery"
+  | "actions"
+  | "recent"
+  | "focus";
+
+export type KnowledgeUniverseHomePartialSnapshot = Partial<KnowledgeUniverseHomeSnapshot> & {
+  query: string;
+  settled: KnowledgeUniverseHomeSettledField[];
+};
+
+/**
+ * Load the knowledge-universe home snapshot without blocking the page on a single
+ * Promise.all. Lightweight fields and each of search / relationships /
+ * recommendations / actions settle independently and can be applied in completion
+ * order via `onPartial`. Discovery and actions still degrade when the gateway
+ * method is missing.
+ */
 export async function loadKnowledgeUniverseHomeSnapshot(params: {
-  client: GatewayBrowserClient | null | undefined;
+  client: KnowledgeUniverseRpcClient | null | undefined;
   query?: string;
   selectedNodeId?: string | null;
   selectedKnowledgeBaseId?: string | null;
   focusDocumentId?: string | null;
+  onPartial?: (partial: KnowledgeUniverseHomePartialSnapshot) => void;
 }): Promise<KnowledgeUniverseHomeSnapshot> {
   const gateway = createKnowledgeUniverseGateway(params.client);
   const query = (params.query ?? "").trim();
@@ -42,35 +66,103 @@ export async function loadKnowledgeUniverseHomeSnapshot(params: {
     }
   }
 
-  const [search, relationships, recommendations, discovery, actions, recent] = await Promise.all([
-    gateway.search({ query }),
-    gateway.relationships({
+  const settled: KnowledgeUniverseHomeSettledField[] = [];
+  const draft: KnowledgeUniverseHomePartialSnapshot = {
+    query,
+    settled,
+    relatedGroups: null,
+    selectedNodeId: params.selectedNodeId ?? null,
+    selectedObject: null,
+    homeInsightsDegraded: false,
+  };
+
+  const emit = (field: KnowledgeUniverseHomeSettledField) => {
+    if (!settled.includes(field)) {
+      settled.push(field);
+    }
+    draft.settled = [...settled];
+    draft.homeInsightsDegraded = homeInsightsDegraded;
+    params.onPartial?.({ ...draft, settled: [...settled] });
+  };
+
+  const searchP = gateway.search({ query }).then((search) => {
+    draft.sourceSummary = search.sourceSummary;
+    draft.searchResults = search.results;
+    draft.dataCapabilities = search.dataCapabilities ?? [];
+    draft.sourceBrowse = search.sourceBrowse ?? {
+      personal: [],
+      enterprise: [],
+      enterpriseRestricted: [],
+    };
+    draft.externalDataSources = search.externalDataSources ?? [];
+    emit("search");
+    return search;
+  });
+
+  const relationshipsP = gateway
+    .relationships({
       query,
       focusNodeId: focusDocumentId ? null : (params.selectedNodeId ?? null),
       focusDocumentId,
       // Document ego when focusDocumentId set; otherwise library panorama when a
-      // space folder is selected; global owner panorama when neither is set.
+      // space folder is selected; capped summary when neither is set.
       knowledgeBaseId: kbScope,
+    })
+    .then((relationships) => {
+      draft.graph = relationships.graph;
+      draft.graphViewModel = buildHomeGraphViewModel(relationships.graph);
+      emit("relationships");
+      return relationships;
+    });
+
+  const recommendationsP = gateway
+    .recommendations({ limit: 4, ...recommendationContext })
+    .then((recommendations) => {
+      draft.recommendations = recommendations.recommendations;
+      emit("recommendations");
+      return recommendations;
+    });
+
+  const discoveryP = loadOptionalHomeInsight<{ events: KnowledgeDiscoveryEvent[] }>(
+    gateway.discovery({ limit: 8 }),
+    { events: [] },
+  ).then((discovery) => {
+    draft.discoveryEvents = discovery.events;
+    emit("discovery");
+    return discovery;
+  });
+
+  const actionsP = loadOptionalHomeInsight<{ actions: KnowledgeActionSuggestion[] }>(
+    gateway.actions({
+      limit: 4,
+      knowledgeBaseId: kbScope,
+      focusObjectId: null,
     }),
-    gateway.recommendations({ limit: 4, ...recommendationContext }),
-    loadOptionalHomeInsight<{ events: KnowledgeDiscoveryEvent[] }>(
-      gateway.discovery({ limit: 8 }),
-      { events: [] },
-    ),
-    loadOptionalHomeInsight<{ actions: KnowledgeActionSuggestion[] }>(
-      gateway.actions({
-        limit: 4,
-        knowledgeBaseId: kbScope,
-        focusObjectId: null,
-      }),
-      { actions: [] },
-    ),
-    gateway.recent({ limit: 8 }),
+    { actions: [] },
+  ).then((actions) => {
+    draft.actionSuggestions = actions.actions;
+    emit("actions");
+    return actions;
+  });
+
+  const recentP = gateway.recent({ limit: 8 }).then((recent) => {
+    draft.recentVisits = recent.visits;
+    emit("recent");
+    return recent;
+  });
+
+  const [search, relationships, recommendations, discovery, actions, recent] = await Promise.all([
+    searchP,
+    relationshipsP,
+    recommendationsP,
+    discoveryP,
+    actionsP,
+    recentP,
   ]);
 
-  let selectedObject: KnowledgeObject | null = null;
-  let relatedGroups: KnowledgeRelatedGroups | null = null;
-  let recentVisits = recent.visits;
+  let selectedObject: KnowledgeObject | null = draft.selectedObject ?? null;
+  let relatedGroups: KnowledgeRelatedGroups | null = draft.relatedGroups ?? null;
+  let recentVisits = draft.recentVisits ?? recent.visits;
   if (params.selectedNodeId) {
     const objectResponse = await gateway.object({
       nodeId: params.selectedNodeId,
@@ -125,6 +217,12 @@ export async function loadKnowledgeUniverseHomeSnapshot(params: {
         }),
         { actions: [] },
       );
+      draft.recommendations = focusRecommendations.recommendations;
+      draft.actionSuggestions = focusActions.actions;
+      draft.relatedGroups = relatedGroups;
+      draft.recentVisits = recentVisits;
+      draft.selectedObject = selectedObject;
+      emit("focus");
       return {
         query,
         sourceSummary: search.sourceSummary,

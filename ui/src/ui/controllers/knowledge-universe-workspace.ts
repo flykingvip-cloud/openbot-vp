@@ -64,9 +64,12 @@ import {
   workspaceMessageInviteEmailRequired,
   workspaceMessageInviteFailed,
 } from "./knowledge-universe-workspace-messages.ts";
-import { getKnowledgeUniverseRuntime } from "./knowledge-universe.ts";
+import {
+  getKnowledgeUniverseRuntime,
+  type KnowledgeUniverseSession,
+} from "./knowledge-universe.ts";
 
-function requestUpdate(state: AppPortState) {
+function requestUpdate(state: KnowledgeUniverseSession) {
   if (typeof state.requestUpdate === "function") {
     state.requestUpdate();
   }
@@ -192,143 +195,151 @@ function preloadFavoriteFunnelDocuments(state: AppPortState) {
   }
 }
 
-export function syncWorkspaceToAppState(state: AppPortState) {
+export function syncWorkspaceToAppState(state: KnowledgeUniverseSession) {
   const runtime = getKnowledgeUniverseRuntime(state);
-  state.knowledgeUniverseKnowledgeBases = runtime.knowledgeBases;
-  state.knowledgeUniverseSelectedKnowledgeBaseId = runtime.selectedKnowledgeBaseId;
-  state.knowledgeUniverseSearchScope = runtime.searchScope;
-  state.knowledgeUniverseKbSearchQuery = runtime.kbSearchQuery;
-  state.knowledgeUniverseKbSearchEvidence = runtime.kbSearchEvidence;
-  state.knowledgeUniverseKbSearchMode = runtime.kbSearchMode;
-  state.knowledgeUniverseKbSearchSubstringResults = runtime.kbSearchSubstringResults;
-  state.knowledgeUniverseWorkspaceDeliverables = runtime.workspaceDeliverables;
-  state.knowledgeUniverseWorkspaceDeliverableStatusFilter =
+  const surface = state as Record<string, unknown>;
+  surface.knowledgeUniverseKnowledgeBases = runtime.knowledgeBases;
+  surface.knowledgeUniverseSelectedKnowledgeBaseId = runtime.selectedKnowledgeBaseId;
+  surface.knowledgeUniverseSearchScope = runtime.searchScope;
+  surface.knowledgeUniverseKbSearchQuery = runtime.kbSearchQuery;
+  surface.knowledgeUniverseKbSearchEvidence = runtime.kbSearchEvidence;
+  surface.knowledgeUniverseKbSearchMode = runtime.kbSearchMode;
+  surface.knowledgeUniverseKbSearchSubstringResults = runtime.kbSearchSubstringResults;
+  surface.knowledgeUniverseWorkspaceDeliverables = runtime.workspaceDeliverables;
+  surface.knowledgeUniverseWorkspaceDeliverableStatusFilter =
     runtime.workspaceDeliverableStatusFilter;
-  state.knowledgeUniverseWorkspaceBusy = runtime.workspaceBusy;
-  state.knowledgeUniverseWorkspaceNotice = runtime.workspaceNotice;
-  state.knowledgeUniverseWorkspaceError = runtime.workspaceError;
-  state.knowledgeUniverseWorkspaceHint = runtime.workspaceHint;
-  state.knowledgeUniverseWorkspaceDeliverablesUnavailable =
+  surface.knowledgeUniverseWorkspaceBusy = runtime.workspaceBusy;
+  surface.knowledgeUniverseWorkspaceNotice = runtime.workspaceNotice;
+  surface.knowledgeUniverseWorkspaceError = runtime.workspaceError;
+  surface.knowledgeUniverseWorkspaceHint = runtime.workspaceHint;
+  surface.knowledgeUniverseWorkspaceDeliverablesUnavailable =
     runtime.workspaceDeliverablesUnavailable;
-  state.knowledgeUniverseNewKnowledgeBaseTitle = runtime.newKnowledgeBaseTitle;
-  state.knowledgeUniverseNewKnowledgeBaseDescription = runtime.newKnowledgeBaseDescription;
-  state.knowledgeUniverseNewKnowledgeBaseVisibility = runtime.newKnowledgeBaseVisibility;
-  state.knowledgeUniverseWorkspaceDeliverablesExpanded = runtime.workspaceDeliverablesExpanded;
-  state.knowledgeUniverseSelectedKbSearchHighlightKey = runtime.selectedKbSearchHighlightKey;
-  state.knowledgeUniverseSearchPanelOpen = runtime.searchPanelOpen;
-  state.knowledgeUniverseWorkspaceDeliverableTrace = runtime.workspaceDeliverableTrace;
-  state.knowledgeUniverseWorkspaceDeliverableTraceLoading =
+  surface.knowledgeUniverseNewKnowledgeBaseTitle = runtime.newKnowledgeBaseTitle;
+  surface.knowledgeUniverseNewKnowledgeBaseDescription = runtime.newKnowledgeBaseDescription;
+  surface.knowledgeUniverseNewKnowledgeBaseVisibility = runtime.newKnowledgeBaseVisibility;
+  surface.knowledgeUniverseWorkspaceDeliverablesExpanded = runtime.workspaceDeliverablesExpanded;
+  surface.knowledgeUniverseSelectedKbSearchHighlightKey = runtime.selectedKbSearchHighlightKey;
+  surface.knowledgeUniverseSearchPanelOpen = runtime.searchPanelOpen;
+  surface.knowledgeUniverseWorkspaceDeliverableTrace = runtime.workspaceDeliverableTrace;
+  surface.knowledgeUniverseWorkspaceDeliverableTraceLoading =
     runtime.workspaceDeliverableTraceLoading;
-  state.knowledgeUniverseDeliverableDetailFocus = runtime.deliverableDetailFocus;
-  state.knowledgeUniverseOpenDeliverableMoreMenuId = runtime.openDeliverableMoreMenuId;
-  state.knowledgeUniversePinnedKnowledgeBaseIds = runtime.pinnedKnowledgeBaseIds;
-  state.knowledgeUniverseFavoriteKnowledgeBaseIds = runtime.favoriteKnowledgeBaseIds;
-  state.knowledgeUniverseLibraryWorkspaceContentTab = runtime.libraryWorkspaceContentTab;
-  state.knowledgeUniverseLibraryWorkspaceMaterialsKindFilter =
+  surface.knowledgeUniverseDeliverableDetailFocus = runtime.deliverableDetailFocus;
+  surface.knowledgeUniverseOpenDeliverableMoreMenuId = runtime.openDeliverableMoreMenuId;
+  surface.knowledgeUniversePinnedKnowledgeBaseIds = runtime.pinnedKnowledgeBaseIds;
+  surface.knowledgeUniverseFavoriteKnowledgeBaseIds = runtime.favoriteKnowledgeBaseIds;
+  surface.knowledgeUniverseLibraryWorkspaceContentTab = runtime.libraryWorkspaceContentTab;
+  surface.knowledgeUniverseLibraryWorkspaceMaterialsKindFilter =
     runtime.libraryWorkspaceMaterialsKindFilter;
-  state.knowledgeUniverseLibraryWorkspaceDocuments = runtime.libraryWorkspaceDocuments;
-  state.knowledgeUniverseLibraryWorkspaceDocumentsLoading =
+  surface.knowledgeUniverseLibraryWorkspaceDocuments = runtime.libraryWorkspaceDocuments;
+  surface.knowledgeUniverseLibraryWorkspaceDocumentsLoading =
     runtime.libraryWorkspaceDocumentsLoading;
-  state.knowledgeUniverseLibraryWorkspaceSources = runtime.libraryWorkspaceSources;
-  state.knowledgeUniverseLibraryWorkspaceSourcesLoading = runtime.libraryWorkspaceSourcesLoading;
-  state.knowledgeUniverseLibraryWorkspaceSourcesPlaneFilter =
+  surface.knowledgeUniverseLibraryWorkspaceSources = runtime.libraryWorkspaceSources;
+  surface.knowledgeUniverseLibraryWorkspaceSourcesLoading = runtime.libraryWorkspaceSourcesLoading;
+  surface.knowledgeUniverseLibraryWorkspaceSourcesPlaneFilter =
     runtime.libraryWorkspaceSourcesPlaneFilter;
-  state.knowledgeUniverseLibraryWorkspaceSelectedDocumentIds =
+  surface.knowledgeUniverseLibraryWorkspaceSelectedDocumentIds =
     runtime.libraryWorkspaceSelectedDocumentIds;
-  state.knowledgeUniverseLibraryWorkspaceSnippets = runtime.libraryWorkspaceSnippets;
-  state.knowledgeUniverseLibraryWorkspaceSnippetsLoading = runtime.libraryWorkspaceSnippetsLoading;
-  state.knowledgeUniverseLibraryWorkspaceRecycleDocuments =
+  surface.knowledgeUniverseLibraryWorkspaceSnippets = runtime.libraryWorkspaceSnippets;
+  surface.knowledgeUniverseLibraryWorkspaceSnippetsLoading =
+    runtime.libraryWorkspaceSnippetsLoading;
+  surface.knowledgeUniverseLibraryWorkspaceRecycleDocuments =
     runtime.libraryWorkspaceRecycleDocuments;
-  state.knowledgeUniverseLibraryWorkspaceRecycleLoading = runtime.libraryWorkspaceRecycleLoading;
-  state.knowledgeUniverseLibraryWorkspaceEvictedChunks = runtime.libraryWorkspaceEvictedChunks;
-  state.knowledgeUniverseLibraryWorkspaceWebPages = runtime.libraryWorkspaceWebPages;
-  state.knowledgeUniverseLibraryWorkspaceWebPagesLoading = runtime.libraryWorkspaceWebPagesLoading;
-  state.knowledgeUniverseLibraryWorkspaceDatasets = runtime.libraryWorkspaceDatasets;
-  state.knowledgeUniverseLibraryWorkspaceDatasetsLoading = runtime.libraryWorkspaceDatasetsLoading;
-  state.knowledgeUniverseLibraryWorkspaceAgentKnowledge = runtime.libraryWorkspaceAgentKnowledge;
-  state.knowledgeUniverseLibraryWorkspaceAgentKnowledgeLoading =
+  surface.knowledgeUniverseLibraryWorkspaceRecycleLoading = runtime.libraryWorkspaceRecycleLoading;
+  surface.knowledgeUniverseLibraryWorkspaceEvictedChunks = runtime.libraryWorkspaceEvictedChunks;
+  surface.knowledgeUniverseLibraryWorkspaceWebPages = runtime.libraryWorkspaceWebPages;
+  surface.knowledgeUniverseLibraryWorkspaceWebPagesLoading =
+    runtime.libraryWorkspaceWebPagesLoading;
+  surface.knowledgeUniverseLibraryWorkspaceDatasets = runtime.libraryWorkspaceDatasets;
+  surface.knowledgeUniverseLibraryWorkspaceDatasetsLoading =
+    runtime.libraryWorkspaceDatasetsLoading;
+  surface.knowledgeUniverseLibraryWorkspaceAgentKnowledge = runtime.libraryWorkspaceAgentKnowledge;
+  surface.knowledgeUniverseLibraryWorkspaceAgentKnowledgeLoading =
     runtime.libraryWorkspaceAgentKnowledgeLoading;
-  state.knowledgeUniverseLibraryWorkspaceMembers = runtime.libraryWorkspaceMembers;
-  state.knowledgeUniverseLibraryWorkspaceMembersLoading = runtime.libraryWorkspaceMembersLoading;
-  state.knowledgeUniverseLibraryWorkspaceInviteRole = runtime.libraryWorkspaceInviteRole;
-  state.knowledgeUniverseLibraryWorkspaceInviteDrawerOpen =
+  surface.knowledgeUniverseLibraryWorkspaceMembers = runtime.libraryWorkspaceMembers;
+  surface.knowledgeUniverseLibraryWorkspaceMembersLoading = runtime.libraryWorkspaceMembersLoading;
+  surface.knowledgeUniverseLibraryWorkspaceInviteRole = runtime.libraryWorkspaceInviteRole;
+  surface.knowledgeUniverseLibraryWorkspaceInviteDrawerOpen =
     runtime.libraryWorkspaceInviteDrawerOpen;
-  state.knowledgeUniverseLibraryWorkspaceInviteEmail = runtime.libraryWorkspaceInviteEmail;
-  state.knowledgeUniverseLibraryWorkspaceInlineRenameKbId =
+  surface.knowledgeUniverseLibraryWorkspaceInviteEmail = runtime.libraryWorkspaceInviteEmail;
+  surface.knowledgeUniverseLibraryWorkspaceInlineRenameKbId =
     runtime.libraryWorkspaceInlineRenameKbId;
-  state.knowledgeUniverseLibraryWorkspaceSettingsKbId = runtime.libraryWorkspaceSettingsKbId;
-  state.knowledgeUniverseLibraryWorkspaceSettingsTitle = runtime.libraryWorkspaceSettingsTitle;
-  state.knowledgeUniverseLibraryWorkspaceImportOpen = runtime.libraryWorkspaceImportOpen;
-  state.knowledgeUniverseLibraryWorkspaceImportLockSpace = runtime.libraryWorkspaceImportLockSpace;
-  state.knowledgeUniverseLibraryWorkspaceImportKind = runtime.libraryWorkspaceImportKind;
-  state.knowledgeUniverseLibraryWorkspaceBindSourceKind = runtime.libraryWorkspaceBindSourceKind;
-  state.knowledgeUniverseLibraryWorkspaceBindSourceTitle = runtime.libraryWorkspaceBindSourceTitle;
-  state.knowledgeUniverseLibraryWorkspaceBindSourceEndpoint =
+  surface.knowledgeUniverseLibraryWorkspaceSettingsKbId = runtime.libraryWorkspaceSettingsKbId;
+  surface.knowledgeUniverseLibraryWorkspaceSettingsTitle = runtime.libraryWorkspaceSettingsTitle;
+  surface.knowledgeUniverseLibraryWorkspaceImportOpen = runtime.libraryWorkspaceImportOpen;
+  surface.knowledgeUniverseLibraryWorkspaceImportLockSpace =
+    runtime.libraryWorkspaceImportLockSpace;
+  surface.knowledgeUniverseLibraryWorkspaceImportKind = runtime.libraryWorkspaceImportKind;
+  surface.knowledgeUniverseLibraryWorkspaceBindSourceKind = runtime.libraryWorkspaceBindSourceKind;
+  surface.knowledgeUniverseLibraryWorkspaceBindSourceTitle =
+    runtime.libraryWorkspaceBindSourceTitle;
+  surface.knowledgeUniverseLibraryWorkspaceBindSourceEndpoint =
     runtime.libraryWorkspaceBindSourceEndpoint;
-  state.knowledgeUniverseLibraryWorkspaceConnectorBindDraft =
+  surface.knowledgeUniverseLibraryWorkspaceConnectorBindDraft =
     runtime.libraryWorkspaceConnectorBindDraft;
-  state.knowledgeUniverseLibraryWorkspaceConnectorCatalog =
+  surface.knowledgeUniverseLibraryWorkspaceConnectorCatalog =
     runtime.libraryWorkspaceConnectorCatalog;
-  state.knowledgeUniverseLibraryWorkspaceConnectorCatalogLoading =
+  surface.knowledgeUniverseLibraryWorkspaceConnectorCatalogLoading =
     runtime.libraryWorkspaceConnectorCatalogLoading;
-  state.knowledgeUniverseLibraryWorkspaceConnectorCatalogError =
+  surface.knowledgeUniverseLibraryWorkspaceConnectorCatalogError =
     runtime.libraryWorkspaceConnectorCatalogError;
-  state.knowledgeUniverseLibraryWorkspaceConnectorCredentials =
+  surface.knowledgeUniverseLibraryWorkspaceConnectorCredentials =
     runtime.libraryWorkspaceConnectorCredentials;
-  state.knowledgeUniverseLibraryWorkspaceConnectorCredentialsLoading =
+  surface.knowledgeUniverseLibraryWorkspaceConnectorCredentialsLoading =
     runtime.libraryWorkspaceConnectorCredentialsLoading;
-  state.knowledgeUniverseLibraryWorkspaceConnectorProbeOk =
+  surface.knowledgeUniverseLibraryWorkspaceConnectorProbeOk =
     runtime.libraryWorkspaceConnectorProbeOk;
-  state.knowledgeUniverseLibraryWorkspaceConnectorProbeMessage =
+  surface.knowledgeUniverseLibraryWorkspaceConnectorProbeMessage =
     runtime.libraryWorkspaceConnectorProbeMessage;
-  state.knowledgeUniverseLibraryWorkspaceConnectorProbeBusy =
+  surface.knowledgeUniverseLibraryWorkspaceConnectorProbeBusy =
     runtime.libraryWorkspaceConnectorProbeBusy;
-  state.knowledgeUniverseLibraryWorkspaceConnectorOAuthBusy =
+  surface.knowledgeUniverseLibraryWorkspaceConnectorOAuthBusy =
     runtime.libraryWorkspaceConnectorOAuthBusy;
-  state.knowledgeUniverseLibraryWorkspaceConnectorOAuthNotice =
+  surface.knowledgeUniverseLibraryWorkspaceConnectorOAuthNotice =
     runtime.libraryWorkspaceConnectorOAuthNotice;
-  state.knowledgeUniverseLibraryWorkspaceConnectorOAuthError =
+  surface.knowledgeUniverseLibraryWorkspaceConnectorOAuthError =
     runtime.libraryWorkspaceConnectorOAuthError;
-  state.knowledgeUniverseLibraryWorkspaceConnectorOAuthSessionId =
+  surface.knowledgeUniverseLibraryWorkspaceConnectorOAuthSessionId =
     runtime.libraryWorkspaceConnectorOAuthSessionId;
-  state.knowledgeUniverseLibraryWorkspaceConnectorOAuthSimulateAllowed =
+  surface.knowledgeUniverseLibraryWorkspaceConnectorOAuthSimulateAllowed =
     runtime.libraryWorkspaceConnectorOAuthSimulateAllowed;
-  state.knowledgeUniverseLibraryWorkspaceHttpRestExpanded =
+  surface.knowledgeUniverseLibraryWorkspaceHttpRestExpanded =
     runtime.libraryWorkspaceHttpRestExpanded;
-  state.knowledgeUniverseLibraryWorkspaceDatasetImportTab =
+  surface.knowledgeUniverseLibraryWorkspaceDatasetImportTab =
     runtime.libraryWorkspaceDatasetImportTab;
-  state.knowledgeUniverseLibraryWorkspaceDatasetFileAttachment =
+  surface.knowledgeUniverseLibraryWorkspaceDatasetFileAttachment =
     runtime.libraryWorkspaceDatasetFileAttachment;
-  state.knowledgeUniverseLibraryWorkspaceDatasetPreview = runtime.libraryWorkspaceDatasetPreview;
-  state.knowledgeUniverseLibraryWorkspaceDatasetPreviewError =
+  surface.knowledgeUniverseLibraryWorkspaceDatasetPreview = runtime.libraryWorkspaceDatasetPreview;
+  surface.knowledgeUniverseLibraryWorkspaceDatasetPreviewError =
     runtime.libraryWorkspaceDatasetPreviewError;
-  state.knowledgeUniverseLibraryWorkspaceUrlImportMode = runtime.libraryWorkspaceUrlImportMode;
-  state.knowledgeUniverseLibraryWorkspaceUrlImportText = runtime.libraryWorkspaceUrlImportText;
-  state.knowledgeUniverseLibraryWorkspaceUrlImportAdvancedOpen =
+  surface.knowledgeUniverseLibraryWorkspaceUrlImportMode = runtime.libraryWorkspaceUrlImportMode;
+  surface.knowledgeUniverseLibraryWorkspaceUrlImportText = runtime.libraryWorkspaceUrlImportText;
+  surface.knowledgeUniverseLibraryWorkspaceUrlImportAdvancedOpen =
     runtime.libraryWorkspaceUrlImportAdvancedOpen;
-  state.knowledgeUniverseLibraryWorkspaceUrlSyncSchedule = runtime.libraryWorkspaceUrlSyncSchedule;
-  state.knowledgeUniverseLibraryWorkspaceUrlStripNavAds = runtime.libraryWorkspaceUrlStripNavAds;
-  state.knowledgeUniverseLibraryWorkspaceUrlMainContentOnly =
+  surface.knowledgeUniverseLibraryWorkspaceUrlSyncSchedule =
+    runtime.libraryWorkspaceUrlSyncSchedule;
+  surface.knowledgeUniverseLibraryWorkspaceUrlStripNavAds = runtime.libraryWorkspaceUrlStripNavAds;
+  surface.knowledgeUniverseLibraryWorkspaceUrlMainContentOnly =
     runtime.libraryWorkspaceUrlMainContentOnly;
-  state.knowledgeUniverseLibraryWorkspaceNoteTags = runtime.libraryWorkspaceNoteTags;
-  state.knowledgeUniverseLibraryWorkspaceNoteTagDraft = runtime.libraryWorkspaceNoteTagDraft;
-  state.knowledgeUniverseLibraryWorkspaceNoteTagSuggestionsOpen =
+  surface.knowledgeUniverseLibraryWorkspaceNoteTags = runtime.libraryWorkspaceNoteTags;
+  surface.knowledgeUniverseLibraryWorkspaceNoteTagDraft = runtime.libraryWorkspaceNoteTagDraft;
+  surface.knowledgeUniverseLibraryWorkspaceNoteTagSuggestionsOpen =
     runtime.libraryWorkspaceNoteTagSuggestionsOpen;
-  state.knowledgeUniverseLibraryWorkspaceNoteTagHistory = runtime.libraryWorkspaceNoteTagHistory;
-  state.knowledgeUniverseLibraryWorkspaceNoteAiBusy = runtime.libraryWorkspaceNoteAiBusy;
-  state.knowledgeUniverseLibraryWorkspaceFileImportItems = runtime.libraryWorkspaceFileImportItems;
-  state.knowledgeUniverseLibraryWorkspaceFileImportAdvancedOpen =
+  surface.knowledgeUniverseLibraryWorkspaceNoteTagHistory = runtime.libraryWorkspaceNoteTagHistory;
+  surface.knowledgeUniverseLibraryWorkspaceNoteAiBusy = runtime.libraryWorkspaceNoteAiBusy;
+  surface.knowledgeUniverseLibraryWorkspaceFileImportItems =
+    runtime.libraryWorkspaceFileImportItems;
+  surface.knowledgeUniverseLibraryWorkspaceFileImportAdvancedOpen =
     runtime.libraryWorkspaceFileImportAdvancedOpen;
-  state.knowledgeUniverseLibraryWorkspaceFileChunkingStrategy =
+  surface.knowledgeUniverseLibraryWorkspaceFileChunkingStrategy =
     runtime.libraryWorkspaceFileChunkingStrategy;
-  state.knowledgeUniverseLibraryWorkspaceFileOcrEnabled = runtime.libraryWorkspaceFileOcrEnabled;
+  surface.knowledgeUniverseLibraryWorkspaceFileOcrEnabled = runtime.libraryWorkspaceFileOcrEnabled;
   runtime.chatScopeSyncKey = syncKnowledgeUniverseSelectionToChatHost(
     state as KnowledgeUniverseChatScopeHost,
     runtime,
   );
 }
 
-function ensureSelectedKnowledgeBase(state: AppPortState) {
+function ensureSelectedKnowledgeBase(state: KnowledgeUniverseSession) {
   const runtime = getKnowledgeUniverseRuntime(state);
   const preferredId = readPreferredKnowledgeBaseId();
   if (
@@ -1479,7 +1490,7 @@ export function setKnowledgeUniverseDeliverableStatusFilter(
 const WORKSPACE_DELIVERABLES_PREVIEW_LIMIT = 12;
 
 export async function loadKnowledgeUniverseWorkspace(
-  state: AppPortState,
+  state: KnowledgeUniverseSession,
   options?: { deliverablesLimit?: number },
 ) {
   const runtime = getKnowledgeUniverseRuntime(state);
@@ -1525,9 +1536,11 @@ export async function loadKnowledgeUniverseWorkspace(
     syncWorkspaceToAppState(state);
     requestUpdate(state);
     if (runtime.selectedKnowledgeBaseId) {
-      void refreshLibraryWorkspaceAfterKbMutation(state);
+      void refreshLibraryWorkspaceAfterKbMutation(
+        state as import("../app-port-state.ts").AppPortState,
+      );
     }
-    preloadFavoriteFunnelDocuments(state);
+    preloadFavoriteFunnelDocuments(state as import("../app-port-state.ts").AppPortState);
   }
 }
 

@@ -2,7 +2,13 @@
 import type { Api, Model } from "@earendil-works/pi-ai/compat";
 import type { OpenBotConfig } from "../../config/config.js";
 import type { InteractionModelInput } from "../contracts/interaction.js";
-import { invokeInteractionCompletion, type createAuthorizedModelSession } from "../model/index.js";
+import {
+  createInteractionResourceBudget,
+  interactionTimeoutError,
+  invokeInteractionCompletion,
+  type InteractionResourceBudget,
+  type createAuthorizedModelSession,
+} from "../model/index.js";
 import type { InteractionInferencePort } from "./interpret-interaction.js";
 import { routeInteraction } from "./route-interaction.js";
 
@@ -17,6 +23,7 @@ export function createPreparedInteractionInference(
     creditUserId?: string;
     fallbacksOverride?: string[];
     timeoutMs: number;
+    resourceBudget?: InteractionResourceBudget;
     maxTokens: number;
   },
   session: ReturnType<typeof createAuthorizedModelSession>,
@@ -25,6 +32,8 @@ export function createPreparedInteractionInference(
     model: string,
   ) => Promise<{ model: Model<Api>; apiKey?: string }>,
 ): InteractionInferencePort {
+  const resourceBudget =
+    params.resourceBudget ?? createInteractionResourceBudget({ overrideMs: params.timeoutMs });
   return {
     infer: async (input: InteractionModelInput) => {
       const started = Date.now();
@@ -37,19 +46,30 @@ export function createPreparedInteractionInference(
         taskText: input.message,
         signal: input.abortSignal,
         run: async (provider, model) => {
+          input.abortSignal?.throwIfAborted();
+          if (resourceBudget.isExhausted()) {
+            throw interactionTimeoutError();
+          }
           const candidate = await resolveCandidate(provider, model);
+          input.abortSignal?.throwIfAborted();
+          const remainingMs = resourceBudget.remainingMs();
+          if (remainingMs <= 0) {
+            throw interactionTimeoutError();
+          }
           return invokeInteractionCompletion({
             input,
             ...candidate,
-            timeoutMs: params.timeoutMs,
+            timeoutMs: remainingMs,
             maxTokens: params.maxTokens,
           });
         },
       });
+      // Usage must be settled even if the visible deadline has already
+      // elapsed. Late admission is still forbidden below.
       await session.recordUsage({
         provider: result.provider,
         model: result.model,
-        usage: result.result.response.usage,
+        usage: result.result.response?.usage,
         agentId: params.agentId,
         creditUserId: params.creditUserId,
         durationMs: Date.now() - started,
@@ -57,6 +77,10 @@ export function createPreparedInteractionInference(
         toolClasses: [],
         fallbackAttemptsRaw: result.attempts,
       });
+      input.abortSignal?.throwIfAborted();
+      if (resourceBudget.isExhausted()) {
+        throw interactionTimeoutError();
+      }
       return result.result.readDecision();
     },
   };
@@ -73,6 +97,7 @@ export async function runPreparedInteraction(
     creditUserId?: string;
     fallbacksOverride?: string[];
     timeoutMs: number;
+    resourceBudget?: InteractionResourceBudget;
     maxTokens: number;
   },
   session: ReturnType<typeof createAuthorizedModelSession>,

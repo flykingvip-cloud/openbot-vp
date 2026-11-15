@@ -19183,6 +19183,16 @@ button.knowledge-universe__search-hit.is-selected,
   pointer-events: none;
 }
 
+/* Hover-only node names: a background halo keeps the single floating label readable
+   over nearby nodes/edges once permanent labels are no longer always on. */
+.knowledge-universe__graph-node-label {
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: var(--bg-elevated, var(--bg));
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
 .knowledge-universe__graph-node.is-active circle {
   fill: color-mix(in srgb, var(--accent) 32%, var(--bg-elevated));
   stroke: var(--accent);

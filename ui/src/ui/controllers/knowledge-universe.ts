@@ -5,7 +5,10 @@ import type {
   KnowledgePersonalDocumentAttachment,
 } from "../capability/knowledge-universe/endpoints.ts";
 import { loadKnowledgeUniverseHomeSnapshot } from "../capability/knowledge-universe/facade.ts";
-import { createKnowledgeUniverseGateway } from "../capability/knowledge-universe/gateway-client.ts";
+import {
+  createKnowledgeUniverseGateway,
+  type KnowledgeUniverseRpcClient,
+} from "../capability/knowledge-universe/gateway-client.ts";
 import {
   buildHomeGraphViewModel,
   buildRadialGraphLayout,
@@ -50,6 +53,8 @@ import {
 } from "../chat/knowledge-universe-chat-scope.ts";
 import type {
   KnowledgeHomeFocus,
+  KnowledgeUniverseBrowseSubTab,
+  KnowledgeUniversePageTab,
   KnowledgeUniverseSearchScope,
   LibraryWorkspaceContentTab,
   WorkspaceDeliverableStatusFilter,
@@ -162,6 +167,10 @@ export function requireSelectedKnowledgeBaseId(state: AppPortState): string | nu
 
 export type KnowledgeUniverseControllerState = {
   loading: boolean;
+  /** True while the relation graph request for the current home load is in flight. */
+  graphLoading: boolean;
+  /** True while recommendations / actions / discovery for the current home load are in flight. */
+  insightsLoading: boolean;
   error: string | null;
   query: string;
   homeFocus: KnowledgeHomeFocus | null;
@@ -411,165 +420,189 @@ export type KnowledgeUniverseControllerState = {
   governanceTaskGraphHoveredNodeId: string | null;
 };
 
-const runtimes = new WeakMap<AppPortState, KnowledgeUniverseControllerState>();
+/**
+ * Host needed by knowledge-universe home load/refresh and the runtime WeakMap.
+ * Production `AppPortState` satisfies this; tests may pass a small session
+ * object (identity, `client`, `requestUpdate`) instead of inventing the full
+ * shell state.
+ */
+export type KnowledgeUniverseSession = {
+  requestUpdate?: () => void;
+  client?: KnowledgeUniverseRpcClient | null;
+  knowledgeUniversePageTab?: KnowledgeUniversePageTab;
+  knowledgeUniverseBrowseSubTab?: KnowledgeUniverseBrowseSubTab;
+};
 
-function requestUpdate(state: AppPortState) {
+const runtimes = new WeakMap<object, KnowledgeUniverseControllerState>();
+
+function requestUpdate(state: KnowledgeUniverseSession) {
   if (typeof state.requestUpdate === "function") {
     state.requestUpdate();
   }
 }
 
-function syncToAppState(state: AppPortState, runtime: KnowledgeUniverseControllerState) {
-  state.knowledgeUniverseLoading = runtime.loading;
-  state.knowledgeUniverseError = runtime.error;
-  state.knowledgeUniverseQuery = runtime.query;
-  state.knowledgeUniverseHomeFocus = runtime.homeFocus;
-  state.knowledgeUniverseSearchScope = runtime.searchScope;
-  state.knowledgeUniverseSelectedNodeId = runtime.selectedNodeId;
-  state.knowledgeUniverseSelectedObject = runtime.selectedObject;
-  state.knowledgeUniverseSourceSummary = runtime.sourceSummary;
-  state.knowledgeUniverseGraph = runtime.graph;
-  state.knowledgeUniverseGraphViewModel = runtime.graphViewModel;
-  state.knowledgeUniverseSearchResults = runtime.searchResults;
-  state.knowledgeUniverseDataCapabilities = runtime.dataCapabilities;
-  state.knowledgeUniverseSourceBrowse = runtime.sourceBrowse;
-  state.knowledgeUniverseExternalDataSources = runtime.externalDataSources;
-  state.knowledgeUniversePersonalCollectTitle = runtime.personalCollectTitle;
-  state.knowledgeUniversePersonalCollectSummary = runtime.personalCollectSummary;
-  state.knowledgeUniversePersonalCollectTags = runtime.personalCollectTags;
-  state.knowledgeUniversePersonalCollectUrl = runtime.personalCollectUrl;
-  state.knowledgeUniversePersonalDatasetText = runtime.personalDatasetText;
-  state.knowledgeUniversePersonalUploadAttachment = runtime.personalUploadAttachment;
-  state.knowledgeUniversePersonalActionBusy = runtime.personalActionBusy;
-  state.knowledgeUniversePersonalActionNotice = runtime.personalActionNotice;
-  state.knowledgeUniversePersonalActionError = runtime.personalActionError;
-  state.knowledgeUniverseAccessRequestBusyCapabilityId = runtime.accessRequestBusyCapabilityId;
-  state.knowledgeUniverseAccessRequestBusyProjectionId = runtime.accessRequestBusyProjectionId;
-  state.knowledgeUniverseAccessRequestNotice = runtime.accessRequestNotice;
-  state.knowledgeUniverseCapabilityPreview = runtime.capabilityPreview;
-  state.knowledgeUniverseCapabilityInvocation = runtime.capabilityInvocation;
-  state.knowledgeUniversePersonalManageObjectId = runtime.personalManageObjectId;
-  state.knowledgeUniversePersonalManageObjectTitle = runtime.personalManageObjectTitle;
-  state.knowledgeUniversePersonalManageTags = runtime.personalManageTags;
-  state.knowledgeUniversePersonalManageBusy = runtime.personalManageBusy;
-  state.knowledgeUniversePersonalManageNotice = runtime.personalManageNotice;
-  state.knowledgeUniversePersonalVersions = runtime.personalVersions;
-  state.knowledgeUniversePersonalVersionCompareFrom = runtime.personalVersionCompareFrom;
-  state.knowledgeUniversePersonalVersionCompareTo = runtime.personalVersionCompareTo;
-  state.knowledgeUniversePersonalVersionDiff = runtime.personalVersionDiff;
-  state.knowledgeUniverseRecommendations = runtime.recommendations;
-  state.knowledgeUniverseDiscoveryEvents = runtime.discoveryEvents;
-  state.knowledgeUniverseActionSuggestions = runtime.actionSuggestions;
-  state.knowledgeUniverseHomeInsightsDegraded = runtime.homeInsightsDegraded;
-  state.knowledgeUniverseRecentVisits = runtime.recentVisits;
-  state.knowledgeUniverseRelatedGroups = runtime.relatedGroups;
-  state.knowledgeUniverseGraphZoom = runtime.graphZoom;
-  state.knowledgeUniverseGraphPanX = runtime.graphPanX;
-  state.knowledgeUniverseGraphPanY = runtime.graphPanY;
-  state.knowledgeUniverseHoveredNodeId = runtime.hoveredNodeId;
-  state.knowledgeUniverseKnowledgeBases = runtime.knowledgeBases;
-  state.knowledgeUniverseSelectedKnowledgeBaseId = runtime.selectedKnowledgeBaseId;
-  state.knowledgeUniverseKbSearchQuery = runtime.kbSearchQuery;
-  state.knowledgeUniverseKbSearchEvidence = runtime.kbSearchEvidence;
-  state.knowledgeUniverseKbSearchMode = runtime.kbSearchMode;
-  state.knowledgeUniverseKbSearchSubstringResults = runtime.kbSearchSubstringResults;
-  state.knowledgeUniverseWorkspaceDeliverables = runtime.workspaceDeliverables;
-  state.knowledgeUniverseWorkspaceDeliverableStatusFilter =
+function syncToAppState(
+  state: KnowledgeUniverseSession,
+  runtime: KnowledgeUniverseControllerState,
+) {
+  const surface = state as Record<string, unknown>;
+  surface.knowledgeUniverseLoading = runtime.loading;
+  surface.knowledgeUniverseError = runtime.error;
+  surface.knowledgeUniverseQuery = runtime.query;
+  surface.knowledgeUniverseHomeFocus = runtime.homeFocus;
+  surface.knowledgeUniverseSearchScope = runtime.searchScope;
+  surface.knowledgeUniverseSelectedNodeId = runtime.selectedNodeId;
+  surface.knowledgeUniverseSelectedObject = runtime.selectedObject;
+  surface.knowledgeUniverseSourceSummary = runtime.sourceSummary;
+  surface.knowledgeUniverseGraph = runtime.graph;
+  surface.knowledgeUniverseGraphViewModel = runtime.graphViewModel;
+  surface.knowledgeUniverseSearchResults = runtime.searchResults;
+  surface.knowledgeUniverseDataCapabilities = runtime.dataCapabilities;
+  surface.knowledgeUniverseSourceBrowse = runtime.sourceBrowse;
+  surface.knowledgeUniverseExternalDataSources = runtime.externalDataSources;
+  surface.knowledgeUniversePersonalCollectTitle = runtime.personalCollectTitle;
+  surface.knowledgeUniversePersonalCollectSummary = runtime.personalCollectSummary;
+  surface.knowledgeUniversePersonalCollectTags = runtime.personalCollectTags;
+  surface.knowledgeUniversePersonalCollectUrl = runtime.personalCollectUrl;
+  surface.knowledgeUniversePersonalDatasetText = runtime.personalDatasetText;
+  surface.knowledgeUniversePersonalUploadAttachment = runtime.personalUploadAttachment;
+  surface.knowledgeUniversePersonalActionBusy = runtime.personalActionBusy;
+  surface.knowledgeUniversePersonalActionNotice = runtime.personalActionNotice;
+  surface.knowledgeUniversePersonalActionError = runtime.personalActionError;
+  surface.knowledgeUniverseAccessRequestBusyCapabilityId = runtime.accessRequestBusyCapabilityId;
+  surface.knowledgeUniverseAccessRequestBusyProjectionId = runtime.accessRequestBusyProjectionId;
+  surface.knowledgeUniverseAccessRequestNotice = runtime.accessRequestNotice;
+  surface.knowledgeUniverseCapabilityPreview = runtime.capabilityPreview;
+  surface.knowledgeUniverseCapabilityInvocation = runtime.capabilityInvocation;
+  surface.knowledgeUniversePersonalManageObjectId = runtime.personalManageObjectId;
+  surface.knowledgeUniversePersonalManageObjectTitle = runtime.personalManageObjectTitle;
+  surface.knowledgeUniversePersonalManageTags = runtime.personalManageTags;
+  surface.knowledgeUniversePersonalManageBusy = runtime.personalManageBusy;
+  surface.knowledgeUniversePersonalManageNotice = runtime.personalManageNotice;
+  surface.knowledgeUniversePersonalVersions = runtime.personalVersions;
+  surface.knowledgeUniversePersonalVersionCompareFrom = runtime.personalVersionCompareFrom;
+  surface.knowledgeUniversePersonalVersionCompareTo = runtime.personalVersionCompareTo;
+  surface.knowledgeUniversePersonalVersionDiff = runtime.personalVersionDiff;
+  surface.knowledgeUniverseRecommendations = runtime.recommendations;
+  surface.knowledgeUniverseDiscoveryEvents = runtime.discoveryEvents;
+  surface.knowledgeUniverseActionSuggestions = runtime.actionSuggestions;
+  surface.knowledgeUniverseHomeInsightsDegraded = runtime.homeInsightsDegraded;
+  surface.knowledgeUniverseRecentVisits = runtime.recentVisits;
+  surface.knowledgeUniverseRelatedGroups = runtime.relatedGroups;
+  surface.knowledgeUniverseGraphZoom = runtime.graphZoom;
+  surface.knowledgeUniverseGraphPanX = runtime.graphPanX;
+  surface.knowledgeUniverseGraphPanY = runtime.graphPanY;
+  surface.knowledgeUniverseHoveredNodeId = runtime.hoveredNodeId;
+  surface.knowledgeUniverseKnowledgeBases = runtime.knowledgeBases;
+  surface.knowledgeUniverseSelectedKnowledgeBaseId = runtime.selectedKnowledgeBaseId;
+  surface.knowledgeUniverseKbSearchQuery = runtime.kbSearchQuery;
+  surface.knowledgeUniverseKbSearchEvidence = runtime.kbSearchEvidence;
+  surface.knowledgeUniverseKbSearchMode = runtime.kbSearchMode;
+  surface.knowledgeUniverseKbSearchSubstringResults = runtime.kbSearchSubstringResults;
+  surface.knowledgeUniverseWorkspaceDeliverables = runtime.workspaceDeliverables;
+  surface.knowledgeUniverseWorkspaceDeliverableStatusFilter =
     runtime.workspaceDeliverableStatusFilter;
-  state.knowledgeUniverseWorkspaceBusy = runtime.workspaceBusy;
-  state.knowledgeUniverseWorkspaceNotice = runtime.workspaceNotice;
-  state.knowledgeUniverseWorkspaceError = runtime.workspaceError;
-  state.knowledgeUniverseWorkspaceHint = runtime.workspaceHint;
-  state.knowledgeUniverseWorkspaceDeliverablesUnavailable =
+  surface.knowledgeUniverseWorkspaceBusy = runtime.workspaceBusy;
+  surface.knowledgeUniverseWorkspaceNotice = runtime.workspaceNotice;
+  surface.knowledgeUniverseWorkspaceError = runtime.workspaceError;
+  surface.knowledgeUniverseWorkspaceHint = runtime.workspaceHint;
+  surface.knowledgeUniverseWorkspaceDeliverablesUnavailable =
     runtime.workspaceDeliverablesUnavailable;
-  state.knowledgeUniverseNewKnowledgeBaseTitle = runtime.newKnowledgeBaseTitle;
-  state.knowledgeUniverseNewKnowledgeBaseDescription = runtime.newKnowledgeBaseDescription;
-  state.knowledgeUniverseNewKnowledgeBaseVisibility = runtime.newKnowledgeBaseVisibility;
-  state.knowledgeUniverseWorkspaceSearchGroups = runtime.workspaceSearchGroups;
-  state.knowledgeUniverseWorkspaceSearchTotalCount = runtime.workspaceSearchTotalCount;
-  state.knowledgeUniverseWorkspaceSearchMode = runtime.workspaceSearchMode;
-  state.knowledgeUniverseSelectedWorkspaceSearchHitId = runtime.selectedWorkspaceSearchHitId;
-  state.knowledgeUniverseSelectedWorkspaceSearchDeliverableId =
+  surface.knowledgeUniverseNewKnowledgeBaseTitle = runtime.newKnowledgeBaseTitle;
+  surface.knowledgeUniverseNewKnowledgeBaseDescription = runtime.newKnowledgeBaseDescription;
+  surface.knowledgeUniverseNewKnowledgeBaseVisibility = runtime.newKnowledgeBaseVisibility;
+  surface.knowledgeUniverseWorkspaceSearchGroups = runtime.workspaceSearchGroups;
+  surface.knowledgeUniverseWorkspaceSearchTotalCount = runtime.workspaceSearchTotalCount;
+  surface.knowledgeUniverseWorkspaceSearchMode = runtime.workspaceSearchMode;
+  surface.knowledgeUniverseSelectedWorkspaceSearchHitId = runtime.selectedWorkspaceSearchHitId;
+  surface.knowledgeUniverseSelectedWorkspaceSearchDeliverableId =
     runtime.selectedWorkspaceSearchDeliverableId;
-  state.knowledgeUniverseOpenDeliverableMoreMenuId = runtime.openDeliverableMoreMenuId;
-  state.knowledgeUniverseRelationsInsightExpanded = runtime.relationsInsightExpanded;
-  state.knowledgeUniverseSupplySectionExpanded = runtime.supplySectionExpanded;
-  state.knowledgeUniverseSelectedKbSearchHighlightKey = runtime.selectedKbSearchHighlightKey;
-  state.knowledgeUniverseWorkspaceDeliverablesExpanded = runtime.workspaceDeliverablesExpanded;
-  state.knowledgeUniverseSearchPanelOpen = runtime.searchPanelOpen;
-  state.knowledgeUniverseWorkspaceDeliverableTrace = runtime.workspaceDeliverableTrace;
-  state.knowledgeUniverseWorkspaceDeliverableTraceLoading =
+  surface.knowledgeUniverseOpenDeliverableMoreMenuId = runtime.openDeliverableMoreMenuId;
+  surface.knowledgeUniverseRelationsInsightExpanded = runtime.relationsInsightExpanded;
+  surface.knowledgeUniverseSupplySectionExpanded = runtime.supplySectionExpanded;
+  surface.knowledgeUniverseSelectedKbSearchHighlightKey = runtime.selectedKbSearchHighlightKey;
+  surface.knowledgeUniverseWorkspaceDeliverablesExpanded = runtime.workspaceDeliverablesExpanded;
+  surface.knowledgeUniverseSearchPanelOpen = runtime.searchPanelOpen;
+  surface.knowledgeUniverseWorkspaceDeliverableTrace = runtime.workspaceDeliverableTrace;
+  surface.knowledgeUniverseWorkspaceDeliverableTraceLoading =
     runtime.workspaceDeliverableTraceLoading;
-  state.knowledgeUniverseDeliverableDetailFocus = runtime.deliverableDetailFocus;
-  state.knowledgeUniversePinnedKnowledgeBaseIds = runtime.pinnedKnowledgeBaseIds;
-  state.knowledgeUniverseFavoriteKnowledgeBaseIds = runtime.favoriteKnowledgeBaseIds;
-  state.knowledgeUniverseLibraryWorkspaceContentTab = runtime.libraryWorkspaceContentTab;
-  state.knowledgeUniverseLibraryWorkspaceMaterialsKindFilter =
+  surface.knowledgeUniverseDeliverableDetailFocus = runtime.deliverableDetailFocus;
+  surface.knowledgeUniversePinnedKnowledgeBaseIds = runtime.pinnedKnowledgeBaseIds;
+  surface.knowledgeUniverseFavoriteKnowledgeBaseIds = runtime.favoriteKnowledgeBaseIds;
+  surface.knowledgeUniverseLibraryWorkspaceContentTab = runtime.libraryWorkspaceContentTab;
+  surface.knowledgeUniverseLibraryWorkspaceMaterialsKindFilter =
     runtime.libraryWorkspaceMaterialsKindFilter;
-  state.knowledgeUniverseLibraryWorkspaceDocuments = runtime.libraryWorkspaceDocuments;
-  state.knowledgeUniverseLibraryWorkspaceDocumentsLoading =
+  surface.knowledgeUniverseLibraryWorkspaceDocuments = runtime.libraryWorkspaceDocuments;
+  surface.knowledgeUniverseLibraryWorkspaceDocumentsLoading =
     runtime.libraryWorkspaceDocumentsLoading;
-  state.knowledgeUniverseLibraryWorkspaceSources = runtime.libraryWorkspaceSources;
-  state.knowledgeUniverseLibraryWorkspaceSourcesLoading = runtime.libraryWorkspaceSourcesLoading;
-  state.knowledgeUniverseLibraryWorkspaceSourcesPlaneFilter =
+  surface.knowledgeUniverseLibraryWorkspaceSources = runtime.libraryWorkspaceSources;
+  surface.knowledgeUniverseLibraryWorkspaceSourcesLoading = runtime.libraryWorkspaceSourcesLoading;
+  surface.knowledgeUniverseLibraryWorkspaceSourcesPlaneFilter =
     runtime.libraryWorkspaceSourcesPlaneFilter;
-  state.knowledgeUniverseLibraryWorkspaceSelectedDocumentIds =
+  surface.knowledgeUniverseLibraryWorkspaceSelectedDocumentIds =
     runtime.libraryWorkspaceSelectedDocumentIds;
-  state.knowledgeUniverseLibraryWorkspaceSnippets = runtime.libraryWorkspaceSnippets;
-  state.knowledgeUniverseLibraryWorkspaceSnippetsLoading = runtime.libraryWorkspaceSnippetsLoading;
-  state.knowledgeUniverseLibraryWorkspaceRecycleDocuments =
+  surface.knowledgeUniverseLibraryWorkspaceSnippets = runtime.libraryWorkspaceSnippets;
+  surface.knowledgeUniverseLibraryWorkspaceSnippetsLoading =
+    runtime.libraryWorkspaceSnippetsLoading;
+  surface.knowledgeUniverseLibraryWorkspaceRecycleDocuments =
     runtime.libraryWorkspaceRecycleDocuments;
-  state.knowledgeUniverseLibraryWorkspaceRecycleLoading = runtime.libraryWorkspaceRecycleLoading;
-  state.knowledgeUniverseLibraryWorkspaceWebPages = runtime.libraryWorkspaceWebPages;
-  state.knowledgeUniverseLibraryWorkspaceWebPagesLoading = runtime.libraryWorkspaceWebPagesLoading;
-  state.knowledgeUniverseLibraryWorkspaceDatasets = runtime.libraryWorkspaceDatasets;
-  state.knowledgeUniverseLibraryWorkspaceDatasetsLoading = runtime.libraryWorkspaceDatasetsLoading;
-  state.knowledgeUniverseLibraryWorkspaceAgentKnowledge = runtime.libraryWorkspaceAgentKnowledge;
-  state.knowledgeUniverseLibraryWorkspaceAgentKnowledgeLoading =
+  surface.knowledgeUniverseLibraryWorkspaceRecycleLoading = runtime.libraryWorkspaceRecycleLoading;
+  surface.knowledgeUniverseLibraryWorkspaceWebPages = runtime.libraryWorkspaceWebPages;
+  surface.knowledgeUniverseLibraryWorkspaceWebPagesLoading =
+    runtime.libraryWorkspaceWebPagesLoading;
+  surface.knowledgeUniverseLibraryWorkspaceDatasets = runtime.libraryWorkspaceDatasets;
+  surface.knowledgeUniverseLibraryWorkspaceDatasetsLoading =
+    runtime.libraryWorkspaceDatasetsLoading;
+  surface.knowledgeUniverseLibraryWorkspaceAgentKnowledge = runtime.libraryWorkspaceAgentKnowledge;
+  surface.knowledgeUniverseLibraryWorkspaceAgentKnowledgeLoading =
     runtime.libraryWorkspaceAgentKnowledgeLoading;
-  state.knowledgeUniverseLibraryWorkspaceMembers = runtime.libraryWorkspaceMembers;
-  state.knowledgeUniverseLibraryWorkspaceMembersLoading = runtime.libraryWorkspaceMembersLoading;
-  state.knowledgeUniverseLibraryWorkspaceInviteDrawerOpen =
+  surface.knowledgeUniverseLibraryWorkspaceMembers = runtime.libraryWorkspaceMembers;
+  surface.knowledgeUniverseLibraryWorkspaceMembersLoading = runtime.libraryWorkspaceMembersLoading;
+  surface.knowledgeUniverseLibraryWorkspaceInviteDrawerOpen =
     runtime.libraryWorkspaceInviteDrawerOpen;
-  state.knowledgeUniverseLibraryWorkspaceInviteEmail = runtime.libraryWorkspaceInviteEmail;
-  state.knowledgeUniverseLibraryWorkspaceInviteRole = runtime.libraryWorkspaceInviteRole;
-  state.knowledgeUniverseLibraryWorkspaceInlineRenameKbId =
+  surface.knowledgeUniverseLibraryWorkspaceInviteEmail = runtime.libraryWorkspaceInviteEmail;
+  surface.knowledgeUniverseLibraryWorkspaceInviteRole = runtime.libraryWorkspaceInviteRole;
+  surface.knowledgeUniverseLibraryWorkspaceInlineRenameKbId =
     runtime.libraryWorkspaceInlineRenameKbId;
-  state.knowledgeUniverseLibraryWorkspaceSettingsKbId = runtime.libraryWorkspaceSettingsKbId;
-  state.knowledgeUniverseLibraryWorkspaceSettingsTitle = runtime.libraryWorkspaceSettingsTitle;
-  state.knowledgeUniverseLibraryWorkspaceImportOpen = runtime.libraryWorkspaceImportOpen;
-  state.knowledgeUniverseLibraryWorkspaceImportLockSpace = runtime.libraryWorkspaceImportLockSpace;
-  state.knowledgeUniverseLibraryWorkspaceImportKind = runtime.libraryWorkspaceImportKind;
-  state.knowledgeUniverseLibraryWorkspaceBindSourceKind = runtime.libraryWorkspaceBindSourceKind;
-  state.knowledgeUniverseLibraryWorkspaceBindSourceTitle = runtime.libraryWorkspaceBindSourceTitle;
-  state.knowledgeUniverseLibraryWorkspaceBindSourceEndpoint =
+  surface.knowledgeUniverseLibraryWorkspaceSettingsKbId = runtime.libraryWorkspaceSettingsKbId;
+  surface.knowledgeUniverseLibraryWorkspaceSettingsTitle = runtime.libraryWorkspaceSettingsTitle;
+  surface.knowledgeUniverseLibraryWorkspaceImportOpen = runtime.libraryWorkspaceImportOpen;
+  surface.knowledgeUniverseLibraryWorkspaceImportLockSpace =
+    runtime.libraryWorkspaceImportLockSpace;
+  surface.knowledgeUniverseLibraryWorkspaceImportKind = runtime.libraryWorkspaceImportKind;
+  surface.knowledgeUniverseLibraryWorkspaceBindSourceKind = runtime.libraryWorkspaceBindSourceKind;
+  surface.knowledgeUniverseLibraryWorkspaceBindSourceTitle =
+    runtime.libraryWorkspaceBindSourceTitle;
+  surface.knowledgeUniverseLibraryWorkspaceBindSourceEndpoint =
     runtime.libraryWorkspaceBindSourceEndpoint;
-  state.knowledgeUniverseLibraryWorkspaceLocalFolderPath = runtime.libraryWorkspaceLocalFolderPath;
-  state.knowledgeUniverseLibraryWorkspaceLocalFolderLabel =
+  surface.knowledgeUniverseLibraryWorkspaceLocalFolderPath =
+    runtime.libraryWorkspaceLocalFolderPath;
+  surface.knowledgeUniverseLibraryWorkspaceLocalFolderLabel =
     runtime.libraryWorkspaceLocalFolderLabel;
-  state.knowledgeUniverseLibraryWorkspaceLocalFolderDeletePolicy =
+  surface.knowledgeUniverseLibraryWorkspaceLocalFolderDeletePolicy =
     runtime.libraryWorkspaceLocalFolderDeletePolicy;
-  state.knowledgeUniverseLibraryWorkspaceLocalFolderWatcherEnabled =
+  surface.knowledgeUniverseLibraryWorkspaceLocalFolderWatcherEnabled =
     runtime.libraryWorkspaceLocalFolderWatcherEnabled;
-  state.knowledgeUniverseLibraryWorkspaceLocalFolderMode = runtime.libraryWorkspaceLocalFolderMode;
-  state.knowledgeUniverseLibraryWorkspaceLocalFolderStatusItems =
+  surface.knowledgeUniverseLibraryWorkspaceLocalFolderMode =
+    runtime.libraryWorkspaceLocalFolderMode;
+  surface.knowledgeUniverseLibraryWorkspaceLocalFolderStatusItems =
     runtime.libraryWorkspaceLocalFolderStatusItems;
-  state.knowledgeUniverseGovernanceSummary = runtime.governanceSummary;
-  state.knowledgeUniverseGovernanceTasks = runtime.governanceTasks;
-  state.knowledgeUniverseGovernanceLoading = runtime.governanceLoading;
-  state.knowledgeUniverseGovernanceError = runtime.governanceError;
-  state.knowledgeUniverseGovernanceNotice = runtime.governanceNotice;
-  state.knowledgeUniverseGovernanceTaskBusyId = runtime.governanceTaskBusyId;
-  state.knowledgeUniverseGovernanceSelectedTaskId = runtime.governanceSelectedTaskId;
-  state.knowledgeUniverseGovernanceTaskGraph = runtime.governanceTaskGraph;
-  state.knowledgeUniverseGovernanceTaskGraphViewModel = runtime.governanceTaskGraphViewModel;
-  state.knowledgeUniverseGovernanceTaskGraphLoading = runtime.governanceTaskGraphLoading;
-  state.knowledgeUniverseGovernanceTaskGraphZoom = runtime.governanceTaskGraphZoom;
-  state.knowledgeUniverseGovernanceTaskGraphPanX = runtime.governanceTaskGraphPanX;
-  state.knowledgeUniverseGovernanceTaskGraphPanY = runtime.governanceTaskGraphPanY;
-  state.knowledgeUniverseGovernanceTaskGraphSelectedNodeId =
+  surface.knowledgeUniverseGovernanceSummary = runtime.governanceSummary;
+  surface.knowledgeUniverseGovernanceTasks = runtime.governanceTasks;
+  surface.knowledgeUniverseGovernanceLoading = runtime.governanceLoading;
+  surface.knowledgeUniverseGovernanceError = runtime.governanceError;
+  surface.knowledgeUniverseGovernanceNotice = runtime.governanceNotice;
+  surface.knowledgeUniverseGovernanceTaskBusyId = runtime.governanceTaskBusyId;
+  surface.knowledgeUniverseGovernanceSelectedTaskId = runtime.governanceSelectedTaskId;
+  surface.knowledgeUniverseGovernanceTaskGraph = runtime.governanceTaskGraph;
+  surface.knowledgeUniverseGovernanceTaskGraphViewModel = runtime.governanceTaskGraphViewModel;
+  surface.knowledgeUniverseGovernanceTaskGraphLoading = runtime.governanceTaskGraphLoading;
+  surface.knowledgeUniverseGovernanceTaskGraphZoom = runtime.governanceTaskGraphZoom;
+  surface.knowledgeUniverseGovernanceTaskGraphPanX = runtime.governanceTaskGraphPanX;
+  surface.knowledgeUniverseGovernanceTaskGraphPanY = runtime.governanceTaskGraphPanY;
+  surface.knowledgeUniverseGovernanceTaskGraphSelectedNodeId =
     runtime.governanceTaskGraphSelectedNodeId;
-  state.knowledgeUniverseGovernanceTaskGraphHoveredNodeId =
+  surface.knowledgeUniverseGovernanceTaskGraphHoveredNodeId =
     runtime.governanceTaskGraphHoveredNodeId;
   runtime.chatScopeSyncKey = syncKnowledgeUniverseSelectionToChatHost(
     state as KnowledgeUniverseChatScopeHost,
@@ -580,6 +613,8 @@ function syncToAppState(state: AppPortState, runtime: KnowledgeUniverseControlle
 function createInitialRuntime(): KnowledgeUniverseControllerState {
   return {
     loading: false,
+    graphLoading: false,
+    insightsLoading: false,
     error: null,
     query: "",
     homeFocus: null,
@@ -774,7 +809,9 @@ function createInitialRuntime(): KnowledgeUniverseControllerState {
   };
 }
 
-export function getKnowledgeUniverseRuntime(state: AppPortState): KnowledgeUniverseControllerState {
+export function getKnowledgeUniverseRuntime(
+  state: KnowledgeUniverseSession,
+): KnowledgeUniverseControllerState {
   let runtime = runtimes.get(state);
   if (!runtime) {
     runtime = createInitialRuntime();
@@ -783,99 +820,206 @@ export function getKnowledgeUniverseRuntime(state: AppPortState): KnowledgeUnive
   return runtime;
 }
 
-export async function loadKnowledgeUniverseHome(
-  state: AppPortState,
-  options?: { force?: boolean },
+type KnowledgeUniverseHomeLoadRequest = { mode: "load" | "refresh"; force?: boolean };
+
+type HomeLoadCoalescer = {
+  inFlight: Promise<void> | null;
+  inFlightToken: object | null;
+  queued: KnowledgeUniverseHomeLoadRequest | null;
+};
+
+const homeLoadCoalescers = new WeakMap<object, HomeLoadCoalescer>();
+
+function getHomeLoadCoalescer(state: KnowledgeUniverseSession) {
+  let entry = homeLoadCoalescers.get(state);
+  if (!entry) {
+    entry = { inFlight: null, inFlightToken: null, queued: null };
+    homeLoadCoalescers.set(state, entry);
+  }
+  return entry;
+}
+
+function applyKnowledgeUniverseHomeSnapshot(
+  runtime: KnowledgeUniverseControllerState,
+  snapshot:
+    | import("../capability/knowledge-universe/facade.ts").KnowledgeUniverseHomePartialSnapshot
+    | import("../capability/knowledge-universe/endpoints.ts").KnowledgeUniverseHomeSnapshot,
+) {
+  if ("sourceSummary" in snapshot && snapshot.sourceSummary !== undefined) {
+    runtime.sourceSummary = snapshot.sourceSummary;
+  }
+  if ("graph" in snapshot && snapshot.graph !== undefined) {
+    runtime.graph = snapshot.graph;
+    if ("graphViewModel" in snapshot && snapshot.graphViewModel !== undefined) {
+      runtime.graphViewModel = snapshot.graphViewModel;
+    }
+    runtime.graphLoading = false;
+  }
+  if ("searchResults" in snapshot && snapshot.searchResults !== undefined) {
+    runtime.searchResults = snapshot.searchResults;
+  }
+  if ("dataCapabilities" in snapshot && snapshot.dataCapabilities !== undefined) {
+    runtime.dataCapabilities = snapshot.dataCapabilities;
+  }
+  if ("sourceBrowse" in snapshot && snapshot.sourceBrowse !== undefined) {
+    runtime.sourceBrowse = snapshot.sourceBrowse;
+  }
+  if ("externalDataSources" in snapshot && snapshot.externalDataSources !== undefined) {
+    runtime.externalDataSources = snapshot.externalDataSources;
+  }
+  if ("recommendations" in snapshot && snapshot.recommendations !== undefined) {
+    runtime.recommendations = snapshot.recommendations;
+  }
+  if ("discoveryEvents" in snapshot && snapshot.discoveryEvents !== undefined) {
+    runtime.discoveryEvents = snapshot.discoveryEvents;
+  }
+  if ("actionSuggestions" in snapshot && snapshot.actionSuggestions !== undefined) {
+    runtime.actionSuggestions = snapshot.actionSuggestions;
+  }
+  if ("homeInsightsDegraded" in snapshot && snapshot.homeInsightsDegraded !== undefined) {
+    runtime.homeInsightsDegraded = snapshot.homeInsightsDegraded;
+  }
+  if ("recentVisits" in snapshot && snapshot.recentVisits !== undefined) {
+    runtime.recentVisits = snapshot.recentVisits;
+  }
+  if ("relatedGroups" in snapshot && snapshot.relatedGroups !== undefined) {
+    runtime.relatedGroups = snapshot.relatedGroups;
+  }
+  if ("selectedObject" in snapshot && snapshot.selectedObject !== undefined) {
+    runtime.selectedObject = snapshot.selectedObject;
+  }
+  const settled = "settled" in snapshot ? snapshot.settled : undefined;
+  if (
+    !settled ||
+    (settled.includes("recommendations") &&
+      settled.includes("actions") &&
+      settled.includes("discovery"))
+  ) {
+    runtime.insightsLoading = false;
+  }
+}
+
+async function runKnowledgeUniverseHomeLoad(
+  state: KnowledgeUniverseSession,
+  request: KnowledgeUniverseHomeLoadRequest,
 ) {
   const runtime = getKnowledgeUniverseRuntime(state);
-  if (runtime.loading) {
-    return;
-  }
-  if (runtime.hasLoaded && !options?.force) {
+  if (request.mode === "load" && runtime.hasLoaded && !request.force) {
     return;
   }
   if (!runtime.hasLoaded) {
     applyKnowledgeUniverseUiPrefs(state);
   }
   runtime.loading = true;
+  runtime.graphLoading = true;
+  runtime.insightsLoading = true;
   runtime.error = null;
   syncToAppState(state, runtime);
   requestUpdate(state);
+  // Start the space list immediately so it can render before the graph settles.
+  const workspacePromise = loadKnowledgeUniverseWorkspace(state);
   try {
     const snapshot = await loadKnowledgeUniverseHomeSnapshot({
       client: state.client,
       query: runtime.query,
       selectedNodeId: runtime.selectedNodeId,
       selectedKnowledgeBaseId: runtime.selectedKnowledgeBaseId,
+      onPartial: (partial) => {
+        applyKnowledgeUniverseHomeSnapshot(runtime, partial);
+        syncToAppState(state, runtime);
+        requestUpdate(state);
+      },
     });
-    runtime.sourceSummary = snapshot.sourceSummary;
-    runtime.graph = snapshot.graph;
-    runtime.graphViewModel = snapshot.graphViewModel;
-    runtime.searchResults = snapshot.searchResults;
-    runtime.dataCapabilities = snapshot.dataCapabilities;
-    runtime.sourceBrowse = snapshot.sourceBrowse;
-    runtime.externalDataSources = snapshot.externalDataSources;
-    runtime.recommendations = snapshot.recommendations;
-    runtime.discoveryEvents = snapshot.discoveryEvents;
-    runtime.actionSuggestions = snapshot.actionSuggestions;
-    runtime.homeInsightsDegraded = snapshot.homeInsightsDegraded ?? false;
-    runtime.recentVisits = snapshot.recentVisits;
-    runtime.relatedGroups = snapshot.relatedGroups;
-    runtime.selectedObject = snapshot.selectedObject;
+    applyKnowledgeUniverseHomeSnapshot(runtime, snapshot);
     runtime.hasLoaded = true;
     runtime.error = null;
-    await loadKnowledgeUniverseWorkspace(state);
+    await workspacePromise;
     void loadKnowledgeUniverseGovernance(state);
-    void import("./knowledge-universe-connector-bind.ts").then((module) => {
-      module.maybeResumeKnowledgeUniverseConnectorOAuthFromUrl(state);
-    });
+    if (request.mode === "load") {
+      void import("./knowledge-universe-connector-bind.ts").then((module) => {
+        module.maybeResumeKnowledgeUniverseConnectorOAuthFromUrl(
+          state as import("../app-port-state.ts").AppPortState,
+        );
+      });
+    }
   } catch (error) {
-    runtime.error = runtimeMessageFromError(error, runtimeMessageLoadWorkbenchFailed);
+    runtime.error = runtimeMessageFromError(
+      error,
+      request.mode === "refresh"
+        ? runtimeMessageRefreshWorkbenchFailed
+        : runtimeMessageLoadWorkbenchFailed,
+    );
+    await workspacePromise.catch(() => undefined);
   } finally {
     runtime.loading = false;
+    runtime.graphLoading = false;
+    runtime.insightsLoading = false;
     syncToAppState(state, runtime);
     requestUpdate(state);
   }
 }
 
-export async function refreshKnowledgeUniverseHome(state: AppPortState) {
-  const runtime = getKnowledgeUniverseRuntime(state);
-  runtime.loading = true;
-  runtime.error = null;
-  syncToAppState(state, runtime);
-  requestUpdate(state);
-  try {
-    const snapshot = await loadKnowledgeUniverseHomeSnapshot({
-      client: state.client,
-      query: runtime.query,
-      selectedNodeId: runtime.selectedNodeId,
-      selectedKnowledgeBaseId: runtime.selectedKnowledgeBaseId,
-    });
-    runtime.sourceSummary = snapshot.sourceSummary;
-    runtime.graph = snapshot.graph;
-    runtime.graphViewModel = snapshot.graphViewModel;
-    runtime.searchResults = snapshot.searchResults;
-    runtime.dataCapabilities = snapshot.dataCapabilities;
-    runtime.sourceBrowse = snapshot.sourceBrowse;
-    runtime.externalDataSources = snapshot.externalDataSources;
-    runtime.recommendations = snapshot.recommendations;
-    runtime.discoveryEvents = snapshot.discoveryEvents;
-    runtime.actionSuggestions = snapshot.actionSuggestions;
-    runtime.homeInsightsDegraded = snapshot.homeInsightsDegraded ?? false;
-    runtime.recentVisits = snapshot.recentVisits;
-    runtime.relatedGroups = snapshot.relatedGroups;
-    runtime.selectedObject = snapshot.selectedObject;
-    runtime.hasLoaded = true;
-    runtime.error = null;
-    await loadKnowledgeUniverseWorkspace(state);
-    void loadKnowledgeUniverseGovernance(state);
-  } catch (error) {
-    runtime.error = runtimeMessageFromError(error, runtimeMessageRefreshWorkbenchFailed);
-  } finally {
-    runtime.loading = false;
-    syncToAppState(state, runtime);
-    requestUpdate(state);
+async function enqueueKnowledgeUniverseHomeLoad(
+  state: KnowledgeUniverseSession,
+  request: KnowledgeUniverseHomeLoadRequest,
+) {
+  const coalescer = getHomeLoadCoalescer(state);
+  if (coalescer.inFlight) {
+    // Merge or queue behind the in-flight load instead of starting a second
+    // overlapping home snapshot (t316 stacked three home loads to 60s+).
+    const current = coalescer.queued;
+    coalescer.queued = {
+      mode: request.mode === "refresh" || current?.mode === "refresh" ? "refresh" : "load",
+      force:
+        Boolean(request.force || current?.force) ||
+        request.mode === "refresh" ||
+        current?.mode === "refresh",
+    };
+    await coalescer.inFlight;
+    if (coalescer.queued && !coalescer.inFlight) {
+      const leftover = coalescer.queued;
+      coalescer.queued = null;
+      await enqueueKnowledgeUniverseHomeLoad(state, leftover);
+    }
+    return;
   }
+  // Create the in-flight promise and token before work starts so a later
+  // comparison does not read `run` in the TDZ, and so a previous generation
+  // cannot clear a newer holder.
+  let settle!: (result: Promise<void>) => void;
+  const run = new Promise<void>((resolve, reject) => {
+    settle = (result) => {
+      result.then(resolve, reject);
+    };
+  });
+  const token = {};
+  coalescer.inFlightToken = token;
+  coalescer.inFlight = run;
+  const work = (async () => {
+    do {
+      const next = coalescer.queued ?? request;
+      coalescer.queued = null;
+      await runKnowledgeUniverseHomeLoad(state, next);
+    } while (coalescer.queued);
+  })().finally(() => {
+    if (coalescer.inFlightToken === token) {
+      coalescer.inFlight = null;
+      coalescer.inFlightToken = null;
+    }
+  });
+  settle(work);
+  await run;
+}
+
+export async function loadKnowledgeUniverseHome(
+  state: KnowledgeUniverseSession,
+  options?: { force?: boolean },
+) {
+  await enqueueKnowledgeUniverseHomeLoad(state, { mode: "load", force: options?.force });
+}
+
+export async function refreshKnowledgeUniverseHome(state: KnowledgeUniverseSession) {
+  await enqueueKnowledgeUniverseHomeLoad(state, { mode: "refresh", force: true });
 }
 
 export function setKnowledgeUniverseSearchPanelOpen(state: AppPortState, open: boolean) {
@@ -960,7 +1104,7 @@ function resolveGovernanceKbId(
   return kbId ? kbId : undefined;
 }
 
-export async function loadKnowledgeUniverseGovernance(state: AppPortState) {
+export async function loadKnowledgeUniverseGovernance(state: KnowledgeUniverseSession) {
   const runtime = getKnowledgeUniverseRuntime(state);
   if (!state.client) {
     return;
