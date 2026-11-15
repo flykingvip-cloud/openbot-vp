@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import type {
+  FollowupReauthorizationGrant,
   FollowupWorkspaceClassification,
   FollowupWorkspaceDestination,
   FollowupWorkspaceSnapshot,
@@ -37,6 +38,43 @@ export type FollowupRecoveryStatus =
 
 export type BlockedFollowupWorkspaceSnapshot = FollowupWorkspaceSnapshot;
 
+export type FollowupDeliveryResumePayload = {
+  text?: string;
+  mediaUrl?: string;
+  mediaUrls?: string[];
+  replyToId?: string;
+  audioAsVoice?: boolean;
+  isError?: boolean;
+  channelData?: Record<string, unknown>;
+};
+
+export type FollowupDeliveryResumeSnapshot = {
+  deliveryOnly: boolean;
+  payloads: FollowupDeliveryResumePayload[];
+  agentId?: string;
+  agentDir?: string;
+  sessionId?: string;
+  sessionKey?: string;
+  sessionFile?: string;
+  workspaceDir?: string;
+  prompt?: string;
+  messageId?: string;
+  followupItemId?: string;
+  originatingChannel?: string;
+  originatingTo?: string;
+  originatingAccountId?: string;
+  originatingThreadId?: string | number;
+  provider?: string;
+  model?: string;
+  deliverableVersion?: string;
+  asyncWaitRecoveryBind?: {
+    jobId: string;
+    claimToken: string;
+    boundRunId?: string;
+    boundDeliveryId?: string;
+  };
+};
+
 /**
  * Durable recoverable / denied / continuation record for a followup workspace
  * decision. This store is disk-only: a later process finds records by
@@ -59,6 +97,8 @@ export type BlockedFollowupDeliveryRecord = {
   contentVersionChange?: { from: string; to: string };
   pathNormalization?: { from: string; to: string };
   reauthorization?: { kind: "tenant" | "owner" | "permission"; detail: string };
+  reauthorizationGrant?: FollowupReauthorizationGrant;
+  resume?: FollowupDeliveryResumeSnapshot;
   sessionKey?: string;
   sessionFile?: string;
   jobId?: string;
@@ -180,6 +220,8 @@ export async function recordBlockedFollowupDelivery(input: {
   contentVersionChange?: { from: string; to: string };
   pathNormalization?: { from: string; to: string };
   reauthorization?: { kind: "tenant" | "owner" | "permission"; detail: string };
+  reauthorizationGrant?: FollowupReauthorizationGrant;
+  resume?: FollowupDeliveryResumeSnapshot;
   sessionKey?: string;
   sessionFile?: string;
   jobId?: string;
@@ -221,14 +263,48 @@ export async function recordBlockedFollowupDelivery(input: {
     ...(input.pendingDestination ? { pendingDestination: input.pendingDestination } : {}),
     ...(input.contentVersionChange ? { contentVersionChange: input.contentVersionChange } : {}),
     ...(input.pathNormalization ? { pathNormalization: input.pathNormalization } : {}),
-    ...(input.reauthorization ? { reauthorization: input.reauthorization } : {}),
-    ...(input.sessionKey ? { sessionKey: input.sessionKey } : {}),
-    ...(input.sessionFile ? { sessionFile: input.sessionFile } : {}),
-    ...(input.jobId ? { jobId: input.jobId } : {}),
-    ...(input.runId ? { runId: input.runId } : {}),
-    ...(input.deliveryId ? { deliveryId: input.deliveryId } : {}),
-    ...(input.taskId ? { taskId: input.taskId } : {}),
-    ...(input.workspaceBinding ? { workspaceBinding: input.workspaceBinding } : {}),
+    ...(input.reauthorization
+      ? { reauthorization: input.reauthorization }
+      : existing?.reauthorization
+        ? { reauthorization: existing.reauthorization }
+        : {}),
+    ...(input.reauthorizationGrant
+      ? { reauthorizationGrant: input.reauthorizationGrant }
+      : existing?.reauthorizationGrant
+        ? { reauthorizationGrant: existing.reauthorizationGrant }
+        : {}),
+    ...(input.resume
+      ? { resume: input.resume }
+      : existing?.resume
+        ? { resume: existing.resume }
+        : {}),
+    ...(input.sessionKey
+      ? { sessionKey: input.sessionKey }
+      : existing?.sessionKey
+        ? { sessionKey: existing.sessionKey }
+        : {}),
+    ...(input.sessionFile
+      ? { sessionFile: input.sessionFile }
+      : existing?.sessionFile
+        ? { sessionFile: existing.sessionFile }
+        : {}),
+    ...(input.jobId ? { jobId: input.jobId } : existing?.jobId ? { jobId: existing.jobId } : {}),
+    ...(input.runId ? { runId: input.runId } : existing?.runId ? { runId: existing.runId } : {}),
+    ...(input.deliveryId
+      ? { deliveryId: input.deliveryId }
+      : existing?.deliveryId
+        ? { deliveryId: existing.deliveryId }
+        : {}),
+    ...(input.taskId
+      ? { taskId: input.taskId }
+      : existing?.taskId
+        ? { taskId: existing.taskId }
+        : {}),
+    ...(input.workspaceBinding
+      ? { workspaceBinding: input.workspaceBinding }
+      : existing?.workspaceBinding
+        ? { workspaceBinding: existing.workspaceBinding }
+        : {}),
   };
   return writeRecord(input.persistRoot, record);
 }
@@ -245,6 +321,8 @@ export async function recordFollowupWorkspaceDecision(input: {
   deliveryId?: string;
   taskId?: string;
   workspaceBinding?: BlockedFollowupWorkspaceSnapshot;
+  resume?: FollowupDeliveryResumeSnapshot;
+  reauthorizationGrant?: FollowupReauthorizationGrant;
   pendingDestination?: FollowupWorkspaceDestination;
   reasonOverride?: string;
   statusOverride?: FollowupRecoveryStatus;
@@ -275,6 +353,8 @@ export async function recordFollowupWorkspaceDecision(input: {
     contentVersionChange: classification.contentVersionChange,
     pathNormalization: classification.pathNormalization,
     reauthorization: classification.reauthorization,
+    reauthorizationGrant: input.reauthorizationGrant,
+    resume: input.resume,
     sessionKey: input.sessionKey,
     sessionFile: input.sessionFile,
     jobId: input.jobId,

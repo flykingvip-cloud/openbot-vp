@@ -6,6 +6,7 @@ import { M3_VERIFY_RECEIPT_KIND } from "../../gateway/data-governance/migration-
 import {
   classifyFollowupWorkspaceChange,
   findVerifiedWorkspaceMigrationReceipt,
+  isCompleteVerifiedMigration,
   migrationReceiptToEvidence,
   type FollowupWorkspaceCurrentEvidence,
   type FollowupWorkspaceSnapshot,
@@ -64,6 +65,8 @@ function current(
 }
 
 function receipt(
+  fromDir: string,
+  toDir: string,
   overrides: Partial<VerifiedMigrationReceiptEvidence> = {},
 ): VerifiedMigrationReceiptEvidence {
   return {
@@ -73,6 +76,15 @@ function receipt(
     passed: true,
     fromBindingId: "binding",
     toBindingId: "binding-migrated",
+    fromContentVersion: "2",
+    toContentVersion: "4",
+    fromDirectoryRealpath: fromDir,
+    toDirectoryRealpath: toDir,
+    authorizationIdentity: "tenant:tenant:grant:migration-batch-b1",
+    operationIdentity: "tenant:tenant:operator:candidate-c1",
+    catalogBindingVerified: true,
+    ownershipTenantVerified: true,
+    artifactSet: [{ artifactId: RESOURCE, checksum: "sha256:abcd1234abcd1234abcd1234abcd1234" }],
     artifactIdentityVerified: true,
     integrityVerified: true,
     ...overrides,
@@ -122,7 +134,7 @@ it("continues an authorized migration after a complete verify receipt matches th
     current: current(toDir, { bindingId: "binding-migrated", contentVersion: "4" }),
     savedRealpath: fromDir,
     requiredOperation: "write",
-    verifiedMigration: receipt({
+    verifiedMigration: receipt(fromDir, toDir, {
       toLocator: toDir,
       fromLocator: fromDir,
     }),
@@ -178,15 +190,23 @@ it("waits with a concrete missing-item list when evidence is incomplete or a bin
     saved: saved(root),
     current: current(path.join(root, "moved"), { bindingId: "binding-migrated" }),
     requiredOperation: "write",
-    verifiedMigration: receipt({
+    verifiedMigration: receipt(root, path.join(root, "moved"), {
       passed: true,
+      catalogBindingVerified: false,
+      ownershipTenantVerified: false,
       artifactIdentityVerified: false,
       integrityVerified: false,
+      artifactSet: [],
     }),
   });
   expect(incompleteReceipt.destination).toBe("recoverable_wait");
   expect(incompleteReceipt.missingItems).toEqual(
-    expect.arrayContaining(["migration_receipt_artifact_identity", "migration_receipt_integrity"]),
+    expect.arrayContaining([
+      "migration_receipt_catalog_binding",
+      "migration_receipt_ownership_tenant",
+      "migration_receipt_artifact_set",
+      "migration_receipt_integrity",
+    ]),
   );
 });
 
@@ -331,8 +351,10 @@ it("reads a passed verify receipt from disk and still rejects an incomplete appl
   expect(found).toMatchObject({
     receiptId: "v1",
     passed: true,
+    catalogBindingVerified: true,
+    ownershipTenantVerified: true,
     artifactIdentityVerified: true,
-    integrityVerified: true,
+    integrityVerified: false,
   });
 
   const applyOnly = migrationReceiptToEvidence({
@@ -346,7 +368,222 @@ it("reads a passed verify receipt from disk and still rejects an incomplete appl
   });
   expect(applyOnly).toMatchObject({
     passed: true,
+    catalogBindingVerified: false,
+    ownershipTenantVerified: false,
     artifactIdentityVerified: false,
     integrityVerified: false,
   });
+  const applyClassified = classifyFollowupWorkspaceChange({
+    saved: saved(receiptDir),
+    current: current(receiptDir, { bindingId: "binding-migrated" }),
+    savedRealpath: receiptDir,
+    requiredOperation: "write",
+    verifiedMigration: applyOnly,
+  });
+  expect(applyClassified.destination).toBe("recoverable_wait");
+});
+
+it("does not let a same-resource historical receipt approve a later, different migration", () => {
+  const fromDir = makeDir("t171-old-receipt-from-");
+  const oldToDir = makeDir("t171-old-receipt-to-");
+  const newToDir = makeDir("t171-new-migration-to-");
+  const historical = receipt(fromDir, oldToDir, {
+    receiptId: "old-receipt",
+    toBindingId: "binding-old-target",
+    toContentVersion: "4",
+    toDirectoryRealpath: oldToDir,
+  });
+  const result = classifyFollowupWorkspaceChange({
+    saved: saved(fromDir),
+    current: current(newToDir, { bindingId: "binding-new-target", contentVersion: "6" }),
+    savedRealpath: fromDir,
+    requiredOperation: "write",
+    verifiedMigration: historical,
+  });
+  expect(result.destination).toBe("recoverable_wait");
+  expect(result.missingItems).toEqual(
+    expect.arrayContaining([
+      "migration_receipt_target_binding",
+      "migration_receipt_target_version",
+      "migration_receipt_target_directory",
+    ]),
+  );
+  expect(
+    isCompleteVerifiedMigration(
+      historical,
+      saved(fromDir),
+      current(newToDir, { bindingId: "binding-new-target", contentVersion: "6" }),
+      fromDir,
+    ),
+  ).toMatchObject({ ok: false });
+});
+
+it("does not treat a receipt missing required from/to, identity, or artifact-set fields as complete", () => {
+  const fromDir = makeDir("t171-missing-fields-from-");
+  const toDir = makeDir("t171-missing-fields-to-");
+  const incomplete = receipt(fromDir, toDir, {
+    fromBindingId: undefined,
+    toBindingId: undefined,
+    fromContentVersion: undefined,
+    toContentVersion: undefined,
+    fromDirectoryRealpath: undefined,
+    toDirectoryRealpath: undefined,
+    authorizationIdentity: undefined,
+    operationIdentity: undefined,
+    artifactSet: [],
+    integrityVerified: false,
+  });
+  const result = classifyFollowupWorkspaceChange({
+    saved: saved(fromDir),
+    current: current(toDir, { bindingId: "binding-migrated", contentVersion: "4" }),
+    savedRealpath: fromDir,
+    requiredOperation: "write",
+    verifiedMigration: incomplete,
+  });
+  expect(result.destination).toBe("recoverable_wait");
+  expect(result.missingItems).toEqual(
+    expect.arrayContaining([
+      "migration_receipt_source_binding",
+      "migration_receipt_target_binding",
+      "migration_receipt_source_version",
+      "migration_receipt_target_version",
+      "migration_receipt_source_directory",
+      "migration_receipt_target_directory",
+      "migration_receipt_authorization_identity",
+      "migration_receipt_operation_identity",
+      "migration_receipt_artifact_set",
+      "migration_receipt_integrity",
+    ]),
+  );
+});
+
+it("requires both catalog_binding and ownership_tenant; either check alone is not enough", () => {
+  const fromDir = makeDir("t171-identity-and-from-");
+  const toDir = makeDir("t171-identity-and-to-");
+  const catalogOnly = classifyFollowupWorkspaceChange({
+    saved: saved(fromDir),
+    current: current(toDir, { bindingId: "binding-migrated", contentVersion: "4" }),
+    savedRealpath: fromDir,
+    requiredOperation: "write",
+    verifiedMigration: receipt(fromDir, toDir, {
+      catalogBindingVerified: true,
+      ownershipTenantVerified: false,
+      artifactIdentityVerified: true,
+    }),
+  });
+  expect(catalogOnly.destination).toBe("recoverable_wait");
+  expect(catalogOnly.missingItems).toEqual(
+    expect.arrayContaining(["migration_receipt_ownership_tenant"]),
+  );
+
+  const ownershipOnly = classifyFollowupWorkspaceChange({
+    saved: saved(fromDir),
+    current: current(toDir, { bindingId: "binding-migrated", contentVersion: "4" }),
+    savedRealpath: fromDir,
+    requiredOperation: "write",
+    verifiedMigration: receipt(fromDir, toDir, {
+      catalogBindingVerified: false,
+      ownershipTenantVerified: true,
+      artifactIdentityVerified: true,
+    }),
+  });
+  expect(ownershipOnly.destination).toBe("recoverable_wait");
+  expect(ownershipOnly.missingItems).toEqual(
+    expect.arrayContaining(["migration_receipt_catalog_binding"]),
+  );
+});
+
+it("does not continue when a receipt is inconsistent with the current directory change", () => {
+  const fromDir = makeDir("t171-mismatch-from-");
+  const toDir = makeDir("t171-mismatch-to-");
+  const otherDir = makeDir("t171-mismatch-other-");
+  const result = classifyFollowupWorkspaceChange({
+    saved: saved(fromDir),
+    current: current(toDir, { bindingId: "binding-migrated", contentVersion: "4" }),
+    savedRealpath: fromDir,
+    requiredOperation: "write",
+    verifiedMigration: receipt(fromDir, otherDir, {
+      fromBindingId: "binding-other-source",
+      toBindingId: "binding-other-target",
+      fromContentVersion: "1",
+      toContentVersion: "9",
+    }),
+  });
+  expect(result.destination).toBe("recoverable_wait");
+  expect(result.code).not.toBe("authorized_migration");
+  expect(result.missingItems).toEqual(
+    expect.arrayContaining([
+      "migration_receipt_source_binding",
+      "migration_receipt_target_binding",
+      "migration_receipt_source_version",
+      "migration_receipt_target_version",
+      "migration_receipt_target_directory",
+    ]),
+  );
+});
+
+it("parses retained from/to binding fields and the checksummed artifact set from a verify receipt", () => {
+  const fromDir = makeDir("t171-parse-from-");
+  const toDir = makeDir("t171-parse-to-");
+  const receiptDir = makeDir("t171-parse-receipts-");
+  const payload = {
+    kind: M3_VERIFY_RECEIPT_KIND,
+    receiptId: "v-bound",
+    batchId: "b1",
+    tenantId: "tenant",
+    resourceId: RESOURCE,
+    candidateId: "c1",
+    passed: true,
+    fromBindingId: "binding",
+    toBindingId: "binding-migrated",
+    fromContentVersion: "2",
+    toContentVersion: "4",
+    fromDirectoryRealpath: fromDir,
+    toDirectoryRealpath: toDir,
+    authorizationIdentity: "tenant:tenant:grant:migration-batch-b1",
+    operationIdentity: "tenant:tenant:operator:candidate-c1",
+    artifactSet: [{ artifactId: RESOURCE, checksum: "sha256:abcd1234abcd1234abcd1234abcd1234" }],
+    findings: [
+      { check: "catalog_binding", outcome: "passed", detail: toDir },
+      { check: "checksum", outcome: "passed", detail: "sha256:abcd1234abcd1234abcd1234abcd1234" },
+      { check: "ownership_tenant", outcome: "passed", detail: "position:seat" },
+    ],
+    legalHold: null,
+    retention: null,
+  };
+  const parsed = migrationReceiptToEvidence(payload);
+  expect(parsed).toMatchObject({
+    receiptId: "v-bound",
+    fromBindingId: "binding",
+    toBindingId: "binding-migrated",
+    fromContentVersion: "2",
+    toContentVersion: "4",
+    fromDirectoryRealpath: fs.realpathSync(fromDir),
+    toDirectoryRealpath: fs.realpathSync(toDir),
+    authorizationIdentity: "tenant:tenant:grant:migration-batch-b1",
+    operationIdentity: "tenant:tenant:operator:candidate-c1",
+    catalogBindingVerified: true,
+    ownershipTenantVerified: true,
+    integrityVerified: true,
+    artifactSet: [{ artifactId: RESOURCE, checksum: "sha256:abcd1234abcd1234abcd1234abcd1234" }],
+  });
+  fs.writeFileSync(path.join(receiptDir, "verify.json"), `${JSON.stringify(payload)}\n`);
+  const found = findVerifiedWorkspaceMigrationReceipt({
+    receiptDirs: [receiptDir],
+    resourceId: RESOURCE,
+    tenantId: "tenant",
+    saved: saved(fromDir),
+    current: current(toDir, { bindingId: "binding-migrated", contentVersion: "4" }),
+    savedRealpath: fromDir,
+  });
+  expect(found?.receiptId).toBe("v-bound");
+  expect(
+    classifyFollowupWorkspaceChange({
+      saved: saved(fromDir),
+      current: current(toDir, { bindingId: "binding-migrated", contentVersion: "4" }),
+      savedRealpath: fromDir,
+      requiredOperation: "write",
+      verifiedMigration: found,
+    }).destination,
+  ).toBe("continue");
 });

@@ -46,6 +46,17 @@ export type FollowupWorkspaceCurrentEvidence = {
   operationAllowed: boolean;
 };
 
+export type MigrationArtifactIntegrity = {
+  artifactId: string;
+  checksum: string;
+};
+
+export type FollowupReauthorizationGrant = {
+  kind: "tenant" | "owner" | "permission";
+  actorIdentity: string;
+  grantedAtMs: number;
+};
+
 export type VerifiedMigrationReceiptEvidence = {
   receiptId: string;
   resourceId: string;
@@ -53,8 +64,17 @@ export type VerifiedMigrationReceiptEvidence = {
   passed: boolean;
   fromBindingId?: string;
   toBindingId?: string;
+  fromContentVersion?: string;
+  toContentVersion?: string;
+  fromDirectoryRealpath?: string;
+  toDirectoryRealpath?: string;
   fromLocator?: string;
   toLocator?: string;
+  authorizationIdentity?: string;
+  operationIdentity?: string;
+  catalogBindingVerified: boolean;
+  ownershipTenantVerified: boolean;
+  artifactSet?: MigrationArtifactIntegrity[];
   artifactIdentityVerified: boolean;
   integrityVerified: boolean;
 };
@@ -80,8 +100,13 @@ export type FollowupWorkspaceClassification = {
     receiptId: string;
     fromBindingId?: string;
     toBindingId?: string;
+    fromContentVersion?: string;
+    toContentVersion?: string;
     fromPath?: string;
     toPath?: string;
+    authorizationIdentity?: string;
+    operationIdentity?: string;
+    artifactSet?: MigrationArtifactIntegrity[];
   };
   reauthorization?: {
     kind: "tenant" | "owner" | "permission";
@@ -219,10 +244,24 @@ function lifecycleOf(
   return current?.lifecycleState || savedCatalogLifecycle || saved?.lifecycleState || undefined;
 }
 
-function isCompleteVerifiedMigration(
+function requiredText(value?: string | null): string | undefined {
+  const text = value?.trim();
+  return text ? text : undefined;
+}
+
+function directoryToken(value?: string | null): string | undefined {
+  const text = requiredText(value);
+  if (!text) {
+    return undefined;
+  }
+  return resolveWorkspaceRealpath(text) ?? text;
+}
+
+export function isCompleteVerifiedMigration(
   receipt: VerifiedMigrationReceiptEvidence | null | undefined,
   saved: FollowupWorkspaceSnapshot,
   current: FollowupWorkspaceCurrentEvidence,
+  savedRealpath?: string | null,
 ): { ok: true } | { ok: false; missing: string[] } {
   if (!receipt) {
     return { ok: false, missing: ["verified_migration_receipt"] };
@@ -231,33 +270,93 @@ function isCompleteVerifiedMigration(
   if (!receipt.passed) {
     missing.push("migration_receipt_passed");
   }
-  if (receipt.resourceId !== saved.resourceId || receipt.resourceId !== current.resourceId) {
+  if (
+    !requiredText(receipt.resourceId) ||
+    receipt.resourceId !== saved.resourceId ||
+    receipt.resourceId !== current.resourceId
+  ) {
     missing.push("migration_receipt_resource_identity");
   }
   const savedTenant = snapshotTenant(saved);
   const currentTenant = currentTenantOf(current);
-  if (receipt.tenantId && savedTenant && receipt.tenantId !== savedTenant) {
+  if (!requiredText(receipt.tenantId)) {
+    missing.push("migration_receipt_tenant");
+  } else if (
+    (savedTenant && receipt.tenantId !== savedTenant) ||
+    (currentTenant && receipt.tenantId !== currentTenant)
+  ) {
     missing.push("migration_receipt_tenant");
   }
-  if (receipt.tenantId && currentTenant && receipt.tenantId !== currentTenant) {
-    missing.push("migration_receipt_tenant");
-  }
-  if (!receipt.artifactIdentityVerified) {
-    missing.push("migration_receipt_artifact_identity");
-  }
-  if (!receipt.integrityVerified) {
-    missing.push("migration_receipt_integrity");
-  }
-  if (receipt.fromBindingId && saved.bindingId && receipt.fromBindingId !== saved.bindingId) {
+  if (!requiredText(receipt.fromBindingId)) {
+    missing.push("migration_receipt_source_binding");
+  } else if (receipt.fromBindingId !== saved.bindingId) {
     missing.push("migration_receipt_source_binding");
   }
-  if (receipt.toBindingId && receipt.toBindingId !== current.bindingId) {
+  if (!requiredText(receipt.toBindingId)) {
     missing.push("migration_receipt_target_binding");
+  } else if (receipt.toBindingId !== current.bindingId) {
+    missing.push("migration_receipt_target_binding");
+  }
+  if (!requiredText(receipt.fromContentVersion)) {
+    missing.push("migration_receipt_source_version");
+  } else if (receipt.fromContentVersion !== (saved.contentVersion ?? "")) {
+    missing.push("migration_receipt_source_version");
+  }
+  if (!requiredText(receipt.toContentVersion)) {
+    missing.push("migration_receipt_target_version");
+  } else if (receipt.toContentVersion !== current.contentVersion) {
+    missing.push("migration_receipt_target_version");
+  }
+  const expectedFromDir =
+    directoryToken(savedRealpath) ?? directoryToken(saved.workspaceDir) ?? undefined;
+  const expectedToDir = directoryToken(current.realpath) ?? directoryToken(current.rootPath);
+  const receiptFromDir = directoryToken(receipt.fromDirectoryRealpath);
+  const receiptToDir = directoryToken(receipt.toDirectoryRealpath);
+  if (!receiptFromDir) {
+    missing.push("migration_receipt_source_directory");
+  } else if (expectedFromDir && receiptFromDir !== expectedFromDir) {
+    missing.push("migration_receipt_source_directory");
+  }
+  if (!receiptToDir) {
+    missing.push("migration_receipt_target_directory");
+  } else if (expectedToDir && receiptToDir !== expectedToDir) {
+    missing.push("migration_receipt_target_directory");
+  }
+  if (!receipt.catalogBindingVerified) {
+    missing.push("migration_receipt_catalog_binding");
+  }
+  if (!receipt.ownershipTenantVerified) {
+    missing.push("migration_receipt_ownership_tenant");
+  }
+  const artifactSet = (receipt.artifactSet ?? []).filter(
+    (row) => requiredText(row.artifactId) && requiredText(row.checksum),
+  );
+  if (artifactSet.length === 0) {
+    missing.push("migration_receipt_artifact_set");
+  }
+  if (!receipt.integrityVerified || artifactSet.length === 0) {
+    missing.push("migration_receipt_integrity");
+  }
+  if (!requiredText(receipt.authorizationIdentity)) {
+    missing.push("migration_receipt_authorization_identity");
+  }
+  if (!requiredText(receipt.operationIdentity)) {
+    missing.push("migration_receipt_operation_identity");
   }
   if (missing.length > 0) {
     return { ok: false, missing: [...new Set(missing)] };
   }
   return { ok: true };
+}
+
+function grantCovers(
+  grant: FollowupReauthorizationGrant | null | undefined,
+  kind: "tenant" | "owner" | "permission",
+): boolean {
+  if (!grant) {
+    return false;
+  }
+  return Boolean(requiredText(grant.actorIdentity) && grant.kind === kind);
 }
 
 export function classifyFollowupWorkspaceChange(input: {
@@ -271,6 +370,7 @@ export function classifyFollowupWorkspaceChange(input: {
   savedCatalogOwner?: FollowupWorkspaceOwner | null;
   savedCatalogTenantId?: string | null;
   trustedTenantId?: string | null;
+  reauthorizationGrant?: FollowupReauthorizationGrant | null;
 }): FollowupWorkspaceClassification {
   const saved = input.saved;
   const current = input.current ?? null;
@@ -278,6 +378,7 @@ export function classifyFollowupWorkspaceChange(input: {
   const lifecycle = lifecycleOf(current, savedCatalogLifecycle, saved);
   const savedOwner = input.savedCatalogOwner ?? saved.owner;
   const savedTenant = snapshotTenant(saved, input.savedCatalogTenantId);
+  const grant = input.reauthorizationGrant ?? null;
 
   if (lifecycle && DENY_LIFECYCLES.has(lifecycle)) {
     return denyResult(`followup_workspace_denied:revoked:${lifecycle}`);
@@ -289,18 +390,27 @@ export function classifyFollowupWorkspaceChange(input: {
       if (input.trustedTenantId && savedTenant && input.trustedTenantId !== savedTenant) {
         return denyResult("followup_workspace_denied:cross_tenant");
       }
-      return reauthResult(
-        savedOwner ? "owner" : "tenant",
-        savedOwner
-          ? "Ownership no longer matches the trusted identity; reauthorization is required."
-          : "Tenant or ownership no longer matches the trusted identity; reauthorization is required.",
-      );
+      const kind = savedOwner ? "owner" : "tenant";
+      if (
+        !grantCovers(grant, kind) &&
+        !grantCovers(grant, "tenant") &&
+        !grantCovers(grant, "owner")
+      ) {
+        return reauthResult(
+          kind,
+          savedOwner
+            ? "Ownership no longer matches the trusted identity; reauthorization is required."
+            : "Tenant or ownership no longer matches the trusted identity; reauthorization is required.",
+        );
+      }
     }
     if (resolveReason && RESOLVE_PERMISSION_REASONS.has(resolveReason)) {
-      return reauthResult(
-        "permission",
-        `Required operation '${input.requiredOperation}' is no longer allowed (${resolveReason}).`,
-      );
+      if (!grantCovers(grant, "permission")) {
+        return reauthResult(
+          "permission",
+          `Required operation '${input.requiredOperation}' is no longer allowed (${resolveReason}).`,
+        );
+      }
     }
     const missing: string[] = [];
     if (!saved.resourceId) {
@@ -342,17 +452,21 @@ export function classifyFollowupWorkspaceChange(input: {
   const currentOwnerKey = ownerKey(current.owner);
   const savedOwnerKey = ownerKey(savedOwner);
   if (savedOwnerKey && currentOwnerKey && savedOwnerKey !== currentOwnerKey) {
-    return reauthResult(
-      "owner",
-      "Workspace ownership changed; reauthorization is required before continuing.",
-    );
+    if (!grantCovers(grant, "owner")) {
+      return reauthResult(
+        "owner",
+        "Workspace ownership changed; reauthorization is required before continuing.",
+      );
+    }
   }
 
   if (!current.operationAllowed) {
-    return reauthResult(
-      "permission",
-      `Required operation '${input.requiredOperation}' is no longer allowed by lifecycle or binding state.`,
-    );
+    if (!grantCovers(grant, "permission")) {
+      return reauthResult(
+        "permission",
+        `Required operation '${input.requiredOperation}' is no longer allowed by lifecycle or binding state.`,
+      );
+    }
   }
 
   const savedRealpath = input.savedRealpath ?? resolveWorkspaceRealpath(saved.workspaceDir);
@@ -400,7 +514,12 @@ export function classifyFollowupWorkspaceChange(input: {
     });
   }
 
-  const receiptCheck = isCompleteVerifiedMigration(input.verifiedMigration, saved, current);
+  const receiptCheck = isCompleteVerifiedMigration(
+    input.verifiedMigration,
+    saved,
+    current,
+    savedRealpath,
+  );
   if (!sameBinding || !sameRealDirectory) {
     if (receiptCheck.ok) {
       const receipt = input.verifiedMigration!;
@@ -409,10 +528,15 @@ export function classifyFollowupWorkspaceChange(input: {
         code: "authorized_migration",
         migration: {
           receiptId: receipt.receiptId,
-          fromBindingId: saved.bindingId,
-          toBindingId: current.bindingId,
-          fromPath: saved.workspaceDir,
-          toPath: current.rootPath,
+          fromBindingId: receipt.fromBindingId ?? saved.bindingId,
+          toBindingId: receipt.toBindingId ?? current.bindingId,
+          fromContentVersion: receipt.fromContentVersion,
+          toContentVersion: receipt.toContentVersion,
+          fromPath: receipt.fromDirectoryRealpath ?? saved.workspaceDir,
+          toPath: receipt.toDirectoryRealpath ?? current.rootPath,
+          authorizationIdentity: receipt.authorizationIdentity,
+          operationIdentity: receipt.operationIdentity,
+          artifactSet: receipt.artifactSet,
         },
         ...(versionChanged
           ? {
@@ -451,8 +575,121 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object";
 }
 
-function findingPassed(receipt: MigrationVerifyReceipt, check: string): boolean {
-  return receipt.findings.some((row) => row.check === check && row.outcome === "passed");
+function optionalString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function findingPassed(
+  findings: Array<{ check?: unknown; outcome?: unknown }> | undefined,
+  check: string,
+): boolean {
+  return Boolean(findings?.some((row) => row.check === check && row.outcome === "passed"));
+}
+
+function findingDetail(
+  findings: Array<{ check?: unknown; outcome?: unknown; detail?: unknown }> | undefined,
+  check: string,
+): string | undefined {
+  const row = findings?.find((item) => item.check === check && item.outcome === "passed");
+  return optionalString(row?.detail);
+}
+
+function parseArtifactSet(value: unknown): MigrationArtifactIntegrity[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const rows: MigrationArtifactIntegrity[] = [];
+  for (const item of value) {
+    if (!isRecord(item)) {
+      continue;
+    }
+    const artifactId =
+      optionalString(item.artifactId) ||
+      optionalString(item.id) ||
+      optionalString(item.locator) ||
+      optionalString(item.resourceId);
+    const checksum =
+      optionalString(item.checksum) ||
+      optionalString(item.contentChecksum) ||
+      optionalString(item.digest);
+    if (artifactId && checksum) {
+      rows.push({ artifactId, checksum });
+    }
+  }
+  return rows;
+}
+
+function isConcreteChecksum(value?: string): boolean {
+  if (!value) {
+    return false;
+  }
+  const lowered = value.toLowerCase();
+  if (lowered === "ok" || lowered === "passed" || lowered === "true") {
+    return false;
+  }
+  return (
+    value.startsWith("sha256:") ||
+    value.startsWith("sha512:") ||
+    value.startsWith("checksum:") ||
+    /^[a-f0-9]{32,}$/i.test(value)
+  );
+}
+
+function artifactSetFromValue(value: Record<string, unknown>): MigrationArtifactIntegrity[] {
+  const direct = parseArtifactSet(value.artifactSet ?? value.artifacts);
+  if (direct.length > 0) {
+    return direct;
+  }
+  const findings = Array.isArray(value.findings)
+    ? (value.findings as Array<{ check?: unknown; outcome?: unknown; detail?: unknown }>)
+    : undefined;
+  const checksum = findingDetail(findings, "checksum");
+  const locator = findingDetail(findings, "catalog_binding");
+  const artifactId = optionalString(value.resourceId) || locator;
+  if (artifactId && isConcreteChecksum(checksum)) {
+    return [{ artifactId, checksum: checksum! }];
+  }
+  return [];
+}
+
+function bindingFieldsFromValue(value: Record<string, unknown>): {
+  fromBindingId?: string;
+  toBindingId?: string;
+  fromContentVersion?: string;
+  toContentVersion?: string;
+  fromDirectoryRealpath?: string;
+  toDirectoryRealpath?: string;
+  fromLocator?: string;
+  toLocator?: string;
+  authorizationIdentity?: string;
+  operationIdentity?: string;
+} {
+  const fromDirectoryRealpath = directoryToken(
+    optionalString(value.fromDirectoryRealpath) ||
+      optionalString(value.fromDirectory) ||
+      optionalString(value.fromPath),
+  );
+  const toDirectoryRealpath = directoryToken(
+    optionalString(value.toDirectoryRealpath) ||
+      optionalString(value.toDirectory) ||
+      optionalString(value.toPath),
+  );
+  return {
+    fromBindingId: optionalString(value.fromBindingId),
+    toBindingId: optionalString(value.toBindingId) || optionalString(value.canonicalBindingId),
+    fromContentVersion: optionalString(value.fromContentVersion),
+    toContentVersion: optionalString(value.toContentVersion),
+    fromDirectoryRealpath,
+    toDirectoryRealpath,
+    fromLocator: optionalString(value.fromLocator) || optionalString(value.previousLocator),
+    toLocator: optionalString(value.toLocator) || optionalString(value.canonicalLocator),
+    authorizationIdentity:
+      optionalString(value.authorizationIdentity) || optionalString(value.authorizedBy),
+    operationIdentity:
+      optionalString(value.operationIdentity) ||
+      optionalString(value.operationId) ||
+      optionalString(value.actorIdentity),
+  };
 }
 
 export function migrationReceiptToEvidence(
@@ -462,37 +699,46 @@ export function migrationReceiptToEvidence(
     return null;
   }
   if (value.kind === M3_VERIFY_RECEIPT_KIND) {
-    const receipt = value as unknown as MigrationVerifyReceipt;
+    const receipt = value as unknown as MigrationVerifyReceipt & Record<string, unknown>;
     if (!receipt.receiptId || !receipt.resourceId) {
       return null;
     }
+    const findings = receipt.findings;
+    const catalogBindingVerified = findingPassed(findings, "catalog_binding");
+    const ownershipTenantVerified = findingPassed(findings, "ownership_tenant");
+    const artifactSet = artifactSetFromValue(value);
+    const bindings = bindingFieldsFromValue(value);
     return {
       receiptId: receipt.receiptId,
       resourceId: receipt.resourceId,
-      tenantId: receipt.tenantId,
+      tenantId: optionalString(receipt.tenantId),
       passed: receipt.passed,
-      artifactIdentityVerified:
-        findingPassed(receipt, "catalog_binding") || findingPassed(receipt, "ownership_tenant"),
-      integrityVerified: findingPassed(receipt, "checksum"),
+      ...bindings,
+      catalogBindingVerified,
+      ownershipTenantVerified,
+      artifactSet: artifactSet.length > 0 ? artifactSet : undefined,
+      artifactIdentityVerified: catalogBindingVerified && ownershipTenantVerified,
+      integrityVerified: findingPassed(findings, "checksum") && artifactSet.length > 0,
     };
   }
   if (value.kind === MIGRATION_RECEIPT_KIND) {
     // An apply receipt is not enough by itself: identity and integrity still
     // have to be verified. Surface it as incomplete evidence so the classifier
     // waits for a verify receipt rather than auto-continuing.
-    const receiptId = typeof value.receiptId === "string" ? value.receiptId : "";
-    const resourceId = typeof value.resourceId === "string" ? value.resourceId : "";
+    const receiptId = optionalString(value.receiptId) ?? "";
+    const resourceId = optionalString(value.resourceId) ?? "";
     if (!receiptId || !resourceId) {
       return null;
     }
+    const bindings = bindingFieldsFromValue(value);
     return {
       receiptId,
       resourceId,
-      tenantId: typeof value.tenantId === "string" ? value.tenantId : undefined,
+      tenantId: optionalString(value.tenantId),
       passed: value.status === "migrated",
-      fromLocator: typeof value.previousLocator === "string" ? value.previousLocator : undefined,
-      toBindingId:
-        typeof value.canonicalBindingId === "string" ? value.canonicalBindingId : undefined,
+      ...bindings,
+      catalogBindingVerified: false,
+      ownershipTenantVerified: false,
       artifactIdentityVerified: false,
       integrityVerified: false,
     };
@@ -530,27 +776,37 @@ export function findVerifiedWorkspaceMigrationReceipt(params: {
   receiptDirs?: Array<string | undefined | null>;
   resourceId?: string;
   tenantId?: string;
+  saved?: FollowupWorkspaceSnapshot;
+  current?: FollowupWorkspaceCurrentEvidence | null;
+  savedRealpath?: string | null;
 }): VerifiedMigrationReceiptEvidence | null {
   const resourceId = params.resourceId?.trim();
   if (!resourceId) {
     return null;
   }
   const dirs = params.receiptDirs ?? [];
+  const candidates: VerifiedMigrationReceiptEvidence[] = [];
   for (const receiptDir of dirs) {
-    const match = listVerifiedMigrationReceipts(receiptDir).find((row) => {
+    for (const row of listVerifiedMigrationReceipts(receiptDir)) {
       if (row.resourceId !== resourceId) {
-        return false;
+        continue;
       }
       if (params.tenantId && row.tenantId && row.tenantId !== params.tenantId) {
-        return false;
+        continue;
       }
-      return true;
-    });
-    if (match) {
-      return match;
+      candidates.push(row);
     }
   }
-  return null;
+  if (params.saved && params.current) {
+    const complete = candidates.find(
+      (row) =>
+        isCompleteVerifiedMigration(row, params.saved!, params.current!, params.savedRealpath).ok,
+    );
+    if (complete) {
+      return complete;
+    }
+  }
+  return candidates[0] ?? null;
 }
 
 function catalogOwner(record: CatalogRecord): FollowupWorkspaceOwner | null {
@@ -593,6 +849,9 @@ export async function loadFollowupRevalidationEvidence(params: {
         evidence.savedCatalogTenantId ||
         params.saved?.tenantId ||
         tenantIdFromResourceId(resourceId),
+      saved: params.saved,
+      current: params.current,
+      savedRealpath: params.saved ? resolveWorkspaceRealpath(params.saved.workspaceDir) : null,
     });
   } catch {
     // Missing receipt directories mean the migration is not verified.

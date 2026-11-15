@@ -14591,6 +14591,9 @@ tasks:
       - src/auto-reply/reply/followup-workspace-change.ts
       - src/auto-reply/reply/followup-workspace-change.test.ts
       - src/gateway/workspace-resolver/execution-workspace-entrypoints.test.ts
+      - src/agent-runtime/state/repository/blocked-followup-delivery-recovery.ts
+      - src/agent-runtime/state/repository/blocked-followup-delivery-recovery.test.ts
+      - src/agent-runtime/state/repository/async-wait-job-recovery.ts
     state: active
     sessions:
       - id: codex-canonical-20261114
@@ -14629,6 +14632,9 @@ landingStreams:
       - src/auto-reply/reply/followup-workspace-change.ts
       - src/auto-reply/reply/followup-workspace-change.test.ts
       - src/gateway/workspace-resolver/execution-workspace-entrypoints.test.ts
+      - src/agent-runtime/state/repository/blocked-followup-delivery-recovery.ts
+      - src/agent-runtime/state/repository/blocked-followup-delivery-recovery.test.ts
+      - src/agent-runtime/state/repository/async-wait-job-recovery.ts
     canLandWith: []
     metadata:
       owner: codex-observation
@@ -29888,6 +29894,18 @@ sharedPaths:
   - glob: src/auto-reply/reply/followup-workspace-change.test.ts
     landerTask: canonical-execution-workspace-20261114
     reason: Decision-table tests for followup workspace change classification and recoverable continuation.
+    reviewAfter: 2026-11-30
+  - glob: src/agent-runtime/state/repository/blocked-followup-delivery-recovery.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: Gateway-boot recovery of durable followup workspace waits and reauthorization resume entry.
+    reviewAfter: 2026-11-30
+  - glob: src/agent-runtime/state/repository/blocked-followup-delivery-recovery.test.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: Recovery-chain and reauthorization resume tests for durable followup workspace waits.
+    reviewAfter: 2026-11-30
+  - glob: src/agent-runtime/state/repository/async-wait-job-recovery.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: Existing gateway-boot recoverer now scans and resumes durable followup workspace waits.
     reviewAfter: 2026-11-30
   - glob: src/exec-protocol/**
     landerTask: exec-protocol-v1-min-loop

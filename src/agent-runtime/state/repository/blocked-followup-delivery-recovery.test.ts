@@ -1,0 +1,389 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import type { FollowupWorkspaceSnapshot } from "../../../auto-reply/reply/followup-workspace-change.js";
+import {
+  clearFollowupDrainCallback,
+  clearFollowupQueue,
+  registerFollowupDrainCallback,
+} from "../../../auto-reply/reply/queue.js";
+import { createMockTypingController } from "../../../auto-reply/reply/test-helpers.js";
+import type { OpenBotConfig } from "../../../config/config.js";
+import {
+  findBlockedFollowupDelivery,
+  listBlockedFollowupDeliveries,
+  listRecoverableFollowupDeliveries,
+} from "./blocked-followup-delivery.js";
+
+const resolveExecutionWorkspace = vi.fn();
+const confirmPendingTurnDelivery = vi.fn();
+const peekAwaitingDelivery = vi.fn();
+const deliverQueuedReply = vi.fn();
+const runQueuedCandidate = vi.fn();
+
+vi.mock("../../../gateway/workspace-resolver/execution-workspace.js", () => ({
+  resolveExecutionWorkspace: (...args: unknown[]) => resolveExecutionWorkspace(...args),
+}));
+
+vi.mock("../../wiring/delivery-confirm.js", () => ({
+  confirmPendingTurnDelivery: (...args: unknown[]) => confirmPendingTurnDelivery(...args),
+}));
+
+vi.mock("../../../task-outcome/pending-delivery.js", () => ({
+  peekAwaitingDelivery: (...args: unknown[]) => peekAwaitingDelivery(...args),
+}));
+
+vi.mock("../../delivery/index.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../delivery/index.js")>();
+  return {
+    ...actual,
+    deliverQueuedReply: (...args: unknown[]) => deliverQueuedReply(...args),
+  };
+});
+
+vi.mock("../../execution/index.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../execution/index.js")>();
+  return {
+    ...actual,
+    runQueuedCandidate: (...args: unknown[]) => runQueuedCandidate(...args),
+  };
+});
+
+const { createFollowupRunner } = await import("../../../auto-reply/reply/followup-runner.js");
+const { recoverFollowupWorkspaceWaitsAtGatewayBoot, resumeFollowupDeliveryAfterReauthorization } =
+  await import("./blocked-followup-delivery-recovery.js");
+
+const RESOURCE = "ws:tenant:seat:seat:asset:asset";
+const SESSION_KEY = "t171-followup-wait-recovery";
+const tempRoots: string[] = [];
+
+function makePersistRoot(): { persistRoot: string; sessionFile: string; workspaceDir: string } {
+  const persistRoot = fs.mkdtempSync(path.join(os.tmpdir(), "t171-followup-wait-"));
+  tempRoots.push(persistRoot);
+  const workspaceDir = fs.realpathSync(persistRoot);
+  const sessionFile = path.join(persistRoot, "session.jsonl");
+  fs.writeFileSync(sessionFile, "");
+  return { persistRoot, sessionFile, workspaceDir };
+}
+
+function binding(workspaceDir: string, overrides: Partial<FollowupWorkspaceSnapshot> = {}) {
+  return {
+    resourceId: RESOURCE,
+    bindingId: "binding",
+    contentVersion: "2",
+    workspaceDir,
+    tenantId: "tenant",
+    owner: { kind: "position" as const, seatId: "seat" },
+    lifecycleState: "active",
+    bindingState: "active",
+    ...overrides,
+  };
+}
+
+function writeWaitRecord(params: {
+  persistRoot: string;
+  sessionFile: string;
+  workspaceDir: string;
+  status?: "recoverable_wait" | "reauthorization_required";
+  reason?: string;
+  retryCount?: number;
+  retryCap?: number;
+  retryExhausted?: boolean;
+  missingItems?: string[];
+  ownerSeatId?: string;
+  reauthorization?: { kind: "tenant" | "owner" | "permission"; detail: string };
+}) {
+  const dir = path.join(params.persistRoot, "blocked-followup-deliveries");
+  fs.mkdirSync(dir, { recursive: true });
+  const id = "wait-record-1";
+  const status = params.status ?? "recoverable_wait";
+  const record = {
+    kind: "blocked_followup_delivery",
+    id,
+    recordedAtMs: Date.now(),
+    updatedAtMs: Date.now(),
+    status,
+    destination: status,
+    reason: params.reason ?? "followup_workspace_recoverable_wait:missing_evidence",
+    error: params.reason ?? "followup_workspace_recoverable_wait:missing_evidence",
+    missingItems: params.missingItems ?? ["verified_migration_receipt"],
+    retryCount: params.retryCount ?? 0,
+    retryCap: params.retryCap ?? 5,
+    retryExhausted: params.retryExhausted ?? false,
+    sessionKey: SESSION_KEY,
+    sessionFile: params.sessionFile,
+    jobId: "job-1",
+    runId: "run-1",
+    deliveryId: "delivery:run-1:visible",
+    taskId: "task-1",
+    workspaceBinding: binding(params.workspaceDir, {
+      owner: { kind: "position", seatId: params.ownerSeatId ?? "seat" },
+    }),
+    ...(params.reauthorization ? { reauthorization: params.reauthorization } : {}),
+    resume: {
+      deliveryOnly: true,
+      payloads: [{ text: "original visible reply" }],
+      agentId: "robot",
+      agentDir: params.persistRoot,
+      sessionId: "session",
+      sessionKey: SESSION_KEY,
+      sessionFile: params.sessionFile,
+      workspaceDir: params.workspaceDir,
+      prompt: "hello",
+      originatingTo: "channel:C1",
+      provider: "anthropic",
+      model: "claude",
+      asyncWaitRecoveryBind: {
+        jobId: "job-1",
+        claimToken: "token-1",
+        boundRunId: "run-1",
+        boundDeliveryId: "delivery:run-1:visible",
+      },
+    },
+  };
+  fs.writeFileSync(
+    path.join(dir, `${encodeURIComponent(id)}.json`),
+    `${JSON.stringify(record, null, 2)}\n`,
+  );
+  return record;
+}
+
+function currentWorkspace(workspaceDir: string, overrides: Record<string, unknown> = {}) {
+  return {
+    resourceId: RESOURCE,
+    bindingId: "binding",
+    contentVersion: "2",
+    rootPath: workspaceDir,
+    tenantId: "tenant",
+    owner: { kind: "position" as const, seatId: "seat" },
+    lifecycleState: "active",
+    bindingState: "active",
+    ...overrides,
+  };
+}
+
+function registerRunner() {
+  const typing = createMockTypingController();
+  const runner = createFollowupRunner({
+    typing,
+    typingMode: "never",
+    defaultModel: "anthropic/claude-opus-4-5",
+    sessionKey: SESSION_KEY,
+  });
+  registerFollowupDrainCallback(SESSION_KEY, runner);
+  return { typing, runner };
+}
+
+async function waitFor(predicate: () => boolean, timeoutMs = 3000): Promise<void> {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    if (predicate()) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  throw new Error("timed out waiting for followup wait recovery");
+}
+
+beforeEach(() => {
+  resolveExecutionWorkspace.mockReset();
+  confirmPendingTurnDelivery.mockReset();
+  confirmPendingTurnDelivery.mockResolvedValue(undefined);
+  peekAwaitingDelivery.mockReset();
+  peekAwaitingDelivery.mockReturnValue({
+    runId: "run-1",
+    deliveryId: "delivery:run-1:visible",
+    taskId: "task-1",
+  });
+  deliverQueuedReply.mockReset();
+  deliverQueuedReply.mockResolvedValue("delivered");
+  runQueuedCandidate.mockReset();
+  clearFollowupQueue(SESSION_KEY);
+  clearFollowupDrainCallback(SESSION_KEY);
+});
+
+afterEach(() => {
+  clearFollowupQueue(SESSION_KEY);
+  clearFollowupDrainCallback(SESSION_KEY);
+  for (const root of tempRoots.splice(0)) {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+it("recovers a durable wait through restart scan, revalidation, re-enqueue, original delivery, and record update", async () => {
+  const { persistRoot, sessionFile, workspaceDir } = makePersistRoot();
+  writeWaitRecord({ persistRoot, sessionFile, workspaceDir });
+  const rawFound = JSON.parse(
+    fs.readFileSync(
+      path.join(persistRoot, "blocked-followup-deliveries", "wait-record-1.json"),
+      "utf8",
+    ),
+  );
+  expect(rawFound.status).toBe("recoverable_wait");
+  expect(listRecoverableFollowupDeliveries(persistRoot)).toHaveLength(1);
+  expect(findBlockedFollowupDelivery(persistRoot, { runId: "run-1", jobId: "job-1" })?.id).toBe(
+    "wait-record-1",
+  );
+
+  resolveExecutionWorkspace.mockResolvedValue(
+    currentWorkspace(workspaceDir, { contentVersion: "3" }),
+  );
+  registerRunner();
+  const result = await recoverFollowupWorkspaceWaitsAtGatewayBoot({
+    cfg: {} as OpenBotConfig,
+    persistRoots: [persistRoot],
+  });
+  expect(result.recordsSeen).toBe(1);
+  expect(result.enqueued).toBe(1);
+  expect(resolveExecutionWorkspace).toHaveBeenCalledWith(
+    expect.objectContaining({ operation: "read", agentId: "robot" }),
+  );
+
+  await waitFor(() => deliverQueuedReply.mock.calls.length === 1);
+  expect(deliverQueuedReply).toHaveBeenCalledWith(
+    expect.objectContaining({
+      payloads: [expect.objectContaining({ text: "original visible reply" })],
+    }),
+    expect.anything(),
+  );
+  expect(runQueuedCandidate).not.toHaveBeenCalled();
+  await waitFor(() => {
+    const row = findBlockedFollowupDelivery(persistRoot, { id: "wait-record-1" });
+    return row?.status === "continued";
+  });
+  const continued = findBlockedFollowupDelivery(persistRoot, { id: "wait-record-1" });
+  expect(continued).toMatchObject({
+    status: "continued",
+    destination: "continue",
+    contentVersionChange: { from: "2", to: "3" },
+  });
+  expect(listRecoverableFollowupDeliveries(persistRoot)).toHaveLength(0);
+});
+
+it("keeps waiting, records pending items, and increments retry when evidence is still missing", async () => {
+  const { persistRoot, sessionFile, workspaceDir } = makePersistRoot();
+  writeWaitRecord({ persistRoot, sessionFile, workspaceDir, retryCount: 1 });
+  resolveExecutionWorkspace.mockResolvedValue(
+    currentWorkspace(workspaceDir, { bindingId: "binding-rotated", contentVersion: "9" }),
+  );
+  registerRunner();
+  const result = await recoverFollowupWorkspaceWaitsAtGatewayBoot({
+    cfg: {} as OpenBotConfig,
+    persistRoots: [persistRoot],
+  });
+  expect(result.enqueued).toBe(0);
+  expect(result.stillWaiting).toBe(1);
+  expect(deliverQueuedReply).not.toHaveBeenCalled();
+  const waiting = findBlockedFollowupDelivery(persistRoot, { id: "wait-record-1" });
+  expect(waiting).toMatchObject({
+    status: "recoverable_wait",
+    retryCount: 2,
+    retryExhausted: false,
+  });
+  expect(waiting?.missingItems).toEqual(expect.arrayContaining(["verified_migration_receipt"]));
+  expect(listRecoverableFollowupDeliveries(persistRoot)).toHaveLength(1);
+});
+
+it("stops auto-retry at the cap and leaves the wait record queryable", async () => {
+  const { persistRoot, sessionFile, workspaceDir } = makePersistRoot();
+  writeWaitRecord({
+    persistRoot,
+    sessionFile,
+    workspaceDir,
+    retryCount: 5,
+    retryCap: 5,
+    retryExhausted: true,
+  });
+  resolveExecutionWorkspace.mockResolvedValue(
+    currentWorkspace(workspaceDir, { bindingId: "binding-rotated", contentVersion: "9" }),
+  );
+  registerRunner();
+  const result = await recoverFollowupWorkspaceWaitsAtGatewayBoot({
+    cfg: {} as OpenBotConfig,
+    persistRoots: [persistRoot],
+  });
+  expect(result.enqueued).toBe(0);
+  expect(result.retryExhausted).toBe(1);
+  expect(deliverQueuedReply).not.toHaveBeenCalled();
+  const held = findBlockedFollowupDelivery(persistRoot, { id: "wait-record-1" });
+  expect(held).toMatchObject({
+    status: "recoverable_wait",
+    retryCount: 5,
+    retryCap: 5,
+    retryExhausted: true,
+  });
+  expect(listRecoverableFollowupDeliveries(persistRoot)).toHaveLength(1);
+  expect(listBlockedFollowupDeliveries(persistRoot)).toHaveLength(1);
+});
+
+it("resumes the original delivery from the reauthorization entry only when authorization evidence is present", async () => {
+  const { persistRoot, sessionFile, workspaceDir } = makePersistRoot();
+  writeWaitRecord({
+    persistRoot,
+    sessionFile,
+    workspaceDir,
+    status: "reauthorization_required",
+    reason: "followup_workspace_reauthorization_required:owner",
+    reauthorization: {
+      kind: "owner",
+      detail: "Workspace ownership changed; reauthorization is required before continuing.",
+    },
+    ownerSeatId: "seat",
+  });
+  resolveExecutionWorkspace.mockResolvedValue(
+    currentWorkspace(workspaceDir, { owner: { kind: "position", seatId: "other-seat" } }),
+  );
+  registerRunner();
+
+  const denied = await resumeFollowupDeliveryAfterReauthorization({
+    persistRoot,
+    id: "wait-record-1",
+    cfg: {} as OpenBotConfig,
+    authorization: null,
+  });
+  expect(denied).toMatchObject({
+    ok: false,
+    enqueued: false,
+    reason: "followup_reauthorization:authorization_evidence_missing",
+  });
+  expect(deliverQueuedReply).not.toHaveBeenCalled();
+  expect(findBlockedFollowupDelivery(persistRoot, { id: "wait-record-1" })?.status).toBe(
+    "reauthorization_required",
+  );
+
+  const boot = await recoverFollowupWorkspaceWaitsAtGatewayBoot({
+    cfg: {} as OpenBotConfig,
+    persistRoots: [persistRoot],
+  });
+  expect(boot.enqueued).toBe(0);
+  expect(deliverQueuedReply).not.toHaveBeenCalled();
+
+  const resumed = await resumeFollowupDeliveryAfterReauthorization({
+    persistRoot,
+    id: "wait-record-1",
+    cfg: {} as OpenBotConfig,
+    authorization: {
+      kind: "owner",
+      actorIdentity: "user:owner:reauth-grant",
+      grantedAtMs: Date.now(),
+    },
+  });
+  expect(resumed).toMatchObject({ ok: true, enqueued: true });
+  await waitFor(() => deliverQueuedReply.mock.calls.length === 1);
+  expect(deliverQueuedReply).toHaveBeenCalledWith(
+    expect.objectContaining({
+      payloads: [expect.objectContaining({ text: "original visible reply" })],
+    }),
+    expect.anything(),
+  );
+  expect(runQueuedCandidate).not.toHaveBeenCalled();
+  await waitFor(() => {
+    const row = findBlockedFollowupDelivery(persistRoot, { id: "wait-record-1" });
+    return row?.status === "continued";
+  });
+  expect(findBlockedFollowupDelivery(persistRoot, { id: "wait-record-1" })).toMatchObject({
+    status: "continued",
+    destination: "continue",
+  });
+});

@@ -22,6 +22,7 @@ import {
   planFollowupRecoveryRetry,
   recordFollowupWorkspaceDecision,
   resolveBlockedFollowupDeliveryPersistRoot,
+  type FollowupDeliveryResumeSnapshot,
 } from "../../agent-runtime/state/repository/blocked-followup-delivery.js";
 import { bindAdmittedTurnHost } from "../../agent-runtime/wiring/admitted-turn-host.js";
 import { confirmPendingTurnDelivery } from "../../agent-runtime/wiring/delivery-confirm.js";
@@ -102,6 +103,30 @@ function snapshotFromQueued(queued: FollowupRun): FollowupWorkspaceSnapshot {
   };
 }
 
+function resumeSnapshotFromQueued(queued: FollowupRun): FollowupDeliveryResumeSnapshot {
+  return {
+    deliveryOnly: queued.asyncWaitDeliveryOnly === true,
+    payloads: queued.asyncWaitDeliveryPayloads ?? [],
+    agentId: queued.run.agentId,
+    agentDir: queued.run.agentDir,
+    sessionId: queued.run.sessionId,
+    sessionKey: queued.run.sessionKey,
+    sessionFile: queued.run.sessionFile,
+    workspaceDir: queued.run.workspaceDir,
+    prompt: queued.prompt,
+    messageId: queued.messageId,
+    followupItemId: queued.followupItemId,
+    originatingChannel: queued.originatingChannel,
+    originatingTo: queued.originatingTo,
+    originatingAccountId: queued.originatingAccountId,
+    originatingThreadId: queued.originatingThreadId,
+    provider: queued.run.provider,
+    model: queued.run.model,
+    deliverableVersion: queued.asyncWaitDeliverableVersion,
+    asyncWaitRecoveryBind: queued.asyncWaitRecoveryBind,
+  };
+}
+
 function currentEvidenceFromBinding(
   boundWorkspace: NonNullable<Awaited<ReturnType<typeof resolveExecutionWorkspace>>>,
   operationAllowed: boolean,
@@ -174,6 +199,7 @@ async function persistWorkspaceDecision(params: {
       ...(params.deliveryId ? { deliveryId: params.deliveryId } : {}),
       ...(params.taskId ? { taskId: params.taskId } : {}),
       workspaceBinding: snapshotFromQueued(params.queued),
+      resume: resumeSnapshotFromQueued(params.queued),
     });
     return true;
   } catch (recordErr) {
@@ -409,16 +435,21 @@ export function createFollowupRunner(params: {
         savedCatalogOwner: evidence.savedCatalogOwner,
         savedCatalogTenantId: evidence.savedCatalogTenantId,
         trustedTenantId: boundWorkspace.tenantId,
+        reauthorizationGrant: existingRecovery?.reauthorizationGrant,
       });
 
-      // Prior authorization or denial records must not auto-continue.
+      // Prior authorization or denial records must not auto-continue
+      // unless a reauthorization grant is already on the durable record.
       if (
         existingRecovery &&
         (existingRecovery.status === "reauthorization_required" ||
           existingRecovery.status === "denied")
       ) {
         const plan = planFollowupRecoveryRetry(existingRecovery);
-        if (plan.action === "await_reauthorization" || plan.action === "closed") {
+        const granted =
+          existingRecovery.status === "reauthorization_required" &&
+          Boolean(existingRecovery.reauthorizationGrant?.actorIdentity);
+        if (!granted && (plan.action === "await_reauthorization" || plan.action === "closed")) {
           await settleNonContinue({
             ...classification,
             destination:
@@ -434,12 +465,13 @@ export function createFollowupRunner(params: {
       }
 
       if (classification.destination === "continue") {
-        if (
+        const mustRecordContinuation =
+          Boolean(existingRecovery) ||
           classification.code !== "unchanged" ||
-          classification.contentVersionChange ||
-          classification.pathNormalization ||
-          classification.migration
-        ) {
+          Boolean(classification.contentVersionChange) ||
+          Boolean(classification.pathNormalization) ||
+          Boolean(classification.migration);
+        if (mustRecordContinuation) {
           const continued = await persistWorkspaceDecision({
             queued,
             sessionKey,
@@ -449,8 +481,9 @@ export function createFollowupRunner(params: {
             taskId: decisionTaskId,
             id: existingRecovery?.id,
           });
-          if (!continued && classification.code !== "unchanged") {
-            // Version or migration should be recorded; retry persist later.
+          if (!continued && (classification.code !== "unchanged" || existingRecovery)) {
+            // Version, migration, or a prior wait/reauth record should be
+            // recorded as continued so a successful send cannot stay waiting.
             if (queued.asyncWaitDeliveryOnly) {
               typing.markRunComplete();
               typing.markDispatchIdle();
@@ -478,6 +511,7 @@ export function createFollowupRunner(params: {
         savedCatalogLifecycle: evidence.savedCatalogLifecycle,
         savedCatalogOwner: evidence.savedCatalogOwner,
         savedCatalogTenantId: evidence.savedCatalogTenantId,
+        reauthorizationGrant: existingRecovery?.reauthorizationGrant,
       });
       if (classification.destination === "continue") {
         throw new Error(resolveError);
