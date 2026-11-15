@@ -1065,7 +1065,13 @@ describe("platform first-screen snapshot binding", () => {
       return {
         ok: true,
         coverage: { attemptedCount: 5, fullyLinkedCount: 3, invalidCount: 1, link: 0.6 },
-        heartbeat: { expectedSamples: 4, observedSamples: 2 },
+        heartbeat: {
+          scheduledRobotCount: 2,
+          confirmedRobotCount: 2,
+          onCadenceRobotCount: 1,
+          expectedSamples: null,
+          observedSamples: null,
+        },
       };
     });
     const { container, panel } = await mount(request);
@@ -1077,7 +1083,7 @@ describe("platform first-screen snapshot binding", () => {
     ).not.toBeNull();
     expect(
       panel.querySelector('[data-testid="obs-health-心跳时效"] .obs-cap-val')?.textContent,
-    ).toBe("2/4");
+    ).toBe("1/2 · 50%");
     expect(
       panel.querySelector('[data-testid="obs-health-心跳时效"] .obs-coverage-meter__fill'),
     ).not.toBeNull();
@@ -1089,7 +1095,7 @@ describe("platform first-screen snapshot binding", () => {
     const capacity = panel.querySelector('[data-testid="obs-platform-capacity"]');
     const values = [...capacity!.querySelectorAll(".obs-cap-val")].map((node) => node.textContent);
     expect(values[0]).toBe("3/5 · 60%");
-    expect(values[1]).toBe("2/4");
+    expect(values[1]).toBe("1/2 · 50%");
     expect(values[2]).toBe("未知");
     expect(values[3]).toBe("未知");
     expect(capacity?.querySelector(".obs-coverage-meter__fill")).not.toBeNull();
@@ -1138,6 +1144,48 @@ describe("platform first-screen snapshot binding", () => {
       }),
     ).toBe(true);
     container.remove();
+  });
+
+  it("shows an honest 0% when a scheduled cohort has no fresh robots, and stays unknown without a cohort", async () => {
+    const request = vi.fn(async () => ({
+      ok: true,
+      coverage: { attemptedCount: 0, fullyLinkedCount: 0, link: null },
+      heartbeat: {
+        scheduledRobotCount: 2,
+        confirmedRobotCount: 2,
+        onCadenceRobotCount: 0,
+        observedEventCount: 0,
+        events: [],
+      },
+    }));
+    const { container, panel } = await mount(request);
+    expect(
+      panel.querySelector('[data-testid="obs-health-心跳时效"] .obs-cap-val')?.textContent,
+    ).toBe("0/2 · 0%");
+    expect(
+      panel.querySelector('[data-testid="obs-health-心跳时效"] .obs-coverage-meter__fill'),
+    ).not.toBeNull();
+    container.remove();
+
+    const empty = vi.fn(async () => ({
+      ok: true,
+      coverage: { attemptedCount: 0, fullyLinkedCount: 0, link: null },
+      heartbeat: {
+        scheduledRobotCount: 0,
+        confirmedRobotCount: 0,
+        onCadenceRobotCount: null,
+        observedEventCount: 0,
+        events: [],
+      },
+    }));
+    const second = await mount(empty);
+    expect(
+      second.panel.querySelector('[data-testid="obs-health-心跳时效"] .obs-cap-val')?.textContent,
+    ).toBe("暂无心跳记录");
+    expect(
+      second.panel.querySelector('[data-testid="obs-health-心跳时效"]')?.textContent,
+    ).not.toContain("0%");
+    second.container.remove();
   });
 });
 

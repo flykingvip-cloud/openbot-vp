@@ -642,6 +642,8 @@ export async function runHeartbeatOnce(opts: {
   // interval ticks without a pending event are rejected after preflight.
 
   const startedAt = opts.deps?.nowMs?.() ?? Date.now();
+  const emitAgentHeartbeat: typeof emitHeartbeatEvent = (evt) =>
+    emitHeartbeatEvent({ ...evt, agentId });
   if (!isWithinActiveHours(cfg, heartbeat, startedAt)) {
     return { status: "skipped", reason: "quiet-hours" };
   }
@@ -660,7 +662,7 @@ export async function runHeartbeatOnce(opts: {
     reason: opts.reason,
   });
   if (preflight.skipReason) {
-    emitHeartbeatEvent({
+    emitAgentHeartbeat({
       status: "skipped",
       reason: preflight.skipReason,
       durationMs: Date.now() - startedAt,
@@ -673,7 +675,7 @@ export async function runHeartbeatOnce(opts: {
       hasPendingEvents: preflight.pendingEventEntries.length > 0,
     })
   ) {
-    emitHeartbeatEvent({
+    emitAgentHeartbeat({
       status: "skipped",
       reason: HEARTBEAT_NO_TRIGGER_SKIP_REASON,
       durationMs: Date.now() - startedAt,
@@ -756,7 +758,7 @@ export async function runHeartbeatOnce(opts: {
         }
       }
     }
-    emitHeartbeatEvent({
+    emitAgentHeartbeat({
       status: "skipped",
       reason: heartbeatFocus.skipReason,
       durationMs: Date.now() - startedAt,
@@ -766,7 +768,7 @@ export async function runHeartbeatOnce(opts: {
 
   if (hasExecCompletion) {
     drainSystemEventEntries(sessionKey);
-    emitHeartbeatEvent({
+    emitAgentHeartbeat({
       status: "ok-empty",
       reason: opts.reason ?? "exec-internal",
       durationMs: Date.now() - startedAt,
@@ -813,7 +815,7 @@ export async function runHeartbeatOnce(opts: {
         restoreUpdatedAt: true,
       });
       await pruneHeartbeatTranscript(transcriptState);
-      emitHeartbeatEvent({
+      emitAgentHeartbeat({
         status,
         reason: reason ?? opts.reason,
         durationMs: Date.now() - startedAt,
@@ -882,7 +884,7 @@ export async function runHeartbeatOnce(opts: {
       }
     }
 
-    emitHeartbeatEvent({
+    emitAgentHeartbeat({
       status: "sent",
       preview: previewText?.slice(0, 200),
       durationMs: Date.now() - startedAt,
@@ -893,7 +895,7 @@ export async function runHeartbeatOnce(opts: {
     return { status: "ran", durationMs: Date.now() - startedAt };
   } catch (err) {
     const reason = formatErrorMessage(err);
-    emitHeartbeatEvent({
+    emitAgentHeartbeat({
       status: "failed",
       reason,
       durationMs: Date.now() - startedAt,

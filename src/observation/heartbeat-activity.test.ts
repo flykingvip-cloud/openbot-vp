@@ -276,3 +276,24 @@ describe("heartbeat activity period query", () => {
     handle.stop();
   });
 });
+
+describe("heartbeat activity agent attribution", () => {
+  it("retains a trimmed agentId on captured events and leaves missing ids unattributed", () => {
+    let listener: ((event: { ts: number; status: "sent"; agentId?: string }) => void) | undefined;
+    const handle = startHeartbeatActivity({
+      enabled: () => true,
+      now: () => 100,
+      subscribe: (fn) => {
+        listener = fn;
+        return () => {};
+      },
+    });
+    listener!({ ts: 100, status: "sent", agentId: " Bot-A " });
+    listener!({ ts: 100, status: "sent" });
+    expect(handle.query().events).toEqual([
+      expect.objectContaining({ status: "sent", agentId: "bot-a" }),
+      expect.objectContaining({ status: "sent", agentId: null }),
+    ]);
+    handle.stop();
+  });
+});

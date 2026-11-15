@@ -19,6 +19,12 @@ import {
 } from "./outcome-reader.js";
 import { getOutcomeSourceStore, type createOutcomeSourceStore } from "./outcome-source.js";
 import {
+  observeScheduledHeartbeatRobots,
+  rollupHeartbeatCohort,
+  rollupHeartbeatCohortByTenant,
+  type HeartbeatRobotObservation,
+} from "./heartbeat-cohort.js";
+import {
   assembleObservationSamples,
   type ExecutionEvidence,
   type OutcomeEvidence,
@@ -185,13 +191,37 @@ export type HeartbeatActivityMark = {
   status: string;
 };
 
+export type HeartbeatRobotSnapshot = {
+  agentId: string;
+  expectedPeriodMs: number;
+  expectedSamples: number | null;
+  observedSamples: number | null;
+  onCadence: boolean | null;
+  tenantId: string | null;
+};
+
+export type HeartbeatTenantSnapshot = {
+  tenantId: string;
+  scheduledRobotCount: number;
+  confirmedRobotCount: number;
+  onCadenceRobotCount: number | null;
+  expectedPeriodMs: number | null;
+  expectedSamples: number | null;
+  observedSamples: number | null;
+};
+
 export type PlatformHeartbeatSnapshot = {
   expectedPeriodMs: number | null;
   expectedSamples: number | null;
   observedSamples: number | null;
+  scheduledRobotCount: number;
+  confirmedRobotCount: number;
+  onCadenceRobotCount: number | null;
   observedEventCount: number;
   lastEventAt: number | null;
   events: HeartbeatActivityMark[];
+  robots: HeartbeatRobotSnapshot[];
+  tenants: HeartbeatTenantSnapshot[];
   reasons: string[];
 };
 
@@ -230,13 +260,18 @@ export type HeartbeatActivityInput = {
   expectedPeriodMs?: number | null;
   expectedSamples?: number | null;
   observedSamples?: number | null;
-  events?: readonly { ts: number; status?: string }[];
-  reasons: readonly string[];
+  events?: readonly { ts: number; status?: string; agentId?: string | null }[];
+  reasons?: readonly string[];
+  collectionStartedAt?: number | null;
+  collectorState?: string;
+  evictedCount?: number;
+  expiredCount?: number;
 } | null;
 
 export function projectHeartbeatSnapshot(
   activity: HeartbeatActivityInput,
   window: { from: number; to: number },
+  cfg?: OpenBotConfig,
 ): PlatformHeartbeatSnapshot {
   const marks = (activity?.events ?? [])
     .filter(
@@ -249,30 +284,84 @@ export function projectHeartbeatSnapshot(
     }))
     .toSorted((left, right) => left.ts - right.ts);
   const lastEventAt = marks.length ? marks[marks.length - 1].ts : null;
-  if (!activity) {
+  const baseReasons = [
+    "heartbeat_activity_not_liveness",
+    ...(cfg ? [] : ["expected_period_unknown"]),
+  ];
+  if (!cfg) {
     return {
-      expectedPeriodMs: null,
-      expectedSamples: null,
-      observedSamples: null,
+      expectedPeriodMs: activity?.expectedPeriodMs ?? null,
+      expectedSamples: activity?.expectedSamples ?? null,
+      observedSamples: activity?.observedSamples ?? null,
+      scheduledRobotCount: 0,
+      confirmedRobotCount: 0,
+      onCadenceRobotCount: null,
       observedEventCount: marks.length,
       lastEventAt,
       events: marks,
+      robots: [],
+      tenants: [],
       reasons: [
-        "heartbeat_activity_not_liveness",
+        ...baseReasons,
         "tenant_attribution_unavailable",
-        "expected_period_unknown",
-        "platform_activity_unavailable",
+        ...(activity ? activity.reasons ?? [] : ["platform_activity_unavailable"]),
       ],
     };
   }
+  const collecting = activity?.collectorState === "collecting" && Boolean(activity);
+  const observed = observeScheduledHeartbeatRobots({
+    cfg,
+    events: activity?.events ?? [],
+    from: window.from,
+    to: window.to,
+    collecting,
+    collectionStartedAt: activity?.collectionStartedAt ?? null,
+    evictedCount: activity?.evictedCount ?? 0,
+    expiredCount: activity?.expiredCount ?? 0,
+  });
+  const robots: HeartbeatRobotSnapshot[] = observed.robots.map((robot: HeartbeatRobotObservation) => ({
+    agentId: robot.agentId,
+    expectedPeriodMs: robot.expectedPeriodMs,
+    expectedSamples: robot.expectedSamples,
+    observedSamples: robot.observedSamples,
+    onCadence: robot.onCadence,
+    tenantId: robot.tenantId,
+  }));
+  const mapped = robots.filter((robot) => robot.tenantId);
+  const rollup = rollupHeartbeatCohort(observed.robots, {
+    attributionIncomplete: observed.unattributedInWindow > 0,
+    reasons: [
+      ...baseReasons,
+      ...(activity ? activity.reasons ?? [] : ["platform_activity_unavailable"]),
+      ...(mapped.length === robots.length && robots.length > 0
+        ? []
+        : ["tenant_attribution_unavailable"]),
+    ],
+  });
+  const tenants = rollupHeartbeatCohortByTenant(observed.robots, {
+    attributionIncomplete: observed.unattributedInWindow > 0,
+  }).map((row) => ({
+    tenantId: row.tenantId,
+    scheduledRobotCount: row.scheduledRobotCount,
+    confirmedRobotCount: row.confirmedRobotCount,
+    onCadenceRobotCount: row.onCadenceRobotCount,
+    expectedPeriodMs: row.expectedPeriodMs,
+    expectedSamples: row.expectedSamples,
+    observedSamples: row.observedSamples,
+  }));
   return {
-    expectedPeriodMs: activity.expectedPeriodMs ?? null,
-    expectedSamples: activity.expectedSamples ?? null,
-    observedSamples: activity.observedSamples ?? null,
+    expectedPeriodMs: rollup.expectedPeriodMs,
+    expectedSamples: rollup.expectedSamples,
+    observedSamples: rollup.observedSamples,
+    scheduledRobotCount: rollup.scheduledRobotCount,
+    confirmedRobotCount: rollup.confirmedRobotCount,
+    onCadenceRobotCount: rollup.onCadenceRobotCount,
     observedEventCount: marks.length,
     lastEventAt,
     events: marks,
-    reasons: [...activity.reasons],
+    robots,
+    tenants,
+    reasons: rollup.reasons,
   };
 }
 
@@ -436,7 +525,7 @@ export function queryPlatformObservationSnapshot(input: {
       link: attemptedCount ? fullyLinkedCount / attemptedCount : null,
       reasons: coverageReasonsFromScan(scanned.stats, attemptedCount),
     },
-    heartbeat: projectHeartbeatSnapshot(input.activity ?? null, { from: input.from, to: input.to }),
+    heartbeat: projectHeartbeatSnapshot(input.activity ?? null, { from: input.from, to: input.to }, input.cfg),
     unmappedEvents: { count: unmappedEventCount },
     capacity: {
       concurrency: {

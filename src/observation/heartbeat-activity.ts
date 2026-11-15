@@ -1,6 +1,7 @@
 /** Passive platform activity. Liveness denominators appear only when a period is known. */
 import { randomUUID } from "node:crypto";
 import { listAgentEntries } from "../agents/agent-scope.js";
+import { normalizeAgentId } from "../routing/session-key.js";
 import type { OpenBotConfig } from "../config/config.js";
 import { onHeartbeatEvent, type HeartbeatEventPayload } from "../infra/heartbeat-events.js";
 import { resolveHeartbeatIntervalMs } from "../infra/heartbeat-runner.js";
@@ -111,6 +112,7 @@ export function startHeartbeatActivity(
     status: HeartbeatEventPayload["status"];
     durationMs: number | null;
     receivedAt: number;
+    agentId: string | null;
   }[] = [];
   let sequence = 0;
   let evictedCount = 0;
@@ -181,6 +183,8 @@ export function startHeartbeatActivity(
       ) {
         return;
       }
+      const rawAgentId = typeof event.agentId === "string" ? event.agentId.trim() : "";
+      const agentId = rawAgentId ? normalizeAgentId(rawAgentId) : null;
       events.push({
         sequence: ++sequence,
         ts: event.ts,
@@ -192,6 +196,7 @@ export function startHeartbeatActivity(
             ? event.durationMs
             : null,
         receivedAt: now(),
+        agentId,
       });
       while (events.length > capacity) {
         discard("capacity");

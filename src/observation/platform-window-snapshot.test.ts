@@ -125,16 +125,25 @@ describe("platform window snapshot", () => {
   });
 
   it("uses collector heartbeat samples when a real expected period exists", () => {
+    const scheduled = {
+      agents: { list: [{ id: "bot", agentDir: dir, heartbeat: { every: "100ms" } }] },
+    } as OpenBotConfig;
     const snapshot = queryPlatformObservationSnapshot({
-      cfg,
+      cfg: scheduled,
       from: time,
-      to: time + 1000,
-      projectedAt: time + 1000,
+      to: time + 400,
+      projectedAt: time + 400,
       executionStore: createExecutionEvidenceStore({ enabled: () => false, now: () => time + 1 }),
       activity: {
-        expectedPeriodMs: 100,
-        expectedSamples: 4,
-        observedSamples: 3,
+        collectorState: "collecting",
+        collectionStartedAt: time,
+        evictedCount: 0,
+        expiredCount: 0,
+        events: [
+          { ts: time + 10, status: "sent", agentId: "bot" },
+          { ts: time + 110, status: "ok-empty", agentId: "bot" },
+          { ts: time + 210, status: "sent", agentId: "bot" },
+        ],
         reasons: ["heartbeat_activity_not_liveness"],
       },
     });
@@ -142,8 +151,59 @@ describe("platform window snapshot", () => {
     if (!snapshot.ok) {
       throw new Error("snapshot_failed");
     }
+    expect(snapshot.heartbeat.scheduledRobotCount).toBe(1);
+    expect(snapshot.heartbeat.confirmedRobotCount).toBe(1);
+    expect(snapshot.heartbeat.onCadenceRobotCount).toBe(0);
+    expect(snapshot.heartbeat.expectedPeriodMs).toBe(100);
     expect(snapshot.heartbeat.expectedSamples).toBe(4);
     expect(snapshot.heartbeat.observedSamples).toBe(3);
+    expect(snapshot.heartbeat.robots[0]).toMatchObject({
+      agentId: "bot",
+      expectedSamples: 4,
+      observedSamples: 3,
+      onCadence: false,
+    });
+  });
+
+  it("rolls up mixed periods as a robot cadence cohort, not a mashed tick ratio", () => {
+    const mixed = {
+      agents: {
+        list: [
+          { id: "fast", agentDir: dir, heartbeat: { every: "100ms" } },
+          { id: "slow", agentDir: dir, heartbeat: { every: "200ms" } },
+        ],
+      },
+    } as OpenBotConfig;
+    const snapshot = queryPlatformObservationSnapshot({
+      cfg: mixed,
+      from: time,
+      to: time + 400,
+      projectedAt: time + 400,
+      executionStore: createExecutionEvidenceStore({ enabled: () => false, now: () => time + 1 }),
+      activity: {
+        collectorState: "collecting",
+        collectionStartedAt: time,
+        evictedCount: 0,
+        expiredCount: 0,
+        events: [
+          { ts: time + 10, status: "sent", agentId: "fast" },
+          { ts: time + 110, status: "sent", agentId: "fast" },
+          { ts: time + 210, status: "sent", agentId: "fast" },
+          { ts: time + 310, status: "sent", agentId: "fast" },
+          { ts: time + 50, status: "sent", agentId: "slow" },
+        ],
+        reasons: [],
+      },
+    });
+    expect(snapshot.ok).toBe(true);
+    if (!snapshot.ok) {
+      throw new Error("snapshot_failed");
+    }
+    expect(snapshot.heartbeat.onCadenceRobotCount).toBe(1);
+    expect(snapshot.heartbeat.confirmedRobotCount).toBe(2);
+    expect(snapshot.heartbeat.expectedSamples).toBeNull();
+    expect(snapshot.heartbeat.observedSamples).toBeNull();
+    expect(snapshot.heartbeat.reasons).toContain("mixed_heartbeat_periods");
   });
 
   it("marks coverage unknown with tips_outside_window when durable tips exist outside the window", () => {

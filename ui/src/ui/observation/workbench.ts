@@ -64,6 +64,7 @@ import {
   heartbeatFraction,
   linkCoverageFraction,
   formatTenantCoverage,
+  formatTenantHeartbeat,
   tenantDisplayName,
   tenantGrantNote,
   visibleTenantCode,
@@ -293,9 +294,13 @@ export class OpenBotObservationWorkbench extends LitElement {
       heartbeat?: {
         expectedSamples?: unknown;
         observedSamples?: unknown;
+        scheduledRobotCount?: unknown;
+        confirmedRobotCount?: unknown;
+        onCadenceRobotCount?: unknown;
         observedEventCount?: unknown;
         lastEventAt?: unknown;
         events?: unknown;
+        tenants?: unknown;
       };
       unmappedEvents?: { count?: unknown };
       capacity?: {
@@ -329,9 +334,41 @@ export class OpenBotObservationWorkbench extends LitElement {
         ? {
             expectedSamples: count(row.heartbeat.expectedSamples),
             observedSamples: count(row.heartbeat.observedSamples),
+            scheduledRobotCount: count(row.heartbeat.scheduledRobotCount),
+            confirmedRobotCount: count(row.heartbeat.confirmedRobotCount),
+            onCadenceRobotCount: count(row.heartbeat.onCadenceRobotCount),
             observedEventCount: count(row.heartbeat.observedEventCount) ?? (events.length ? events.length : null),
             lastEventAt: count(row.heartbeat.lastEventAt),
             events,
+            tenants: Array.isArray(row.heartbeat.tenants)
+              ? row.heartbeat.tenants.flatMap((entry) => {
+                  if (!entry || typeof entry !== "object") {
+                    return [];
+                  }
+                  const tenant = entry as {
+                    tenantId?: unknown;
+                    scheduledRobotCount?: unknown;
+                    confirmedRobotCount?: unknown;
+                    onCadenceRobotCount?: unknown;
+                    expectedSamples?: unknown;
+                    observedSamples?: unknown;
+                  };
+                  const tenantId = typeof tenant.tenantId === "string" ? tenant.tenantId.trim() : "";
+                  if (!tenantId) {
+                    return [];
+                  }
+                  return [
+                    {
+                      tenantId,
+                      scheduledRobotCount: count(tenant.scheduledRobotCount),
+                      confirmedRobotCount: count(tenant.confirmedRobotCount),
+                      onCadenceRobotCount: count(tenant.onCadenceRobotCount),
+                      expectedSamples: count(tenant.expectedSamples),
+                      observedSamples: count(tenant.observedSamples),
+                    },
+                  ];
+                })
+              : [],
           }
         : null,
       unmappedEvents: row.unmappedEvents ? { count: count(row.unmappedEvents.count) } : null,
@@ -2189,7 +2226,7 @@ export class OpenBotObservationWorkbench extends LitElement {
       <div class="obs-plat-card__head"><div><h3>租户隔离与授权</h3></div></div>
       <div class="obs-tenant-table-wrap">
         <table class="obs-tenant-table">
-          <thead><tr><th>租户</th><th>授权</th><th>覆盖</th><th>说明</th></tr></thead>
+          <thead><tr><th>租户</th><th>授权</th><th>覆盖</th><th>心跳</th><th>说明</th></tr></thead>
           <tbody>
             ${rows.map((entry) => {
               const grant = this.entryGrant(entry);
@@ -2197,10 +2234,14 @@ export class OpenBotObservationWorkbench extends LitElement {
                 grant === "granted" ? "已授权" : grant === "none" ? "无授权" : "尚未确认";
               const tenantCode = visibleTenantCode(entry.label, entry.tenantId);
               const note = grant === "granted" ? "" : tenantGrantNote(grant, isSample);
+              const tenantHeartbeat = this.firstScreenSnapshot()?.heartbeat?.tenants?.find(
+                (row) => row.tenantId === entry.tenantId,
+              ) ?? null;
               return html`<tr data-tenant-id=${entry.tenantId}>
                 <td>${tenantDisplayName(entry.label, entry.tenantId)}${tenantCode ? html`<code>${tenantCode}</code>` : nothing}</td>
                 <td><span class="obs-grant-chip is-${grant}">${grantLabel}</span></td>
                 <td>${formatTenantCoverage(grant)}</td>
+                <td>${formatTenantHeartbeat(grant, tenantHeartbeat)}</td>
                 <td class="obs-plat-footnote">${note}</td>
               </tr>`;
             })}

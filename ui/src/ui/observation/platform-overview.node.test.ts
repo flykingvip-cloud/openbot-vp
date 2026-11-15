@@ -17,6 +17,7 @@ import {
   formatConcurrency,
   linkCoverageFraction,
   formatTenantCoverage,
+  formatTenantHeartbeat,
   tenantGrantNote,
 } from "./platform-overview.ts";
 
@@ -71,11 +72,33 @@ describe("formatHeartbeat", () => {
     expect(formatHeartbeat(null).value).toBe("未知");
     expect(formatHeartbeat({ expectedSamples: null, observedSamples: 1 }).value).toBe("未知");
     expect(formatHeartbeat({ expectedSamples: 0, observedSamples: 0 }).value).toBe("未知");
+    expect(formatHeartbeat({ scheduledRobotCount: 0, onCadenceRobotCount: 0 }).value).toBe("未知");
+    expect(formatHeartbeat({ scheduledRobotCount: 2, onCadenceRobotCount: null }).value).toBe("未知");
     expect(formatHeartbeat(null).note).toContain("source_unavailable");
+    expect(formatHeartbeat({ scheduledRobotCount: 0, onCadenceRobotCount: 0 }).value).not.toContain("0%");
   });
 
   it("formats a confirmed expected and observed count", () => {
     expect(formatHeartbeat({ expectedSamples: 4, observedSamples: 3 }).value).toBe("3/4");
+  });
+
+  it("formats a confirmed scheduled-robot cadence cohort, including an honest 0%", () => {
+    expect(
+      formatHeartbeat({ scheduledRobotCount: 2, confirmedRobotCount: 2, onCadenceRobotCount: 1 }).value,
+    ).toBe("1/2 · 50%");
+    expect(
+      formatHeartbeat({ scheduledRobotCount: 2, confirmedRobotCount: 2, onCadenceRobotCount: 0 }).value,
+    ).toBe("0/2 · 0%");
+    // Mixed-period payloads must use the cohort, never a mashed tick ratio.
+    expect(
+      formatHeartbeat({
+        scheduledRobotCount: 2,
+        confirmedRobotCount: 2,
+        onCadenceRobotCount: 1,
+        expectedSamples: null,
+        observedSamples: null,
+      }).value,
+    ).toBe("1/2 · 50%");
   });
 
   it("does not expose raw field names in the formatted detail", () => {
@@ -90,6 +113,9 @@ describe("heartbeatFraction", () => {
   it("is null when heartbeat is unknown and returns the confirmed ratio", () => {
     expect(heartbeatFraction(null)).toBeNull();
     expect(heartbeatFraction({ expectedSamples: 4, observedSamples: 3 })).toBe(0.75);
+    expect(
+      heartbeatFraction({ scheduledRobotCount: 2, confirmedRobotCount: 2, onCadenceRobotCount: 1 }),
+    ).toBe(0.5);
   });
 });
 
@@ -152,6 +178,16 @@ describe("tenant row projection", () => {
     expect(formatTenantCoverage("granted")).toBe("未知");
     expect(formatTenantCoverage("none")).toBe("无授权");
     expect(formatTenantCoverage("unknown")).toBe("尚未确认");
+    expect(formatTenantHeartbeat("granted")).toBe("未知");
+    expect(formatTenantHeartbeat("none")).toBe("无授权");
+    expect(formatTenantHeartbeat("unknown")).toBe("尚未确认");
+    expect(
+      formatTenantHeartbeat("granted", {
+        scheduledRobotCount: 1,
+        confirmedRobotCount: 1,
+        onCadenceRobotCount: 1,
+      }),
+    ).toBe("1/1 · 100%");
     expect(tenantGrantNote("none", false)).toContain("不返回该租户运行");
     expect(tenantGrantNote("unknown", false)).toContain("尚未确认");
   });

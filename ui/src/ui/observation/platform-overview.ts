@@ -20,12 +20,25 @@ export type HeartbeatActivityMark = {
   status?: string;
 };
 
+export type HeartbeatTenantInput = {
+  tenantId: string;
+  scheduledRobotCount?: number | null;
+  confirmedRobotCount?: number | null;
+  onCadenceRobotCount?: number | null;
+  expectedSamples?: number | null;
+  observedSamples?: number | null;
+};
+
 export type HeartbeatInput = {
   expectedSamples?: number | null;
   observedSamples?: number | null;
+  scheduledRobotCount?: number | null;
+  confirmedRobotCount?: number | null;
+  onCadenceRobotCount?: number | null;
   observedEventCount?: number | null;
   lastEventAt?: number | null;
   events?: readonly HeartbeatActivityMark[] | null;
+  tenants?: readonly HeartbeatTenantInput[] | null;
 };
 
 export type ConcurrencyInput = {
@@ -130,10 +143,37 @@ export function formatLinkCoverage(coverage: LinkCoverageInput | null | undefine
   };
 }
 
+function confirmedCohort(activity: HeartbeatInput | null | undefined): {
+  onCadence: number;
+  scheduled: number;
+} | null {
+  const confirmed = activity?.confirmedRobotCount;
+  const scheduled =
+    confirmed != null && Number.isFinite(confirmed) && confirmed > 0
+      ? confirmed
+      : activity?.scheduledRobotCount;
+  const onCadence = activity?.onCadenceRobotCount;
+  if (
+    scheduled == null ||
+    onCadence == null ||
+    !Number.isFinite(scheduled) ||
+    !Number.isFinite(onCadence) ||
+    scheduled <= 0 ||
+    onCadence < 0
+  ) {
+    return null;
+  }
+  return { onCadence, scheduled };
+}
+
 export function heartbeatFraction(activity: HeartbeatInput | null | undefined): number | null {
   const formatted = formatHeartbeat(activity);
   if (formatted.value === "未知") {
     return null;
+  }
+  const cohort = confirmedCohort(activity);
+  if (cohort) {
+    return Math.min(1, Math.max(0, cohort.onCadence / cohort.scheduled));
   }
   const expected = activity?.expectedSamples;
   const observed = activity?.observedSamples;
@@ -150,6 +190,15 @@ export function heartbeatFraction(activity: HeartbeatInput | null | undefined): 
 }
 
 export function formatHeartbeat(activity: HeartbeatInput | null | undefined): FormattedMetric {
+  const cohort = confirmedCohort(activity);
+  if (cohort) {
+    const percent = Math.round((cohort.onCadence / cohort.scheduled) * 1000) / 10;
+    return {
+      value: `${cohort.onCadence}/${cohort.scheduled} · ${percent}%`,
+      detail: "",
+      note: "心跳时效 · 不等于窗口覆盖",
+    };
+  }
   const expected = activity?.expectedSamples;
   const observed = activity?.observedSamples;
   if (
@@ -171,6 +220,19 @@ export function formatHeartbeat(activity: HeartbeatInput | null | undefined): Fo
     detail: "",
     note: "心跳时效 · 不等于窗口覆盖",
   };
+}
+
+export function formatTenantHeartbeat(
+  grant: TenantGrant,
+  activity?: HeartbeatInput | null,
+): string {
+  if (grant === "none") {
+    return "无授权";
+  }
+  if (grant === "unknown") {
+    return "尚未确认";
+  }
+  return formatHeartbeat(activity).value;
 }
 
 function ratioOrUnknown(
