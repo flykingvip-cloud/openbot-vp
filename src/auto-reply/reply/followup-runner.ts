@@ -19,8 +19,11 @@ import {
 } from "../../agent-runtime/state/index.js";
 import {
   findBlockedFollowupDelivery,
+  markFollowupRecoveryDeliveryStarted,
+  markFollowupRecoveryDeliverySent,
   planFollowupRecoveryRetry,
   recordFollowupWorkspaceDecision,
+  recordBlockedFollowupDelivery,
   resolveBlockedFollowupDeliveryPersistRoot,
   type FollowupDeliveryResumeSnapshot,
 } from "../../agent-runtime/state/repository/blocked-followup-delivery.js";
@@ -480,6 +483,9 @@ export function createFollowupRunner(params: {
             deliveryId: decisionDeliveryId,
             taskId: decisionTaskId,
             id: existingRecovery?.id,
+            ...(queued.asyncWaitDeliveryOnly
+              ? { statusOverride: "recoverable_wait" as const }
+              : {}),
           });
           if (!continued && (classification.code !== "unchanged" || existingRecovery)) {
             // Version, migration, or a prior wait/reauth record should be
@@ -569,6 +575,27 @@ export function createFollowupRunner(params: {
             error: "original_payloads_missing",
           });
         } else {
+          const persistRoot = resolveBlockedFollowupDeliveryPersistRoot(queued.run.sessionFile);
+          let record = findBlockedFollowupDelivery(persistRoot, {
+            runId: deliveryRunId,
+            deliveryId,
+            jobId: queued.asyncWaitRecoveryBind?.jobId,
+          });
+          if (!record) {
+            record = await recordBlockedFollowupDelivery({
+              persistRoot,
+              reason: "delivery_receipt_pending",
+              error: "",
+              runId: deliveryRunId,
+              deliveryId,
+              taskId,
+              sessionFile: queued.run.sessionFile,
+              sessionKey: queued.run.sessionKey ?? sessionKey,
+              jobId: queued.asyncWaitRecoveryBind?.jobId,
+              status: "recoverable_wait",
+            });
+          }
+          const dispatching = await markFollowupRecoveryDeliveryStarted({ persistRoot, record });
           const delivered = await sendFollowupPayloads(retryPayloads, queued, true);
           let confirmStatus: "delivered" | "failed" | "delivery_unknown" =
             delivered === "none" ? "failed" : delivered;
@@ -584,6 +611,9 @@ export function createFollowupRunner(params: {
             sessionKey: queued.run.sessionKey ?? sessionKey,
             status: confirmStatus,
           });
+          if (confirmStatus === "delivered") {
+            await markFollowupRecoveryDeliverySent({ persistRoot, record: dispatching });
+          }
         }
       } catch (err) {
         logVerbose(`async-wait delivery-only retry failed: ${String(err)}`);

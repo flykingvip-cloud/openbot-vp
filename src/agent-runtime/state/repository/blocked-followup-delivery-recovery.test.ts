@@ -17,6 +17,8 @@ import type { OpenBotConfig } from "../../../config/config.js";
 import { confirmAccessReauthorization } from "../../../gateway/access-control/followup-workspace-reauthorization.js";
 import {
   claimFollowupRecoveryForResume,
+  markFollowupRecoveryDeliveryStarted,
+  followupRecoveryClaimBlocksEnqueue,
   findBlockedFollowupDelivery,
   followupDeliveryIdempotencyKey,
   listBlockedFollowupDeliveries,
@@ -606,4 +608,18 @@ it("does not let mark-enqueued or a later wait write regress a continued deliver
     status: "continued",
     destination: "continue",
   });
+});
+
+it("keeps an ambiguous pre-send fence held after process death instead of replaying", async () => {
+  const { persistRoot, sessionFile, workspaceDir, sessionKey } = makePersistRoot();
+  writeWaitRecord({ persistRoot, sessionFile, workspaceDir, sessionKey });
+  const record = findBlockedFollowupDelivery(persistRoot, { id: "wait-record-1" })!;
+  const started = await markFollowupRecoveryDeliveryStarted({ persistRoot, record });
+  expect(started.status).not.toBe("continued");
+  const restarted = findBlockedFollowupDelivery(persistRoot, { id: record.id })!;
+  restarted.claim!.holderPid = 2147483647;
+  expect(followupRecoveryClaimBlocksEnqueue(restarted, Date.now() + 86400000)).toBe(true);
+  await expect(
+    markFollowupRecoveryDeliveryStarted({ persistRoot, record: restarted }),
+  ).rejects.toThrow("receipt_reconciliation");
 });

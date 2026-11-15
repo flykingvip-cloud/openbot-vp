@@ -85,6 +85,7 @@ export type FollowupRecoveryClaim = {
   /** Stable across retries and restarts; never includes retryCount. */
   deliveryIdempotencyKey: string;
   deliverySentAtMs?: number;
+  deliveryStartedAtMs?: number;
 };
 
 /**
@@ -574,7 +575,11 @@ export function followupRecoveryClaimBlocksEnqueue(
   record: BlockedFollowupDeliveryRecord,
   nowMs = Date.now(),
 ): boolean {
-  if (record.status === "continued" || record.claim?.deliverySentAtMs) {
+  if (
+    record.status === "continued" ||
+    record.claim?.deliverySentAtMs ||
+    record.claim?.deliveryStartedAtMs
+  ) {
     return true;
   }
   const claim = record.claim;
@@ -585,7 +590,7 @@ export function followupRecoveryClaimBlocksEnqueue(
 }
 
 function claimIsHeld(claim: FollowupRecoveryClaim, nowMs: number): boolean {
-  if (claim.deliverySentAtMs) {
+  if (claim.deliverySentAtMs || claim.deliveryStartedAtMs) {
     return true;
   }
   if (claim.stage !== "claimed" && claim.stage !== "enqueued") {
@@ -692,10 +697,11 @@ export async function claimFollowupRecoveryForResume(input: {
       return claimed;
     },
   );
-  if (result.ok) {
-    return { ...result, record: updated ?? result.record };
+  const settled = result as FollowupRecoveryClaimResult;
+  if (settled.ok) {
+    return { ...settled, record: updated ?? settled.record };
   }
-  return result.record || !updated ? result : { ...result, record: updated };
+  return settled.record || !updated ? settled : { ...settled, record: updated };
 }
 
 export async function markFollowupRecoveryClaimEnqueued(input: {
@@ -760,8 +766,8 @@ export async function releaseFollowupRecoveryClaim(input: {
       return {
         ...current,
         updatedAtMs: nowMs,
-        status: current.status === "continued" ? current.status : "recoverable_wait",
-        destination: current.status === "continued" ? current.destination : "recoverable_wait",
+        status: "recoverable_wait",
+        destination: "recoverable_wait",
         deliveryIdempotencyKey: followupDeliveryIdempotencyKey(current),
         claim: {
           ...current.claim,
@@ -807,4 +813,42 @@ export async function markFollowupRecoveryDeliverySent(input: {
     },
   );
   return updated ?? input.record;
+}
+
+/** A durable pre-send fence: loss of the process requires receipt reconciliation. */
+export async function markFollowupRecoveryDeliveryStarted(input: {
+  persistRoot: string;
+  record: BlockedFollowupDeliveryRecord;
+}): Promise<BlockedFollowupDeliveryRecord> {
+  const updated = await mutateFollowupRecordUnderLock(
+    input.persistRoot,
+    input.record.id,
+    (current) => {
+      if (!current) {
+        throw new Error("followup_delivery_record_missing");
+      }
+      if (current.claim?.deliveryStartedAtMs || current.status === "continued") {
+        throw new Error("followup_delivery_requires_receipt_reconciliation");
+      }
+      const now = Date.now();
+      return {
+        ...current,
+        reason: "delivery_receipt_pending",
+        missingItems: ["authoritative_delivery_receipt"],
+        updatedAtMs: now,
+        claim: {
+          token: current.claim?.token || randomUUID(),
+          stage: current.claim?.stage ?? "enqueued",
+          claimedAtMs: current.claim?.claimedAtMs ?? now,
+          holderPid: process.pid,
+          deliveryIdempotencyKey: followupDeliveryIdempotencyKey(current),
+          deliveryStartedAtMs: now,
+        },
+      };
+    },
+  );
+  if (!updated) {
+    throw new Error("followup_delivery_record_missing");
+  }
+  return updated;
 }

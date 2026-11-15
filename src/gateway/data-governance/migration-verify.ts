@@ -510,7 +510,9 @@ export async function verifyMigrationBatch(params: {
     }
 
     const canonical = record ? activeCanonical(record) : null;
-    const change = lookupVerifyChange(params.changes, item.resourceId, item.candidateId);
+    const change =
+      item.receipt.changeSnapshot ??
+      lookupVerifyChange(params.changes, item.resourceId, item.candidateId);
     const previousLocator = item.receipt.previousLocator?.trim() || undefined;
     const fromBinding = bindingAtLocator(
       record,
@@ -522,7 +524,7 @@ export async function verifyMigrationBatch(params: {
     )?.detail;
     const artifactSet = concreteArtifactSet([
       ...(change?.artifactSet ?? []),
-      item.resourceId && isConcreteChecksum(checksumDetail)
+      !change?.artifactSet?.length && item.resourceId && isConcreteChecksum(checksumDetail)
         ? { artifactId: item.resourceId, checksum: checksumDetail }
         : undefined,
     ]);

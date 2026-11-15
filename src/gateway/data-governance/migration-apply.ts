@@ -70,6 +70,7 @@ export type MigrationReceipt = {
   inventoryChecksum: string;
   planChecksum: string;
   contentChecksum: string | null;
+  changeSnapshot?: import("./migration-verify.js").MigrationVerifyChangeSnapshot;
   previousLocator: string;
   canonicalBindingId: string | null;
   observationLocator: string | null;

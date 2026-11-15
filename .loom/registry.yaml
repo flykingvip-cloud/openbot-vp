@@ -14596,6 +14596,16 @@ tasks:
       - src/agent-runtime/state/repository/async-wait-job-recovery.ts
       - src/gateway/data-governance/migration-verify.ts
       - src/gateway/access-control/followup-workspace-reauthorization.ts
+      - src/gateway/access-control/canonical-workspace-migration-control.test.ts
+      - src/gateway/access-control/canonical-workspace-migration-control.ts
+      - src/gateway/access-control/confirm-followup-workspace-access.test.ts
+      - src/gateway/access-control/confirm-followup-workspace-access.ts
+      - src/gateway/data-governance/canonical-migration-plan.ts
+      - src/gateway/data-governance/canonical-migration.test.ts
+      - src/gateway/data-governance/canonical-migration.ts
+      - src/gateway/server-methods/mesh-workspace-actions.test.ts
+      - src/gateway/server-methods/mesh-governance.ts
+      - src/gateway/data-governance/migration-apply.ts
     state: active
     sessions:
       - id: codex-canonical-20261114
@@ -14604,6 +14614,13 @@ tasks:
         agent: codex-observation
         status: active
         lastSignalAt: 2026-11-14T14:03:38.339Z
+        metadata: {}
+      - id: codex-final-closure-20261115
+        taskId: canonical-execution-workspace-20261114
+        ide: codex
+        agent: codex-observation
+        status: active
+        lastSignalAt: 2026-11-15T13:15:28.605Z
         metadata: {}
     ownerHistory: []
     since: 2026-11-14
@@ -14639,6 +14656,16 @@ landingStreams:
       - src/agent-runtime/state/repository/async-wait-job-recovery.ts
       - src/gateway/data-governance/migration-verify.ts
       - src/gateway/access-control/followup-workspace-reauthorization.ts
+      - src/gateway/access-control/canonical-workspace-migration-control.test.ts
+      - src/gateway/access-control/canonical-workspace-migration-control.ts
+      - src/gateway/access-control/confirm-followup-workspace-access.test.ts
+      - src/gateway/access-control/confirm-followup-workspace-access.ts
+      - src/gateway/data-governance/canonical-migration-plan.ts
+      - src/gateway/data-governance/canonical-migration.test.ts
+      - src/gateway/data-governance/canonical-migration.ts
+      - src/gateway/server-methods/mesh-workspace-actions.test.ts
+      - src/gateway/server-methods/mesh-governance.ts
+      - src/gateway/data-governance/migration-apply.ts
     canLandWith: []
     metadata:
       owner: codex-observation
@@ -29811,6 +29838,42 @@ landingStreams:
       agent: codex-runtime-manager
       purpose: Three-way registry merge preserving tasks, sessions and landing history.
 sharedPaths:
+  - glob: src/gateway/access-control/canonical-workspace-migration-control.test.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: User-authorized final production wiring takeover.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/access-control/canonical-workspace-migration-control.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: User-authorized final production wiring takeover.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/access-control/confirm-followup-workspace-access.test.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: User-authorized final production wiring takeover.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/access-control/confirm-followup-workspace-access.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: User-authorized final production wiring takeover.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/data-governance/canonical-migration-plan.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: User-authorized final production wiring takeover.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/data-governance/canonical-migration.test.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: User-authorized final production wiring takeover.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/data-governance/canonical-migration.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: User-authorized final production wiring takeover.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/mesh-workspace-actions.test.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: User-authorized final production wiring takeover.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/mesh-governance.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: User-authorized final production wiring takeover.
+    reviewAfter: 2026-11-30
   - glob: src/auto-reply/reply/get-reply-run.ts
     landerTask: canonical-execution-workspace-20261114
     reason: Verified scoped takeover for canonical entry and regression alignment.
