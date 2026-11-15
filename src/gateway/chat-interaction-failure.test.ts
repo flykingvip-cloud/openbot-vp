@@ -12,10 +12,12 @@ import { persistInteractionMessage } from "../agent-runtime/state/index.js";
 import { openSessionManager } from "../agents/pi-sdk/session.js";
 import {
   BILLING_BLOCKED_INTERACTION_TEXT,
+  formatChatTurnTerminalText,
   persistRejectedInteractionTurn,
   readChatTurnTerminal,
   reconcileChatTurnTerminal,
   REJECTED_INTERACTION_TURN_TEXT,
+  shortChatRunId,
 } from "./chat-interaction-failure.js";
 it("persists only governed billing failures as a pre-execution blocked interaction", async () => {
   const append = vi.fn(async () => ({ ok: true }));
@@ -557,4 +559,51 @@ it("serializes reconcile and persist on the same terminal path so a late conflic
   } finally {
     fs.rmSync(storeDir, { recursive: true, force: true });
   }
+});
+
+it("persists a broken JSON / SyntaxError as a neutral Chinese bubble without leaking internals", async () => {
+  const append = vi.fn(async (text: string) => ({ ok: true, text }));
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+  const rawFragment = '{"kind":"reply"';
+  try {
+    const error = new SyntaxError(`Unexpected end of JSON input near ${rawFragment}`);
+    const formatted = formatChatTurnTerminalText(error);
+    expect(formatted.businessExecution).toBe("none");
+    expect(formatted.text).toBe(REJECTED_INTERACTION_TURN_TEXT);
+    expect(formatted.text).not.toMatch(/SyntaxError|Unexpected|kind":"reply/);
+    const result = await persistRejectedInteractionTurn({
+      error,
+      runId: "syntax-run",
+      append,
+    });
+    expect(result).toEqual({ persisted: true, text: REJECTED_INTERACTION_TURN_TEXT });
+    expect(append).toHaveBeenCalledTimes(1);
+    expect(append.mock.calls[0]?.[0]).toBe(REJECTED_INTERACTION_TURN_TEXT);
+    const logged = warn.mock.calls.map((call) => JSON.stringify(call)).join("\n");
+    expect(logged).toContain("[interaction-rejection-source]");
+    expect(logged).toContain(shortChatRunId("syntax-run"));
+    expect(logged).toContain("SyntaxError");
+    expect(logged).not.toContain(rawFragment);
+    expect(logged).not.toContain("Unexpected end of JSON input");
+  } finally {
+    warn.mockRestore();
+  }
+});
+
+it("persists a missing-text interaction decision as a durable pre-admission notice", async () => {
+  const append = vi.fn(async () => ({ ok: true }));
+  const error = Object.assign(new Error("本轮未取得有效的交互决定，没有启动或修改任务。"), {
+    interactionPhase: "interpretation" as const,
+    reason: "empty",
+    usageRecorded: true,
+  });
+  const result = await persistRejectedInteractionTurn({
+    error,
+    runId: "empty-decision",
+    append,
+  });
+  expect(result.persisted).toBe(true);
+  expect(result.text).toBe(INTERACTION_TIMEOUT_TEXT);
+  expect(result.text).not.toMatch(/SyntaxError|stack|\\{/);
+  expect(append).toHaveBeenCalledTimes(1);
 });

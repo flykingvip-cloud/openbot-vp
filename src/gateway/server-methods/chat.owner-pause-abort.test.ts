@@ -210,7 +210,10 @@ describe("gateway chat.send owner pause/cancel stop sequence", () => {
       );
       expect(fs.readFileSync(`${transcriptPath}.task-board.json`, "utf8")).toBe(before);
       const dispatched = vi.mocked(dispatchInboundMessage).mock.calls[0]?.[0];
-      expect(dispatched?.replyOptions?.interactionIngress).toEqual({ userMessageId: "greeting" });
+      expect(dispatched?.replyOptions?.interactionIngress).toEqual({
+        userMessageId: "greeting",
+        persistOwnTranscript: true,
+      });
       const entries = fs
         .readFileSync(transcriptPath, "utf8")
         .trim()
