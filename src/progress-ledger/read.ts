@@ -1,6 +1,7 @@
 import { resolveCronLedgerTaskId } from "../cron/wake-identity.js";
 import { isLongHorizonCronJob } from "./cron-binding.js";
-import { isProgressLedgerEnabled } from "./feature.js";
+import { isProgressLedgerEnabled, isProgressLedgerProjected } from "./feature.js";
+import type { ProgressLedgerConfigReader } from "./feature.js";
 import {
   isCronProgressQuiet,
   toHumanGatePendingItem,
@@ -17,6 +18,7 @@ export type CronProgressJob = {
   name?: string;
   description?: string;
   conversationTaskId?: string;
+  ownership?: { tenantId?: string; ownerId?: string };
 };
 
 export function inferTurnContractFromLedger(
@@ -44,12 +46,14 @@ export async function readCronProgressView(params: {
   cronStorePath: string;
   nowMs?: number;
   env?: NodeJS.ProcessEnv;
-  readConfig?: () => boolean;
+  readConfig?: ProgressLedgerConfigReader;
   turnContract?: TurnContractSnapshot;
 }): Promise<ProgressView | null> {
-  const enabled = params.readConfig
-    ? isProgressLedgerEnabled(params.env ?? process.env, params.readConfig)
-    : isProgressLedgerEnabled(params.env ?? process.env);
+  const enabled = isProgressLedgerProjected({
+    tenantId: params.job.ownership?.tenantId,
+    env: params.env ?? process.env,
+    readConfig: params.readConfig,
+  });
   if (!enabled || !isLongHorizonCronJob(params.job)) {
     return null;
   }
@@ -76,12 +80,10 @@ export async function attachProgressToCronJobs<T extends CronProgressJob>(
     cronStorePath: string;
     nowMs?: number;
     env?: NodeJS.ProcessEnv;
-    readConfig?: () => boolean;
+    readConfig?: ProgressLedgerConfigReader;
   },
 ): Promise<Array<T & { progress?: ProgressView }>> {
-  const enabled = params.readConfig
-    ? isProgressLedgerEnabled(params.env ?? process.env, params.readConfig)
-    : isProgressLedgerEnabled(params.env ?? process.env);
+  const enabled = isProgressLedgerEnabled(params.env ?? process.env, params.readConfig);
   if (!enabled) {
     return jobs;
   }
@@ -133,11 +135,9 @@ export async function listCronHumanGates(params: {
   cronStorePath: string;
   nowMs?: number;
   env?: NodeJS.ProcessEnv;
-  readConfig?: () => boolean;
+  readConfig?: ProgressLedgerConfigReader;
 }): Promise<HumanGatePendingItem[]> {
-  const enabled = params.readConfig
-    ? isProgressLedgerEnabled(params.env ?? process.env, params.readConfig)
-    : isProgressLedgerEnabled(params.env ?? process.env);
+  const enabled = isProgressLedgerEnabled(params.env ?? process.env, params.readConfig);
   if (!enabled) {
     return [];
   }

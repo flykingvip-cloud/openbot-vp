@@ -32,10 +32,11 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "../../..");
 const DISPATCH_REL = "src/auto-reply/reply/dispatch-from-config.ts";
 
-const OBSERVE_HELPERS = [
+// Helpers actually invoked from dispatch-from-config.ts. observeOrchestrationConsider
+// is implemented and tested default-off below, but is not wired at this choke point.
+const WIRED_OBSERVE_HELPERS = [
   "observeInboundTurnShadow",
   "observeInboundTurnActivation",
-  "observeOrchestrationConsider",
   "observeWebReadShadowFromChat",
   "observeConversationTaskReplyCompleted",
 ] as const;
@@ -87,9 +88,9 @@ describe("dispatch-from-config observe standby (P2)", () => {
     vi.restoreAllMocks();
   });
 
-  it("keeps the five observe helpers wired at the reply choke point", () => {
+  it("keeps shadow, activation, web_read, and reply-completion wired at the reply choke point", () => {
     const src = readFileSync(resolve(REPO_ROOT, DISPATCH_REL), "utf8");
-    for (const name of OBSERVE_HELPERS) {
+    for (const name of WIRED_OBSERVE_HELPERS) {
       expect(src, `${name} must stay wired in ${DISPATCH_REL}`).toContain(`${name}(`);
     }
   });

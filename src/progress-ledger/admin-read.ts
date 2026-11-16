@@ -1,5 +1,6 @@
 import { resolveCronLedgerTaskId } from "../cron/wake-identity.js";
 import { isProgressLedgerEnabled } from "./feature.js";
+import type { ProgressLedgerConfigReader } from "./feature.js";
 import { getLedgerMetrics, type LedgerMetrics, type LedgerMetricsSnapshot } from "./metrics.js";
 import { attachProgressToCronJobs, type CronProgressJob } from "./read.js";
 import type { ProgressView } from "./types.js";
@@ -30,14 +31,12 @@ export async function readAdminProgressLedger(params: {
   cronStorePath: string;
   nowMs?: number;
   env?: NodeJS.ProcessEnv;
-  readConfig?: () => boolean;
+  readConfig?: ProgressLedgerConfigReader;
   metrics?: LedgerMetrics;
   limit?: number;
 }): Promise<AdminProgressLedgerResult> {
   const metrics = params.metrics ?? getLedgerMetrics();
-  const enabled = params.readConfig
-    ? isProgressLedgerEnabled(params.env ?? process.env, params.readConfig)
-    : isProgressLedgerEnabled(params.env ?? process.env);
+  const enabled = isProgressLedgerEnabled(params.env ?? process.env, params.readConfig);
   if (!enabled) {
     return { projectionKind: "canonical", items: [], metrics: metrics.snapshot() };
   }

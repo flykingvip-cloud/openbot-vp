@@ -9,7 +9,22 @@ export {
   recordEvidence,
 } from "./evidence.js";
 export { LedgerInvariantError, LedgerWriteError } from "./errors.js";
-export { PROGRESS_LEDGER_ENABLED_ENV, isProgressLedgerEnabled } from "./feature.js";
+export {
+  PROGRESS_LEDGER_ENABLED_ENV,
+  PROGRESS_LEDGER_SHUTDOWN_ENV,
+  PROGRESS_LEDGER_TENANT_ALLOWLIST_ENV,
+  describeProgressLedgerCanaryScope,
+  isProgressLedgerEnabled,
+  isProgressLedgerProjected,
+  isProgressLedgerShutdown,
+  isProgressLedgerTenantAdmitted,
+  resolveProgressLedgerGate,
+} from "./feature.js";
+export type {
+  ProgressLedgerConfigReader,
+  ProgressLedgerConfigSlice,
+  ProgressLedgerGate,
+} from "./feature.js";
 export {
   buildCronCurrentStepPrompt,
   createCronLedgerSession,

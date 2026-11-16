@@ -10,6 +10,7 @@ import {
   resolveStorePath,
   type SessionEntry,
 } from "../../config/sessions.js";
+import { observeInboundTurnActivation } from "../../conversation-task/gateway-activation-hook.js";
 import { observeInboundTurnShadow } from "../../conversation-task/gateway-shadow-hook.js";
 import { observeConversationTaskReplyCompleted } from "../../conversation-task/reply-completion.js";
 import { captureTaskCompletionBinding } from "../../conversation-task/session-task-board.js";
@@ -265,6 +266,19 @@ export async function dispatchReplyFromConfig(params: {
   // shadow runtime is initialized (initShadowHook, wired separately under its own grant) AND
   // detection is enabled AND the tenant is allowlisted. No flag, no activation, no side effect.
   observeInboundTurnShadow({
+    tenantId: sourceContext.tenantId,
+    requesterId: ctx.GatewayClientPlatformUserId ?? sourceContext.userId ?? null,
+    conversationId: sessionKey ?? null,
+    employeeScopeAllowed: sourceContext.hasEnterpriseScope,
+    messageId: messageId ?? "",
+    text: ctx.BodyForCommands ?? ctx.Body ?? "",
+  });
+
+  // ConversationTask Runtime — official Activation bridge (fail-safe, default-off).
+  // Same server-derived identity as the shadow hook. No-op unless the hook is
+  // initialized and OPENBOT_CONVERSATION_TASK_ACTIVATION is on. Never throws
+  // into this path and does not enable the flag.
+  observeInboundTurnActivation({
     tenantId: sourceContext.tenantId,
     requesterId: ctx.GatewayClientPlatformUserId ?? sourceContext.userId ?? null,
     conversationId: sessionKey ?? null,

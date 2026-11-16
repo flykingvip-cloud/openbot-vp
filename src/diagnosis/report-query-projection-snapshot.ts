@@ -8,6 +8,7 @@ import path from "node:path";
 import { loadJsonFile } from "../infra/json-file.js";
 import { CONFIG_DIR } from "../utils.js";
 import { aggregateCrossTargetCases, type CrossTargetSlice } from "./cross-target.js";
+import { deriveDiagnoseObservationSummaryFromOutput } from "./diagnose-observation-summary.js";
 import type { DiagnoseOutput } from "./diagnose.js";
 import type { ProductionReportAuthoritySource } from "./report-query-production-adapters.js";
 import { DIAGNOSIS_PRODUCTION_REPORT_SOURCE_KIND } from "./report-query-production-config.js";
@@ -78,7 +79,9 @@ export function buildCompositeDiagnosisReportFromDiagnoseOutput(
   const diagnosis = aggregateCrossTargetCases([
     buildCrossTargetSliceFromDiagnoseOutput(output, trusted),
   ]);
-  return buildCompositeDiagnosisReport(diagnosis, trusted, options);
+  const report = buildCompositeDiagnosisReport(diagnosis, trusted, options);
+  const observationSummary = deriveDiagnoseObservationSummaryFromOutput(output, report.completion);
+  return observationSummary ? { ...report, observationSummary } : report;
 }
 
 export function encodeProjectionSnapshotFilename(reportId: string): string {

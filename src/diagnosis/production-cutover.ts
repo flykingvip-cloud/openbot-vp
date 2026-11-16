@@ -248,9 +248,17 @@ export function resolveProductionDaibaiTransport(
       "transport",
     );
   }
+  const sessionKey = input.sessionKey ?? DIAGNOSIS_P24_5_LIVE_SESSION_KEY;
+  if (sessionKey.trim() !== DIAGNOSIS_P24_5_LIVE_SESSION_KEY) {
+    fail(
+      "canary_session_mismatch",
+      "live Da Bai transport is limited to the diagnosis canary session key",
+      "sessionKey",
+    );
+  }
   return createLiveDaibaiTransport({
     send,
-    sessionKey: input.sessionKey ?? DIAGNOSIS_P24_5_LIVE_SESSION_KEY,
+    sessionKey,
     canaryTenantId: DIAGNOSIS_P24_5_CANARY_TENANT,
   });
 }
@@ -313,6 +321,13 @@ export function bindConversationDiagnosisToLiveChat(
       "canary_tenant_mismatch",
       "conversation live chat is limited to the internal single tenant canary",
       "tenantId",
+    );
+  }
+  if (binding.sessionKey.trim() !== DIAGNOSIS_P24_5_LIVE_SESSION_KEY) {
+    fail(
+      "canary_session_mismatch",
+      "conversation live chat is limited to the diagnosis canary session key",
+      "sessionKey",
     );
   }
   return createConversationLiveChatOutbound(binding);
