@@ -14610,7 +14610,41 @@ tasks:
     ownerHistory: []
     since: 2026-11-13
     metadata: {}
+  - id: gate-debt-delivery-c1-c2-c3-20261116:auditbot-batch1
+    owner: auditbot-batch1
+    intent:
+      - Inherited delivery-guard debt C1-C3 review. Fix stale seq 151 test;
+        classify missing objects; propose RELEASE_RECORD correction. No ledger
+        write and no production deploy.
+    paths:
+      - .kiro/specs/gate-debt-delivery-c1-c2-c3-20261116/**
+      - scripts/delivery/classify-ledger-objects.ts
+      - scripts/delivery/classify-ledger-objects.test.ts
+      - docs/notes/delivery-guard-debt-2026-11-16/**
+    state: active
+    sessions:
+      - id: 56b63656-ff2b-4c1e-8b65-da8d2ad0cfa0
+        taskId: gate-debt-delivery-c1-c2-c3-20261116:auditbot-batch1
+        ide: cursor
+        agent: auditbot-batch1
+        status: active
+        lastSignalAt: 2026-11-16T11:40:25.697Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-16
+    metadata: {}
 landingStreams:
+  - id: gate-debt-delivery-c1-c2-c3-20261116
+    landingPolicy: serial
+    paths:
+      - .kiro/specs/gate-debt-delivery-c1-c2-c3-20261116/**
+      - docs/notes/delivery-guard-debt-2026-11-16/**
+      - scripts/delivery/classify-ledger-objects.ts
+      - scripts/delivery/classify-ledger-objects.test.ts
+    canLandWith: []
+    metadata:
+      task: gate-debt-delivery-c1-c2-c3-20261116:auditbot-batch1
+      owner: auditbot-batch1
   - id: rule-adaptation-shadow-host-min
     landingPolicy: serial
     paths:
