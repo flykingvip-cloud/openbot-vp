@@ -1721,6 +1721,7 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
           task: result.task,
           stopControl: result.stopControl,
           alreadyStopped: result.alreadyStopped,
+          cascadeFacts: result.cascadeFacts,
         },
         undefined,
       );
