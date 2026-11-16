@@ -5,7 +5,7 @@ import { isDeepStrictEqual } from "node:util";
 import { CURRENT_SESSION_VERSION } from "@earendil-works/pi-coding-agent";
 import { stopTaskAtGateway } from "../../agent-runtime/command/index.js";
 import type { FocusSwitchGateDecision } from "../../agent-runtime/contracts/task-control.js";
-import { CHAT_TURN_ERROR_UNCONFIRMED_TEXT } from "../../agent-runtime/model/interaction-resource-wait.js";
+import { CHAT_TURN_ERROR_UNCONFIRMED_TEXT } from "../../agent-runtime/model/index.js";
 import { shouldTaskParkAbortInFlight } from "../../agent-runtime/policy/index.js";
 import { sessionTaskState } from "../../agent-runtime/state/index.js";
 import { resolveSessionAgentId } from "../../agents/agent-scope.js";
