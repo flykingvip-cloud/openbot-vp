@@ -4,7 +4,7 @@ import {
   mergeNamedFileReceiptArtifacts,
   namedFileReceiptsToArtifactFields,
 } from "../agent-runtime/delivery/named-file-receipt.js";
-import { visibleAsyncWaitIdentity } from "../agent-runtime/state/repository/async-wait-visible-identity.js";
+import { visibleAsyncWaitIdentity } from "../agent-runtime/state/index.js";
 import { resolveSessionAgentId } from "../agents/agent-scope.js";
 import { applyUserVisibleOutputGate } from "../agents/model-output-boundary.js";
 import { settleTurnCompletion } from "../agents/turn-completion/contract.js";
