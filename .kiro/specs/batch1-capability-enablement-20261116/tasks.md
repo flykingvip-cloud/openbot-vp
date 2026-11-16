@@ -2,7 +2,7 @@
 
 ## Agents
 
-- auditbot-batch1 · role: owner · scope: comment-only Account Worker / readonly-invoke alignment, isolated wiring for task-progress, knowledge reuse and basic diagnosis loops, tests, PR and canary draft; no production deploy or ledger write · paths: .kiro/specs/batch1-capability-enablement-20261116/\*\* · since: 2026-11-16
+- auditbot-batch1 · role: owner · scope: comment-only Account Worker / readonly-invoke alignment, isolated wiring for task-progress, knowledge reuse and basic diagnosis loops, tests, PR and canary draft; no production deploy or ledger write · paths: .kiro/specs/batch1-capability-enablement-20261116/**, src/batch1-capability-enablement/**, src/diagnosis/official-live-send.ts, src/diagnosis/official-live-send.test.ts, src/diagnosis/bootstrap.ts, src/diagnosis/production-cutover.ts · since: 2026-11-16
 
 ## Tasks
 
@@ -18,5 +18,6 @@
 - origin/main baseline at start: `a78c5b66959dac3db4ecb2ecd2065aaec029b3c3`.
 - Isolated flag change only: `OPENBOT_PROGRESS_LEDGER_ENABLED=1` inside the isolated test, restored after each case. CTR activation, knowledge auto-generate, auto-remediation, and external delivery were not enabled.
 - Isolated loop evidence: `/workspace/openbot-vp-audit/batch1-evidence/isolated-loops.json` (7 passing vitest cases).
-- DGN-T3–T6 live `chat.send` / `chat.inject` / `sessions.reset` against a local gateway was not started in this unit; official tenant fence and `deliver:false` fallback path were recorded, with a follow-up for a confirmed loopback-only harness.
+- Official live-write path now refuses non-canary session keys and does not fall back to `chat.inject` after an auth/authorization failure. `sessions.reset` in that path is limited to `diagnosis:canary:daibai`.
+- Isolated loopback gateway, stronger egress/cost, and three business demos evidence: `/workspace/openbot-vp-audit/batch1-evidence/{gateway,egress-cost,demos}/`.
 - No production deploy and no `deploy/production/releases.jsonl` write. — auditbot-batch1
