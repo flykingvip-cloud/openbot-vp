@@ -74,6 +74,10 @@ const tenantConfigMocks = vi.hoisted(() => ({
 const webReadShadowMocks = vi.hoisted(() => ({
   observeWebReadShadowFromChat: vi.fn(),
 }));
+const conversationTaskObserveMocks = vi.hoisted(() => ({
+  observeInboundTurnShadow: vi.fn(),
+  observeInboundTurnActivation: vi.fn(),
+}));
 
 const sessionBindingMocks = vi.hoisted(() => ({
   listBySession: vi.fn<(targetSessionKey: string) => SessionBindingRecord[]>(() => []),
@@ -200,6 +204,25 @@ vi.mock("../../task-orchestration/gateway-hook.js", async (importOriginal) => {
     ...actual,
     observeWebReadShadowFromChat: (input: unknown, sink?: unknown) =>
       webReadShadowMocks.observeWebReadShadowFromChat(input, sink),
+  };
+});
+
+vi.mock("../../conversation-task/gateway-shadow-hook.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../conversation-task/gateway-shadow-hook.js")>();
+  return {
+    ...actual,
+    observeInboundTurnShadow: (input: unknown) =>
+      conversationTaskObserveMocks.observeInboundTurnShadow(input),
+  };
+});
+vi.mock("../../conversation-task/gateway-activation-hook.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../conversation-task/gateway-activation-hook.js")>();
+  return {
+    ...actual,
+    observeInboundTurnActivation: (input: unknown) =>
+      conversationTaskObserveMocks.observeInboundTurnActivation(input),
   };
 });
 
@@ -2170,6 +2193,87 @@ describe("dispatchReplyFromConfig B2 web-read shadow wiring", () => {
     expect(arg).not.toHaveProperty("requesterId");
     expect(arg).not.toHaveProperty("conversationId");
     expect(arg).not.toHaveProperty("ctx");
+  });
+});
+
+describe("dispatchReplyFromConfig ConversationTask activation wiring", () => {
+  function expectedIdentity(overrides: {
+    messageId: string;
+    text: string;
+    conversationId: string | null;
+    requesterId: string | null;
+  }) {
+    return {
+      tenantId: "tenant-acme",
+      requesterId: overrides.requesterId,
+      conversationId: overrides.conversationId,
+      employeeScopeAllowed: true,
+      messageId: overrides.messageId,
+      text: overrides.text,
+    };
+  }
+
+  beforeEach(() => {
+    conversationTaskObserveMocks.observeInboundTurnShadow.mockClear();
+    conversationTaskObserveMocks.observeInboundTurnActivation.mockClear();
+  });
+
+  it("invokes observeInboundTurnActivation with the same server-derived identity as shadow", async () => {
+    setNoAbort();
+    const ctx = buildTestCtx({
+      Provider: "webchat",
+      Surface: "webchat",
+      SessionKey: "agent:main:main",
+      MessageSid: "msg-activation-1",
+      GatewayClientPlatformUserId: "platform-user-9",
+      BodyForCommands: "每天监控竞品价格,如果异常就预警",
+      Body: "should-not-win",
+    });
+    await dispatchReplyFromConfig({
+      ctx,
+      cfg: emptyConfig,
+      dispatcher: createDispatcher(),
+      replyResolver: async () => ({ text: "ok" }),
+    });
+    const identity = expectedIdentity({
+      messageId: "msg-activation-1",
+      text: "每天监控竞品价格,如果异常就预警",
+      conversationId: "agent:main:main",
+      requesterId: "platform-user-9",
+    });
+    expect(conversationTaskObserveMocks.observeInboundTurnShadow).toHaveBeenCalledTimes(1);
+    expect(conversationTaskObserveMocks.observeInboundTurnActivation).toHaveBeenCalledTimes(1);
+    expect(conversationTaskObserveMocks.observeInboundTurnShadow).toHaveBeenCalledWith(identity);
+    expect(conversationTaskObserveMocks.observeInboundTurnActivation).toHaveBeenCalledWith(
+      identity,
+    );
+  });
+
+  it("falls back to the source user id when GatewayClientPlatformUserId is absent", async () => {
+    setNoAbort();
+    const ctx = buildTestCtx({
+      Provider: "webchat",
+      Surface: "webchat",
+      SessionKey: "agent:main:main",
+      MessageSid: "msg-activation-2",
+      BodyForCommands: "每天监控竞品价格,如果异常就预警",
+    });
+    await dispatchReplyFromConfig({
+      ctx,
+      cfg: emptyConfig,
+      dispatcher: createDispatcher(),
+      replyResolver: async () => ({ text: "ok" }),
+    });
+    const identity = expectedIdentity({
+      messageId: "msg-activation-2",
+      text: "每天监控竞品价格,如果异常就预警",
+      conversationId: "agent:main:main",
+      requesterId: "user-1",
+    });
+    expect(conversationTaskObserveMocks.observeInboundTurnActivation).toHaveBeenCalledWith(
+      identity,
+    );
+    expect(conversationTaskObserveMocks.observeInboundTurnShadow).toHaveBeenCalledWith(identity);
   });
 });
 
