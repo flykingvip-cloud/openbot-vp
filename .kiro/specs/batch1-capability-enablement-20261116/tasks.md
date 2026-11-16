@@ -21,3 +21,5 @@
 - Official live-write path now refuses non-canary session keys and does not fall back to `chat.inject` after an auth/authorization failure. `sessions.reset` in that path is limited to `diagnosis:canary:daibai`.
 - Isolated loopback gateway, stronger egress/cost, and three business demos evidence: `/workspace/openbot-vp-audit/batch1-evidence/{gateway,egress-cost,demos}/`.
 - No production deploy and no `deploy/production/releases.jsonl` write. — auditbot-batch1
+
+- 2026-11-16 20:28 CST（Asia/Shanghai），授权人 t18u 补测：知识复用改为官方 reserved-folder 写入/读取原文、提取两个虚构商品价格并计算变动幅度；诊断保留 seeded 报告作状态管理，另用受控 web_fetch 超时生成 CONFIRMED 工具超时证据并人工驳回；网关补齐逐次 RPC、会话前后状态、跨租户与隔离进程对应。独立任务进度灰度单见 `canary-task-progress.md`。未合入、未部署、未写账本。 — auditbot-batch1

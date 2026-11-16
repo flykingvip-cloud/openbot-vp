@@ -24,6 +24,7 @@ import {
   TaskBudgetExceededError,
 } from "../task-outcome/runtime-from-runner.js";
 import type { TrustedScope } from "../task-outcome/types.js";
+import { readBoundSha } from "./bound-sha.js";
 
 const EVIDENCE_DIR = path.join(
   process.env.OPENBOT_BATCH1_EVIDENCE_DIR ?? "/workspace/openbot-vp-audit/batch1-evidence",
@@ -35,17 +36,23 @@ const evidence: Record<string, unknown> = {
   zone: "Asia/Shanghai",
   productionHostsTouched: false,
   productionLedgerWritten: false,
+  boundSha: readBoundSha(),
   cases: {} as Record<string, unknown>,
 };
 
 function writeEvidence(): void {
   fs.mkdirSync(EVIDENCE_DIR, { recursive: true });
   evidence.finishedAt = new Date().toISOString();
-  fs.writeFileSync(
-    path.join(EVIDENCE_DIR, "egress-cost.json"),
-    `${JSON.stringify(evidence, null, 2)}\n`,
-    "utf8",
+  evidence.boundSha = readBoundSha();
+  const body = `${JSON.stringify(evidence, null, 2)}
+`;
+  fs.writeFileSync(path.join(EVIDENCE_DIR, "egress-cost.json"), body, "utf8");
+  const proofDir = path.join(
+    process.env.OPENBOT_BATCH1_EVIDENCE_DIR ?? "/workspace/openbot-vp-audit/batch1-evidence",
+    "isolation-proof",
   );
+  fs.mkdirSync(proofDir, { recursive: true });
+  fs.writeFileSync(path.join(proofDir, "egress-cost.json"), body, "utf8");
 }
 
 function record(name: string, value: unknown): void {

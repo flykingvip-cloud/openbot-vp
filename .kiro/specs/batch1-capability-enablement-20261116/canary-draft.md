@@ -56,3 +56,7 @@
 - 本批代码变更：注释/示例文案 + 隔离测试与 Loom 登记，不改变生产运行时默认值。
 - 现网 digest / bundled SHA 不以卫生附件追认；新候选必须另做可追溯构建后再填。
 - 诊断 Conversation UI 旧版本状态未知，不能推定新版本已安全可用。
+
+## 独立任务进度灰度单（t18u）
+
+优先单项见同目录 `canary-task-progress.md`。生产试点租户、负责人和费用上限仍待授权人指定，未编造。镜像 digest 因审计箱无容器构建工具而未填写。隔离回滚演练证据：`/workspace/openbot-vp-audit/batch1-evidence/release-prep/rollback-drill.json`。

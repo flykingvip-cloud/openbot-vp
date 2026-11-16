@@ -7,6 +7,7 @@
  * request. Agent dispatch is the official test stub (getReplyFromConfig);
  * a paid-model call fails the test instead of being issued.
  */
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -31,13 +32,14 @@ import {
   startServerWithClient,
   testState,
 } from "../gateway/test-helpers.js";
+import { readBoundSha } from "./bound-sha.js";
 
 installGatewayTestHooks({ scope: "suite" });
 
-const EVIDENCE_DIR = path.join(
-  process.env.OPENBOT_BATCH1_EVIDENCE_DIR ?? "/workspace/openbot-vp-audit/batch1-evidence",
-  "gateway",
-);
+const EVIDENCE_ROOT =
+  process.env.OPENBOT_BATCH1_EVIDENCE_DIR ?? "/workspace/openbot-vp-audit/batch1-evidence";
+const EVIDENCE_DIR = path.join(EVIDENCE_ROOT, "gateway");
+const ISOLATION_PROOF_DIR = path.join(EVIDENCE_ROOT, "isolation-proof");
 const TEST_TOKEN = "test-gateway-token-1234567890";
 const INHERITED_ENV_KEYS = [
   "OPENCLAW_GATEWAY_URL",
@@ -67,6 +69,9 @@ const evidence: Record<string, unknown> = {
   productionHostsTouched: false,
   productionLedgerWritten: false,
   paidModelDispatched: false,
+  boundSha: readBoundSha(),
+  rpc: [] as unknown[],
+  stubUpstreamCalls: [] as unknown[],
   cases: {} as Record<string, unknown>,
 };
 
@@ -83,6 +88,93 @@ function writeEvidence(): void {
 function record(name: string, value: unknown): void {
   (evidence.cases as Record<string, unknown>)[name] = value;
   writeEvidence();
+}
+
+function appendJsonl(filePath: string, value: unknown): void {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.appendFileSync(filePath, `${JSON.stringify(value)}\n`, "utf8");
+}
+
+function writeIsolationProof(name: string, value: unknown): void {
+  fs.mkdirSync(ISOLATION_PROOF_DIR, { recursive: true });
+  fs.writeFileSync(
+    path.join(ISOLATION_PROOF_DIR, name),
+    typeof value === "string" ? value : `${JSON.stringify(value, null, 2)}\n`,
+    "utf8",
+  );
+}
+
+function captureProcessGatewayProof(input: {
+  bindAddress: string;
+  port: number;
+  effectiveUrl: string;
+}): Record<string, unknown> {
+  const pid = process.pid;
+  const comm = fs.existsSync("/proc/self/comm")
+    ? fs.readFileSync("/proc/self/comm", "utf8").trim()
+    : "";
+  let exe = "";
+  try {
+    exe = fs.readlinkSync("/proc/self/exe");
+  } catch {
+    exe = "";
+  }
+  const cmdline = fs.existsSync("/proc/self/cmdline")
+    ? fs.readFileSync("/proc/self/cmdline", "utf8").replaceAll("\0", " ").trim()
+    : process.argv.join(" ");
+  let ssOutput = "";
+  try {
+    ssOutput = execFileSync("ss", ["-ltnp"], { encoding: "utf8" });
+  } catch (error) {
+    ssOutput = error instanceof Error ? error.message : String(error);
+  }
+  const portNeedle = `:${input.port}`;
+  const ssLines = ssOutput
+    .split("\n")
+    .filter(
+      (line) =>
+        line.includes(portNeedle) || line.includes(`pid=${pid}`) || line.startsWith("State"),
+    );
+  let procNet = "";
+  try {
+    procNet = fs.readFileSync("/proc/net/tcp", "utf8");
+  } catch {
+    procNet = "";
+  }
+  return {
+    boundSha: readBoundSha(),
+    note: "The isolated test gateway is started in-process by startServerWithClient; the Vitest worker pid is the gateway process.",
+    pid,
+    comm,
+    exe,
+    cmdline,
+    bindAddress: input.bindAddress,
+    port: input.port,
+    effectiveUrl: input.effectiveUrl,
+    ssListenMatchingPortOrPid: ssLines,
+    ssRawTruncated: ssOutput.slice(0, 8000),
+    procNetTcpBytes: Buffer.byteLength(procNet, "utf8"),
+    correspondence: {
+      processIsTestGateway: true,
+      listen: `${input.bindAddress}:${input.port}`,
+      url: input.effectiveUrl,
+    },
+  };
+}
+
+function redactInheritedEnv(): Record<
+  string,
+  { presentBefore: boolean; presentAfterClear: boolean }
+> {
+  return Object.fromEntries(
+    INHERITED_ENV_KEYS.map((key) => [
+      key,
+      {
+        presentBefore: inheritedSnapshot[key] != null,
+        presentAfterClear: process.env[key] != null && key !== "OPENCLAW_GATEWAY_TOKEN",
+      },
+    ]),
+  );
 }
 
 function emptyTrace(): OfficialLiveSendTrace {
@@ -104,8 +196,17 @@ describe("batch1 isolated loopback gateway", () => {
     }
     testState.gatewayBind = "loopback";
     testState.gatewayAuth = { mode: "token", token: TEST_TOKEN };
-    getReplyFromConfig.mockImplementation(async () => {
+    getReplyFromConfig.mockImplementation(async (...args: unknown[]) => {
+      const call = {
+        at: new Date().toISOString(),
+        stub: "getReplyFromConfig",
+        paidModelDispatched: false,
+        argCount: args.length,
+      };
       stubReplies.push("fixture-no-paid-model");
+      (evidence.stubUpstreamCalls as unknown[]).push(call);
+      appendJsonl(path.join(EVIDENCE_DIR, "upstream-calls.jsonl"), call);
+      appendJsonl(path.join(ISOLATION_PROOF_DIR, "upstream-calls.jsonl"), call);
       if (process.env.DEEPSEEK_API_KEY || process.env.OPENBOT_P4_LIVE_API_KEY) {
         evidence.paidModelDispatched = true;
         throw new Error("paid model dispatch is forbidden in isolated Batch 1 tests");
@@ -157,6 +258,42 @@ describe("batch1 isolated loopback gateway", () => {
       deliverDefault: false,
     };
     evidence.isolation = isolation;
+    const processProof = captureProcessGatewayProof({
+      bindAddress: String(isolation.bindAddress),
+      port,
+      effectiveUrl,
+    });
+    evidence.processGateway = processProof;
+    const credentialCheck = {
+      boundSha: readBoundSha(),
+      inheritedEnv: redactInheritedEnv(),
+      testTokenInstalledByHelper: process.env.OPENCLAW_GATEWAY_TOKEN === TEST_TOKEN,
+      productionTokensPresentAfterClear: Boolean(
+        inheritedSnapshot.OPENCLAW_GATEWAY_TOKEN &&
+        process.env.OPENCLAW_GATEWAY_TOKEN &&
+        process.env.OPENCLAW_GATEWAY_TOKEN !== TEST_TOKEN,
+      ),
+      paidKeysPresentAfterClear: Boolean(
+        process.env.DEEPSEEK_API_KEY || process.env.OPENBOT_P4_LIVE_API_KEY,
+      ),
+      valuesRedacted: true,
+    };
+    evidence.credentialCheck = credentialCheck;
+    writeIsolationProof("process-gateway.json", processProof);
+    writeIsolationProof("credential-check.json", credentialCheck);
+    writeIsolationProof(
+      "listen.txt",
+      [
+        `time=${new Date().toISOString()}`,
+        `pid=${process.pid}`,
+        `bindAddress=${isolation.bindAddress}`,
+        `port=${port}`,
+        `effectiveGatewayUrl=${effectiveUrl}`,
+        "urlProvenLoopbackBeforeRequests=true",
+        `ss=${JSON.stringify(processProof.ssListenMatchingPortOrPid)}`,
+        "",
+      ].join("\n"),
+    );
     fs.mkdirSync(EVIDENCE_DIR, { recursive: true });
     isolationLogPath = path.join(EVIDENCE_DIR, "isolation-proof.log");
     fs.writeFileSync(
@@ -195,13 +332,83 @@ describe("batch1 isolated loopback gateway", () => {
     token: string,
     extra?: Partial<CallGatewayOptions>,
   ): OfficialDiagnosisGatewayCall {
-    return async (opts) =>
-      callGateway({
+    return async (opts) => {
+      const entry = {
+        at: new Date().toISOString(),
+        caseName: "official-call",
+        method: opts.method,
+        requestId:
+          (
+            opts.params as
+              | { idempotencyKey?: string; key?: string; sessionKey?: string }
+              | undefined
+          )?.idempotencyKey ??
+          (opts.params as { key?: string } | undefined)?.key ??
+          (opts.params as { sessionKey?: string } | undefined)?.sessionKey ??
+          null,
+        tokenIsTestToken: token === TEST_TOKEN,
+      };
+      (evidence.rpc as unknown[]).push(entry);
+      appendJsonl(path.join(EVIDENCE_DIR, "rpc-log.jsonl"), entry);
+      appendJsonl(path.join(ISOLATION_PROOF_DIR, "rpc-log.jsonl"), entry);
+      return await callGateway({
         ...opts,
         ...extra,
         url: effectiveUrl,
         token,
       });
+    };
+  }
+
+  async function tracedRpc<T = Record<string, unknown>>(
+    caseName: string,
+    method: string,
+    params: Record<string, unknown>,
+  ) {
+    const response = await rpcReq<T>(ws, method, params);
+    const payload = response.payload as { runId?: string; messages?: unknown[] } | undefined;
+    const entry = {
+      at: new Date().toISOString(),
+      caseName,
+      method,
+      requestId:
+        (params.idempotencyKey as string | undefined) ??
+        (params.deliveryId as string | undefined) ??
+        (params.key as string | undefined) ??
+        (params.sessionKey as string | undefined) ??
+        null,
+      ok: response.ok,
+      error: response.error ?? null,
+      runId: payload?.runId ?? null,
+      messageCount: Array.isArray(payload?.messages) ? payload.messages.length : null,
+    };
+    (evidence.rpc as unknown[]).push(entry);
+    appendJsonl(path.join(EVIDENCE_DIR, "rpc-log.jsonl"), entry);
+    appendJsonl(path.join(ISOLATION_PROOF_DIR, "rpc-log.jsonl"), entry);
+    return response;
+  }
+
+  async function snapshotSession(caseName: string, key: string, label: "before" | "after") {
+    const history = await tracedRpc<{ messages?: unknown[] }>(caseName, "chat.history", {
+      sessionKey: key,
+      limit: 50,
+    });
+    const got = await tracedRpc(caseName, "sessions.get", { key, limit: 20 });
+    const messages = history.payload?.messages ?? [];
+    return {
+      label,
+      sessionKey: key,
+      historyOk: history.ok,
+      getOk: got.ok,
+      messageCount: messages.length,
+      roles: messages.map((message) => {
+        if (!message || typeof message !== "object") {
+          return null;
+        }
+        const row = message as { role?: unknown; message?: { role?: unknown } };
+        return row.role ?? row.message?.role ?? null;
+      }),
+    };
   }
 
   it("proves isolation before any diagnosis write", () => {
@@ -211,18 +418,24 @@ describe("batch1 isolated loopback gateway", () => {
     expect(process.env.OPENBOT_GATEWAY_URL).toBeUndefined();
     expect(process.env.DEEPSEEK_API_KEY).toBeUndefined();
     expect(process.env.OPENBOT_P4_LIVE_API_KEY).toBeUndefined();
-    record("isolation", evidence.isolation);
+    expect(fs.existsSync(path.join(ISOLATION_PROOF_DIR, "process-gateway.json"))).toBe(true);
+    record("isolation", {
+      isolation: evidence.isolation,
+      processGateway: evidence.processGateway,
+      credentialCheck: evidence.credentialCheck,
+    });
   });
 
   it("send succeeds and a duplicate idempotency key does not create a second run", async () => {
-    const first = await rpcReq(ws, "chat.send", {
+    const before = await snapshotSession("send-success-duplicate", "main", "before");
+    const first = await tracedRpc("send-success-duplicate", "chat.send", {
       sessionKey: "main",
       message: "batch1 isolated send",
       idempotencyKey: "batch1-idem-send-1",
       deliver: false,
     });
     expect(first.ok).toBe(true);
-    const duplicate = await rpcReq(ws, "chat.send", {
+    const duplicate = await tracedRpc("send-success-duplicate", "chat.send", {
       sessionKey: "main",
       message: "batch1 isolated send",
       idempotencyKey: "batch1-idem-send-1",
@@ -232,11 +445,14 @@ describe("batch1 isolated loopback gateway", () => {
     const firstRun = (first.payload as { runId?: string } | undefined)?.runId;
     const dupRun = (duplicate.payload as { runId?: string } | undefined)?.runId;
     expect(dupRun).toBe(firstRun);
-    const history = await rpcReq<{ messages?: unknown[] }>(ws, "chat.history", {
-      sessionKey: "main",
-      limit: 50,
-    });
-    const userMessages = (history.payload?.messages ?? []).filter((message) => {
+    const after = await snapshotSession("send-success-duplicate", "main", "after");
+    const history = after;
+    const historyPayload = await tracedRpc<{ messages?: unknown[] }>(
+      "send-success-duplicate",
+      "chat.history",
+      { sessionKey: "main", limit: 50 },
+    );
+    const userMessages = (historyPayload.payload?.messages ?? []).filter((message) => {
       if (!message || typeof message !== "object") {
         return false;
       }
@@ -248,18 +464,37 @@ describe("batch1 isolated loopback gateway", () => {
     });
     expect(matching.length).toBe(1);
     record("send-success-duplicate", {
+      boundSha: readBoundSha(),
       requestId: "batch1-idem-send-1",
+      rpcs: [
+        "sessions.get/chat.history before",
+        "chat.send",
+        "chat.send duplicate",
+        "chat.history/sessions.get after",
+      ],
       firstOk: first.ok,
       duplicateOk: duplicate.ok,
+      firstRunId: firstRun ?? null,
+      duplicateRunId: dupRun ?? null,
       sameRunId: firstRun === dupRun,
       matchingUserMessages: matching.length,
+      sessionBefore: before,
+      sessionAfter: after,
+      messageCountBefore: before.messageCount,
+      messageCountAfter: after.messageCount,
       paidModelDispatched: evidence.paidModelDispatched,
       stubReplies: stubReplies.length,
       result: "pass",
     });
+    void history;
   }, 60_000);
 
   it("falls back to inject when send has written but the response times out", async () => {
+    const before = await snapshotSession(
+      "send-timeout-fallback",
+      DIAGNOSIS_P24_5_LIVE_SESSION_KEY,
+      "before",
+    );
     const previous = process.env.OPENBOT_CHAT_INBOUND_PERSIST_EARLY;
     process.env.OPENBOT_CHAT_INBOUND_PERSIST_EARLY = "1";
     const t = emptyTrace();
@@ -299,12 +534,23 @@ describe("batch1 isolated loopback gateway", () => {
         },
         { call, timeoutMs: { send: 400, inject: 10_000 }, trace: t },
       );
+      const after = await snapshotSession(
+        "send-timeout-fallback",
+        DIAGNOSIS_P24_5_LIVE_SESSION_KEY,
+        "after",
+      );
       record("send-timeout-fallback", {
+        boundSha: readBoundSha(),
+        requestId: "batch1-timeout-fallback",
         result,
+        rpcs: t.methods,
         methods: t.methods,
         resetKeys: t.resetKeys,
         skippedInjectBecauseAuth: t.skippedInjectBecauseAuth,
         sendRpc: sendOutcome,
+        sessionBefore: before,
+        sessionAfter: after,
+        messageCountAfter: after.messageCount,
         note: "Live chat.send may return started after persist. This case forces a client-side timeout after that write and then runs the official inject fallback.",
       });
       expect(result).toBe("accepted");
@@ -340,14 +586,18 @@ describe("batch1 isolated loopback gateway", () => {
     expect(t.skippedInjectBecauseAuth).toBe(true);
     expect(t.methods).not.toContain("chat.inject");
     record("auth-no-inject-bypass", {
+      boundSha: readBoundSha(),
+      requestId: "batch1-auth-deny",
       result,
+      rpcs: t.methods,
       methods: t.methods,
       skippedInjectBecauseAuth: t.skippedInjectBecauseAuth,
+      injectBypassed: t.methods.includes("chat.inject"),
       resultStatus: "pass",
     });
   }, 30_000);
 
-  it("refuses arbitrary session keys at the official bind and send layers", () => {
+  it("refuses arbitrary session keys at the official bind and send layers", async () => {
     const bind = (() => {
       try {
         bindConversationDiagnosisToLiveChat({
@@ -365,23 +615,57 @@ describe("batch1 isolated loopback gateway", () => {
     })();
     expect(bind.rejected).toBe(true);
     expect(bind.code).toBe("canary_session_mismatch");
-    record("arbitrary-session-key", { bind, result: "pass" });
+    const sendLayer = await (async () => {
+      try {
+        const outcome = await deliverDiagnosisViaOfficialLiveGateway(
+          {
+            sessionKey: "someone-else-session",
+            tenantId: DIAGNOSIS_P24_5_CANARY_TENANT,
+            text: "【诊断提醒】arbitrary-key",
+            deliveryId: "batch1-arbitrary-key",
+          },
+          { call: officialCall(TEST_TOKEN), timeoutMs: { send: 2_000, inject: 2_000 } },
+        );
+        return { rejected: false, result: outcome, code: null };
+      } catch (error) {
+        return {
+          rejected: true,
+          result: null,
+          code: error instanceof DiagnosisContractError ? error.code : "other",
+        };
+      }
+    })();
+    expect(sendLayer.rejected).toBe(true);
+    expect(sendLayer.code).toBe("canary_session_mismatch");
+    record("arbitrary-session-key", {
+      boundSha: readBoundSha(),
+      bindLayer: "bindConversationDiagnosisToLiveChat",
+      sendLayer: "deliverDiagnosisViaOfficialLiveGateway/assertDiagnosisCanarySessionKey",
+      bind,
+      officialSend: sendLayer,
+      result: "pass",
+    });
   });
 
   it("covers inject failure, session-not-found reset of the canary key only, and concurrent delivers", async () => {
-    const reset = await rpcReq(ws, "sessions.reset", {
+    const canaryBefore = await snapshotSession(
+      "inject-reset-concurrent",
+      DIAGNOSIS_P24_5_LIVE_SESSION_KEY,
+      "before",
+    );
+    const reset = await tracedRpc("inject-reset-concurrent", "sessions.reset", {
       key: DIAGNOSIS_P24_5_LIVE_SESSION_KEY,
       reason: "new",
     });
     expect(reset.ok).toBe(true);
 
     const otherKey = "batch1-protected-session";
-    const seedOther = await rpcReq(ws, "sessions.reset", {
+    const seedOther = await tracedRpc("inject-reset-concurrent", "sessions.reset", {
       key: otherKey,
       reason: "new",
     });
     expect(seedOther.ok).toBe(true);
-    const injectMissing = await rpcReq(ws, "chat.inject", {
+    const injectMissing = await tracedRpc("inject-reset-concurrent", "chat.inject", {
       sessionKey: "batch1-missing-session",
       message: "should fail",
       label: "诊断提醒",
@@ -402,7 +686,15 @@ describe("batch1 isolated loopback gateway", () => {
     );
     expect(["accepted", "unavailable"]).toContain(official);
 
-    const otherAfter = await rpcReq(ws, "sessions.get", { key: otherKey, limit: 20 });
+    const otherAfter = await tracedRpc("inject-reset-concurrent", "sessions.get", {
+      key: otherKey,
+      limit: 20,
+    });
+    const canaryAfter = await snapshotSession(
+      "inject-reset-concurrent",
+      DIAGNOSIS_P24_5_LIVE_SESSION_KEY,
+      "after",
+    );
     const concurrent = emptyTrace();
     const [a, b] = await Promise.all([
       deliverDiagnosisViaOfficialLiveGateway(
@@ -428,6 +720,15 @@ describe("batch1 isolated loopback gateway", () => {
       true,
     );
     record("inject-reset-concurrent", {
+      boundSha: readBoundSha(),
+      rpcs: [
+        "sessions.reset canary",
+        "sessions.reset protected",
+        "chat.inject missing",
+        "deliverDiagnosisViaOfficialLiveGateway after-reset",
+        "sessions.get protected",
+        "concurrent delivers",
+      ],
       injectMissing: { ok: injectMissing.ok, error: injectMissing.error ?? null },
       canaryResetOk: reset.ok,
       protectedSessionResetOk: seedOther.ok,
@@ -435,9 +736,47 @@ describe("batch1 isolated loopback gateway", () => {
       officialMethods: t.methods,
       resetKeys: t.resetKeys,
       otherSessionStillGettable: otherAfter.ok,
-      concurrent: { a, b },
+      sessionBefore: canaryBefore,
+      sessionAfter: canaryAfter,
+      concurrent: {
+        a,
+        b,
+        methods: concurrent.methods,
+        requestIds: ["batch1-concurrent-a", "batch1-concurrent-b"],
+      },
       paidModelDispatched: evidence.paidModelDispatched,
       result: "pass",
     });
   }, 60_000);
+
+  it("refuses cross-tenant official delivery before any gateway call", async () => {
+    const t = emptyTrace();
+    let code: string | null = null;
+    let outcome: string | null = null;
+    try {
+      outcome = await deliverDiagnosisViaOfficialLiveGateway(
+        {
+          sessionKey: DIAGNOSIS_P24_5_LIVE_SESSION_KEY,
+          tenantId: "tenant-foreign",
+          text: "【诊断提醒】cross-tenant",
+          deliveryId: "batch1-cross-tenant",
+        },
+        { call: officialCall(TEST_TOKEN), trace: t, timeoutMs: { send: 2_000, inject: 2_000 } },
+      );
+    } catch (error) {
+      code = error instanceof DiagnosisContractError ? error.code : String(error);
+    }
+    expect(code).toBe("canary_tenant_mismatch");
+    expect(t.methods).toEqual([]);
+    record("cross-tenant", {
+      boundSha: readBoundSha(),
+      requestId: "batch1-cross-tenant",
+      rejected: true,
+      code,
+      outcome,
+      rpcs: t.methods,
+      gatewayCalls: t.methods.length,
+      result: "pass",
+    });
+  });
 });

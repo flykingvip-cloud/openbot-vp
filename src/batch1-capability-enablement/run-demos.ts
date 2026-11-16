@@ -35,12 +35,19 @@ import {
 import { stripRunCompletion } from "../diagnosis/runner.js";
 import { DiagnosisContractError, type TrustedTenantContext } from "../diagnosis/types.js";
 import {
-  findDeliverableArchiveByLogicalId,
   getDeliverableArchiveRecord,
   setDeliverableArchiveRecord,
 } from "../gateway/knowledge/deliverables/archive-store.js";
-import { buildDeliverableCiteUri, parseCiteUri } from "../gateway/knowledge/ke/cite.js";
+import { computeRawContentHash } from "../gateway/knowledge/document-fingerprint.js";
+import { buildDeliverableCiteUri } from "../gateway/knowledge/ke/cite.js";
 import { PROGRESS_LEDGER_ENABLED_ENV } from "../progress-ledger/feature.js";
+import { readBoundSha } from "./bound-sha.js";
+import { runControlledFaultDiagnosis } from "./controlled-fault-diagnosis.js";
+import {
+  PRICE_WATCH_DELIVERABLE_ID,
+  PRICE_WATCH_ORIGINAL_MARKDOWN,
+  runOfficialKnowledgeReuse,
+} from "./knowledge-reuse.js";
 
 export const DEMO_EVIDENCE_ROOT = path.join(
   process.env.OPENBOT_BATCH1_EVIDENCE_DIR ?? "/workspace/openbot-vp-audit/batch1-evidence",
@@ -67,7 +74,7 @@ export async function runTaskDemo(demoRoot: string): Promise<Record<string, unkn
   const artifactPath = path.join(work, "artifacts", "price-watch.md");
   const archivePath = path.join(work, "deliverable-archive.json");
   fs.mkdirSync(path.dirname(artifactPath), { recursive: true });
-  const artifactBody = "# 竞品价格预警\nbatch1-demo-task-artifact\n";
+  const artifactBody = PRICE_WATCH_ORIGINAL_MARKDOWN;
   fs.writeFileSync(artifactPath, artifactBody, "utf8");
 
   const previous = process.env[PROGRESS_LEDGER_ENABLED_ENV];
@@ -123,6 +130,7 @@ export async function runTaskDemo(demoRoot: string): Promise<Record<string, unkn
       logicalId: "logical-price-watch",
       filename: "price-watch.md",
       title: "竞品价格预警",
+      rawHash: computeRawContentHash(Buffer.from(artifactBody, "utf8")),
       archivedByUserId: "user-a",
       storePath: archivePath,
     });
@@ -198,81 +206,82 @@ export async function runTaskDemo(demoRoot: string): Promise<Record<string, unkn
 
 export async function runKnowledgeDemo(demoRoot: string): Promise<Record<string, unknown>> {
   const work = fs.mkdtempSync(path.join(os.tmpdir(), "batch1-demo-knowledge-"));
-  const archivePath = path.join(work, "deliverable-archive.json");
-  const previousArtifact = path.join(work, "artifacts", "price-watch.md");
-  const followupArtifact = path.join(work, "artifacts", "price-watch-followup.md");
-  fs.mkdirSync(path.dirname(previousArtifact), { recursive: true });
-  fs.writeFileSync(previousArtifact, "# 竞品价格预警\nbatch1-demo-prior-artifact\n", "utf8");
-  setDeliverableArchiveRecord({
-    deliverableId: "dlv-demo-price-watch",
-    knowledgeBaseId: "kb-tenant-a",
-    documentId: "doc-price-watch",
-    logicalId: "logical-price-watch",
-    filename: "price-watch.md",
-    title: "竞品价格预警",
-    archivedByUserId: "user-a",
-    storePath: archivePath,
-  });
-  const cite = buildDeliverableCiteUri({
+  const boundSha = readBoundSha();
+  const reuse = runOfficialKnowledgeReuse({
+    workRoot: work,
     workspaceId: "ws-tenant-a",
-    deliverableId: "dlv-demo-price-watch",
-    versionId: "v1",
+    deliverableId: PRICE_WATCH_DELIVERABLE_ID,
   });
-  const parsed = parseCiteUri(cite);
-  const prior = getDeliverableArchiveRecord("dlv-demo-price-watch", archivePath);
-  const later = findDeliverableArchiveByLogicalId({
-    knowledgeBaseId: "kb-tenant-a",
-    logicalId: "logical-price-watch",
-    storePath: archivePath,
-  });
-  const followupBody = [
-    "# 价格跟踪续报",
-    "",
-    `引用上一任务交付物：${cite}`,
-    `标题：${prior?.title}`,
-    "结论：在先前预警基础上继续跟踪同一逻辑文档 logical-price-watch。",
-    "",
-  ].join("\n");
-  fs.writeFileSync(followupArtifact, followupBody, "utf8");
-  setDeliverableArchiveRecord({
-    deliverableId: "dlv-demo-price-watch-followup",
-    knowledgeBaseId: "kb-tenant-a",
-    documentId: "doc-price-watch-followup",
-    logicalId: "logical-price-watch-followup",
-    filename: "price-watch-followup.md",
-    title: "价格跟踪续报",
-    archivedByUserId: "user-a",
-    storePath: archivePath,
-  });
-
-  const foreignArchive = path.join(work, "tenant-b-archive.json");
-  const foreignRead = getDeliverableArchiveRecord("dlv-demo-price-watch", foreignArchive);
   const storeRoot = path.join(work, "tasks");
   const storeB = openTaskStore({ tenantId: "tenant-b", storeRoot });
   const visibleToB = storeB.findActiveTasksByConversation("conv-demo-task");
   storeB.close();
-  // Opening tenant-a hashed file as tenant-b is a different file key.
   const tenantAFile = path.join(storeRoot, "tenant", `${fileKeyForTenant("tenant-a")}.db`);
 
-  copyFile(previousArtifact, path.join(demoRoot, "artifacts", "price-watch.md"));
-  copyFile(followupArtifact, path.join(demoRoot, "artifacts", "price-watch-followup.md"));
-  writeJson(path.join(demoRoot, "entry.json"), {
-    entry: "getDeliverableArchiveRecord + buildDeliverableCiteUri",
-    priorDeliverableId: "dlv-demo-price-watch",
-    followupDeliverableId: "dlv-demo-price-watch-followup",
+  copyFile(reuse.originalPath, path.join(demoRoot, "artifacts", "price-watch.md"));
+  copyFile(reuse.followupPath, path.join(demoRoot, "artifacts", "price-watch-followup.md"));
+  writeJson(path.join(demoRoot, "read-record.json"), {
+    boundSha,
+    ...reuse.readRecord,
+    extracted: reuse.extracted,
   });
+  writeJson(path.join(demoRoot, "cross-tenant.json"), {
+    boundSha,
+    ...reuse.crossTenant,
+    tenantBVisibleTasks: visibleToB.length,
+    tenantAFileKeyExists: fs.existsSync(tenantAFile),
+  });
+  writeJson(path.join(demoRoot, "entry.json"), {
+    entry:
+      "writeKnowledgeFolderFile + setDeliverableArchiveRecord + readReservedDeliverableOriginal + fact extraction and comparison",
+    priorDeliverableId: PRICE_WATCH_DELIVERABLE_ID,
+    followupDeliverableId: "dlv-demo-price-watch-followup",
+    boundSha,
+    officialSavedPath: reuse.originalPath,
+  });
+  const followupCitesPrior = reuse.followupBody.includes(reuse.cite);
+  const followupUsesExtractedFacts = reuse.extracted.every(
+    (row) => reuse.followupBody.includes(row.sku) && reuse.followupBody.includes(row.collectedOn),
+  );
+  const followupHasCalculation = reuse.comparison.moves.every((move) =>
+    reuse.followupBody.includes(`${move.percentChange.toFixed(2)}%`),
+  );
   const summary = {
     requestId: "demo-knowledge-followup-1",
-    priorCite: cite,
-    parsedKind: parsed?.kind ?? null,
-    laterLogicalId: later?.deliverableId ?? null,
-    followupCitesPrior: followupBody.includes(cite),
+    boundSha,
+    priorCite: reuse.cite,
+    parsedKind: reuse.parsedKind,
+    officialSavedPath: reuse.originalPath,
+    readRecord: reuse.readRecord,
+    extracted: reuse.extracted,
+    comparison: reuse.comparison,
+    followupCitesPrior,
+    followupUsesExtractedFacts,
+    followupHasCalculation,
+    uriConcatenationOnly: false,
     crossTenant: {
-      foreignArchiveRecord: foreignRead ?? null,
+      ...reuse.crossTenant,
       tenantBVisibleTasks: visibleToB.length,
       tenantAFileKeyExists: fs.existsSync(tenantAFile),
     },
-    result: "pass",
+    result:
+      reuse.result === "pass" &&
+      reuse.readRecord.hashMatchesArchive &&
+      followupCitesPrior &&
+      followupUsesExtractedFacts &&
+      followupHasCalculation &&
+      reuse.crossTenant.foreignArchiveRecord == null &&
+      reuse.crossTenant.foreignReservedRead == null &&
+      reuse.crossTenant.foreignFolderRead == null &&
+      reuse.comparison.largerMoveSku === "LightNorth-LX1" &&
+      reuse.comparison.moves.some(
+        (move) => move.sku === "LightNorth-LX1" && move.percentChange === 15,
+      ) &&
+      reuse.comparison.moves.some(
+        (move) => move.sku === "Rainbrook-CUP2" && move.percentChange === -10,
+      )
+        ? "pass"
+        : "fail",
   };
   writeJson(path.join(demoRoot, "result.json"), summary);
   fs.rmSync(work, { recursive: true, force: true });
@@ -400,24 +409,43 @@ export async function runDiagnosisDemo(demoRoot: string): Promise<Record<string,
 }
 
 export async function runAllDemos(root = DEMO_EVIDENCE_ROOT): Promise<Record<string, unknown>> {
+  const boundSha = readBoundSha();
   const taskRoot = path.join(root, "task");
   const knowledgeRoot = path.join(root, "knowledge");
   const diagnosisRoot = path.join(root, "diagnosis");
+  const controlledRoot = path.join(root, "diagnosis", "controlled-fault");
   fs.mkdirSync(taskRoot, { recursive: true });
   fs.mkdirSync(knowledgeRoot, { recursive: true });
   fs.mkdirSync(diagnosisRoot, { recursive: true });
+  fs.mkdirSync(controlledRoot, { recursive: true });
   const task = await runTaskDemo(taskRoot);
   const knowledge = await runKnowledgeDemo(knowledgeRoot);
   const diagnosis = await runDiagnosisDemo(diagnosisRoot);
+  const controlledWork = fs.mkdtempSync(path.join(os.tmpdir(), "batch1-demo-diag-fault-"));
+  const controlledFault = await runControlledFaultDiagnosis({
+    workRoot: controlledWork,
+    evidenceRoot: controlledRoot,
+  });
+  fs.rmSync(controlledWork, { recursive: true, force: true });
   const index = {
     startedAt: new Date().toISOString(),
     zone: "Asia/Shanghai",
+    boundSha,
     productionHostsTouched: false,
     productionLedgerWritten: false,
-    task,
-    knowledge,
-    diagnosis,
+    task: { ...task, boundSha },
+    knowledge: { ...knowledge, boundSha },
+    diagnosis: {
+      ...diagnosis,
+      boundSha,
+      role: "seeded-fixture-status-management",
+      controlledFault,
+    },
   };
   writeJson(path.join(root, "index.json"), index);
+  writeJson(path.join(diagnosisRoot, "controlled-fault-index.json"), {
+    boundSha,
+    controlledFault,
+  });
   return index;
 }

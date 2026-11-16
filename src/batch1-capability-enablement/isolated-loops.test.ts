@@ -45,7 +45,6 @@ import {
 import { stripRunCompletion } from "../diagnosis/runner.js";
 import { DiagnosisContractError, type TrustedTenantContext } from "../diagnosis/types.js";
 import {
-  findDeliverableArchiveByLogicalId,
   getDeliverableArchiveRecord,
   setDeliverableArchiveRecord,
 } from "../gateway/knowledge/deliverables/archive-store.js";
@@ -59,6 +58,8 @@ import { fetchRemoteMedia } from "../media/fetch.js";
 import { PROGRESS_LEDGER_ENABLED_ENV } from "../progress-ledger/feature.js";
 import { invokeReadonlySurface } from "../task-orchestration/readonly-invoke.js";
 import { applySpendAndAssess, buildTaskBudgetState } from "../task-outcome/budget.js";
+import { readBoundSha } from "./bound-sha.js";
+import { PRICE_WATCH_ORIGINAL_MARKDOWN, runOfficialKnowledgeReuse } from "./knowledge-reuse.js";
 
 const EVIDENCE_DIR =
   process.env.OPENBOT_BATCH1_EVIDENCE_DIR ?? "/workspace/openbot-vp-audit/batch1-evidence";
@@ -357,67 +358,50 @@ describe("batch1 isolated loops", () => {
     });
   });
 
-  it("knowledge reuse: later lookup cites the earlier artifact and refuses cross-tenant reads", () => {
+  it("knowledge reuse: later lookup reads original facts, calculates, and refuses cross-tenant reads", () => {
     const root = tempDir("batch1-knowledge-");
-    const storeA = path.join(root, "tenant-a-archive.json");
-    const storeB = path.join(root, "tenant-b-archive.json");
-    const artifactPath = path.join(root, "tenant-a", "weekly-report.md");
-    fs.mkdirSync(path.dirname(artifactPath), { recursive: true });
-    fs.writeFileSync(artifactPath, "weekly report body for later reuse\n", "utf8");
-
-    setDeliverableArchiveRecord({
-      deliverableId: "dlv-weekly-a",
-      knowledgeBaseId: "kb-a",
-      documentId: "doc-weekly-a",
-      logicalId: "weekly-report",
-      filename: "weekly-report.md",
-      title: "周报",
-      archivedByUserId: "user-a",
-      storePath: storeA,
-    });
-    const cite = buildDeliverableCiteUri({
+    const reuse = runOfficialKnowledgeReuse({
+      workRoot: root,
       workspaceId: "ws-a",
       deliverableId: "dlv-weekly-a",
-      versionId: "v1",
     });
-    const later = findDeliverableArchiveByLogicalId({
-      knowledgeBaseId: "kb-a",
-      logicalId: "weekly-report",
-      storePath: storeA,
-    });
-    expect(later?.deliverableId).toBe("dlv-weekly-a");
-    expect(parseCiteUri(cite)?.kind).toBe("deliverable");
-
-    const cross = findDeliverableArchiveByLogicalId({
-      knowledgeBaseId: "kb-a",
-      logicalId: "weekly-report",
-      storePath: storeB,
-    });
-    expect(cross).toBeNull();
-    expect(getDeliverableArchiveRecord("dlv-weekly-a", storeB)).toBeNull();
-
-    // Duplicate capture of the same logical id stays one record.
-    setDeliverableArchiveRecord({
-      deliverableId: "dlv-weekly-a",
-      knowledgeBaseId: "kb-a",
-      documentId: "doc-weekly-a",
-      logicalId: "weekly-report",
-      filename: "weekly-report.md",
-      title: "周报",
-      storePath: storeA,
-    });
-    expect(getDeliverableArchiveRecord("dlv-weekly-a", storeA)?.logicalId).toBe("weekly-report");
+    expect(reuse.parsedKind).toBe("deliverable");
+    expect(reuse.readRecord.hashMatchesArchive).toBe(true);
+    expect(reuse.extracted).toHaveLength(4);
+    expect(reuse.comparison.largerMoveSku).toBe("LightNorth-LX1");
+    expect(
+      reuse.comparison.moves.some(
+        (move) => move.sku === "LightNorth-LX1" && move.percentChange === 15,
+      ),
+    ).toBe(true);
+    expect(
+      reuse.comparison.moves.some(
+        (move) => move.sku === "Rainbrook-CUP2" && move.percentChange === -10,
+      ),
+    ).toBe(true);
+    expect(reuse.followupBody.includes(reuse.cite)).toBe(true);
+    expect(reuse.followupBody.includes("15.00%")).toBe(true);
+    expect(reuse.crossTenant.foreignArchiveRecord).toBeNull();
+    expect(reuse.crossTenant.foreignLogicalLookup).toBeNull();
+    expect(reuse.crossTenant.foreignReservedRead).toBeNull();
+    expect(reuse.crossTenant.foreignFolderRead).toBeNull();
+    expect(fs.existsSync(reuse.originalPath)).toBe(true);
+    expect(fs.readFileSync(reuse.originalPath, "utf8")).toBe(PRICE_WATCH_ORIGINAL_MARKDOWN);
 
     record("knowledge-reuse", {
       requestId: "dlv-weekly-a",
+      boundSha: readBoundSha(),
+      uriConcatenationOnly: false,
       before: { storeAExists: false, cite: null },
       after: {
-        artifactExists: fs.existsSync(artifactPath),
-        laterCite: cite,
-        laterDeliverableId: later?.deliverableId ?? null,
-        title: later?.record.title ?? null,
+        artifactExists: fs.existsSync(reuse.originalPath),
+        laterCite: reuse.cite,
+        officialSavedPath: reuse.originalPath,
+        readRecord: reuse.readRecord,
+        extracted: reuse.extracted,
+        comparison: reuse.comparison,
       },
-      crossTenant: { storeBHit: cross !== null },
+      crossTenant: reuse.crossTenant,
       result: "pass",
     });
   });
