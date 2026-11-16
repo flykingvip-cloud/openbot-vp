@@ -6,6 +6,10 @@
  * role library. Shared guard: assertTaskNotStopped / assertPersistedTaskNotStopped.
  */
 import type { Task } from "@openbot/collaboration-core";
+import {
+  clearFollowupQueueItemsForTask,
+  listFollowupQueueItemsForTask,
+} from "../../auto-reply/reply/queue.js";
 import { loadConfig } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
 import { applyTaskStopUnderControlLock } from "../collaboration-dispatch/task-control-cas.js";
@@ -13,14 +17,19 @@ import { asGovernedTask, type GovernedTask } from "../collaboration-dispatch/tas
 import {
   assertTaskNotStopped,
   buildAcceptedTaskStopControl,
+  cancelOwnedWorkAfterAcceptedStop,
   isTaskStopAccepted,
   readTaskStopControl,
   TaskStoppedError,
+  type OwnedStopPorts,
+  type OwnedStopTarget,
+  type OwnedStopTargetFact,
   type TaskStopControl,
   type TaskStopExternalEffect,
   type TaskStopInFlightAbort,
 } from "../collaboration-dispatch/task-stop-control.js";
 import { resolveSecurityProfile } from "../security-profile.js";
+import { hasSupervisorRun, cancelSupervisorRun } from "../supervisor/run-registry.js";
 import { isMappedDeliveryIdentity } from "./delivery-actor-binding.js";
 import { createWorkspaceCollaborationStores, readGroupOperatingState } from "./shared.js";
 import {
@@ -115,6 +124,57 @@ export async function assertPersistedTaskNotStopped(params: {
   return governed;
 }
 
+export function createDefaultOwnedStopPorts(): OwnedStopPorts {
+  return {
+    listOwnedTargets: (taskId) => {
+      const targets: OwnedStopTarget[] = [];
+      if (hasSupervisorRun(taskId)) {
+        targets.push({ kind: "supervisor_run", id: taskId, taskId });
+      }
+      for (const { item, queueKey } of listFollowupQueueItemsForTask(taskId)) {
+        targets.push({
+          kind: "queue_item",
+          id: item.followupItemId?.trim() || `${queueKey}:${item.enqueuedAt}`,
+          taskId,
+        });
+      }
+      return targets;
+    },
+    cancelTarget: async (target) => {
+      if (target.kind === "supervisor_run") {
+        const stopped = await cancelSupervisorRun(target.taskId);
+        return {
+          kind: target.kind,
+          id: target.id,
+          taskId: target.taskId,
+          status: stopped ? "confirmed_stopped" : "pending",
+          detail: stopped ? undefined : "no in-process supervisor run to confirm",
+        };
+      }
+      if (target.kind === "queue_item") {
+        const removed = clearFollowupQueueItemsForTask(target.taskId);
+        return {
+          kind: target.kind,
+          id: target.id,
+          taskId: target.taskId,
+          status: removed > 0 ? "confirmed_stopped" : "pending",
+          detail:
+            removed > 0
+              ? `removed ${removed} owned queue item(s)`
+              : "owned queue item already gone",
+        };
+      }
+      return {
+        kind: target.kind,
+        id: target.id,
+        taskId: target.taskId,
+        status: "unsupported",
+        detail: "no cancel port wired for this target kind",
+      };
+    },
+  };
+}
+
 export type RequestCollaborationTaskStopParams = {
   groupId: string;
   taskId: string;
@@ -129,12 +189,15 @@ export type RequestCollaborationTaskStopParams = {
   stores?: TrustedGroupStores | null;
   cfg?: OpenBotConfig;
   nowMs?: number;
+  /** Test/production override; defaults cancel only explicitly owned in-process work. */
+  ownedStopPorts?: OwnedStopPorts;
 };
 
 export type RequestCollaborationTaskStopResult = {
   task: GovernedTask;
   stopControl: TaskStopControl;
   alreadyStopped: boolean;
+  cascadeFacts: OwnedStopTargetFact[];
 };
 
 /**
@@ -202,7 +265,12 @@ export async function requestCollaborationTaskStop(
   const governed = asGovernedTask(current);
   const existing = readTaskStopControl(governed);
   if (existing) {
-    return { task: governed, stopControl: existing, alreadyStopped: true };
+    const cascadeFacts = await cancelOwnedWorkAfterAcceptedStop({
+      taskId: params.taskId,
+      stopAccepted: true,
+      ports: params.ownedStopPorts ?? createDefaultOwnedStopPorts(),
+    });
+    return { task: governed, stopControl: existing, alreadyStopped: true, cascadeFacts };
   }
   const stopControl = buildAcceptedTaskStopControl({
     requestedBy: actorId,
@@ -228,5 +296,10 @@ export async function requestCollaborationTaskStop(
   if (!persistedStop) {
     throw new TaskStopEntryError("stop_persist_failed", "stop did not persist under control lock");
   }
-  return { task: updated, stopControl: persistedStop, alreadyStopped: false };
+  const cascadeFacts = await cancelOwnedWorkAfterAcceptedStop({
+    taskId: params.taskId,
+    stopAccepted: true,
+    ports: params.ownedStopPorts ?? createDefaultOwnedStopPorts(),
+  });
+  return { task: updated, stopControl: persistedStop, alreadyStopped: false, cascadeFacts };
 }
