@@ -5743,6 +5743,8 @@ export const chatHandlers: GatewayRequestHandlers = {
             | undefined;
           let discussToTaskPrincipalActor: string | undefined;
           let discussToTaskCoordinatorBinding: string | undefined;
+          let formalTaskBoardPublished = false;
+          let formalTaskReceiptMessage: Record<string, unknown> | undefined;
           const runStageBot = async (params: {
             bot: GroupDiscussionBotTarget;
             isWrapTurn: boolean;
@@ -6149,6 +6151,8 @@ export const chatHandlers: GatewayRequestHandlers = {
                     })
                   : { d2tResult: null };
               const d2tApplied = applyDiscussToTaskChatTurnToChatHandler(d2tTurn);
+              formalTaskBoardPublished = d2tTurn.d2tResult?.stages.boardPublished === true;
+              formalTaskReceiptMessage = d2tApplied.transcriptPersist?.message;
               if (d2tApplied.formalTaskEstablish) {
                 formalTaskEstablish = d2tApplied.formalTaskEstablish;
               }
@@ -6207,6 +6211,44 @@ export const chatHandlers: GatewayRequestHandlers = {
                 nodeSendToSession: context.nodeSendToSession,
                 tenantId: collabTenant?.tenantId ?? client?.sessionEnterpriseId ?? null,
               });
+            }
+
+            if (
+              groupUnderstanding?.kind === "understood" &&
+              groupUnderstanding.decision.kind === "execution_request" &&
+              groupUnderstanding.decision.request.lifecycle === "long_task" &&
+              !formalTaskBoardPublished
+            ) {
+              // A durable draft id is not execution admission. Participant
+              // selection must not launch tool-capable member turns to repair
+              // or recreate the still-unconfirmed contract themselves.
+              setGatewayDedupeEntry({
+                dedupe: context.dedupe,
+                key: `chat:${clientRunId}`,
+                entry: {
+                  ts: Date.now(),
+                  ok: true,
+                  payload: { runId: clientRunId, status: "ok" as const },
+                },
+              });
+              broadcastChatFinal({
+                context,
+                runId: clientRunId,
+                sessionKey: rawSessionKey,
+                message: formalTaskReceiptMessage ?? {
+                  role: "assistant",
+                  content: [
+                    {
+                      type: "text",
+                      text:
+                        formalTaskEstablish?.userMessage ||
+                        "正式任务尚未获准启动，本轮没有派发成员执行。",
+                    },
+                  ],
+                  timestamp: Date.now(),
+                },
+              });
+              return;
             }
 
             if (
