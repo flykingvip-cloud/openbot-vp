@@ -240,9 +240,16 @@ export class OpenBotObservationWorkbench extends LitElement {
       return;
     }
     if (
-      ["role", "tenantId", "sessionKey", "scopes", "authorized", "tenantGrants", "client", "gatewayMethods"].some((key) =>
-        changed.has(key),
-      )
+      [
+        "role",
+        "tenantId",
+        "sessionKey",
+        "scopes",
+        "authorized",
+        "tenantGrants",
+        "client",
+        "gatewayMethods",
+      ].some((key) => changed.has(key))
     ) {
       this.clearSensitiveObservation();
     }
@@ -342,7 +349,8 @@ export class OpenBotObservationWorkbench extends LitElement {
             scheduledRobotCount: count(row.heartbeat.scheduledRobotCount),
             confirmedRobotCount: count(row.heartbeat.confirmedRobotCount),
             onCadenceRobotCount: count(row.heartbeat.onCadenceRobotCount),
-            observedEventCount: count(row.heartbeat.observedEventCount) ?? (events.length ? events.length : null),
+            observedEventCount:
+              count(row.heartbeat.observedEventCount) ?? (events.length ? events.length : null),
             lastEventAt: count(row.heartbeat.lastEventAt),
             events,
             tenants: Array.isArray(row.heartbeat.tenants)
@@ -358,7 +366,8 @@ export class OpenBotObservationWorkbench extends LitElement {
                     expectedSamples?: unknown;
                     observedSamples?: unknown;
                   };
-                  const tenantId = typeof tenant.tenantId === "string" ? tenant.tenantId.trim() : "";
+                  const tenantId =
+                    typeof tenant.tenantId === "string" ? tenant.tenantId.trim() : "";
                   if (!tenantId) {
                     return [];
                   }
@@ -452,8 +461,18 @@ export class OpenBotObservationWorkbench extends LitElement {
       agents?: unknown;
       truncated?: unknown;
     };
-    const authorization = row.authorization === "unknown" ? "unknown" : row.authorization === "granted" ? "granted" : null;
-    if (!authorization || !row.window || typeof row.window.from !== "number" || typeof row.window.to !== "number") {
+    const authorization =
+      row.authorization === "unknown"
+        ? "unknown"
+        : row.authorization === "granted"
+          ? "granted"
+          : null;
+    if (
+      !authorization ||
+      !row.window ||
+      typeof row.window.from !== "number" ||
+      typeof row.window.to !== "number"
+    ) {
       return null;
     }
     const tasks = Array.isArray(row.tasks)
@@ -488,7 +507,8 @@ export class OpenBotObservationWorkbench extends LitElement {
               outcomeVersion: task.outcomeVersion,
               agentId: task.agentId,
               decidedAt: task.decidedAt,
-              tenantId: typeof task.tenantId === "string" && task.tenantId.trim() ? task.tenantId : null,
+              tenantId:
+                typeof task.tenantId === "string" && task.tenantId.trim() ? task.tenantId : null,
               coverage: task.coverage
                 ? {
                     fullyLinkedCount: count(task.coverage.fullyLinkedCount),
@@ -502,7 +522,8 @@ export class OpenBotObservationWorkbench extends LitElement {
       : [];
     const agents = Array.isArray(row.agents)
       ? row.agents.flatMap((entry) => {
-          const id = entry && typeof entry === "object" ? (entry as { id?: unknown }).id : undefined;
+          const id =
+            entry && typeof entry === "object" ? (entry as { id?: unknown }).id : undefined;
           return typeof id === "string" && id.trim() ? [{ id }] : [];
         })
       : [];
@@ -1234,13 +1255,19 @@ export class OpenBotObservationWorkbench extends LitElement {
     return html`<section class="obs-plat-card" data-testid="obs-platform-capacity" aria-label="覆盖与容量">
       <div class="obs-plat-card__head"><div><h3>覆盖与容量</h3></div></div>
       <div class="obs-cap-grid">${cards.map(
-        (card) => html`<div class="obs-cap-item ${card.chart ? "obs-cap-item--chart" : ""}" data-testid=${`obs-capacity-${card.title}`}>
+        (
+          card,
+        ) => html`<div class="obs-cap-item ${card.chart ? "obs-cap-item--chart" : ""}" data-testid=${`obs-capacity-${card.title}`}>
           <h4>${card.title}</h4>
           ${
             card.title === "心跳时效" && card.fraction == null
               ? this.renderHeartbeatActivity(heartbeatInput)
               : card.chart
-                ? this.renderRatioMeter({ label: card.title, value: card.value, fraction: card.fraction })
+                ? this.renderRatioMeter({
+                    label: card.title,
+                    value: card.value,
+                    fraction: card.fraction,
+                  })
                 : html`<div class="obs-cap-val">${card.value}</div>`
           }
         </div>`,
@@ -1916,12 +1943,22 @@ export class OpenBotObservationWorkbench extends LitElement {
   private setTaskDateRange(fromValue: string, toValue: string) {
     const fromParts = fromValue.split("-").map(Number);
     const toParts = toValue.split("-").map(Number);
-    if (fromParts.length !== 3 || toParts.length !== 3 || fromParts.some((n) => !Number.isFinite(n)) || toParts.some((n) => !Number.isFinite(n))) {
+    if (
+      fromParts.length !== 3 ||
+      toParts.length !== 3 ||
+      fromParts.some((n) => !Number.isFinite(n)) ||
+      toParts.some((n) => !Number.isFinite(n))
+    ) {
       return;
     }
     const from = new Date(fromParts[0], fromParts[1] - 1, fromParts[2]).getTime();
     const to = new Date(toParts[0], toParts[1] - 1, toParts[2] + 1).getTime();
-    if (!Number.isFinite(from) || !Number.isFinite(to) || from >= to || to - from > 30 * 86_400_000) {
+    if (
+      !Number.isFinite(from) ||
+      !Number.isFinite(to) ||
+      from >= to ||
+      to - from > 30 * 86_400_000
+    ) {
       return;
     }
     this.taskFrom = from;
@@ -1943,7 +1980,9 @@ export class OpenBotObservationWorkbench extends LitElement {
   }
   private indexItemToRun(item: PlatformTaskIndexItem, view: ObservationView): ObservationRun {
     const directory = this.directoryEntries(view);
-    const entry = item.tenantId ? directory.find((row) => row.tenantId === item.tenantId) : undefined;
+    const entry = item.tenantId
+      ? directory.find((row) => row.tenantId === item.tenantId)
+      : undefined;
     return {
       id: this.indexItemId(item),
       label: item.taskId,
@@ -1991,7 +2030,8 @@ export class OpenBotObservationWorkbench extends LitElement {
     const marks = heartbeatActivityMarks(activity);
     const first = marks[0]?.ts;
     const last = marks[marks.length - 1]?.ts;
-    const start = first != null && last != null && last > first ? first : (last != null ? last - 1 : 0);
+    const start =
+      first != null && last != null && last > first ? first : last != null ? last - 1 : 0;
     const end = last != null && last > start ? last : start + 1;
     const span = Math.max(1, end - start);
     const value = formatHeartbeatFreshness(activity);
@@ -2015,7 +2055,8 @@ export class OpenBotObservationWorkbench extends LitElement {
     const radius = 28;
     const circumference = 2 * Math.PI * radius;
     const offset = circumference * (1 - (options.fraction ?? 0));
-    const label = options.fraction == null ? `${options.label}未知` : `${options.label} ${options.value}`;
+    const label =
+      options.fraction == null ? `${options.label}未知` : `${options.label} ${options.value}`;
     return html`<div class="obs-coverage-chart">
       <svg class="obs-coverage-meter ${options.fraction == null ? "is-unknown" : ""}" viewBox="0 0 72 72" role="img" aria-label=${label}>
         <circle class="obs-coverage-meter__track" cx="36" cy="36" r="28" fill="none" stroke-width="8"></circle>
@@ -2114,11 +2155,15 @@ export class OpenBotObservationWorkbench extends LitElement {
       </label>
       <label class="field obs-query-scope obs-query-dates-field"><span>日期</span>
         <div class="obs-query-dates">
-          <input type="date" aria-label="起始日期" ?disabled=${disabled} .value=${this.dateInputValue(window.from)} @change=${(event: Event) => {
+          <input type="date" aria-label="起始日期" ?disabled=${disabled} .value=${this.dateInputValue(window.from)} @change=${(
+            event: Event,
+          ) => {
             const fromValue = (event.target as HTMLInputElement).value;
             this.setTaskDateRange(fromValue, this.dateInputValue(window.to - 1));
           }} />
-          <input type="date" aria-label="结束日期" ?disabled=${disabled} .value=${this.dateInputValue(window.to - 1)} @change=${(event: Event) => {
+          <input type="date" aria-label="结束日期" ?disabled=${disabled} .value=${this.dateInputValue(window.to - 1)} @change=${(
+            event: Event,
+          ) => {
             const toValue = (event.target as HTMLInputElement).value;
             this.setTaskDateRange(this.dateInputValue(window.from), toValue);
           }} />
@@ -2186,10 +2231,18 @@ export class OpenBotObservationWorkbench extends LitElement {
       return nothing;
     }
     if (index.authorization === "unknown") {
-      return html`<div class="obs-task-index" data-testid="obs-task-index"><p class="obs-plat-footnote">授权尚未确认，不返回该租户任务。</p></div>`;
+      return html`
+        <div class="obs-task-index" data-testid="obs-task-index">
+          <p class="obs-plat-footnote">授权尚未确认，不返回该租户任务。</p>
+        </div>
+      `;
     }
     if (!index.tasks.length) {
-      return html`<div class="obs-task-index" data-testid="obs-task-index"><p class="obs-plat-footnote">当前筛选下没有可列出的任务。</p></div>`;
+      return html`
+        <div class="obs-task-index" data-testid="obs-task-index">
+          <p class="obs-plat-footnote">当前筛选下没有可列出的任务。</p>
+        </div>
+      `;
     }
     return html`<div class="obs-task-index" data-testid="obs-task-index">
       <ul class="obs-task-index__list">
@@ -2207,7 +2260,13 @@ export class OpenBotObservationWorkbench extends LitElement {
           </li>`;
         })}
       </ul>
-      ${index.truncated ? html`<p class="obs-plat-footnote">仅显示最近一部分匹配任务。</p>` : nothing}
+      ${
+        index.truncated
+          ? html`
+              <p class="obs-plat-footnote">仅显示最近一部分匹配任务。</p>
+            `
+          : nothing
+      }
     </div>`;
   }
   private renderTenantGrantTable(view: ObservationView) {
@@ -2232,9 +2291,10 @@ export class OpenBotObservationWorkbench extends LitElement {
                 grant === "granted" ? "已授权" : grant === "none" ? "无授权" : "尚未确认";
               const tenantCode = visibleTenantCode(entry.label, entry.tenantId);
               const note = grant === "granted" ? "" : tenantGrantNote(grant, isSample);
-              const tenantHeartbeat = this.firstScreenSnapshot()?.heartbeat?.tenants?.find(
-                (row) => row.tenantId === entry.tenantId,
-              ) ?? null;
+              const tenantHeartbeat =
+                this.firstScreenSnapshot()?.heartbeat?.tenants?.find(
+                  (row) => row.tenantId === entry.tenantId,
+                ) ?? null;
               return html`<tr data-tenant-id=${entry.tenantId}>
                 <td>${tenantDisplayName(entry.label, entry.tenantId)}${tenantCode ? html`<code>${tenantCode}</code>` : nothing}</td>
                 <td><span class="obs-grant-chip is-${grant}">${grantLabel}</span></td>
@@ -2321,7 +2381,7 @@ export class OpenBotObservationWorkbench extends LitElement {
         ${showDrawer && selected ? this.renderEvidence(selected) : nothing}
       </div>`;
     }
-    return html`<div class="obs-workbench" id="observation-workbench" data-observation-source=${view.source} data-time-window=${this.role === "platform" ? this.timeWindow : "enterprise"} data-tenant-filter=${this.tenantFilter}>
+    return html`<div class="obs-workbench" id="observation-workbench" data-observation-source=${view.source} data-time-window="enterprise" data-tenant-filter=${this.tenantFilter}>
       <div class="obs-header"><div><h2>智能诊断</h2></div></div>
       ${this.renderTabs()}
       ${this.renderFilters(view)}

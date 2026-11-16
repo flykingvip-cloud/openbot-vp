@@ -234,8 +234,12 @@ describe("platform tenant compare filters", () => {
     expect(
       panel.querySelector('[data-testid="obs-health-关联覆盖率"] .obs-cap-val')?.textContent,
     ).toBe("未知");
-    expect(panel.querySelector('[data-testid="obs-health-关联覆盖率"] .obs-coverage-meter')).not.toBeNull();
-    expect(panel.querySelector('[data-testid="obs-health-关联覆盖率"] .obs-coverage-meter__fill')).toBeNull();
+    expect(
+      panel.querySelector('[data-testid="obs-health-关联覆盖率"] .obs-coverage-meter'),
+    ).not.toBeNull();
+    expect(
+      panel.querySelector('[data-testid="obs-health-关联覆盖率"] .obs-coverage-meter__fill'),
+    ).toBeNull();
     expect(panel.querySelector('[data-testid="obs-platform-health"]')?.textContent).not.toContain(
       "覆盖率必须带分子分母",
     );
@@ -259,7 +263,9 @@ describe("platform tenant compare filters", () => {
       panel.querySelector('[data-testid="obs-health-心跳时效"] .obs-cap-val')?.textContent,
     ).toBe("暂无心跳记录");
     expect(panel.querySelector('[data-testid="obs-heartbeat-activity"]')).not.toBeNull();
-    expect(panel.querySelector('[data-testid="obs-health-心跳时效"] .obs-coverage-meter')).toBeNull();
+    expect(
+      panel.querySelector('[data-testid="obs-health-心跳时效"] .obs-coverage-meter'),
+    ).toBeNull();
     expect(panel.querySelector('[data-testid="obs-platform-health"]')?.textContent).not.toContain(
       "expectedSamples",
     );
@@ -272,7 +278,9 @@ describe("platform tenant compare filters", () => {
     expect(
       panel.querySelector('[data-testid="obs-health-租户授权"] .obs-cap-val')?.textContent,
     ).toBe("1/2 · 50%");
-    expect(panel.querySelector('[data-testid="obs-health-租户授权"] .obs-coverage-meter__fill')).not.toBeNull();
+    expect(
+      panel.querySelector('[data-testid="obs-health-租户授权"] .obs-coverage-meter__fill'),
+    ).not.toBeNull();
     expect(panel.querySelector('[data-testid="obs-health-租户授权"]')?.textContent).not.toMatch(
       /0 无授权/,
     );
@@ -312,14 +320,18 @@ describe("platform tenant compare filters", () => {
     expect(panel.querySelector(".obs-plat-toolbar")?.textContent).not.toContain("样例验收");
     expect(panel.querySelector(".obs-source-label")).toBeNull();
     expect(panel.querySelector(".obs-source small")).toBeNull();
-    expect(rectsOverlap(
-      panel.querySelector('[aria-label="起始日期"]'),
-      panel.querySelector('[aria-label="机器人筛选"]'),
-    )).toBe(false);
-    expect(rectsOverlap(
-      panel.querySelector('[aria-label="结束日期"]'),
-      panel.querySelector('[aria-label="机器人筛选"]'),
-    )).toBe(false);
+    expect(
+      rectsOverlap(
+        panel.querySelector('[aria-label="起始日期"]'),
+        panel.querySelector('[aria-label="机器人筛选"]'),
+      ),
+    ).toBe(false);
+    expect(
+      rectsOverlap(
+        panel.querySelector('[aria-label="结束日期"]'),
+        panel.querySelector('[aria-label="机器人筛选"]'),
+      ),
+    ).toBe(false);
     expect(panel.querySelector('[data-tenant-id="tenant-b"]')?.textContent).not.toMatch(
       /近 7 天调用[\s\S]*\b0\b/,
     );
@@ -577,9 +589,9 @@ describe("governance readonly intent integration", () => {
     await panel.updateComplete;
     expect(panel.textContent).toContain("记录状态：effective");
     expect(panel.querySelector(".obs-gov-banner")).toBeNull();
-    expect(
-      [...panel.querySelectorAll("h3")].map((node) => node.textContent?.trim()),
-    ).toEqual(expect.arrayContaining(["改善记录", "从发现到验证，每一步都有回执", "显式任务版本对照"]));
+    expect([...panel.querySelectorAll("h3")].map((node) => node.textContent?.trim())).toEqual(
+      expect.arrayContaining(["改善记录", "从发现到验证，每一步都有回执", "显式任务版本对照"]),
+    );
     expect(panel.textContent).not.toContain("ActionIntent");
     expect(panel.textContent).not.toContain("改善记录与显式任务版本对照独立于连接工作台筛选");
     expect(panel.textContent).not.toContain("improvementEligible 保持为 false");
@@ -595,10 +607,9 @@ describe("governance readonly intent integration", () => {
     expect(panel.textContent).toContain("进入治理控制面");
     const compare = panel.querySelector('[aria-label="显式对照查询"]')!;
     expect(compare).not.toBeNull();
-    expect([...compare.querySelectorAll("legend")].map((node) => node.textContent?.trim())).toEqual([
-      "基准",
-      "候选",
-    ]);
+    expect([...compare.querySelectorAll("legend")].map((node) => node.textContent?.trim())).toEqual(
+      ["基准", "候选"],
+    );
     expect(compare.querySelector('[aria-label="基准 开始时间"]')).not.toBeNull();
     expect(compare.querySelector('[aria-label="候选 结束时间"]')).not.toBeNull();
     expect(compare.textContent).not.toContain("开始UTC");
@@ -1124,9 +1135,7 @@ describe("platform first-screen snapshot binding", () => {
   it("renders a ring and ratio when the window snapshot supplies a real denominator", async () => {
     const request = vi.fn(async (method: string, params: unknown) => {
       expect(method).toBe("diagnosis.observation.query");
-      expect(params).toEqual(
-        expect.objectContaining({ platformWindow: true }),
-      );
+      expect(params).toEqual(expect.objectContaining({ platformWindow: true }));
       expect(params).not.toEqual(expect.objectContaining({ agentId: expect.anything() }));
       expect(params).not.toEqual(expect.objectContaining({ taskId: expect.anything() }));
       return {
@@ -1170,7 +1179,7 @@ describe("platform first-screen snapshot binding", () => {
   });
 
   it("keeps first-screen coverage unknown when the snapshot has no denominator, and ignores precise-query evidence", async () => {
-    const request = vi.fn(async () => ({
+    const request = vi.fn(async (_method: string, _params: unknown) => ({
       ok: true,
       coverage: { attemptedCount: 0, fullyLinkedCount: 0, link: null },
       heartbeat: { expectedSamples: null, observedSamples: 1 },
@@ -1186,9 +1195,9 @@ describe("platform first-screen snapshot binding", () => {
       panel.querySelector('[data-testid="obs-health-心跳时效"] .obs-cap-val')?.textContent,
     ).toBe("暂无心跳记录");
     expect(panel.querySelector('[data-testid="obs-heartbeat-activity"]')).not.toBeNull();
-    expect(
-      panel.querySelector('[data-testid="obs-health-关联覆盖率"]')?.textContent,
-    ).not.toContain("0%");
+    expect(panel.querySelector('[data-testid="obs-health-关联覆盖率"]')?.textContent).not.toContain(
+      "0%",
+    );
     const query = panel.querySelector<HTMLInputElement>('input[aria-label="精确任务或运行标识"]')!;
     query.value = "anything";
     query.dispatchEvent(new Event("input"));
@@ -1259,7 +1268,12 @@ describe("platform first-screen snapshot binding", () => {
 describe("platform first-screen density and task search", () => {
   const mount = async (
     request: (method: string, params?: unknown) => Promise<unknown>,
-    directory?: Array<{ tenantId: string; label: string; status: string; tenantGrant?: "granted" | "none" | "unknown" }>,
+    directory?: Array<{
+      tenantId: string;
+      label: string;
+      status: string;
+      tenantGrant?: "granted" | "none" | "unknown";
+    }>,
   ) => {
     const container = document.createElement("div");
     document.body.append(container);
@@ -1274,18 +1288,16 @@ describe("platform first-screen density and task search", () => {
         observationHost: {},
         client: { connected: true, request },
         gatewayMethods: ["diagnosis.observation.query"],
-        enterpriseDirectory:
-          directory ??
-          [
-            { tenantId: "001", label: "upbeyond", status: "paid", tenantGrant: "granted" },
-            { tenantId: "aegis-99491824", label: "Aegis", status: "paid", tenantGrant: "granted" },
-            {
-              tenantId: "workspace-97096055",
-              label: "小飞鱼",
-              status: "paid",
-              tenantGrant: "granted",
-            },
-          ],
+        enterpriseDirectory: directory ?? [
+          { tenantId: "001", label: "upbeyond", status: "paid", tenantGrant: "granted" },
+          { tenantId: "aegis-99491824", label: "Aegis", status: "paid", tenantGrant: "granted" },
+          {
+            tenantId: "workspace-97096055",
+            label: "小飞鱼",
+            status: "paid",
+            tenantGrant: "granted",
+          },
+        ],
         tenantGrants: {
           "001": "granted",
           "aegis-99491824": "granted",
@@ -1309,12 +1321,23 @@ describe("platform first-screen density and task search", () => {
     const request = vi.fn(async (_method: string, params: unknown) => {
       const row = params && typeof params === "object" ? (params as Record<string, unknown>) : {};
       if (row.taskIndex === true) {
-        return { ok: true, authorization: "granted", window: { from: 1, to: 2 }, tasks: [], agents: [] };
+        return {
+          ok: true,
+          authorization: "granted",
+          window: { from: 1, to: 2 },
+          tasks: [],
+          agents: [],
+        };
       }
       return {
         ok: true,
         coverage: { attemptedCount: 0, fullyLinkedCount: 0, link: null },
-        heartbeat: { expectedSamples: null, observedSamples: null, observedEventCount: 0, events: [] },
+        heartbeat: {
+          expectedSamples: null,
+          observedSamples: null,
+          observedEventCount: 0,
+          events: [],
+        },
         unmappedEvents: { count: 4 },
       };
     });
@@ -1326,7 +1349,9 @@ describe("platform first-screen density and task search", () => {
     expect(tenant.textContent).not.toContain("（001）");
     expect(tenant.textContent).not.toContain("aegis-99491824");
     expect(tenant.textContent).not.toContain("workspace-97096055");
-    expect(panel.querySelector('[data-tenant-id="aegis-99491824"]')?.textContent).toContain("Aegis");
+    expect(panel.querySelector('[data-tenant-id="aegis-99491824"]')?.textContent).toContain(
+      "Aegis",
+    );
     expect(panel.querySelector('[data-tenant-id="aegis-99491824"]')?.textContent).not.toContain(
       "aegis-99491824",
     );
@@ -1339,7 +1364,9 @@ describe("platform first-screen density and task search", () => {
     expect(
       panel.querySelector('[data-testid="obs-health-租户授权"] .obs-cap-val')?.textContent,
     ).toBe("3/3 · 100%");
-    expect(panel.querySelector('[data-testid="obs-health-租户授权"] .obs-coverage-meter__fill')).not.toBeNull();
+    expect(
+      panel.querySelector('[data-testid="obs-health-租户授权"] .obs-coverage-meter__fill'),
+    ).not.toBeNull();
     expect(
       panel.querySelector('[data-testid="obs-health-未映射事件"] .obs-cap-val')?.textContent,
     ).toBe("4");
@@ -1356,7 +1383,13 @@ describe("platform first-screen density and task search", () => {
     const request = vi.fn(async (_method: string, params: unknown) => {
       const row = params && typeof params === "object" ? (params as Record<string, unknown>) : {};
       if (row.taskIndex === true) {
-        return { ok: true, authorization: "granted", window: { from: 1, to: 2 }, tasks: [], agents: [] };
+        return {
+          ok: true,
+          authorization: "granted",
+          window: { from: 1, to: 2 },
+          tasks: [],
+          agents: [],
+        };
       }
       return {
         ok: true,
@@ -1374,14 +1407,18 @@ describe("platform first-screen density and task search", () => {
       };
     });
     const { container, panel } = await mount(request);
-    expect(panel.querySelector('[data-testid="obs-health-心跳时效"] .obs-coverage-meter')).toBeNull();
-    expect(panel.querySelector('[data-testid="obs-heartbeat-activity"] .obs-heartbeat-spark__mark')).not.toBeNull();
+    expect(
+      panel.querySelector('[data-testid="obs-health-心跳时效"] .obs-coverage-meter'),
+    ).toBeNull();
+    expect(
+      panel.querySelector('[data-testid="obs-heartbeat-activity"] .obs-heartbeat-spark__mark'),
+    ).not.toBeNull();
     expect(
       panel.querySelector('[data-testid="obs-health-心跳时效"] .obs-cap-val')?.textContent,
     ).toContain("刚刚");
-    expect(panel.querySelector('[data-testid="obs-health-未映射事件"] .obs-cap-val')?.textContent).toBe(
-      "0",
-    );
+    expect(
+      panel.querySelector('[data-testid="obs-health-未映射事件"] .obs-cap-val')?.textContent,
+    ).toBe("0");
     expect(panel.querySelector('[data-testid="obs-health-未映射事件"]')?.textContent).toContain(
       "没有未映射事件",
     );
@@ -1396,7 +1433,10 @@ describe("platform first-screen density and task search", () => {
         return {
           ok: true,
           authorization: "granted",
-          window: { from: typeof row.from === "number" ? row.from : 1, to: typeof row.to === "number" ? row.to : 2 },
+          window: {
+            from: typeof row.from === "number" ? row.from : 1,
+            to: typeof row.to === "number" ? row.to : 2,
+          },
           agents: [{ id: "bot-a" }],
           tasks: [
             {

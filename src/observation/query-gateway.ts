@@ -6,6 +6,8 @@ import {
   type DiagnosisGatewayAuthDeps,
   type DiagnosisGatewayAuthClient,
 } from "../diagnosis/report-query-gateway.js";
+import { resolvePlatformAuthConfig } from "../gateway/platform-auth/config.js";
+import { loadStore } from "../gateway/platform-auth/store.js";
 import { ErrorCodes, errorShape } from "../gateway/protocol/index.js";
 import type { GatewayRequestHandlers } from "../gateway/server-methods/types.js";
 import { normalizeTaskOutcomeSubjectRef } from "../task-outcome/subject-ref.js";
@@ -16,11 +18,9 @@ import { createCapacityReader } from "./capacity-reader.js";
 import { createPlatformHeartbeatActivityQuery } from "./heartbeat-activity-query.js";
 import type { startHeartbeatActivity } from "./heartbeat-activity.js";
 import { createMetricCompareGatewayHelper } from "./metric-compare-gateway.js";
-import { queryObservationWithJournal } from "./query.js";
-import { resolvePlatformAuthConfig } from "../gateway/platform-auth/config.js";
-import { loadStore } from "../gateway/platform-auth/store.js";
 import { queryPlatformTaskIndex } from "./platform-task-index.js";
 import { queryPlatformObservationSnapshot } from "./platform-window-snapshot.js";
+import { queryObservationWithJournal } from "./query.js";
 import { createReasoningGatewayAdapter } from "./reasoning-gateway.js";
 import type { ReasoningInput, ReasoningModelPort } from "./reasoning-pass.js";
 export const OBSERVATION_QUERY_METHOD = "diagnosis.observation.query";
@@ -133,7 +133,7 @@ export function createObservationQueryHandlers(
         let to = params.to;
         if (from === undefined && to === undefined) {
           to = projectedAt;
-          from = to - 7 * 86_400_000;
+          from = projectedAt - 7 * 86_400_000;
         }
         if (
           typeof from !== "number" ||
@@ -197,7 +197,7 @@ export function createObservationQueryHandlers(
         let to = params.to;
         if (from === undefined && to === undefined) {
           to = projectedAt;
-          from = to - 7 * 86_400_000;
+          from = projectedAt - 7 * 86_400_000;
         }
         if (
           typeof from !== "number" ||
