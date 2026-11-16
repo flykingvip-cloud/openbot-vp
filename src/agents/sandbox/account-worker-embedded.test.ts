@@ -1,3 +1,7 @@
+import { vi } from "vitest";
+vi.mock("../../gateway/workspace-resolver/execution-workspace.js", () => ({
+  resolveExecutionWorkspace: vi.fn(async () => null),
+}));
 /**
  * Embedded run acquires an Account Worker handle and passes it into sandbox
  * resolution. Without the handle, Worker ON still refuses the gateway docker driver.

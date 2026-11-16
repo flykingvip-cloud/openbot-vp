@@ -15,6 +15,7 @@ import { adaptAgentsLoadCapabilityState } from "../capability/view-state.ts";
 import { signOutMessage } from "../employee-shell/native-bridge.ts";
 import { sendToNativeHost } from "../employee-shell/native-host.ts";
 import { normalizeBasePath } from "../navigation.ts";
+import { pagePathRequestHeaders } from "../openbot-page-path-request.ts";
 import { PASSWORD_RESET_LOGIN_PATH } from "../routing/password-reset-link.ts";
 import { originForPort, resolvePortFromSubdomain } from "../routing/subdomain-resolver.ts";
 import { formatAdminActivationEmailReceipt } from "./admin-activation-email-receipt.ts";
@@ -302,9 +303,10 @@ async function assertPlatformSessionCookieLanded(host: PlatformAuthHost): Promis
   try {
     const response = await fetch(buildPlatformAuthUrl(host.basePath, "/session"), {
       method: "GET",
-      headers: { Accept: "application/json" },
+      headers: pagePathRequestHeaders(),
       credentials: "same-origin",
       cache: "no-store",
+      referrerPolicy: "same-origin",
     });
     if (!response.ok) {
       return false;

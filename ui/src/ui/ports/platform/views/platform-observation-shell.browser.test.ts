@@ -111,20 +111,20 @@ describe("platform observation shell", () => {
     await workbench.updateComplete;
     expect(container.textContent).toContain("近 7 天跨租户视图来自企业目录摘要");
     expect(container.textContent).toContain("壳层目录企业");
-    expect(container.textContent).toContain("9");
-    const selector = workbench.querySelector<HTMLSelectElement>("select[aria-label=观测数据源]")!;
-    selector.value = "sample";
-    selector.dispatchEvent(new Event("change"));
+    expect(container.textContent).toContain("平台观测");
+    expect(container.textContent).toContain("平台健康与覆盖");
+    expect(container.textContent).toContain("精确任务查询");
+    expect(container.textContent).toContain("租户隔离与授权");
+    expect(container.querySelector(".obs-pulse-grid")).toBeNull();
+    workbench.setSource("sample");
     await workbench.updateComplete;
     expect(container.textContent).toContain("交互验收样例");
-    expect(container.textContent).toContain("运行观测");
-    expect(container.textContent).toContain("样例已启用");
+    expect(container.textContent).toContain("平台观测");
+    expect(container.textContent).toContain("样例验收已启用");
     expect(container.textContent).toContain("物业示例（样例）");
     expect(container.textContent).not.toContain("近 7 天跨租户视图来自企业目录摘要");
     expect(container.querySelector("openbot-platform-monitor-task")).toBeNull();
-    expect(
-      workbench.querySelectorAll('[role="tablist"][aria-label="观测视图"] button'),
-    ).toHaveLength(3);
+    expect(workbench.querySelector('[role="tablist"][aria-label="观测视图"]')).toBeNull();
     container.remove();
   });
 

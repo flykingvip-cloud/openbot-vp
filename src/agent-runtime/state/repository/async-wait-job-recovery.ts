@@ -20,6 +20,7 @@ import {
 } from "./async-wait-recovery-claim.js";
 import { setAsyncWaitRecoveryFollowupConsumerEnsure } from "./async-wait-recovery-enqueue.js";
 import { collectRecoverableAsyncWaitIntents } from "./async-wait-recovery-scan.js";
+import { recoverFollowupWorkspaceWaitsAtGatewayBoot } from "./blocked-followup-delivery-recovery.js";
 import { readSessionTaskBoard } from "./task-board-file.js";
 
 export type AsyncWaitRecoveryLog = {
@@ -274,6 +275,16 @@ export function recoverAsyncWaitJobsAtGatewayBoot(params: {
   params.log?.info?.(
     `async-wait recovery boot: agents=${result.agentsScanned} seen=${result.intentsSeen} waiting=${result.stillWaiting} continueArmed=${result.continueArmed} deliveryOnly=${result.deliveryOnly} retried=${result.retried} cleared=${result.cleared} skipped=${result.skipped}`,
   );
+  void recoverFollowupWorkspaceWaitsAtGatewayBoot({
+    cfg: params.cfg,
+    log: params.log,
+  }).catch((err) => {
+    params.log?.warn?.(
+      `followup workspace wait recovery failed: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+  });
   if (params.startRecheck !== false) {
     startAsyncWaitJobRecoveryRecheck(params.cfg, {
       intervalMs: params.intervalMs,

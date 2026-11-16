@@ -165,6 +165,56 @@ function metadataKey(row: OutcomeRecordMetadata): string {
     attempts,
   ]);
 }
+export function projectOutcomeRecordMetadata(
+  value: unknown,
+  options: { isCurrentTip?: boolean } = {},
+): OutcomeMetadata | null {
+  if (!record(value)) {
+    return null;
+  }
+  return {
+    cohortDimensions: readOutcomeCohort(value),
+    taskId: value.taskId,
+    outcomeVersion: value.outcomeVersion,
+    taskJudgement: value.taskJudgement,
+    lifecycle: value.lifecycle,
+    decidedAt: value.decidedAt,
+    scope:
+      value.scope.kind === "enterprise"
+        ? {
+            kind: value.scope.kind,
+            subjectRef: value.scope.subjectRef,
+            authzScopeRef: value.scope.authzScopeRef,
+            tenantId: value.scope.tenantId,
+            enterpriseDomainId: value.scope.enterpriseDomainId,
+          }
+        : {
+            kind: value.scope.kind,
+            subjectRef: value.scope.subjectRef,
+            authzScopeRef: value.scope.authzScopeRef,
+            personalDomainId: value.scope.personalDomainId,
+          },
+    acceptance: { status: value.acceptance.status },
+    delivery: { status: value.delivery.status },
+    decisiveRunId: value.decisiveRunId,
+    decisiveAttemptId: value.decisiveAttemptId,
+    deliveryId: value.deliveryId,
+    runs: value.runs.map((r) => ({
+      runId: r.runId,
+      attemptIds: [...r.attemptIds],
+      effectiveAttemptId: r.effectiveAttemptId,
+      status: r.status,
+    })),
+    attempts: value.attempts.map((a) => ({
+      attemptId: a.attemptId,
+      runId: a.runId,
+      status: a.status,
+      observedAt: a.observedAt,
+    })),
+    isCurrentTip: options.isCurrentTip === true,
+  };
+}
+
 export function readOutcomeMetadata(input: {
   cfg: OpenBotConfig;
   agentId: string;
@@ -252,50 +302,13 @@ export function readOutcomeMetadata(input: {
     if (fs.readFileSync(tipPath, "utf8") !== tipText) {
       return { ok: false, code: "tip_changed" };
     }
-    return {
-      ok: true,
-      outcome: {
-        cohortDimensions: readOutcomeCohort(snap),
-        taskId: snap.taskId,
-        outcomeVersion: snap.outcomeVersion,
-        taskJudgement: snap.taskJudgement,
-        lifecycle: snap.lifecycle,
-        decidedAt: snap.decidedAt,
-        scope:
-          snap.scope.kind === "enterprise"
-            ? {
-                kind: snap.scope.kind,
-                subjectRef: snap.scope.subjectRef,
-                authzScopeRef: snap.scope.authzScopeRef,
-                tenantId: snap.scope.tenantId,
-                enterpriseDomainId: snap.scope.enterpriseDomainId,
-              }
-            : {
-                kind: snap.scope.kind,
-                subjectRef: snap.scope.subjectRef,
-                authzScopeRef: snap.scope.authzScopeRef,
-                personalDomainId: snap.scope.personalDomainId,
-              },
-        acceptance: { status: snap.acceptance.status },
-        delivery: { status: snap.delivery.status },
-        decisiveRunId: snap.decisiveRunId,
-        decisiveAttemptId: snap.decisiveAttemptId,
-        deliveryId: snap.deliveryId,
-        runs: snap.runs.map((r) => ({
-          runId: r.runId,
-          attemptIds: [...r.attemptIds],
-          effectiveAttemptId: r.effectiveAttemptId,
-          status: r.status,
-        })),
-        attempts: snap.attempts.map((a) => ({
-          attemptId: a.attemptId,
-          runId: a.runId,
-          status: a.status,
-          observedAt: a.observedAt,
-        })),
-        isCurrentTip: tip.outcomeVersion === snap.outcomeVersion,
-      },
-    };
+    const outcome = projectOutcomeRecordMetadata(snap, {
+      isCurrentTip: tip.outcomeVersion === snap.outcomeVersion,
+    });
+    if (!outcome) {
+      return { ok: false, code: "invalid_record" };
+    }
+    return { ok: true, outcome };
   } catch {
     return { ok: false, code: "read_failed" };
   }

@@ -59,6 +59,12 @@ export type AsyncWaitRecoveryState = {
   /** Original visible payloads + version for delivery-only resend (never a placeholder). */
   boundPayloads?: AsyncWaitBoundPayload[];
   boundDeliverableVersion?: string;
+  /** Canonical workspace identity from the original run, copied onto delivery-only retries. */
+  boundWorkspace?: {
+    resourceId: string;
+    bindingId: string;
+    contentVersion: string;
+  };
   lastAttemptAtMs?: number;
   deliveredAtMs?: number;
 };

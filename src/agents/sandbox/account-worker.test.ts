@@ -1,3 +1,7 @@
+import { vi } from "vitest";
+vi.mock("../../gateway/workspace-resolver/execution-workspace.js", () => ({
+  resolveExecutionWorkspace: vi.fn(async () => null),
+}));
 /**
  * Account Computer v4.1 §10–§11 single-account worker prototype.
  *
@@ -13,6 +17,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { OpenBotConfig } from "../../config/types.js";
 import { AccountRuntimeSnapshotStore } from "../../gateway/governance/account-runtime-snapshot.js";
 import type { IssueAccountRuntimeSnapshotInput } from "../../gateway/governance/account-runtime-snapshot.js";
+import { resolveExecutionWorkspace } from "../../gateway/workspace-resolver/execution-workspace.js";
 import {
   readAccountComputerPreview,
   resetAccountComputerSlotsForTests,
@@ -146,9 +151,10 @@ describe("account worker prototype", () => {
 
   async function issuedWorker(params?: { onPhase?: (phase: AccountWorkerPhase) => void }) {
     enableManaged(true);
+    let leaseSequence = 0;
     const store = new AccountRuntimeSnapshotStore(
       path.join(root, "snapshots.json"),
-      () => "lease-1",
+      () => `lease-${++leaseSequence}`,
     );
     const issued = await store.issue(baseInput());
     const driver = createMemoryAccountSandboxDriver();
@@ -210,6 +216,83 @@ describe("account worker prototype", () => {
         },
       ),
     ).toBe(false);
+  });
+
+  it("mounts a server-resolved canonical root and remounts exec without restarting browser", async () => {
+    const { worker, driver, issued } = await issuedWorker();
+    const firstRoot = path.join(root, "canonical-one");
+    const secondRoot = path.join(root, "canonical-two");
+    await fsp.mkdir(firstRoot);
+    await fsp.mkdir(secondRoot);
+    const resolved = vi.mocked(resolveExecutionWorkspace);
+    resolved.mockResolvedValue({ rootPath: firstRoot } as Awaited<
+      ReturnType<typeof resolveExecutionWorkspace>
+    >);
+    const request = requestOf(issued.lease.runtimeLeaseId, issued.snapshot.snapshotVersion);
+    await worker.start(request);
+    expect(
+      driver.execStarts[0]?.execMounts.find((m) => m.containerPath === "/account/workspace")
+        ?.hostPath,
+    ).toBe(firstRoot);
+    const browser = await worker.browse();
+    resolved.mockResolvedValue({ rootPath: secondRoot } as Awaited<
+      ReturnType<typeof resolveExecutionWorkspace>
+    >);
+    await worker.attachIncoming(request);
+    expect(
+      driver.execStarts[1]?.execMounts.find((m) => m.containerPath === "/account/workspace")
+        ?.hostPath,
+    ).toBe(secondRoot);
+    expect(driver.stoppedExec).toContain("aw-exec-lease-1");
+    expect((await worker.browse()).pid).toBe(browser.pid);
+    resolved.mockResolvedValue(null);
+  });
+
+  it("uses only the server snapshot group scope and rejects unavailable group binding", async () => {
+    const { worker, driver, store, issued } = await issuedWorker();
+    const resolved = vi.mocked(resolveExecutionWorkspace);
+    const personal = path.join(root, "personal");
+    const group = path.join(root, "group");
+    await fsp.mkdir(personal);
+    await fsp.mkdir(group);
+    resolved.mockResolvedValue({ rootPath: personal } as Awaited<
+      ReturnType<typeof resolveExecutionWorkspace>
+    >);
+    await worker.start(requestOf(issued.lease.runtimeLeaseId, issued.snapshot.snapshotVersion));
+    const browser = await worker.browse();
+    const grouped = await store.issue({
+      ...baseInput(),
+      executionId: "exec-group",
+      collaborationGroupId: "trusted-group",
+    });
+    resolved.mockResolvedValue({ rootPath: group } as Awaited<
+      ReturnType<typeof resolveExecutionWorkspace>
+    >);
+    await expect(
+      worker.attachIncoming({
+        ...requestOf(grouped.lease.runtimeLeaseId, grouped.snapshot.snapshotVersion),
+        collaborationGroupId: "forged-group",
+      }),
+    ).rejects.toThrow("cannot pass collaborationGroupId");
+    await worker.attachIncoming(
+      requestOf(grouped.lease.runtimeLeaseId, grouped.snapshot.snapshotVersion),
+    );
+    expect(resolved).toHaveBeenLastCalledWith(
+      expect.objectContaining({ groupId: "trusted-group" }),
+    );
+    expect(
+      driver.execStarts[1]?.execMounts.find((m) => m.containerPath === "/account/workspace")
+        ?.hostPath,
+    ).toBe(group);
+    expect((await worker.browse()).pid).toBe(browser.pid);
+    resolved.mockRejectedValueOnce(new Error("workspace_binding_required:binding_unplaced"));
+    await expect(
+      worker.attachIncoming(
+        requestOf(grouped.lease.runtimeLeaseId, grouped.snapshot.snapshotVersion),
+      ),
+    ).rejects.toThrow("binding_unplaced");
+    expect(driver.execStarts).toHaveLength(2);
+    resolved.mockResolvedValue(null);
   });
 
   it("starts and stops through the lifecycle without attaching a gateway", async () => {

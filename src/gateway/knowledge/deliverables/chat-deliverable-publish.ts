@@ -1,8 +1,17 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { loadConfig } from "../../../config/config.js";
 import { resolveStateDir } from "../../../config/paths.js";
 import { extractDeliverableEnvelope } from "../../../shared/preview-artifact/deliverable-envelope.js";
+import { resolveLegacyAgentId } from "../../agent-registry/legacy-resolver.js";
+import { findPrimaryOwnerBinding } from "../../agent-registry/ownership.js";
+import { resolveAgentRegistryStorePath } from "../../agent-registry/store.js";
+import type { AgentRegistryStore } from "../../agent-registry/types.js";
+import { loadValidatedCatalogRecordSync } from "../../data-governance/catalog-store.js";
+import { resolveDataGovernanceCatalogPath } from "../../data-governance/paths.js";
+import { resolveSecurityProfile } from "../../security-profile.js";
+import { selectExecutionWorkspace } from "../../workspace-resolver/execution-workspace.js";
 import {
   markDeliverableDeclarationUnwritten,
   patchDeliverableDeclarationAttrs,
@@ -570,23 +579,69 @@ export function prepareChatDeliverablePublish(
   const injected = "agentWorkspaceRoot" in params || "groupWorkspaceRoot" in params;
 
   try {
-    const resolved = injected
-      ? {
-          agentWorkspaceRoot: params.agentWorkspaceRoot ?? null,
-          groupWorkspaceRoot: params.groupWorkspaceRoot ?? null,
-          siblingAgentWorkspaceRoots: params.siblingAgentWorkspaceRoots ?? [],
-        }
-      : resolveCollaborationDeliverableRoots({
-          agentId: params.agentId,
-          groupId,
-          tenantId,
-          userId: params.userId,
-          sessionKey,
-          stateDir,
-          env: params.env,
-        });
-    const agentRoot = resolved.agentWorkspaceRoot;
-    const groupRoot = resolved.groupWorkspaceRoot;
+    const managed =
+      resolveSecurityProfile(loadConfig(), params.env ?? process.env).profile ===
+      "managed_enterprise";
+    const resolved =
+      injected || managed
+        ? {
+            agentWorkspaceRoot: params.agentWorkspaceRoot ?? null,
+            groupWorkspaceRoot: params.groupWorkspaceRoot ?? null,
+            siblingAgentWorkspaceRoots: params.siblingAgentWorkspaceRoots ?? [],
+          }
+        : resolveCollaborationDeliverableRoots({
+            agentId: params.agentId,
+            groupId,
+            tenantId,
+            userId: params.userId,
+            sessionKey,
+            stateDir,
+            env: params.env,
+          });
+    let agentRoot = resolved.agentWorkspaceRoot;
+    let groupRoot = resolved.groupWorkspaceRoot;
+    if (managed && !injected) {
+      if (!tenantId || !params.userId) {
+        throw new Error("workspace_binding_required:trusted_identity_missing");
+      }
+      const registry = JSON.parse(
+        fs.readFileSync(resolveAgentRegistryStorePath(), "utf8"),
+      ) as AgentRegistryStore;
+      const identity = resolveLegacyAgentId({
+        store: registry,
+        enterpriseId: tenantId,
+        legacyAgentId: params.agentId,
+      });
+      const owner =
+        identity.kind === "resolved" ? findPrimaryOwnerBinding(registry, identity.ref) : undefined;
+      const rid = groupId
+        ? `ws:${tenantId}:group:${groupId}`
+        : identity.kind === "builtin-universal"
+          ? `ws:${tenantId}:user:${params.userId}:steward`
+          : identity.kind === "resolved" && owner
+            ? owner.ownerType === "seat"
+              ? `ws:${tenantId}:seat:${owner.ownerId}:asset:${identity.ref.agentAssetId}`
+              : `ws:${tenantId}:user:${params.userId}:asset:${identity.ref.agentAssetId}`
+            : "";
+      const record = loadValidatedCatalogRecordSync({
+        storePath: resolveDataGovernanceCatalogPath(stateDir),
+        resourceId: rid,
+      });
+      const canonical = selectExecutionWorkspace({
+        tenantId,
+        userId: params.userId,
+        agentId: params.agentId,
+        groupId: groupId ?? undefined,
+        registry,
+        records: record ? [record.record] : [],
+        operation: "write",
+      });
+      agentRoot = groupId ? null : canonical.rootPath;
+      groupRoot = groupId ? canonical.rootPath : null;
+      resolved.agentWorkspaceRoot = agentRoot;
+      resolved.groupWorkspaceRoot = groupRoot;
+      resolved.siblingAgentWorkspaceRoots = [];
+    }
     const ledger = readLedger(stateDir, sessionKey);
     const authoritativeRoot = groupScoped ? groupRoot : agentRoot;
     if (authoritativeRoot) {
@@ -712,6 +767,7 @@ export function prepareChatDeliverablePublish(
           ownerId: params.userId,
           messageId: params.clientRunId,
           content: settled.text,
+          canonicalWorkspaceRoot: authoritativeRoot,
           stateDir,
         });
         if (captured?.deliverableId) {

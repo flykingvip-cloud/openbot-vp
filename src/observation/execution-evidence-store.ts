@@ -359,6 +359,67 @@ export function createExecutionEvidenceStore(
         ],
       };
     },
+    queryAll() {
+      let visible = false;
+      try {
+        visible = active();
+        if (visible) {
+          sweep();
+        }
+      } catch {
+        if (enabledState) {
+          reset();
+          enabledState = false;
+        }
+        visible = false;
+      }
+      const scopedFacts = visible
+        ? [...facts.values()].map((i) => ({
+            ...i.fact,
+            source: i.fact.source ? { ...i.fact.source } : undefined,
+            scope: copyScope(i.fact.scope),
+          }))
+        : [];
+      const scopedLinks = visible
+        ? [...receipts.values()]
+            .filter((r) => r.eventIds.every((id) => facts.has(id) && !conflicts.has(id)))
+            .map((r) => ({ ...r, scope: copyScope(r.scope), eventIds: [...r.eventIds] }))
+        : [];
+      return {
+        scopeWatermark: {
+          state: "unknown" as const,
+          trackingEpoch: null,
+          trackingStartedAt: null,
+          priorHistory: "unknown" as const,
+          ingestSequence: null,
+          expiredCount: null,
+          capacityEvictedCount: null,
+          retainedFromSequence: null,
+          retainedToSequence: null,
+          retainedFromOccurredAt: scopedFacts.length
+            ? Math.min(...scopedFacts.map((f) => f.occurredAt))
+            : null,
+          retainedToOccurredAt: scopedFacts.length
+            ? Math.max(...scopedFacts.map((f) => f.occurredAt))
+            : null,
+        },
+        processId,
+        epoch,
+        retention: "process_memory" as const,
+        capacity,
+        ttlMs,
+        evictedCount: null,
+        discardedThrough: null,
+        facts: scopedFacts,
+        links: scopedLinks,
+        sourceWatermark: null,
+        reasons: [
+          "non_durable_projection",
+          ...(visible ? [] : ["observation_disabled_or_scope_invalid"]),
+          "retention_continuity_unknown",
+        ],
+      };
+    },
   };
 }
 

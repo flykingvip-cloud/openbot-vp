@@ -117,6 +117,7 @@ import {
   readUserProfileOrDefault,
   resolveUserProfileInstructions,
 } from "../../gateway/user-modeling/user-profile-store.js";
+import { resolveExecutionWorkspace } from "../../gateway/workspace-resolver/execution-workspace.js";
 import { logVerbose } from "../../globals.js";
 import { observeObjectiveShadowFromIngress } from "../../objective-shadow/ingress-hook.js";
 import { readConversationTaskCandidates } from "../../objective-shadow/read-existing-objectives.js";
@@ -519,16 +520,31 @@ export async function runPreparedReply(
     chatType: sessionCtx.ChatType,
     collaborationAssembly: useCollaborationAssembly,
   });
-  const runWorkspaceDir = resolveCollaborationRunWorkspaceDir({
+  const boundRunWorkspace = await resolveExecutionWorkspace({
     cfg,
-    agentWorkspaceDir: workspaceDir,
-    groupId: collaborationGroupId,
-    sessionEntry,
-    tenantId:
-      sessionCtx.CollaborationTenantId?.trim() ||
-      sessionCtx.GatewayClientSessionEnterpriseId?.trim() ||
-      undefined,
+    agentId,
+    client: buildKnowledgeReplyGatewayClient({
+      gatewayClientUser: sessionCtx.GatewayClientUser,
+      gatewayClientSessionDomain: sessionCtx.GatewayClientSessionDomain,
+      gatewayClientPlatformUserId: sessionCtx.GatewayClientPlatformUserId,
+      gatewayClientSessionEnterpriseId: sessionCtx.GatewayClientSessionEnterpriseId,
+      gatewayClientSessionMembershipId: sessionCtx.GatewayClientSessionMembershipId,
+    }),
+    groupId: collaborationGroupId ?? undefined,
+    operation: "write",
   });
+  const runWorkspaceDir =
+    boundRunWorkspace?.rootPath ??
+    resolveCollaborationRunWorkspaceDir({
+      cfg,
+      agentWorkspaceDir: workspaceDir,
+      groupId: collaborationGroupId,
+      sessionEntry,
+      tenantId:
+        sessionCtx.CollaborationTenantId?.trim() ||
+        sessionCtx.GatewayClientSessionEnterpriseId?.trim() ||
+        undefined,
+    });
   const inboundMessage = (sessionCtx.BodyStripped ?? sessionCtx.Body ?? "").trim();
   let taskSurfaceNote: string | undefined;
   if (!isHeartbeat && inboundMessage) {
@@ -1954,6 +1970,23 @@ export async function runPreparedReply(
         ? { privateRunBag: sessionCtx.CollaborationPrivateRunBag }
         : {}),
       workspaceDir: runWorkspaceDir,
+      ...(boundRunWorkspace
+        ? {
+            executionWorkspaceBinding: {
+              resourceId: boundRunWorkspace.resourceId,
+              bindingId: boundRunWorkspace.bindingId,
+              contentVersion: boundRunWorkspace.contentVersion,
+              ...(boundRunWorkspace.tenantId ? { tenantId: boundRunWorkspace.tenantId } : {}),
+              ...(boundRunWorkspace.owner ? { owner: boundRunWorkspace.owner } : {}),
+              ...(boundRunWorkspace.lifecycleState
+                ? { lifecycleState: boundRunWorkspace.lifecycleState }
+                : {}),
+              ...(boundRunWorkspace.bindingState
+                ? { bindingState: boundRunWorkspace.bindingState }
+                : {}),
+            },
+          }
+        : {}),
       config: cfg,
       skillsSnapshot,
       provider,

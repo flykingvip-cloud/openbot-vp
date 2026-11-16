@@ -22,6 +22,7 @@ import {
   loadCanonicalWriteOwnership,
   resolveCanonicalRobotWriteRoot,
 } from "../workspace-resolver/canonical-write-root.js";
+import { resolveExecutionWorkspace } from "../workspace-resolver/execution-workspace.js";
 import { alignFormalRootForManagedAddressing } from "../workspace-resolver/formal-deliverable-root.js";
 import { resolveWorkspaceWriteLocator } from "../workspace-resolver/workspace-write-contract.js";
 import { resolveRobotWriteRoot } from "../workspace-resolver/write-roots.js";
@@ -135,6 +136,25 @@ async function authorizeStewardWorkspaceFile(params: {
     typeof params.record.sessionKey === "string" ? params.record.sessionKey.trim() : "";
   const cfg = loadConfig();
   const stateDir = resolveStateDir(process.env);
+  let boundWorkspace: Awaited<ReturnType<typeof resolveExecutionWorkspace>>;
+  try {
+    boundWorkspace = await resolveExecutionWorkspace({
+      cfg,
+      agentId: sessionKey ? resolveSessionAgentId({ sessionKey, config: cfg }) : "main",
+      client: params.client,
+      operation: params.operation === "write" ? "write" : "read",
+    });
+  } catch (error) {
+    params.respond(
+      false,
+      undefined,
+      errorShape(
+        ErrorCodes.UNAVAILABLE,
+        error instanceof Error ? error.message : "workspace_binding_required",
+      ),
+    );
+    return { ok: false };
+  }
 
   let agentId = "main";
   let locator: string;
@@ -256,14 +276,16 @@ async function authorizeStewardWorkspaceFile(params: {
       }
     }
     try {
-      locator = resolvePreviewFilesystemLocator({
-        trustedLocator,
-        runtimeWorkspaces,
-        configuredWorkspace: null,
-        configuredDefaultWorkspace: cfg.agents?.defaults?.workspace,
-        agentId,
-        stateDir,
-      });
+      locator =
+        boundWorkspace?.rootPath ??
+        resolvePreviewFilesystemLocator({
+          trustedLocator,
+          runtimeWorkspaces,
+          configuredWorkspace: null,
+          configuredDefaultWorkspace: cfg.agents?.defaults?.workspace,
+          agentId,
+          stateDir,
+        });
     } catch {
       params.respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, PREVIEW_FILE_NOT_SYNCED));
       return { ok: false };
@@ -282,6 +304,9 @@ async function authorizeStewardWorkspaceFile(params: {
       return { ok: false };
     }
     locator = alignFormalRootForManagedAddressing(robotOwn, { config: cfg });
+  }
+  if (boundWorkspace) {
+    locator = boundWorkspace.rootPath;
   }
   if (params.operation === "write") {
     const decision = resolveWorkspaceWriteLocator({

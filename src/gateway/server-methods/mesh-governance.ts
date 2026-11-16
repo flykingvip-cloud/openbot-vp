@@ -10,6 +10,11 @@ import path from "node:path";
 // - mesh.ownership.transfer: 手动转移归属（admin scope）
 import { loadConfig } from "../../config/config.js";
 import { CONFIG_DIR } from "../../utils.js";
+import { controlCanonicalWorkspaceMigration } from "../access-control/canonical-workspace-migration-control.js";
+import {
+  confirmFollowupWorkspaceAccess,
+  listFollowupWorkspaceWaits,
+} from "../access-control/confirm-followup-workspace-access.js";
 import { listGatewayCollaborationSpaces } from "../collaboration-learning.js";
 import {
   findActiveOwnershipRecord,
@@ -459,7 +464,69 @@ export const meshGovernanceHandlers: GatewayRequestHandlers = {
    * 实际的目标对象状态变更由 UI 层调用对应的 agent/group RPC 完成。
    * 此端点仅记录"治理动作已被执行"事实。
    */
-  "mesh.governance.executeAction": ({ params, respond }) => {
+  "mesh.governance.executeAction": async ({ params, respond, client }) => {
+    const request = params;
+    if (
+      request?.actionType === "prepare_canonical_workspace_migration" ||
+      request?.actionType === "confirm_canonical_workspace_migration"
+    ) {
+      try {
+        const confirm = request.actionType === "confirm_canonical_workspace_migration";
+        if (confirm && request.confirm !== true) {
+          throw new Error("explicit migration confirmation required");
+        }
+        const result = await controlCanonicalWorkspaceMigration(client, {
+          action: confirm ? "confirm" : "prepare",
+          resourceId: typeof request.targetId === "string" ? request.targetId : undefined,
+          planId: typeof request.planId === "string" ? request.planId : undefined,
+        });
+        respond(true, result);
+      } catch (error) {
+        respond(
+          false,
+          undefined,
+          errorShape(
+            ErrorCodes.INVALID_REQUEST,
+            error instanceof Error ? error.message : "migration failed",
+          ),
+        );
+      }
+      return;
+    }
+    if (request?.actionType === "list_followup_workspace_waits") {
+      try {
+        respond(true, { records: await listFollowupWorkspaceWaits(client) });
+      } catch (error) {
+        respond(
+          false,
+          undefined,
+          errorShape(
+            ErrorCodes.INVALID_REQUEST,
+            error instanceof Error ? error.message : "wait list failed",
+          ),
+        );
+      }
+      return;
+    }
+    if (request?.actionType === "reauthorize_followup_delivery") {
+      try {
+        if (request.confirm !== true || typeof request.targetId !== "string") {
+          throw new Error("explicit followup confirmation required");
+        }
+        const result = await confirmFollowupWorkspaceAccess(client, request.targetId);
+        respond(true, result);
+      } catch (error) {
+        respond(
+          false,
+          undefined,
+          errorShape(
+            ErrorCodes.INVALID_REQUEST,
+            error instanceof Error ? error.message : "followup reauthorization failed",
+          ),
+        );
+      }
+      return;
+    }
     const p = params as {
       issueId?: string;
       actionType?: string;

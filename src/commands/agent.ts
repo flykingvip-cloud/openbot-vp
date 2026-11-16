@@ -71,6 +71,7 @@ import {
   resolveSessionStorePathForInboundMessage,
 } from "../gateway/tenant-context.js";
 import { resolveWorkspaceLocator } from "../gateway/workspace-resolver/strict-locator.js";
+import { resolveExecutionWorkspace } from "../gateway/workspace-resolver/execution-workspace.js";
 import {
   clearAgentRunContext,
   emitAgentEvent,
@@ -266,6 +267,9 @@ async function prepareAgentCommandExecution(
   const gatewayClient = buildKnowledgeReplyGatewayClient({
     gatewayClientUser: opts.gatewayClientUser,
     gatewayClientSessionDomain: opts.gatewayClientSessionDomain,
+    gatewayClientPlatformUserId: opts.gatewayClientPlatformUserId,
+    gatewayClientSessionEnterpriseId: opts.gatewayClientSessionEnterpriseId,
+    gatewayClientSessionMembershipId: opts.gatewayClientSessionMembershipId,
   });
   // Internal callers may pin workspace inheritance. Managed BYOK prefers tenant-scoped workspace/agentDir.
   let workspaceDirRaw = normalizedSpawned.workspaceDir;
@@ -282,6 +286,8 @@ async function prepareAgentCommandExecution(
   if (!workspaceDirRaw) {
     workspaceDirRaw = resolveAgentWorkspaceDir(cfg, sessionAgentId);
   }
+  const boundWorkspace = await resolveExecutionWorkspace({ cfg, agentId: sessionAgentId, client: gatewayClient, groupId: opts.executionIdentity?.collaborationGroupId, operation: "write" });
+  if (boundWorkspace) {workspaceDirRaw = boundWorkspace.rootPath;}
   await import("../memory/item7-w2-dark-dual-read-shadow.js").then(
     ({ runItem7W2DarkDualReadShadowIfEnabled }) =>
       runItem7W2DarkDualReadShadowIfEnabled({

@@ -13,6 +13,7 @@ import { renderOfficePreviewHtml } from "../office-render.js";
 import { ErrorCodes, errorShape } from "../protocol/index.js";
 import { resolveSecurityProfile } from "../security-profile.js";
 import { resolveTenantContext } from "../tenant-context.js";
+import { resolveExecutionWorkspace } from "../workspace-resolver/execution-workspace.js";
 import {
   getGatewayWorkspaceCutoverStore,
   InMemoryWorkspaceResourceCatalog,
@@ -126,6 +127,7 @@ async function resolveGroupAccessContext(params: {
   respond: GatewayRequestHandlerOptions["respond"];
   groupId: string;
   userId: string;
+  operation: WorkspaceResolveOperation;
 }): Promise<
   | {
       ok: true;
@@ -167,12 +169,21 @@ async function resolveGroupAccessContext(params: {
 
   let locator: string;
   try {
-    locator = resolveTrustedGroupLocator({
-      groupId: params.groupId,
-      tenantId,
-      profile: profile.profile,
+    const bound = await resolveExecutionWorkspace({
       cfg,
+      client: params.client,
+      agentId: "",
+      groupId: params.groupId,
+      operation: params.operation === "write" ? "write" : "read",
     });
+    locator =
+      bound?.rootPath ??
+      resolveTrustedGroupLocator({
+        groupId: params.groupId,
+        tenantId,
+        profile: profile.profile,
+        cfg,
+      });
   } catch (error) {
     params.respond(
       false,
@@ -225,6 +236,7 @@ async function handleGroupFileOpen(params: {
     respond: params.respond,
     groupId,
     userId: context.userId,
+    operation: params.operation,
   });
   if (!access.ok) {
     return;
@@ -408,6 +420,7 @@ export const groupWorkspaceFileHandlers: GatewayRequestHandlers = {
       respond,
       groupId,
       userId: context.userId,
+      operation: "write",
     });
     if (!access.ok) {
       return;
@@ -482,6 +495,7 @@ export const groupWorkspaceFileHandlers: GatewayRequestHandlers = {
       respond,
       groupId,
       userId: context.userId,
+      operation: "write",
     });
     if (!access.ok) {
       return;
@@ -598,6 +612,7 @@ export const groupWorkspaceFileHandlers: GatewayRequestHandlers = {
       respond,
       groupId,
       userId: context.userId,
+      operation: "list",
     });
     if (!access.ok) {
       return;
@@ -663,6 +678,7 @@ export const groupWorkspaceFileHandlers: GatewayRequestHandlers = {
       respond,
       groupId,
       userId: context.userId,
+      operation: "read",
     });
     if (!access.ok) {
       return;

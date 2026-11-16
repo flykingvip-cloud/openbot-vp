@@ -760,7 +760,7 @@ export class AccountWorkerLifecycle {
       return false;
     }
     return (
-      workspaceDir.endsWith(path.join("OpenBot", "agents", agentId, "workspace")) &&
+      path.isAbsolute(workspaceDir) &&
       artifactsDir.endsWith(path.join("OpenBot", "agents", agentId, "artifacts")) &&
       memoryDir.endsWith(path.join("OpenBot", "memory")) &&
       browserProfileDir.endsWith(path.join("state", "browser"))
