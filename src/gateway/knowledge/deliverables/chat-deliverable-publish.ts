@@ -10,7 +10,6 @@ import {
   settleCollaborationDeclaredDeliverable,
   type DeclaredDeliverableSettlement,
 } from "../../workspace-resolver/settle-declared-deliverable.js";
-import { maybeAutoCaptureAgentDeliverable } from "./maybe-auto-capture-agent-deliverable.js";
 
 /**
  * Shared delivery preparation for chat finals (batch 1).
@@ -166,7 +165,7 @@ export type PrepareChatDeliverablePublishParams = {
   siblingAgentWorkspaceRoots?: string[] | null;
   /** True when the turn is group-scoped even if the formal root is missing. */
   groupScoped?: boolean;
-  /** Tests skip knowledge-center capture. Production captures only after a persisted pass. */
+  /** @deprecated Delivery never auto-captures knowledge; explicit save owns that action. */
   skipCapture?: boolean;
   settleImpl?: typeof settleCollaborationDeclaredDeliverable;
 };
@@ -698,32 +697,8 @@ export function prepareChatDeliverablePublish(
     } else if (persisted) {
       record.persisted = true;
     }
-    if (
-      persisted &&
-      canRegister &&
-      record.registration === "registered" &&
-      !params.skipCapture &&
-      !prior
-    ) {
-      try {
-        const captured = maybeAutoCaptureAgentDeliverable({
-          sessionKey,
-          agentId: params.agentId,
-          ownerId: params.userId,
-          messageId: params.clientRunId,
-          content: settled.text,
-          stateDir,
-        });
-        if (captured?.deliverableId) {
-          record.logicalId = record.logicalId ?? captured.deliverableId;
-          ledger.records[idempotencyKey] = record;
-          writeLedger(stateDir, sessionKey, ledger);
-        }
-      } catch {
-        // Capture is not the publish authority. A capture miss must not erase
-        // a persisted version, and it must not block the chat body.
-      }
-    }
+    // Delivery registration is not user consent to save a knowledge copy.
+    // The explicit save-and-archive path owns capture and its independent ACL.
     const stored = ledger.records[idempotencyKey] ?? record;
     const view =
       canRegister && stored.registration === "registered"
