@@ -8,9 +8,12 @@
  * complex-task-loop.ts may append a visible four-step report only when
  * dispatch is on, the tenant is allowlisted, and the utterance kind is
  * stepped. That path defaults closed and does not invoke tools.
- * `considerReadonlyInvoke` is a separate default-off path (`OPENBOT_ORCH_READONLY_INVOKE`)
- * for memory, skill snapshot read, and web_read only. It does not flip
- * `ORCHESTRATION_LIVE_INVOKE` and chat.send does not call it.
+ * `considerReadonlyInvoke` is a separate path (`OPENBOT_ORCH_READONLY_INVOKE`)
+ * for memory, skill snapshot read, and web_read only. That env flag is on
+ * by default when unset or empty; set it to 0/false/no/off to disable.
+ * This default is independent of the four orchestration flags above, which
+ * stay default-off. It does not flip `ORCHESTRATION_LIVE_INVOKE` and
+ * chat.send does not call it.
  *
  * Existing tool symbols: web_read, browser, node_fs_read, and node_exec
  * are bound by name only (P4.5d/e/f grayscale, no execute). sessions_spawn
