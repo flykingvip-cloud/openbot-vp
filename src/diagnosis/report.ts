@@ -6,6 +6,7 @@
  */
 import { createHash } from "node:crypto";
 import { type AggregatedCase, type CompositeDiagnosis, type EvidenceRef } from "./cross-target.js";
+import type { DiagnoseObservationSummary } from "./diagnose-observation-summary.js";
 import {
   acceptedRootCauseRelations,
   assertGraphRelation,
