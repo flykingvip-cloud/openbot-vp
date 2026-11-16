@@ -1,4 +1,6 @@
+import fs from "node:fs";
 import os from "node:os";
+import path from "node:path";
 import { resolveSessionAgentId } from "../../../agents/agent-scope.js";
 import { isEmployeeBuiltinStewardSession } from "../../../agents/builtin-steward/employee-isolation.js";
 import { loadConfig } from "../../../config/config.js";
@@ -21,6 +23,8 @@ import {
 import { resolveDraftRelativePath, resolveLogicalId } from "./group-manifest.js";
 
 export type MaybeAutoCaptureAgentDeliverableParams = {
+  /** Server-verified canonical root. Never supplied by model or RPC payload. */
+  canonicalWorkspaceRoot?: string | null;
   agentId?: string | null;
   sessionKey?: string | null;
   messageId?: string | null;
@@ -75,12 +79,14 @@ function acceptDeclaredDeliverableFile(params: {
   sessionKey?: string | null;
   stateDir?: string;
 }): string | undefined {
-  const placed = resolvePlacedFilesystemWriteRoot({
-    agentId: params.agentId,
-    userId: params.userId,
-    sessionKey: params.sessionKey,
-    stateDir: params.stateDir,
-  });
+  const placed = isManagedDataMode(loadConfig())
+    ? null
+    : resolvePlacedFilesystemWriteRoot({
+        agentId: params.agentId,
+        userId: params.userId,
+        sessionKey: params.sessionKey,
+        stateDir: params.stateDir,
+      });
   // No placed root yet: still reject illegal shapes, but do not treat the
   // install checkout as the workspace (that would refuse a legal bare name).
   const decision = resolveWorkspaceWriteLocator({
@@ -256,16 +262,44 @@ export function maybeAutoCaptureAgentDeliverable(
       } catch {
         captureCfg = null;
       }
-      const placed = materializeDeclaredDeliverableAtPlacedRoot({
-        agentId,
-        userId: params.ownerId,
-        sessionKey,
-        stateDir: params.stateDir,
-        relativePath: acceptedFile,
-        content: envelope.body,
-        cfg: captureCfg,
-      });
-      fileReadable = placed.ok;
+      if (!captureCfg || isManagedDataMode(captureCfg)) {
+        // Auto-capture is metadata-only on managed turns. Never re-create
+        // an envelope summary in a guessed operators root after execution.
+        const root = params.canonicalWorkspaceRoot;
+        if (root) {
+          const located = resolveWorkspaceWriteLocator({
+            workspaceRoot: root,
+            requestedPath: acceptedFile,
+          });
+          if (located.ok) {
+            const absolute = path.resolve(root, located.relativePath);
+            try {
+              const realRoot = fs.realpathSync(root),
+                real = fs.realpathSync(absolute);
+              const rel = path.relative(realRoot, real);
+              fileReadable =
+                !!rel &&
+                !rel.startsWith("..") &&
+                !path.isAbsolute(rel) &&
+                fs.statSync(real).isFile() &&
+                fs.statSync(real).size > 0;
+            } catch {
+              fileReadable = false;
+            }
+          }
+        }
+      } else {
+        const placed = materializeDeclaredDeliverableAtPlacedRoot({
+          agentId,
+          userId: params.ownerId,
+          sessionKey,
+          stateDir: params.stateDir,
+          relativePath: acceptedFile,
+          content: envelope.body,
+          cfg: captureCfg,
+        });
+        fileReadable = placed.ok;
+      }
     }
     const declaredArtifact = acceptedFile
       ? fileReadable

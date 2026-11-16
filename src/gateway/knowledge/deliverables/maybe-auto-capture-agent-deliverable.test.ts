@@ -3,6 +3,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const cfgState = vi.hoisted(() => ({ managed: false }));
+vi.mock("../../../config/config.js", () => ({
+  loadConfig: () => ({ data: { mode: cfgState.managed ? "managed" : "local" } }),
+}));
 const { tmpDir } = vi.hoisted(() => ({
   tmpDir: `/tmp/openbot-maybe-auto-capture-${Math.random().toString(36).slice(2)}`,
 }));
@@ -29,15 +33,47 @@ function cleanStore() {
 
 describe("maybeAutoCaptureAgentDeliverable", () => {
   beforeEach(() => {
+    cfgState.managed = false;
     cleanStore();
     delete process.env.OPENBOT_DELIVERABLE_AUTO_CAPTURE;
     delete process.env.OPENBOT_DELIVERABLE_AUTO_CAPTURE_HEURISTIC;
   });
 
   afterEach(() => {
+    cfgState.managed = false;
     cleanStore();
     delete process.env.OPENBOT_DELIVERABLE_AUTO_CAPTURE;
     delete process.env.OPENBOT_DELIVERABLE_AUTO_CAPTURE_HEURISTIC;
+  });
+
+  it("managed capture only reads existing canonical bytes and never creates operators files", () => {
+    cfgState.managed = true;
+    const stateDir = path.join(tmpDir, "canonical-test-state");
+    fs.rmSync(stateDir, { recursive: true, force: true });
+    const canonical = path.join(stateDir, "tenant", "workspaces", "hash", "plan");
+    fs.mkdirSync(canonical, { recursive: true });
+    fs.writeFileSync(path.join(canonical, "actual.md"), "REAL BODY");
+    const capture = (file: string, messageId: string) =>
+      maybeAutoCaptureAgentDeliverable({
+        agentId: "robot",
+        ownerId: "user",
+        stateDir,
+        sessionKey: "agent:robot:main",
+        messageId,
+        canonicalWorkspaceRoot: canonical,
+        content: `<<DELIVERABLE title="Result" file="${file}">>SUMMARY MUST NOT REPLACE BYTES<</DELIVERABLE>>`,
+      });
+    capture("actual.md", "existing");
+    expect(fs.readFileSync(path.join(canonical, "actual.md"), "utf8")).toBe("REAL BODY");
+    capture("missing.md", "missing");
+    expect(fs.existsSync(path.join(canonical, "missing.md"))).toBe(false);
+    const outside = path.join(stateDir, "outside.md");
+    fs.writeFileSync(outside, "PRIVATE");
+    fs.symlinkSync(outside, path.join(canonical, "escape.md"));
+    capture("escape.md", "escape");
+    expect(fs.readFileSync(outside, "utf8")).toBe("PRIVATE");
+    expect(fs.existsSync(path.join(stateDir, "operators"))).toBe(false);
+    fs.rmSync(stateDir, { recursive: true, force: true });
   });
 
   it("captures explicit deliverable envelopes after chat completion", async () => {

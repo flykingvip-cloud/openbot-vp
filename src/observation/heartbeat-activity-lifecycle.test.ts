@@ -44,4 +44,14 @@ describe("heartbeat activity gateway lifecycle composition", () => {
     expect(activity.query().events).toEqual([]);
     expect(() => stop?.stop()).not.toThrow();
   });
+  it("enables collection on a real gateway when the env flag is unset", () => {
+    vi.stubEnv("OPENBOT_HEARTBEAT_ACTIVITY_OBSERVATION", "");
+    const enabled = createHeartbeatActivityLifecycle({
+      minimalTestGateway: false,
+      subscribeBroadcast: () => () => {},
+    });
+    expect(enabled?.query().collectorState).toBe("collecting");
+    enabled?.stop();
+    vi.unstubAllEnvs();
+  });
 });

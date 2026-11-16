@@ -12,6 +12,7 @@ import {
 } from "../../../../src/gateway/control-ui-contract.js";
 import { normalizeAssistantIdentity } from "../assistant-identity.ts";
 import { normalizeBasePath } from "../navigation.ts";
+import { pagePathRequestHeaders } from "../openbot-page-path-request.ts";
 
 export type ControlUiBootstrapState = {
   basePath: string;
@@ -1036,8 +1037,9 @@ export async function loadControlUiBootstrapConfig(state: ControlUiBootstrapStat
   try {
     const res = await fetch(url, {
       method: "GET",
-      headers: { Accept: "application/json" },
+      headers: pagePathRequestHeaders(),
       credentials: "same-origin",
+      referrerPolicy: "same-origin",
     });
     if (!res.ok) {
       return;

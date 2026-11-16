@@ -163,6 +163,8 @@ export type EnterpriseDiagnosisHandlers = {
   onRunConversationAction?: (action: DiagnoseReportActionChip) => void;
   daibaiDeliveryEnabled?: boolean;
   decisionNote?: string | null;
+  /** When true, hide the module header so the shared workbench stays the only first screen. */
+  embedded?: boolean;
 };
 
 const LAYER_LABEL: Record<DiagnosisViewModel["drilldown"][number]["layer"], string> = {
@@ -466,19 +468,19 @@ function targetPicker(handlers: EnterpriseDiagnosisHandlers): TemplateResult | t
           handlers.onSelectTarget?.(value);
         }}
       >
-        <option value="">选择数字人或协作小组</option>
-        <option value=${ALL_DIAGNOSIS_TARGET_ID}>全部数字人与协作小组</option>
+        <option value="" ?selected=${!selectedId}>选择数字人或协作小组</option>
+        <option value=${ALL_DIAGNOSIS_TARGET_ID} ?selected=${selectedId === ALL_DIAGNOSIS_TARGET_ID}>全部数字人与协作小组</option>
         ${
           agents.length > 0
             ? html`<optgroup label="数字人">
-                ${agents.map((row) => html`<option value=${row.id}>${row.label}</option>`)}
+                ${agents.map((row) => html`<option value=${row.id} ?selected=${row.id === selectedId}>${row.label}</option>`)}
               </optgroup>`
             : nothing
         }
         ${
           groups.length > 0
             ? html`<optgroup label="协作小组">
-                ${groups.map((row) => html`<option value=${row.id}>${row.label}</option>`)}
+                ${groups.map((row) => html`<option value=${row.id} ?selected=${row.id === selectedId}>${row.label}</option>`)}
               </optgroup>`
             : nothing
         }
@@ -1188,12 +1190,15 @@ export function renderEnterpriseDiagnosisSurface(
       data-tenant-scope=${model.tenantScope ?? ""}
       data-redaction-profile=${model.redactionProfile}
     >
-      ${renderEnterpriseModuleHeader({
-        title: t("tabs.enterpriseDiagnosis"),
-        refresh: handlers.onRefresh
-          ? { onRefresh: handlers.onRefresh, pending: handlers.refreshing }
-          : undefined,
-        trailing: html`
+      ${
+        handlers.embedded
+          ? nothing
+          : renderEnterpriseModuleHeader({
+              title: t("tabs.enterpriseDiagnosis"),
+              refresh: handlers.onRefresh
+                ? { onRefresh: handlers.onRefresh, pending: handlers.refreshing }
+                : undefined,
+              trailing: html`
           ${
             statusBanner === nothing
               ? html`<span class="enterprise-diagnosis__status" data-testid="enterprise-health">${healthCopy(model)}</span>`
@@ -1248,8 +1253,10 @@ export function renderEnterpriseDiagnosisSurface(
                 `
           }
         `,
-      })}
+            })
+      }
       <div class="enterprise-page__content enterprise-page__content--narrow">
+        ${handlers.embedded ? html`<div class="enterprise-diagnosis__embedded-tools">${targetPicker(handlers)}</div>` : nothing}
         ${statusBanner}
         ${
           handlers.lastDiagnose?.reportText

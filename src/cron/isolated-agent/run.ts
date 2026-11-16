@@ -59,6 +59,7 @@ import { isHookDispatchSessionKey } from "../../gateway/hook-surface-session.js"
 import { resolveKnowledgeGatewayClientForAgentRun } from "../../gateway/knowledge/agent-run-gateway-client.js";
 import { formatCapabilityExecutionSurfaceLog } from "../../gateway/model-entitlement/capability-entry-consume.js";
 import { buildRunContextEstimateParts } from "../../gateway/model-entitlement/run-context-estimate.js";
+import { resolveExecutionWorkspace } from "../../gateway/workspace-resolver/execution-workspace.js";
 import { resolveCronWriteRoot } from "../../gateway/workspace-resolver/write-roots.js";
 import { registerAgentRunContext } from "../../infra/agent-events.js";
 import { logWarn } from "../../logger.js";
@@ -299,14 +300,22 @@ export async function runCronIsolatedAgentTurn(params: {
 
   const baseSessionKey = (params.sessionKey?.trim() || `cron:${params.job.id}`).trim();
   const agentSessionKey = resolveCronAgentSessionKey({ sessionKey: baseSessionKey, agentId });
-  const identifiedWorkspace = resolveCronWriteRoot({
+  const boundWorkspace = await resolveExecutionWorkspace({
+    cfg: params.cfg,
     agentId,
-    tenantId: params.job.ownership?.tenantId,
-    userId: params.job.ownership?.ownerId,
-    sessionKey: params.job.sessionKey ?? params.sessionKey,
-    configuredDefaultWorkspace: params.cfg.agents?.defaults?.workspace,
-    stateDir: resolveStateDir(process.env),
+    scheduledOwner: params.job.ownership ?? {},
+    operation: "write",
   });
+  const identifiedWorkspace =
+    boundWorkspace?.rootPath ??
+    resolveCronWriteRoot({
+      agentId,
+      tenantId: params.job.ownership?.tenantId,
+      userId: params.job.ownership?.ownerId,
+      sessionKey: params.job.sessionKey ?? params.sessionKey,
+      configuredDefaultWorkspace: params.cfg.agents?.defaults?.workspace,
+      stateDir: resolveStateDir(process.env),
+    });
   const workspaceDirRaw = identifiedWorkspace;
   const agentDir = resolveAgentDir(params.cfg, agentId);
   const workspace = await ensureAgentWorkspace({

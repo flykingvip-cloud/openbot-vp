@@ -13,7 +13,6 @@ import { ensureAgentWorkspace } from "../../agents/workspace.js";
 import { resolveChannelModelOverride } from "../../channels/model-overrides.js";
 import { type OpenBotConfig, loadConfig } from "../../config/config.js";
 import { isSharedTenantAddressingEnabled } from "../../config/data-space.js";
-import { loadExistingGovernedWorkspaceIdentity } from "../../gateway/data-governance/workspace-catalog-projection.js";
 import {
   mediaUnderstandingUsesFromOutputs,
   recordMediaUnderstandingShadow,
@@ -25,6 +24,7 @@ import {
   loadCanonicalWriteOwnership,
   resolveCanonicalRobotWriteRoot,
 } from "../../gateway/workspace-resolver/canonical-write-root.js";
+import { resolveExecutionWorkspace } from "../../gateway/workspace-resolver/execution-workspace.js";
 import { alignFormalRootForManagedAddressing } from "../../gateway/workspace-resolver/formal-deliverable-root.js";
 import {
   resolveLiveRobotWriteRoot,
@@ -180,41 +180,28 @@ export async function getReplyFromConfig(
   const securityProfile = resolveSecurityProfile(cfg, process.env);
   const cwdUserId = knowledgeContext.userId ?? null;
   const fallbackTenantId = turnTenantId ?? knowledgeContext.tenantId;
-  let writeOwnership = await loadCanonicalWriteOwnership({
+  const executionWorkspace = await resolveExecutionWorkspace({
+    cfg,
+    agentId,
+    client: gatewayClient,
+    groupId: collaborationGroupId ?? undefined,
+    operation: "write",
+  });
+  const writeOwnership = await loadCanonicalWriteOwnership({
     cfg,
     agentId,
     tenantId: fallbackTenantId,
     chattingUserId: cwdUserId,
-    // Mint host for first Path B when sticky absent — chatting user.
-    hostUserId: cwdUserId ?? employeeOwnerId,
     stateDir: undefined,
   });
-  if (fallbackTenantId && cwdUserId && writeOwnership.kind !== "personal") {
-    try {
-      const identity = await loadExistingGovernedWorkspaceIdentity({
-        tenantId: fallbackTenantId,
-        userId: cwdUserId,
-        agentId,
-      });
-      if (identity.catalog) {
-        writeOwnership = await loadCanonicalWriteOwnership({
-          cfg,
-          agentId,
-          tenantId: fallbackTenantId,
-          chattingUserId: cwdUserId,
-          hostUserId: cwdUserId ?? employeeOwnerId,
-          catalog: identity.catalog,
-        });
-      }
-    } catch {
-      // Keep config/registry ownership when catalog is unavailable.
-    }
-  }
   // personalFallback is the single production P5/P1 call site (freeze 164/165).
   // stewardHelperCwd reuses personalFallback; no second helper call.
   // Managed steward does not fall back to personal/local helper as cwd.
   // Missing tenant stays fail-closed; helper is never managed production cwd.
   const personalFallback = () => {
+    if (executionWorkspace) {
+      return executionWorkspace.rootPath;
+    }
     const canonical = resolveCanonicalRobotWriteRoot({
       agentId,
       tenantId: fallbackTenantId,
@@ -275,7 +262,7 @@ export async function getReplyFromConfig(
         authoritativeTenantId: turnTenantId,
       });
     }
-    if (!authorizedCwd) {
+    if (!authorizedCwd && !collaborationGroupId) {
       const resolved = await resolveAuthorizedToolCwdDetailed({
         client: gatewayClient as never,
         cfg,
@@ -309,7 +296,12 @@ export async function getReplyFromConfig(
       reason ? `workspace_authorization_failed:${reason}` : "workspace_authorization_failed",
     );
   }
-  if (securityProfile.profile === "managed_enterprise" && isSharedTenantAddressingEnabled(cfg)) {
+  if (executionWorkspace) {
+    workspaceDirRaw = executionWorkspace.rootPath;
+  } else if (
+    securityProfile.profile === "managed_enterprise" &&
+    isSharedTenantAddressingEnabled(cfg)
+  ) {
     workspaceDirRaw = await healProductionWorkspaceDir(workspaceDirRaw);
   }
   await import("../../memory/item7-w2-dark-dual-read-shadow.js").then(

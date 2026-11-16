@@ -1616,7 +1616,7 @@ export function navItemDescriptionForTab(tab: Tab) {
     case "platformAgents":
       return t("nav.items.platformAgents");
     case "platformObservation":
-      return "运行观测";
+      return "平台观测";
     case "platformDiagnosis":
       return t("nav.items.platformDiagnosis");
     case "platformAdvanced":

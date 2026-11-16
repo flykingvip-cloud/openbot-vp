@@ -210,6 +210,16 @@ describe("enterprise diagnosis surface", () => {
     expect(container.textContent).not.toMatch(/健康|已解决/);
   });
 
+  it("hides the module header when embedded under the shared workbench", () => {
+    const container = document.createElement("div");
+    render(renderEnterpriseDiagnosisSurface(baseModel(), { embedded: true }), container);
+    expect(container.textContent).not.toContain(t("tabs.enterpriseDiagnosis"));
+    expect(container.querySelector(".enterprise-module-header")).toBeNull();
+    expect(container.querySelector("[data-testid=open-daibai-standalone]")).toBeNull();
+    expect(container.querySelector("[data-testid=diagnosis-task-outcome]")).toBeTruthy();
+    container.remove();
+  });
+
   it("renders a diagnose target picker and asks for a choice before running", () => {
     const container = document.createElement("div");
     const onDiagnoseNow = vi.fn();

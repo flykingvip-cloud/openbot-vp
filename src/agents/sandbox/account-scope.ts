@@ -76,6 +76,7 @@ export function resolveEmbeddedSandboxAccount(params: {
   gatewayClientPlatformUserId?: string;
   gatewayClientSessionEnterpriseId?: string;
   executionIdentity?: {
+    collaborationGroupId?: string;
     enterpriseId?: string;
     user?: string;
     platformUserId?: string;
@@ -107,6 +108,7 @@ export type EmbeddedSandboxAccountInput = {
   gatewayClientPlatformUserId?: string;
   gatewayClientSessionEnterpriseId?: string;
   executionIdentity?: {
+    collaborationGroupId?: string;
     enterpriseId?: string;
     user?: string;
     platformUserId?: string;
