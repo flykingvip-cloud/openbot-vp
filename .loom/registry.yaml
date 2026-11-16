@@ -14566,6 +14566,27 @@ tasks:
     ownerHistory: []
     since: 2026-11-13
     metadata: {}
+  - id: batch1-capability-enablement-20261116:auditbot-batch1
+    owner: auditbot-batch1
+    intent:
+      - "Batch 1 isolated capability enablement: comment-only Account Worker and
+        readonly-invoke alignment, isolated wiring for task-progress, knowledge
+        reuse and basic diagnosis loops, tests, PR and canary draft. No production
+        deploy and no releases.jsonl write."
+    paths:
+      - .kiro/specs/batch1-capability-enablement-20261116/**
+    state: active
+    sessions:
+      - id: f0968f98-6660-470c-b7ff-d635fb9f345a
+        taskId: batch1-capability-enablement-20261116:auditbot-batch1
+        ide: cursor
+        agent: auditbot-batch1
+        status: active
+        lastSignalAt: 2026-11-16T10:45:51.725Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-16
+    metadata: {}
 landingStreams:
   - id: runtime-rule-adaptation
     landingPolicy: serial
