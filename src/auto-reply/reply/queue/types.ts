@@ -119,6 +119,24 @@ export type FollowupRun = {
     /** Ephemeral private run bag forwarded into the embedded tool loop (Residual B). */
     privateRunBag?: import("../../../gateway/collaboration-dispatch/private-run-bag.js").CollaborationPrivateRunBag;
     workspaceDir: string;
+    /**
+     * Canonical execution-workspace identity captured at enqueue.
+     * Revalidated before execution so a same-path bindingId or contentVersion
+     * change cannot silently switch directories.
+     */
+    executionWorkspaceBinding?: {
+      resourceId: string;
+      bindingId: string;
+      contentVersion: string;
+      tenantId?: string;
+      owner?:
+        | { kind: "user"; userId: string }
+        | { kind: "position"; seatId: string }
+        | { kind: "group"; groupId: string }
+        | { kind: "system"; systemId: string };
+      lifecycleState?: string;
+      bindingState?: string;
+    };
     config: OpenBotConfig;
     skillsSnapshot?: SkillSnapshot;
     provider: string;

@@ -9,7 +9,10 @@ const { tmpRoot } = vi.hoisted(() => ({
   tmpRoot: `/tmp/openbot-group-file-${Math.random().toString(36).slice(2)}`,
 }));
 
-let contextValue: { userId: string | null } = { userId: "user-a" };
+let contextValue: { userId: string | null; tenantId?: string } = {
+  userId: "user-a",
+  tenantId: "t-a",
+};
 
 vi.mock("../knowledge/context.js", () => ({
   resolveKnowledgeSourceContext: vi.fn(async () => contextValue),
@@ -52,6 +55,11 @@ vi.mock("../agent-registry/store.js", () => ({
 
 const { groupWorkspaceFileHandlers, normalizeGroupWorkspaceRelativePath } =
   await import("./group-workspace-file.js");
+const {
+  upsertWorkspaceGovernanceRecord,
+  resetSharedDataGovernanceCatalogForTests,
+  getSharedDataGovernanceCatalog,
+} = await import("../data-governance/runtime-catalog.js");
 
 type InvokeResult = {
   ok: boolean;
@@ -106,12 +114,15 @@ async function invoke(
 
 describe("workbench.group-file preview/open/write", () => {
   const previousTenants = process.env.OPENBOT_TENANTS_ROOT;
+  const previousState = process.env.OPENBOT_STATE_DIR;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     fs.rmSync(tmpRoot, { recursive: true, force: true });
     fs.mkdirSync(tmpRoot, { recursive: true });
     process.env.OPENBOT_TENANTS_ROOT = tmpRoot;
-    contextValue = { userId: "user-a" };
+    process.env.OPENBOT_STATE_DIR = path.join(tmpRoot, "state");
+    resetSharedDataGovernanceCatalogForTests();
+    contextValue = { userId: "user-a", tenantId: "t-a" };
     const membersPath = path.join(tmpRoot, "t-a", "collaboration", "groups", "g1", "members.json");
     fs.mkdirSync(path.dirname(membersPath), { recursive: true });
     fs.writeFileSync(
@@ -127,9 +138,23 @@ describe("workbench.group-file preview/open/write", () => {
         },
       ]),
     );
+    await upsertWorkspaceGovernanceRecord({
+      resourceId: "ws:t-a:group:g1",
+      tenantId: "t-a",
+      ownerScope: { kind: "group_owned", groupId: "g1" },
+      locator: path.dirname(membersPath),
+      classification: "group_workspace",
+      stateDir: process.env.OPENBOT_STATE_DIR,
+    });
   });
 
   afterEach(() => {
+    resetSharedDataGovernanceCatalogForTests();
+    if (previousState === undefined) {
+      delete process.env.OPENBOT_STATE_DIR;
+    } else {
+      process.env.OPENBOT_STATE_DIR = previousState;
+    }
     if (previousTenants === undefined) {
       delete process.env.OPENBOT_TENANTS_ROOT;
     } else {
@@ -285,6 +310,62 @@ describe("workbench.group-file preview/open/write", () => {
     expect(stale.ok).toBe(false);
     expect(stale.error?.message).toContain("ARTIFACT_VERSION_CONFLICT");
     expect(fs.readFileSync(filePath!)).toEqual(savedBytes);
+  });
+
+  it("allows reads on a read_only workspace but rejects write and patch", async () => {
+    const seeded = await invoke("workbench.group-file.write", {
+      groupId: "g1",
+      filename: "deliverables/note.md",
+      content: "# hello\n",
+    });
+    expect(seeded.ok).toBe(true);
+
+    const catalog = getSharedDataGovernanceCatalog({ stateDir: process.env.OPENBOT_STATE_DIR });
+    const record = await catalog.get("ws:t-a:group:g1");
+    expect(record).toBeTruthy();
+    // Catalog persistence still requires the canonical binding row to stay
+    // state=active; read_only is expressed on the envelope lifecycle.
+    await catalog.put({
+      envelope: { ...record!.envelope, lifecycleState: "read_only" },
+      bindings: record!.bindings,
+    });
+
+    const read = await invoke("workbench.group-file.read", {
+      groupId: "g1",
+      filename: "deliverables/note.md",
+    });
+    expect(read.ok).toBe(true);
+    const preview = await invoke("workbench.group-file.preview", {
+      groupId: "g1",
+      filename: "deliverables/note.md",
+    });
+    expect(preview.ok).toBe(true);
+    const opened = await invoke("workbench.group-file.open", {
+      groupId: "g1",
+      filename: "deliverables/note.md",
+    });
+    expect(opened.ok).toBe(true);
+
+    const deniedWrite = await invoke("workbench.group-file.write", {
+      groupId: "g1",
+      filename: "deliverables/note.md",
+      content: "# mutated\n",
+    });
+    expect(deniedWrite.ok).toBe(false);
+    expect(String(deniedWrite.error?.message ?? "")).toMatch(
+      /lifecycle_denied|binding_read_only|workspace_binding_required/,
+    );
+
+    const deniedPatch = await invoke("workbench.group-file.patch-pptx", {
+      groupId: "g1",
+      filename: "deliverables/note.md",
+      expectedContentHash: "0".repeat(64),
+      slides: [{ index: 1, lines: ["mutated"] }],
+    });
+    expect(deniedPatch.ok).toBe(false);
+    expect(String(deniedPatch.error?.message ?? "")).toMatch(
+      /lifecycle_denied|binding_read_only|workspace_binding_required/,
+    );
   });
 });
 

@@ -1,6 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
 import { emitHeartbeatEvent } from "../infra/heartbeat-events.js";
-import { startHeartbeatActivity, HEARTBEAT_ACTIVITY_FLAG } from "./heartbeat-activity.js";
+import {
+  deriveHeartbeatSamples,
+  resolveConfiguredHeartbeatPeriodMs,
+  startHeartbeatActivity,
+  HEARTBEAT_ACTIVITY_FLAG,
+} from "./heartbeat-activity.js";
 describe("passive heartbeat activity", () => {
   it("reports subscription failure rather than collecting", () => {
     const handle = startHeartbeatActivity({
@@ -154,6 +159,141 @@ describe("passive heartbeat activity", () => {
     on = false;
     expect(handle.query().events).toEqual([]);
     expect(handle.query().epoch).not.toBe(before);
+    handle.stop();
+  });
+});
+
+describe("deriveHeartbeatSamples", () => {
+  it("leaves the ratio unknown without a period, or when collection did not cover the window", () => {
+    expect(
+      deriveHeartbeatSamples({
+        expectedPeriodMs: null,
+        events: [{ ts: 100 }],
+        from: 0,
+        to: 400,
+        collecting: true,
+        collectionStartedAt: 0,
+        evictedCount: 0,
+        expiredCount: 0,
+      }).expectedSamples,
+    ).toBeNull();
+    expect(
+      deriveHeartbeatSamples({
+        expectedPeriodMs: 100,
+        events: [],
+        from: 0,
+        to: 400,
+        collecting: false,
+        collectionStartedAt: 0,
+        evictedCount: 0,
+        expiredCount: 0,
+      }).observedSamples,
+    ).toBeNull();
+    expect(
+      deriveHeartbeatSamples({
+        expectedPeriodMs: 100,
+        events: [{ ts: 50 }],
+        from: 0,
+        to: 400,
+        collecting: true,
+        collectionStartedAt: 0,
+        evictedCount: 1,
+        expiredCount: 0,
+      }).expectedSamples,
+    ).toBeNull();
+  });
+
+  it("counts expected and observed samples only when the period and retained window are known", () => {
+    const result = deriveHeartbeatSamples({
+      expectedPeriodMs: 100,
+      events: [{ ts: 10 }, { ts: 110 }, { ts: 210 }],
+      from: 0,
+      to: 400,
+      collecting: true,
+      collectionStartedAt: 0,
+      evictedCount: 0,
+      expiredCount: 0,
+    });
+    expect(result).toMatchObject({ expectedPeriodMs: 100, expectedSamples: 4, observedSamples: 3 });
+  });
+});
+
+describe("resolveConfiguredHeartbeatPeriodMs", () => {
+  it("returns a shared positive interval for the scheduled cohort and ignores event-only neighbors", () => {
+    expect(resolveConfiguredHeartbeatPeriodMs({})).toBeNull();
+    expect(
+      resolveConfiguredHeartbeatPeriodMs({
+        agents: { defaults: { heartbeat: { every: "0m" } }, list: [{ id: "a" }, { id: "b" }] },
+      }),
+    ).toBeNull();
+    expect(
+      resolveConfiguredHeartbeatPeriodMs({
+        agents: { defaults: { heartbeat: { every: "2m" } }, list: [{ id: "a" }, { id: "b" }] },
+      }),
+    ).toBe(120000);
+    expect(
+      resolveConfiguredHeartbeatPeriodMs({
+        agents: {
+          defaults: { heartbeat: { every: "0m" } },
+          list: [
+            { id: "scheduled", heartbeat: { every: "2m" } },
+            { id: "event-only", heartbeat: { every: "0m" } },
+          ],
+        },
+      }),
+    ).toBe(120000);
+    expect(
+      resolveConfiguredHeartbeatPeriodMs({
+        agents: {
+          defaults: { heartbeat: { every: "2m" } },
+          list: [{ id: "a", heartbeat: { every: "2m" } }, { id: "b", heartbeat: { every: "1m" } }],
+        },
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("heartbeat activity period query", () => {
+  it("fills expected and observed samples when the runner period is known", () => {
+    let at = 1000;
+    let listener: ((event: { ts: number; status: "sent" }) => void) | undefined;
+    const handle = startHeartbeatActivity({
+      enabled: () => true,
+      now: () => at,
+      ttlMs: 10_000,
+      resolveExpectedPeriodMs: () => 1000,
+      subscribe: (fn) => {
+        listener = fn;
+        return () => {};
+      },
+    });
+    listener!({ ts: 1000, status: "sent" });
+    at = 5000;
+    const result = handle.query();
+    expect(result.expectedPeriodMs).toBe(1000);
+    expect(result.expectedSamples).toBe(4);
+    expect(result.observedSamples).toBe(1);
+    handle.stop();
+  });
+});
+
+describe("heartbeat activity agent attribution", () => {
+  it("retains a trimmed agentId on captured events and leaves missing ids unattributed", () => {
+    let listener: ((event: { ts: number; status: "sent"; agentId?: string }) => void) | undefined;
+    const handle = startHeartbeatActivity({
+      enabled: () => true,
+      now: () => 100,
+      subscribe: (fn) => {
+        listener = fn;
+        return () => {};
+      },
+    });
+    listener!({ ts: 100, status: "sent", agentId: " Bot-A " });
+    listener!({ ts: 100, status: "sent" });
+    expect(handle.query().events).toEqual([
+      expect.objectContaining({ status: "sent", agentId: "bot-a" }),
+      expect.objectContaining({ status: "sent", agentId: null }),
+    ]);
     handle.stop();
   });
 });

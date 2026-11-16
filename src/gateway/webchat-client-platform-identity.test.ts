@@ -148,6 +148,40 @@ describe("webchat-client-platform-identity", () => {
     ).toBe("openbot_session=abc.def; other=1");
   });
 
+  it("forwards connect.pagePath when re-reading the upgrade cookie", async () => {
+    readSessionMock.mockResolvedValue({
+      user: "ceo@example.com",
+      domain: "enterprise",
+    });
+    const client: GatewayClient = {
+      connect: {
+        minProtocol: 3,
+        maxProtocol: 3,
+        client: {
+          id: "openbot-control-ui",
+          version: "control-ui",
+          platform: "web",
+          mode: "webchat",
+        },
+        role: "operator",
+        scopes: [],
+        pagePath: "/enterprise/001/overview",
+      } as GatewayClient["connect"],
+      upgradeRequestCookie: "openbot_session=sid.sig",
+      upgradeRequestOrigin: "http://127.0.0.1:18789",
+      upgradeRequestHost: "127.0.0.1:18789",
+      upgradeRequestLocalDirect: true,
+    };
+    await hydrateWebchatGatewayClientPlatformIdentity({ client });
+    expect(readSessionMock).toHaveBeenCalledOnce();
+    const req = readSessionMock.mock.calls[0]?.[0] as {
+      req?: { headers?: Record<string, string> };
+    };
+    expect(req?.req?.headers?.["x-openbot-page-path"]).toBe("/enterprise/001/overview");
+    expect(req?.req?.headers?.origin).toBe("http://127.0.0.1:18789");
+    expect(req?.req?.headers?.host).toBe("127.0.0.1:18789");
+  });
+
   it("hydrates missing client.user from stashed upgrade cookie for webchat", async () => {
     readSessionMock.mockResolvedValue({
       user: "hrqb@163.com",

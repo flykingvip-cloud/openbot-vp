@@ -1,5 +1,8 @@
 /** Internal read-only query. RPC adapters must authenticate caller before invocation. */
 import type { OpenBotConfig } from "../config/config.js";
+import { readExecutorEvidence } from "../executor-evidence/read-port.js";
+import { resolveConfiguredTaskOutcomeRoot } from "../task-outcome/reject-result.js";
+import { projectDurableExecutorExecutions } from "./durable-execution-projection.js";
 import { getExecutionEvidenceStore } from "./execution-evidence-store.js";
 import {
   getExecutionJournalRuntime,
@@ -15,6 +18,38 @@ import {
   type createOutcomeSourceStore,
 } from "./outcome-source.js";
 import { assembleObservationSamples } from "./sample-assembler.js";
+
+function readDurableExecutions(input: {
+  cfg: Parameters<typeof queryObservation>[0]["cfg"];
+  agentId: string;
+  scope: import("../task-outcome/types.js").TrustedScope;
+  taskId: string;
+  outcomeVersion: number;
+  from: number;
+  to: number;
+}) {
+  const located = resolveConfiguredTaskOutcomeRoot(input.cfg, input.agentId);
+  if (!located.ok) {
+    return [];
+  }
+  try {
+    return projectDurableExecutorExecutions({
+      view: readExecutorEvidence({
+        agentId: input.agentId,
+        scope: input.scope,
+        taskId: input.taskId,
+        outcomeVersion: input.outcomeVersion,
+        storeRoot: located.root,
+      }),
+      taskId: input.taskId,
+      outcomeVersion: input.outcomeVersion,
+      from: input.from,
+      to: input.to,
+    });
+  } catch {
+    return [];
+  }
+}
 
 export function queryObservation(input: {
   cfg: OpenBotConfig;
@@ -70,6 +105,15 @@ export function queryObservation(input: {
     taskId: record.taskId,
     outcomeVersion: record.outcomeVersion,
   });
+  const durable = readDurableExecutions({
+    cfg: input.cfg,
+    agentId: input.agentId,
+    scope: record.scope,
+    taskId: record.taskId,
+    outcomeVersion: record.outcomeVersion,
+    from: lookup.from,
+    to: lookup.to,
+  });
   const projection = assembleObservationSamples({
     scope: record.scope,
     from: input.from,
@@ -85,7 +129,7 @@ export function queryObservation(input: {
         isCurrentTip,
       },
     ],
-    executions: execution.executions,
+    executions: [...execution.executions, ...durable],
   });
   const technical = readExecutorTechnicalEvidence(input);
   if (!technical.ok) {
@@ -261,6 +305,16 @@ export async function queryObservationWithJournal(
     }
   }
   // Preserve distinct source/epoch identities without an explicit common-origin proof.
+  const lookup = input.evidenceLookupWindow ?? { from: input.from, to: input.to };
+  const durableExecutions = readDurableExecutions({
+    cfg: input.cfg,
+    agentId: input.agentId,
+    scope: record.scope,
+    taskId: record.taskId,
+    outcomeVersion: record.outcomeVersion,
+    from: lookup.from,
+    to: lookup.to,
+  });
   const assembled = assembleObservationSamples({
     scope: record.scope,
     from: input.from,
@@ -276,7 +330,7 @@ export async function queryObservationWithJournal(
         provenance: base.outcomeSource.provenance,
       },
     ],
-    executions,
+    executions: [...executions, ...durableExecutions],
   });
   const samples = assembled.samples.map((sample) =>
     sample.executionRefs.some((ref) => conflictingIds.has(ref.eventId))

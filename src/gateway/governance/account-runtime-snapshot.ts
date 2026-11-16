@@ -44,6 +44,7 @@ export type IssueAccountRuntimeSnapshotInput = {
   decisionId: string;
   authorizationVersion: string;
   dataSpaceRef: string;
+  collaborationGroupId?: string;
   browserNamespaceRef: string;
   modelEntitlement: AccountModelEntitlement;
   capabilityDecision: AccountCapabilityDecision;
@@ -213,6 +214,11 @@ export class AccountRuntimeSnapshotStore {
         snapshotVersion,
         authorizationVersion,
         dataSpaceRef: requireText(input.dataSpaceRef, "dataSpaceRef"),
+        ...(input.collaborationGroupId
+          ? {
+              collaborationGroupId: requireText(input.collaborationGroupId, "collaborationGroupId"),
+            }
+          : {}),
         browserNamespaceRef: requireText(input.browserNamespaceRef, "browserNamespaceRef"),
         modelEntitlement: { allowlist: [...allowlist] },
         capabilityDecision: { effect },

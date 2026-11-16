@@ -23,9 +23,10 @@ import { ensureAccountProductionDirectories } from "../../gateway/account-execut
 import type { AccountRuntimeSnapshot } from "../../gateway/governance/account-worker-runtime.js";
 import { toWorkerRuntimeSnapshot } from "../../gateway/governance/account-worker-runtime.js";
 import type { WorkerHeartbeatVerdict } from "../../gateway/governance/account-worker-runtime.js";
+import { resolveExecutionWorkspace } from "../../gateway/workspace-resolver/execution-workspace.js";
 import { readJsonFile, writeJsonAtomic } from "../../infra/json-files.js";
 import { normalizeAgentId } from "../../routing/session-key.js";
-import { ACCOUNT_BROWSER_CONTAINER_DIR } from "./account-mounts.js";
+import { ACCOUNT_BROWSER_CONTAINER_DIR, ACCOUNT_EXEC_WORKSPACE } from "./account-mounts.js";
 import {
   resolveDefaultAccountWorkerSandboxDriver,
   type AccountWorkerSandboxDriver,
@@ -206,6 +207,7 @@ export class AccountWorker {
   private userId = "";
   private agentId = "";
   private executionId = "";
+  private collaborationGroupId: string | undefined;
   private decisionId = "";
   private runtimeLeaseId = "";
   private snapshotVersion = 0;
@@ -271,7 +273,7 @@ export class AccountWorker {
     const request = parseRuntimeControllerRequest(body);
     if (
       this.phase === "RUNNING" &&
-      request.runtimeLeaseId === this.runtimeLeaseId &&
+      !request.runtimeLeaseId.includes(":group:") &&
       request.snapshotVersion === this.snapshotVersion
     ) {
       this.touch();
@@ -309,6 +311,14 @@ export class AccountWorker {
       ) {
         throw new Error("controller spec is missing the operator images");
       }
+      started.spec = {
+        ...started.spec,
+        execMounts: started.spec.execMounts.map((mount) =>
+          mount.containerPath === ACCOUNT_EXEC_WORKSPACE
+            ? { ...mount, hostPath: this.persistent!.workspaceDir }
+            : mount,
+        ),
+      };
       this.spec = started.spec;
       const exec = await this.driver.startExec(started.spec);
       this.execContainerName = exec.containerName;
@@ -376,7 +386,15 @@ export class AccountWorker {
       );
     }
     if (normalizeAgentId(request.agentId) === normalizeAgentId(this.agentId)) {
-      return this.attachWarm();
+      const current = await this.ensurePersistent(this.agentId);
+      if (
+        current.workspaceDir === this.persistent?.workspaceDir &&
+        !request.runtimeLeaseId.includes(":group:")
+      ) {
+        return this.attachWarm();
+      }
+      // Binding changed: use the existing agent-switch exec remount path below.
+      // The account browser and its durable profile stay attached.
     }
     const head = await this.options.controlPlane.findByLease(request.runtimeLeaseId);
     if (!head) {
@@ -403,7 +421,10 @@ export class AccountWorker {
     const browserContainerName = this.browserContainerName;
     const previousExec = this.execContainerName;
     const previousProfile = this.persistent?.browserProfileDir ?? null;
-    const persistent = await this.ensurePersistent(head.lease.agentId);
+    const persistent = await this.ensurePersistent(
+      head.lease.agentId,
+      head.snapshot.collaborationGroupId,
+    );
     if (
       previousProfile &&
       path.resolve(persistent.browserProfileDir) !== path.resolve(previousProfile)
@@ -426,6 +447,21 @@ export class AccountWorker {
         "missing-spec",
         this.phase,
       );
+    }
+    started.spec = {
+      ...started.spec,
+      execMounts: started.spec.execMounts.map((mount) =>
+        mount.containerPath === ACCOUNT_EXEC_WORKSPACE
+          ? { ...mount, hostPath: persistent.workspaceDir }
+          : mount,
+      ),
+    };
+    if (
+      previousExec &&
+      normalizeAgentId(request.agentId) === normalizeAgentId(this.agentId) &&
+      persistent.workspaceDir !== this.persistent?.workspaceDir
+    ) {
+      await this.driver.stopExec(previousExec);
     }
     const exec = await this.driver.startExec(started.spec);
     this.remember(toWorkerRuntimeSnapshot(head.snapshot), head.lease);
@@ -702,17 +738,29 @@ export class AccountWorker {
     }
   }
 
-  private async ensurePersistent(agentId: string): Promise<PersistentDirs> {
+  private async ensurePersistent(
+    agentId: string,
+    groupId = this.collaborationGroupId,
+  ): Promise<PersistentDirs> {
     const paths = await ensureAccountProductionDirectories({
       ctx: { tenantId: this.tenantId, userId: this.userId, domain: "employee" },
       cfg: this.options.cfg,
       agentId,
       env: this.options.env,
     });
+    const bound = this.options.cfg
+      ? await resolveExecutionWorkspace({
+          cfg: this.options.cfg,
+          agentId,
+          scheduledOwner: { tenantId: this.tenantId, ownerId: this.userId },
+          groupId,
+          operation: "write",
+        })
+      : null;
     const memoryDir = path.join(paths.dataRoot, "memory");
     await fs.mkdir(memoryDir, { recursive: true });
     return {
-      workspaceDir: paths.workspaceDir,
+      workspaceDir: bound?.rootPath ?? paths.workspaceDir,
       artifactsDir: paths.artifactsDir,
       memoryDir,
       browserProfileDir: paths.browserProfileDir,
@@ -738,6 +786,7 @@ export class AccountWorker {
     this.decisionId = lease.decisionId;
     this.runtimeLeaseId = lease.runtimeLeaseId;
     this.snapshotVersion = snapshot.snapshotVersion;
+    this.collaborationGroupId = snapshot.collaborationGroupId;
   }
 
   private async failToStopped(reason: string): Promise<void> {

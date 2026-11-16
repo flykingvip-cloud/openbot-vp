@@ -628,15 +628,23 @@ describe("platform auth controller", () => {
     expect(host.connect).not.toHaveBeenCalled();
   });
 
-  function stubPageLocation(assign: ReturnType<typeof vi.fn>): () => void {
+  function stubPageLocation(
+    assign: ReturnType<typeof vi.fn>,
+    location: {
+      host?: string;
+      hostname?: string;
+      pathname?: string;
+      href?: string;
+    } = {},
+  ): () => void {
     const original = window.location;
     Object.defineProperty(window, "location", {
       configurable: true,
       value: {
-        host: "localhost:3000",
-        hostname: "localhost",
-        pathname: "/",
-        href: "http://localhost:3000/",
+        host: location.host ?? "localhost:3000",
+        hostname: location.hostname ?? "localhost",
+        pathname: location.pathname ?? "/",
+        href: location.href ?? "http://localhost:3000/",
         assign,
       },
     });
@@ -644,6 +652,61 @@ describe("platform auth controller", () => {
       Object.defineProperty(window, "location", { configurable: true, value: original });
     };
   }
+
+  it("sends the current page path when confirming the session cookie landed", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          ok: true,
+          session: {
+            provider: "trusted-proxy",
+            user: "alice@example.com",
+            role: "operator",
+            scopes: ["operator.admin"],
+          },
+          platformAuth: {
+            enabled: true,
+            sessionKind: "enterprise-admin",
+          },
+        }),
+      })
+      .mockResolvedValueOnce(
+        sessionCookieCheckResponse("alice@example.com", {
+          sessionKind: "enterprise-admin",
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+    const assign = vi.fn();
+    const restore = stubPageLocation(assign, {
+      host: "127.0.0.1:18789",
+      hostname: "127.0.0.1",
+      pathname: "/enterprise/001/overview",
+      href: "http://127.0.0.1:18789/enterprise/001/overview",
+    });
+    const host = createHost();
+    host.platformAuthMode = "login";
+    host.platformAuthLoginIntent = "enterprise-admin";
+
+    await submitPlatformAuth(host);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[1]?.[0])).toContain("/session");
+    expect(String(fetchMock.mock.calls[1]?.[0])).not.toContain("/session/switch");
+    expect(fetchMock.mock.calls[1]?.[1]).toEqual(
+      expect.objectContaining({
+        method: "GET",
+        credentials: "same-origin",
+        referrerPolicy: "same-origin",
+        headers: expect.objectContaining({
+          "x-openbot-page-path": "/enterprise/001/overview",
+        }),
+      }),
+    );
+    expect(host.connect).toHaveBeenCalledTimes(1);
+    restore();
+  });
 
   it("does not confirm a platform switch by reading /session on the employee page", async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce({

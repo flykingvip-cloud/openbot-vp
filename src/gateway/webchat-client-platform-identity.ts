@@ -49,9 +49,14 @@ export function extractUpgradeRequestCookieHeader(
   return trimmed || undefined;
 }
 
+function connectPagePath(client?: Pick<GatewayClient, "connect"> | null): string | undefined {
+  const raw = (client?.connect as { pagePath?: unknown } | undefined)?.pagePath;
+  return typeof raw === "string" && raw.trim() ? raw.trim() : undefined;
+}
+
 function buildSyntheticCookieRequest(
   cookieHeader: string,
-  client?: Pick<GatewayClient, "upgradeRequestOrigin" | "upgradeRequestHost">,
+  client?: Pick<GatewayClient, "upgradeRequestOrigin" | "upgradeRequestHost" | "connect">,
 ): IncomingMessage {
   const headers: Record<string, string> = { cookie: cookieHeader };
   const origin = client?.upgradeRequestOrigin?.trim();
@@ -61,6 +66,10 @@ function buildSyntheticCookieRequest(
   }
   if (host) {
     headers.host = host;
+  }
+  const pagePath = connectPagePath(client);
+  if (pagePath) {
+    headers["x-openbot-page-path"] = pagePath;
   }
   return { headers } as IncomingMessage;
 }
@@ -247,11 +256,6 @@ export async function ensureGatewayClientUserFromPlatformIdentity(params: {
   await fillClientUserFromPlatformUserId(client, params.trustedProxy);
   await ensureGatewayClientEnterpriseTenant(client);
   return client;
-}
-
-function connectPagePath(client: GatewayClient): string | undefined {
-  const raw = (client.connect as { pagePath?: unknown } | undefined)?.pagePath;
-  return typeof raw === "string" && raw.trim() ? raw.trim() : undefined;
 }
 
 function clearPinnedMembership(client: GatewayClient): void {

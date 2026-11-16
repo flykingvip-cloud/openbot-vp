@@ -10,11 +10,13 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { listAgentIds, resolveAgentWorkspaceDir } from "../../agents/agent-scope.js";
 import { isSharedTenantAddressingEnabled } from "../../config/data-space.js";
 import { normalizeOperatorId } from "../../config/operator-state-scope.js";
 import { resolveStateDir } from "../../config/paths.js";
 import type { OpenBotConfig } from "../../config/types.js";
 import { normalizeAgentId } from "../../routing/session-key.js";
+import { resolveSecurityProfile } from "../security-profile.js";
 import { resolveTenantsRoot } from "../tenant-store-paths.js";
 import { resolveTrustedGroupLocator } from "../workspace/group-locator.js";
 import { relocateTenantsVolumeUserPath } from "../workspace/operator-workspace-heal.js";
@@ -315,6 +317,20 @@ export function resolveFormalAgentWorkspace(params: {
       ensureDirectory: params.ensureDirectory,
     });
     root = placed ? alignFormalRootForManagedAddressing(placed, { config: cfg, env }) : null;
+  }
+  // A personal-local host may deliberately configure an execution workspace
+  // without an employee/tenant placement. Use the same trusted config as the
+  // runner; never invent an owner or apply this fallback to managed traffic.
+  if (
+    !root &&
+    cfg &&
+    !shared &&
+    !tenantId &&
+    !userId &&
+    resolveSecurityProfile(cfg, env).profile === "personal_local" &&
+    listAgentIds(cfg).includes(normalizeAgentId(params.agentId))
+  ) {
+    root = resolveAgentWorkspaceDir(cfg, params.agentId);
   }
   if (!root) {
     return null;

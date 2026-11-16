@@ -54,6 +54,7 @@ export type AccountRuntimeSnapshot = {
   /** Audit label for this commercial and permission decision. Not a decision id. */
   authorizationVersion: string;
   dataSpaceRef: string;
+  collaborationGroupId?: string;
   browserNamespaceRef: string;
   modelEntitlement: AccountModelEntitlement;
   capabilityDecision: AccountCapabilityDecision;
@@ -123,6 +124,9 @@ export function toWorkerRuntimeSnapshot(snapshot: AccountRuntimeSnapshot): Accou
     snapshotVersion: snapshot.snapshotVersion,
     authorizationVersion: snapshot.authorizationVersion,
     dataSpaceRef: snapshot.dataSpaceRef,
+    ...(snapshot.collaborationGroupId
+      ? { collaborationGroupId: snapshot.collaborationGroupId }
+      : {}),
     browserNamespaceRef: snapshot.browserNamespaceRef,
     modelEntitlement: { allowlist: [...snapshot.modelEntitlement.allowlist] },
     capabilityDecision: { effect: snapshot.capabilityDecision.effect },

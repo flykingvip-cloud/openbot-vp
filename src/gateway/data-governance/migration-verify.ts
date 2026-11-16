@@ -81,6 +81,28 @@ export type MigrationVerifyFinding = {
   detail: string;
 };
 
+export type MigrationVerifiedArtifact = {
+  artifactId: string;
+  checksum: string;
+};
+
+/**
+ * From/to snapshot for one migration being verified. Callers that know the
+ * saved and current workspace binding must thread these fields through rather
+ * than leaving the official receipt incomplete.
+ */
+export type MigrationVerifyChangeSnapshot = {
+  fromBindingId: string;
+  toBindingId: string;
+  fromContentVersion: string;
+  toContentVersion: string;
+  fromDirectory: string;
+  toDirectory: string;
+  authorizationIdentity: string;
+  operationIdentity: string;
+  artifactSet?: MigrationVerifiedArtifact[];
+};
+
 export type MigrationVerifyReceipt = {
   kind: typeof M3_VERIFY_RECEIPT_KIND;
   receiptId: string;
@@ -92,6 +114,17 @@ export type MigrationVerifyReceipt = {
   legalHold: LegalHold | null;
   retention: RetentionEvidence | null;
   passed: boolean;
+  fromBindingId?: string;
+  toBindingId?: string;
+  fromContentVersion?: string;
+  toContentVersion?: string;
+  fromDirectoryRealpath?: string;
+  toDirectoryRealpath?: string;
+  fromLocator?: string;
+  toLocator?: string;
+  authorizationIdentity?: string;
+  operationIdentity?: string;
+  artifactSet?: MigrationVerifiedArtifact[];
 };
 
 export type MigrationRepairReceipt = {
@@ -272,6 +305,87 @@ async function markRestoreRecoveryRequired(params: {
   }
 }
 
+function isConcreteChecksum(value?: string | null): value is string {
+  const text = value?.trim();
+  if (!text) {
+    return false;
+  }
+  const lowered = text.toLowerCase();
+  if (lowered === "ok" || lowered === "passed" || lowered === "true") {
+    return false;
+  }
+  return (
+    text.startsWith("sha256:") ||
+    text.startsWith("sha512:") ||
+    text.startsWith("checksum:") ||
+    /^[a-f0-9]{32,}$/i.test(text)
+  );
+}
+
+/** Prefer a directory realpath; never invent a path that was not provided. */
+export function normalizeMigrationDirectoryRealpath(value?: string | null): string | undefined {
+  const text = value?.trim();
+  if (!text) {
+    return undefined;
+  }
+  try {
+    const real = fs.realpathSync(text);
+    if (fs.statSync(real).isDirectory()) {
+      return real;
+    }
+  } catch {
+    // Keep the provided path when it cannot be resolved as a directory.
+  }
+  return text;
+}
+
+function lookupVerifyChange(
+  changes: Readonly<Record<string, MigrationVerifyChangeSnapshot | undefined>> | undefined,
+  resourceId: string | null,
+  candidateId: string,
+): MigrationVerifyChangeSnapshot | undefined {
+  if (!changes) {
+    return undefined;
+  }
+  if (resourceId && changes[resourceId]) {
+    return changes[resourceId];
+  }
+  return changes[candidateId];
+}
+
+function concreteArtifactSet(
+  rows: Array<{ artifactId?: string; checksum?: string } | undefined>,
+): MigrationVerifiedArtifact[] {
+  const out: MigrationVerifiedArtifact[] = [];
+  const seen = new Set<string>();
+  for (const row of rows) {
+    const artifactId = row?.artifactId?.trim();
+    const checksum = row?.checksum?.trim();
+    if (!artifactId || !isConcreteChecksum(checksum)) {
+      continue;
+    }
+    const key = `${artifactId}\0${checksum}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    out.push({ artifactId, checksum });
+  }
+  return out;
+}
+
+function bindingAtLocator(
+  record: CatalogRecord | null | undefined,
+  locator: string | undefined,
+  excludeBindingId?: string,
+): StorageBinding | undefined {
+  if (!record || !locator) {
+    return undefined;
+  }
+  const matches = record.bindings.filter((binding) => binding.locator === locator);
+  return matches.find((binding) => binding.bindingId !== excludeBindingId) ?? matches[0];
+}
+
 function proofTenantOk(proof: GovernanceOwnershipProof, callerTenantId: string): boolean {
   if (proof.owner.kind === "group") {
     return proof.scope.kind === "tenant" && proof.scope.tenantId === callerTenantId;
@@ -289,6 +403,12 @@ export async function verifyMigrationBatch(params: {
   physical: PhysicalCanonicalReader;
   indexRebuilder?: CanonicalIndexRebuilder;
   receiptDir: string;
+  /**
+   * Per-resource or per-candidate from/to snapshot for this migration.
+   * Thread these through when the official writer should emit a complete
+   * receipt; do not invent missing start/end fields.
+   */
+  changes?: Readonly<Record<string, MigrationVerifyChangeSnapshot | undefined>>;
 }): Promise<
   | { ok: true; receipts: MigrationVerifyReceipt[] }
   | {
@@ -389,6 +509,42 @@ export async function verifyMigrationBatch(params: {
       });
     }
 
+    const canonical = record ? activeCanonical(record) : null;
+    const change =
+      item.receipt.changeSnapshot ??
+      lookupVerifyChange(params.changes, item.resourceId, item.candidateId);
+    const previousLocator = item.receipt.previousLocator?.trim() || undefined;
+    const fromBinding = bindingAtLocator(
+      record,
+      change?.fromDirectory || previousLocator,
+      canonical?.bindingId,
+    );
+    const checksumDetail = findings.find(
+      (finding) => finding.check === "checksum" && finding.outcome === "passed",
+    )?.detail;
+    const artifactSet = concreteArtifactSet([
+      ...(change?.artifactSet ?? []),
+      !change?.artifactSet?.length && item.resourceId && isConcreteChecksum(checksumDetail)
+        ? { artifactId: item.resourceId, checksum: checksumDetail }
+        : undefined,
+    ]);
+    const fromBindingId = change?.fromBindingId.trim() || fromBinding?.bindingId;
+    const toBindingId = change?.toBindingId.trim() || canonical?.bindingId;
+    const fromContentVersion = change?.fromContentVersion.trim() || fromBinding?.contentVersion;
+    const toContentVersion = change?.toContentVersion.trim() || canonical?.contentVersion;
+    const fromDirectoryRealpath = normalizeMigrationDirectoryRealpath(
+      change?.fromDirectory || previousLocator,
+    );
+    const toDirectoryRealpath = normalizeMigrationDirectoryRealpath(
+      change?.toDirectory || canonical?.locator,
+    );
+    const authorizationIdentity =
+      change?.authorizationIdentity.trim() ||
+      (proof ? `tenant:${callerTenantId}:owner:${ownerKey(proof)}` : undefined);
+    const operationIdentity =
+      change?.operationIdentity.trim() ||
+      item.receipt.operationId?.trim() ||
+      `${batchId}:${item.candidateId}:verify`;
     const receipt: MigrationVerifyReceipt = {
       kind: M3_VERIFY_RECEIPT_KIND,
       receiptId: `m3v-${randomUUID()}`,
@@ -400,6 +556,17 @@ export async function verifyMigrationBatch(params: {
       legalHold: record?.envelope.legalHold ?? null,
       retention: null,
       passed: findings.every((finding) => finding.outcome === "passed"),
+      ...(fromBindingId ? { fromBindingId } : {}),
+      ...(toBindingId ? { toBindingId } : {}),
+      ...(fromContentVersion ? { fromContentVersion } : {}),
+      ...(toContentVersion ? { toContentVersion } : {}),
+      ...(fromDirectoryRealpath ? { fromDirectoryRealpath } : {}),
+      ...(toDirectoryRealpath ? { toDirectoryRealpath } : {}),
+      ...(previousLocator ? { fromLocator: previousLocator } : {}),
+      ...(canonical?.locator ? { toLocator: canonical.locator } : {}),
+      ...(authorizationIdentity ? { authorizationIdentity } : {}),
+      ...(operationIdentity ? { operationIdentity } : {}),
+      ...(artifactSet.length > 0 ? { artifactSet } : {}),
     };
     writeReceipt(params.receiptDir, receipt.receiptId, receipt);
     receipts.push(receipt);

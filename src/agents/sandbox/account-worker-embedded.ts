@@ -146,9 +146,12 @@ async function leaseFor(params: {
   tenantId: string;
   userId: string;
   agentId: string;
+  collaborationGroupId?: string;
 }): Promise<StartLease> {
   const agentId = normalizeAgentId(params.agentId);
-  const executionId = executionIdFor(agentId);
+  const executionId = params.collaborationGroupId
+    ? `${executionIdFor(agentId)}:group:${params.collaborationGroupId}`
+    : executionIdFor(agentId);
   const now = params.runtime.now();
   const current = await params.runtime.store.current({
     tenantId: params.tenantId,
@@ -189,6 +192,7 @@ async function leaseFor(params: {
     decisionId: newGovernanceDecisionId(),
     authorizationVersion: "account-worker-embedded",
     dataSpaceRef: paths.dataSpaceRef,
+    ...(params.collaborationGroupId ? { collaborationGroupId: params.collaborationGroupId } : {}),
     browserNamespaceRef: paths.browserNamespaceRef,
     modelEntitlement: { allowlist: [] },
     capabilityDecision: { effect: "allow" },
@@ -218,6 +222,7 @@ export async function resolveEmbeddedAccountWorkerHandle(params: {
   sessionKey?: string;
   agentId?: string;
   account?: { tenantId: string; userId: string };
+  collaborationGroupId?: string;
   env?: NodeJS.ProcessEnv;
 }): Promise<AccountWorkerSandboxHandle | undefined> {
   const env = params.env ?? process.env;
@@ -248,6 +253,7 @@ export async function resolveEmbeddedAccountWorkerHandle(params: {
     env,
     tenantId,
     userId,
+    collaborationGroupId: params.collaborationGroupId,
     agentId: runtimeStatus.agentId,
   });
   return {
@@ -276,6 +282,7 @@ export async function resolveEmbeddedRunSandboxContextParams(
     sessionKey: params.sessionKey,
     agentId: params.agentId,
     account: base.account,
+    collaborationGroupId: params.executionIdentity?.collaborationGroupId,
     env: params.env,
   });
   return {

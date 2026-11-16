@@ -3,6 +3,8 @@ export type HeartbeatIndicatorType = "ok" | "alert" | "error";
 export type HeartbeatEventPayload = {
   ts: number;
   status: "sent" | "ok-empty" | "ok-token" | "skipped" | "failed";
+  /** Configured agent that produced this heartbeat, when known. */
+  agentId?: string;
   to?: string;
   accountId?: string;
   preview?: string;
