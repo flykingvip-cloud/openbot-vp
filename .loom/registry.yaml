@@ -14566,6 +14566,54 @@ tasks:
     ownerHistory: []
     since: 2026-11-13
     metadata: {}
+  - id: batch1-capability-enablement-20261116:auditbot-batch1
+    owner: auditbot-batch1
+    intent:
+      - "Batch 1 isolated capability enablement: comment-only Account Worker and
+        readonly-invoke alignment, isolated wiring for task-progress, knowledge
+        reuse and basic diagnosis loops, tests, PR and canary draft. No production
+        deploy and no releases.jsonl write."
+    paths:
+      - .kiro/specs/batch1-capability-enablement-20261116/**
+      - .env.example
+      - src/batch1-capability-enablement/**
+      - src/progress-ledger/**
+      - src/conversation-task/ledger-binding.ts
+      - src/config/types.gateway.ts
+      - src/config/zod-schema.ts
+      - src/gateway/workbench/pending-tasks-read-model.ts
+      - src/diagnosis/official-live-send.ts
+      - src/diagnosis/official-live-send.test.ts
+      - src/diagnosis/bootstrap.ts
+      - src/diagnosis/production-cutover.ts
+      - src/diagnosis/diagnose-observation-summary.ts
+      - src/diagnosis/diagnose-observation-summary.test.ts
+      - src/diagnosis/diagnose-report-text.ts
+      - src/diagnosis/diagnose-live-request.ts
+      - src/diagnosis/live-run.ts
+      - src/diagnosis/report.ts
+      - src/diagnosis/report-validate.ts
+      - src/diagnosis/report-query-projection-snapshot.ts
+    state: active
+    sessions:
+      - id: f0968f98-6660-470c-b7ff-d635fb9f345a
+        taskId: batch1-capability-enablement-20261116:auditbot-batch1
+        ide: cursor
+        agent: auditbot-batch1
+        status: active
+        lastSignalAt: 2026-11-16T10:45:51.725Z
+        metadata: {}
+      - id: cdf65e77-349e-4bb6-9525-e8fb127226b9
+        taskId: batch1-capability-enablement-20261116:auditbot-batch1
+        ide: cursor
+        agent: auditbot-batch1
+        status: active
+        lastSignalAt: 2026-11-16T14:10:00.000Z
+        metadata:
+          note: t20 follow-on from origin/main 67fc9b64
+    ownerHistory: []
+    since: 2026-11-16
+    metadata: {}
 landingStreams:
   - id: runtime-rule-adaptation
     landingPolicy: serial
@@ -29733,6 +29781,16 @@ landingStreams:
       task: four-pr-merge-readiness
       agent: codex-runtime-manager
       purpose: Three-way registry merge preserving tasks, sessions and landing history.
+  - id: batch1-capability-enablement
+    landingPolicy: parallel
+    paths:
+      - src/batch1-capability-enablement/**
+    canLandWith: []
+    metadata:
+      task: batch1-capability-enablement-20261116:auditbot-batch1
+      owner: auditbot-batch1
+      purpose: Isolated Batch 1 loop tests. No production deploy or ledger write.
+
 sharedPaths:
   - glob: src/exec-protocol/**
     landerTask: exec-protocol-v1-min-loop
