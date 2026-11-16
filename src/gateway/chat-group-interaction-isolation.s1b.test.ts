@@ -1068,6 +1068,11 @@ describe("checkpoint B isolated Gateway group interaction isolation", () => {
     await vi.waitFor(() => expect(context.chatAbortControllers.has(runA)).toBe(true), {
       timeout: 15_000,
     });
+    // Occupancy is registered before understanding/admission finishes. Wait
+    // for the controlled hang itself so B actually overlaps running A and the
+    // release below cannot be lost before the stub receives its resolver.
+    await vi.waitFor(() => expect(releaseA).toBeTypeOf("function"), { timeout: 15_000 });
+    const releaseRunningA = releaseA!;
     const aController = context.chatAbortControllers.get(runA);
     const sendB = await sendGroupChat({
       fixture,
@@ -1086,7 +1091,7 @@ describe("checkpoint B isolated Gateway group interaction isolation", () => {
 
     const bTextAfterB = collectTranscriptText(fixture.root);
     expect(bTextAfterB).toContain(GREETING_REPLY);
-    releaseA?.(asDispatchResult({ ok: true, text: "A业务结果" }));
+    releaseRunningA(asDispatchResult({ ok: true, text: "A业务结果" }));
     await vi.waitFor(
       () => {
         expect(findTerminal(context, runA), "A should emit a terminal after release").toBeTruthy();
