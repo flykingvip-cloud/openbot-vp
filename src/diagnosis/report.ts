@@ -6,6 +6,7 @@
  */
 import { createHash } from "node:crypto";
 import { type AggregatedCase, type CompositeDiagnosis, type EvidenceRef } from "./cross-target.js";
+import type { DiagnoseObservationSummary } from "./diagnose-observation-summary.js";
 import {
   acceptedRootCauseRelations,
   assertGraphRelation,
@@ -95,6 +96,11 @@ export type CompositeDiagnosisReport = {
   completion: DiagnosisCompletion;
   missingEvidence: EvidenceRequirement[];
   confidence: ReportConfidenceSummary;
+  /**
+   * Derived display meaning from collected evidence and missing sources.
+   * Not a finding. Omitted when no observation clauses apply.
+   */
+  observationSummary?: DiagnoseObservationSummary;
 };
 
 export function buildCompositeDiagnosisReport(

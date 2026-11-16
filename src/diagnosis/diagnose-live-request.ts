@@ -32,6 +32,7 @@ import type {
 } from "./diagnose-growth-assessment.js";
 import { persistGrowthAssessmentSnapshot } from "./diagnose-growth-snapshot.js";
 import type { GrowthAssessmentSnapshot } from "./diagnose-growth-snapshot.js";
+import { mergeDiagnoseObservationSummaries } from "./diagnose-observation-summary.js";
 import {
   asEnterpriseDiagnoseMode,
   planDiagnosisDaibaiDelivery,
@@ -292,6 +293,12 @@ export async function executeParsedDiagnoseRequest(input: {
     delivery: planDiagnosisDaibaiDelivery(input.request.deliverTo),
     reportIds: summaries.map((row) => row.reportId),
   };
+  const observationSummary = mergeDiagnoseObservationSummaries(
+    summaries.map((row) => row.observationSummary),
+  );
+  if (observationSummary) {
+    payload.observationSummary = observationSummary;
+  }
   const sealed = await sealWithGrowth(payload, {
     locators,
     tenantId: input.trusted.tenantId,
@@ -726,6 +733,7 @@ function sealReport(
     completion: payload.completion,
     findingCount: payload.findingCount,
     findings: payload.findings,
+    ...(payload.observationSummary ? { observationSummary: payload.observationSummary } : {}),
     windowId: payload.windowId,
     mode: payload.mode,
     scope: payload.scope,
