@@ -21,14 +21,14 @@
 
 ## 配置差异（隔离已验证 / 生产默认不要自动复制）
 
-| 项 | 生产当前默认 | 隔离验证取值 | 恢复方法 |
-| --- | --- | --- | --- |
-| `OPENBOT_PROGRESS_LEDGER_ENABLED` | 关（unset / 非显式真） | 测试内设为 `1`，测后恢复 | 删除该 env 或设 `0` |
-| ConversationTask activation 五开关 | 默认关；activation 仍禁止 | 未打开 | 保持 unset |
-| `OPENBOT_KNOWLEDGE_AUTO_GENERATE` | 关 | 未打开 | 保持 unset |
-| 诊断自动修复执行 | 关 | 未打开 | 保持关 |
-| 诊断外部投递 / 活 Daibai | 不在本轮启用 | 未打开；官方路径本身使用 `deliver:false` | 保持关 |
-| 四个编排主开关 | 默认关 | 未打开 | 保持关 |
+| 项                                 | 生产当前默认              | 隔离验证取值                             | 恢复方法            |
+| ---------------------------------- | ------------------------- | ---------------------------------------- | ------------------- |
+| `OPENBOT_PROGRESS_LEDGER_ENABLED`  | 关（unset / 非显式真）    | 测试内设为 `1`，测后恢复                 | 删除该 env 或设 `0` |
+| ConversationTask activation 五开关 | 默认关；activation 仍禁止 | 未打开                                   | 保持 unset          |
+| `OPENBOT_KNOWLEDGE_AUTO_GENERATE`  | 关                        | 未打开                                   | 保持 unset          |
+| 诊断自动修复执行                   | 关                        | 未打开                                   | 保持关              |
+| 诊断外部投递 / 活 Daibai           | 不在本轮启用              | 未打开；官方路径本身使用 `deliver:false` | 保持关              |
+| 四个编排主开关                     | 默认关                    | 未打开                                   | 保持关              |
 
 ## 按闭环的成功标准
 

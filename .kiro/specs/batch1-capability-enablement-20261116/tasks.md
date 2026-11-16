@@ -2,7 +2,7 @@
 
 ## Agents
 
-- auditbot-batch1 · role: owner · scope: comment-only Account Worker / readonly-invoke alignment, isolated wiring for task-progress, knowledge reuse and basic diagnosis loops, tests, PR and canary draft; no production deploy or ledger write · paths: .kiro/specs/batch1-capability-enablement-20261116/** · since: 2026-11-16
+- auditbot-batch1 · role: owner · scope: comment-only Account Worker / readonly-invoke alignment, isolated wiring for task-progress, knowledge reuse and basic diagnosis loops, tests, PR and canary draft; no production deploy or ledger write · paths: .kiro/specs/batch1-capability-enablement-20261116/\*\* · since: 2026-11-16
 
 ## Tasks
 
