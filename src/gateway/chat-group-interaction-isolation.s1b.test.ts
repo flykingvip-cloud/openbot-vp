@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -42,7 +43,8 @@ vi.mock("@earendil-works/pi-ai/compat", async (original) => ({
   complete: completeMock,
 }));
 
-const { chatHandlers, appendUserTranscriptMessage } = await import("./server-methods/chat.js");
+const { chatHandlers, appendUserTranscriptMessage, resolveCallerWorkspaceCwd } =
+  await import("./server-methods/chat.js");
 const collaborationShared = await import("./collaboration-learning/shared.js");
 const { createWorkspaceCollaborationStores } = collaborationShared;
 const { resolveGroupPublicTranscriptPath } =
@@ -1669,6 +1671,49 @@ describe("checkpoint B isolated Gateway group interaction isolation", () => {
     expectOperatingStateIdentityUnchanged(osPath, osBefore);
     expect(findTerminal(context, runId)).toBeTruthy();
     expect(dispatchSpy).not.toHaveBeenCalled();
+  }, 30_000);
+
+  it("direct fallback settles the authorized file without reconstructing an identity root", async () => {
+    const fixture = await isolateTrustedGroupGateway();
+    const cfg = JSON.parse(
+      fs.readFileSync(process.env.OPENBOT_CONFIG_PATH!, "utf8"),
+    ) as OpenBotConfig;
+    const workspace = await resolveCallerWorkspaceCwd({
+      cfg,
+      sessionKey: "agent:main:main",
+      agentId: "main",
+      client: null,
+    });
+    expect(workspace).toBeTruthy();
+    fs.mkdirSync(workspace!, { recursive: true });
+    const bytes = "# Actual authorized file\n120 - 78 = 42\n";
+    fs.writeFileSync(path.join(workspace!, "fallback.md"), bytes);
+    vi.spyOn(dispatchModule, "dispatchInboundMessage").mockImplementation(
+      async ({ dispatcher }) => {
+        dispatcher.sendFinalReply({
+          text: '<<DELIVERABLE title="报告" type="report" file="fallback.md">>brief summary<</DELIVERABLE>>',
+        });
+        await dispatcher.waitForIdle();
+        return asDispatchResult({ queuedFinal: true });
+      },
+    );
+    const context = createChatContext();
+    const runId = `run-direct-root-${path.basename(fixture.root)}`;
+    const send = await sendPrivateChat({ fixture, context, runId, message: "交付fallback.md" });
+    await vi.waitFor(
+      () => {
+        const final = collectChatEvents(context, runId).find(
+          (row) => row.payload?.state === "final",
+        )?.payload as
+          | { message?: { deliverablePublish?: { versionChecksum?: string } } }
+          | undefined;
+        expect(final?.message?.deliverablePublish?.versionChecksum).toBe(
+          createHash("sha256").update(bytes).digest("hex"),
+        );
+      },
+      { timeout: 15_000 },
+    );
+    await send.pending;
   }, 30_000);
 
   it("S2-4: the same message and idempotencyKey do not double-dispatch, including a late replay", async () => {
