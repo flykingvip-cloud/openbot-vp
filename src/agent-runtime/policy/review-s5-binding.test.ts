@@ -19,8 +19,8 @@ import {
   shouldSuppressWakeForFirstStageHold,
 } from "../../gateway/collaboration-learning/s5-collaboration-consumers.js";
 import { createTrustedGroupStores } from "../../gateway/collaboration-learning/team-resource-auth.js";
-import { parseAppointedProjectOwner } from "./collaboration-current-goal-binding.js";
-import type { TaskResponsibility as Responsibility } from "./collaboration-policy-model.js";
+import { parseAppointedProjectOwner } from "./index.js";
+import type { TaskResponsibility as Responsibility } from "./index.js";
 
 const tempDirs: string[] = [];
 const saved = {

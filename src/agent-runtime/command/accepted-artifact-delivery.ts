@@ -20,21 +20,24 @@ import {
   type MemberArtifactDeliveryIdentity,
   type NormalizedDeliveryTarget,
   type TrustedDeliveryIssuer,
-} from "../policy/accepted-artifact-delivery.js";
+} from "../policy/index.js";
 import {
   findMemberArtifactDeliveryIntent,
   viewAcceptedArtifactDelivery,
   type AcceptedArtifactDeliveryView,
-} from "../state/collaboration/accepted-artifact-delivery-read.js";
+} from "../state/index.js";
 import {
+  claimMemberArtifactSendUnknown,
   commitMemberArtifactDeliveryAssociation,
   deliveryKeyHash,
   markMemberArtifactQueued,
   noteAssociationRenamedAwayFromStaged,
   prepareMemberArtifactQueuePublication,
+  readMemberArtifactDeliveryIntent,
   readServerOutboundArtifactGrant,
+  recordMemberArtifactReceipt,
   writeIssuedOutboundArtifactGrant,
-} from "../state/collaboration/accepted-artifact-delivery-txn.js";
+} from "../state/index.js";
 
 export type AcceptedArtifactDeliveryDirs = {
   rootDir: string;
@@ -334,6 +337,11 @@ export async function requestAcceptedArtifactDelivery(params: {
       stateDir: params.dirs.queueStateDir,
       deps: params.deps,
       log: params.log,
+      store: {
+        readIntent: readMemberArtifactDeliveryIntent,
+        claimUnknown: claimMemberArtifactSendUnknown,
+        recordReceipt: recordMemberArtifactReceipt,
+      },
     });
   } catch {
     // Queue is durable; boot or a later recover can finish after a crash here.

@@ -26,10 +26,10 @@ import {
   INTERACTION_TIMEOUT_TEXT,
   createInteractionResourceBudget,
   formatInteractionFailureReply,
-} from "../model/interaction-resource-wait.js";
-import { runAuthorizedInteraction } from "./authorized-interaction.js";
-import { formatRestrictedInteractionNotice } from "./interaction-sources.js";
-import { routeInteraction } from "./route-interaction.js";
+} from "../model/index.js";
+import { runAuthorizedInteraction } from "./index.js";
+import { formatRestrictedInteractionNotice } from "./index.js";
+import { routeInteraction } from "./index.js";
 
 afterEach(() => {
   vi.useRealTimers();

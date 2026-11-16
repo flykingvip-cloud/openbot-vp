@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { OpenBotConfig } from "../../config/config.js";
 import { enqueueDelivery, resolveDeliveryQueueDir } from "../../infra/outbound/delivery-queue.js";
 import * as recoverMod from "../delivery/accepted-artifact-recover.js";
-import type { AcceptedArtifactIssuanceFacts } from "../policy/accepted-artifact-delivery.js";
+import type { AcceptedArtifactIssuanceFacts } from "../policy/index.js";
 import {
   acceptedArtifactDeliveryDirs,
   readAcceptedArtifactDelivery,

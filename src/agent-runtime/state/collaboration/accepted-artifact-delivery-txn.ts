@@ -10,7 +10,7 @@ import {
   type MemberArtifactDeliveryIdentity,
   type NormalizedDeliveryTarget,
   type OutboundArtifactGrant,
-} from "../../policy/accepted-artifact-delivery.js";
+} from "../../policy/index.js";
 import { withDirectoryLock, writeJsonDurable } from "../repository/durable-json.js";
 
 /**

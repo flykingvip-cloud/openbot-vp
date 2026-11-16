@@ -12,7 +12,7 @@ import {
   formatInteractionFailureReply,
   isInteractionUserAbort,
   resolveInteractionResourceWaitMs,
-} from "./interaction-resource-wait.js";
+} from "./index.js";
 
 afterEach(() => {
   vi.useRealTimers();

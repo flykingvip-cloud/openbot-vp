@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { hostBoundTaskTarget } from "../../command/host-task-target.js";
+import { hostBoundTaskTarget } from "../../command/index.js";
 import type { SessionTaskBoard, TrackedTask } from "../../contracts/task.js";
 import { seedSessionTaskBoard, readSessionTaskBoard } from "../repository/task-board-file.js";
 import { commitAdmittedSessionTask } from "./admit-task.js";
