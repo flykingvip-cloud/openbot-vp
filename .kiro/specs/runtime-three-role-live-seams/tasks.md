@@ -60,3 +60,10 @@
 - 当前尚未发布/认领/确认计划/执行/验收。草案责任记录为发起账号而非请求指定的uat-lead；成员回复称发布遇到activationKey不一致，该说法尚未用工具回执独立核准，不能直接作为已证根因。继续核准任命提案与首次持久契约的衔接，不改确认模式或绕过身份门禁。— codex-runtime-manager
 - personal_local专用平台账号不等于已配置企业/席位主体，已登录成果根定位缺口继续开放；不为测试伪造tenant或放宽匿名工作区fallback。新增测试日志在/tmp/runtime-auth-group-new-task-result.log。— codex-runtime-manager
 - 本次重启仅隔离19101；初次沙箱绑定和Bun WS握手失败均为测试环境失败，后续原Node/tsx客户端成功，不当作业务回归。凭证仍为0600且不纳入证据。— codex-runtime-manager
+
+## 2026-11-17 原方案核准
+
+- [x] 经用户两次限定授权，同步a78c5b669及87f881e1b；登记WIP按记录三方恢复并保留上游新增登记，未提交共享registry。最终源码4e16e158b；构建build-info一致。— codex-runtime-manager
+- [x] 修复负责人任命、新建意图误分类、未准入草案提前成员执行、两类交付出口工作区偏离与交付自动知识捕捉副作用。原红例保留，最终28文件269PASS，UI逻辑30+5PASS。— codex-runtime-manager
+- [x] 同SHA真实模型文件仅一份739字节，登记/预览/读取hash一致；同SHA真实群草案负责人uat-lead，零成员运行记录。仅隔离19101，不外发。— codex-runtime-manager
+- [ ] 原方案整体退出标准：S3归属停止、S5完整成员执行/整合、组终稿、真实控制/重启/PPT/渠道及工程全绿仍开；详见original-plan-acceptance-2026-11-17.md，不宣称全面替代/上线。— codex-runtime-manager
