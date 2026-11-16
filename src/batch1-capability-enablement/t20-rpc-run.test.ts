@@ -293,7 +293,7 @@ describe("t20 clean isolated RPC run", () => {
           token,
           timeoutMs: 8_000,
         });
-        ok = result.ok;
+        ok = result.ok === true;
         error =
           typeof result.error === "string"
             ? result.error
