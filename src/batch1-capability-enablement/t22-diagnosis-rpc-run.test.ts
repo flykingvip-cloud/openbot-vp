@@ -796,8 +796,8 @@ describe("t22 diagnosis isolated RPC honesty run", () => {
       tCross.methods.length === 0 &&
       tCross.resetKeys.length === 0 &&
       tReset.resetKeys.length > 0 &&
-      tReset.resetKeys.every((key) => key === canary) &&
       !tReset.resetKeys.includes(OTHER_SESSION_KEY) &&
+      tReset.resetKeys.every((key) => key === canary) &&
       officialAfter.count >= officialBefore.count;
 
     const report = {
