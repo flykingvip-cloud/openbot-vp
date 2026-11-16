@@ -134,10 +134,10 @@ describe("R4 operating-review PPTX lifecycle via office_file", () => {
     const native = await renderOfficeToPngs(originalBytes, "pptx");
     await fs.mkdir(PREVIEW_DIR, { recursive: true });
     const metaPath = path.join(PREVIEW_DIR, "render-meta.json");
-    if (native.available && native.pages && native.pages.length > 0) {
+    if (native.available && native.pngs && native.pngs.length > 0) {
       expect(native.pageCount).toBeGreaterThanOrEqual(6);
       expect(native.nonWhiteRatio ?? 0).toBeGreaterThan(0);
-      for (const [index, page] of native.pages.entries()) {
+      for (const [index, page] of native.pngs.entries()) {
         const dest = path.join(PREVIEW_DIR, `slide-${String(index + 1).padStart(2, "0")}.png`);
         await fs.writeFile(dest, page);
         expect((await fs.stat(dest)).size).toBeGreaterThan(0);
