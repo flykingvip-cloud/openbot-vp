@@ -130,6 +130,7 @@ export {
   requestCollaborationTaskStop,
   assertPersistedTaskNotStopped,
   canRequestTaskStop,
+  createDefaultOwnedStopPorts,
   TaskStopEntryError,
   TaskStoppedError,
   assertTaskNotStopped,
