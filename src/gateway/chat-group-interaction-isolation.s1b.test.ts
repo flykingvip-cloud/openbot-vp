@@ -1663,11 +1663,12 @@ describe("checkpoint B isolated Gateway group interaction isolation", () => {
     });
     await vi.waitFor(() => expect(findTerminal(context, runId)).toBeTruthy(), { timeout: 15_000 });
     await send.pending;
-    // Official discussion dispatch may still run after admission; mention bypass must stay zero.
+    // A draft/blocked formal request has not admitted any member work, even
+    // when participant selection has already selected the mentioned robot.
     await expectZeroMentionBypass(spies, fixture.root);
     expectOperatingStateIdentityUnchanged(osPath, osBefore);
     expect(findTerminal(context, runId)).toBeTruthy();
-    expect(dispatchSpy.mock.calls.length).toBeLessThanOrEqual(1);
+    expect(dispatchSpy).not.toHaveBeenCalled();
   }, 30_000);
 
   it("S2-4: the same message and idempotencyKey do not double-dispatch, including a late replay", async () => {
