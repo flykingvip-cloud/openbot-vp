@@ -670,22 +670,24 @@ describe("batch1 isolated loops", () => {
       }
     })();
 
+    expect(arbitraryKey.rejected).toBe(true);
+    expect(arbitraryKey.code).toBe("canary_session_mismatch");
+
     record("diagnosis-write-fallback", {
       DGN_T1_crossTenant: foreign,
       DGN_T2_arbitrarySessionKey: {
         attemptedKey: "someone-else-session",
         canaryKey: DIAGNOSIS_P24_5_LIVE_SESSION_KEY,
         bindResult: arbitraryKey,
-        note: arbitraryKey.rejected
-          ? "session key refused"
-          : "bindConversationDiagnosisToLiveChat currently checks tenant only; session-key allowlisting remains a follow-up if live send is later enabled",
+        note: "bindConversationDiagnosisToLiveChat and official live send now refuse non-canary session keys",
       },
       DGN_T3_T6_liveGateway: {
-        status: "not_started_in_this_file",
+        status: "covered_in_isolated_gateway_test",
+        evidence: "/workspace/openbot-vp-audit/batch1-evidence/gateway/",
         reason:
-          "Did not start a local gateway in this unit to avoid any chance of resolving a non-loopback OPENCLAW_GATEWAY_URL or paid model dispatch. Official bootstrap path uses deliver:false, then chat.inject, then sessions.reset(reason=new) only on /session not found/i. A dedicated local-gateway exercise can be added once a temp-state harness is confirmed loopback-only.",
+          "Loopback-only official gateway coverage lives in isolated-gateway.test.ts (send, duplicate, timeout fallback, auth no-inject, inject/session-not-found, canary-only reset, concurrent delivery).",
       },
-      result: "pass-with-followup",
+      result: "pass",
     });
     writeEvidence();
   });
