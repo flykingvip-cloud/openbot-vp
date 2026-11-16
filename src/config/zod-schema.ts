@@ -834,6 +834,8 @@ export const OpenBotSchema = z
         progressLedger: z
           .object({
             enabled: z.boolean().optional(),
+            shutdown: z.boolean().optional(),
+            tenantAllowlist: z.array(z.string()).optional(),
           })
           .strict()
           .optional(),

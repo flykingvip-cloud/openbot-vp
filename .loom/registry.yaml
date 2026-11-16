@@ -14575,11 +14575,25 @@ tasks:
         deploy and no releases.jsonl write."
     paths:
       - .kiro/specs/batch1-capability-enablement-20261116/**
+      - .env.example
       - src/batch1-capability-enablement/**
+      - src/progress-ledger/**
+      - src/conversation-task/ledger-binding.ts
+      - src/config/types.gateway.ts
+      - src/config/zod-schema.ts
+      - src/gateway/workbench/pending-tasks-read-model.ts
       - src/diagnosis/official-live-send.ts
       - src/diagnosis/official-live-send.test.ts
       - src/diagnosis/bootstrap.ts
       - src/diagnosis/production-cutover.ts
+      - src/diagnosis/diagnose-observation-summary.ts
+      - src/diagnosis/diagnose-observation-summary.test.ts
+      - src/diagnosis/diagnose-report-text.ts
+      - src/diagnosis/diagnose-live-request.ts
+      - src/diagnosis/live-run.ts
+      - src/diagnosis/report.ts
+      - src/diagnosis/report-validate.ts
+      - src/diagnosis/report-query-projection-snapshot.ts
     state: active
     sessions:
       - id: f0968f98-6660-470c-b7ff-d635fb9f345a
@@ -14589,6 +14603,14 @@ tasks:
         status: active
         lastSignalAt: 2026-11-16T10:45:51.725Z
         metadata: {}
+      - id: cdf65e77-349e-4bb6-9525-e8fb127226b9
+        taskId: batch1-capability-enablement-20261116:auditbot-batch1
+        ide: cursor
+        agent: auditbot-batch1
+        status: active
+        lastSignalAt: 2026-11-16T14:10:00.000Z
+        metadata:
+          note: t20 follow-on from origin/main 67fc9b64
     ownerHistory: []
     since: 2026-11-16
     metadata: {}
