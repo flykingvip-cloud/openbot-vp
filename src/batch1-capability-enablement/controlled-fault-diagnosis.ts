@@ -10,6 +10,8 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { deriveDiagnoseObservationSummaryFromOutput } from "../diagnosis/diagnose-observation-summary.js";
+import { formatDiagnoseReportText } from "../diagnosis/diagnose-report-text.js";
 import { diagnose } from "../diagnosis/diagnose.js";
 import {
   createDiagnosisHandlingLoop,
@@ -320,13 +322,35 @@ export async function runControlledFaultDiagnosis(params: {
     confirmedToolTimeout,
     assessments: output.result.assessments,
     hypotheses: output.result.hypotheses,
+    observationSummary:
+      report.observationSummary ??
+      deriveDiagnoseObservationSummaryFromOutput(output, report.completion),
+    reportDisplayText: formatDiagnoseReportText({
+      completion: report.completion,
+      findingCount: report.findings.length,
+      findings: report.findings.slice(0, 12).map((finding) => ({
+        findingId: finding.findingId,
+        severity: finding.severity,
+        status: finding.status,
+        ...(finding.code ? { code: finding.code } : {}),
+      })),
+      windowId: "controlled-fault",
+      mode: "TARGETED",
+      scope: "session",
+      scanned: 1,
+      skipped: 0,
+      reportId: report.reportId,
+      reportIds: [report.reportId],
+      ...(report.observationSummary ? { observationSummary: report.observationSummary } : {}),
+    }),
     problem: {
       title: "web_fetch timed out after 30s in the induced isolated session",
       basis:
-        "Official runner collected tool_runtime evidence (toolNameClass=web_fetch, timeout=true, errorClass=timeout, latencyMs=30000) and stopped at step-q4 with CONFIRMED (tool.timeout=true). Composite report findings may be empty because diagnose() emits assessments/hypotheses, not finding drafts.",
+        "Official runner collected tool_runtime evidence (toolNameClass=web_fetch, timeout=true, errorClass=timeout, latencyMs=30000) and stopped at step-q4 with CONFIRMED (tool.timeout=true). Composite report findings stay empty because diagnose() emits assessments/hypotheses, not handwritten finding drafts. Display meaning comes from observationSummary derived from collected evidence, unconfirmed root-cause confidence, and missing route_resolution.",
       evidence: toolRuntimeEvidence ?? toolTimeoutEvidence[0] ?? null,
       runnerCompletion,
       confirmedToolTimeout,
+      observationSummary: report.observationSummary ?? null,
     },
     persistedPath: persisted.filePath ?? null,
     handling: {
@@ -342,7 +366,11 @@ export async function runControlledFaultDiagnosis(params: {
       afterReload.record?.status === "rejected" &&
       confirmedToolTimeout &&
       toolRuntimeEvidence != null &&
-      runnerCompletion === "CONFIRMED"
+      runnerCompletion === "CONFIRMED" &&
+      report.completion === "INCONCLUSIVE" &&
+      report.findings.length === 0 &&
+      report.observationSummary?.text === "已观察到工具超时；根因尚未确认；路由证据缺失。" &&
+      report.observationSummary.rootCauseConfirmed === false
         ? "pass"
         : "fail",
   };
