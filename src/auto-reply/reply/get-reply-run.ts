@@ -1663,7 +1663,9 @@ export async function runPreparedReply(
               )
             : { kind: "rejected" as const, reason: "unauthorized" };
         if (applied.kind === "applied" && applied.abort) {
-          replyTurnRuntime.interrupt(sessionIdFinal, sessionKey);
+          const stopTaskId =
+            "target" in routed.decision ? routed.decision.target?.taskId : undefined;
+          replyTurnRuntime.interrupt(sessionIdFinal, sessionKey, stopTaskId);
           if (routed.decision.kind === "task_control" && routed.decision.action !== "resume") {
             await opts?.onInteractionTaskEffect?.({
               kind: routed.decision.action,
