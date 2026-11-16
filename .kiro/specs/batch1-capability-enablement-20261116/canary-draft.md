@@ -1,5 +1,7 @@
 # Batch 1 灰度单草稿（准备，不执行）
 
+> 已被 `canary-task-progress.md` 取代。本文仅作历史草稿保留，**不是部署申请**。其中“pending / 推送后回填”和“删除 env 或设 0”的回滚写法已经作废。请以 `canary-task-progress.md` 为准。
+
 - 起草时间：2026-11-16 18:55 CST（Asia/Shanghai）；补测更新：2026-11-16 19:42 CST（Asia/Shanghai）
 - 状态：草稿。生产部署、灰度启用和 `deploy/production/releases.jsonl` 账本变更仍保留为授权人最终批准步骤，本轮未执行。
 - 起草人 / 隔离交付 owner：`auditbot-batch1`
@@ -8,10 +10,10 @@
 
 - 基线：freshly fetched `origin/main` = `a78c5b66959dac3db4ecb2ecd2065aaec029b3c3`
 - 候选分支：`batch1/capability-enablement-20261116`
-- 候选 SHA：合入 PR 后以 `origin/main` 新 tip 为准（推送后回填本分支 tip）。不得使用 `commit=null`。
-- 网关 / UI SHA：与候选 SHA 相同，待构建后回填。
-- 镜像 ID：pending（本轮未构建生产镜像）
-- Registry digest：pending（不得用镜像 ID 冒充 digest）
+- 候选 SHA：历史草稿，已过期；请看 `canary-task-progress.md`。不得使用 `commit=null`。
+- 网关 / UI SHA：与候选 SHA 相同。本历史草稿不再作为申请依据。
+- 镜像 ID：**未填写**（本轮未构建生产镜像；未编造）
+- Registry digest：**未填写**（不得用镜像 ID 冒充 digest；未编造）
 - `OPENBOT_BUNDLED_VERSION`：仅作自报版本证据，不能替代 digest。
 
 ## 试点与负责人
@@ -21,14 +23,14 @@
 
 ## 配置差异（隔离已验证 / 生产默认不要自动复制）
 
-| 项                                 | 生产当前默认              | 隔离验证取值                                               | 恢复方法            |
-| ---------------------------------- | ------------------------- | ---------------------------------------------------------- | ------------------- |
-| `OPENBOT_PROGRESS_LEDGER_ENABLED`  | 关（unset / 非显式真）    | 测试内设为 `1`，测后恢复                                   | 删除该 env 或设 `0` |
-| ConversationTask activation 五开关 | 默认关；activation 仍禁止 | 未打开                                                     | 保持 unset          |
-| `OPENBOT_KNOWLEDGE_AUTO_GENERATE`  | 关                        | 未打开                                                     | 保持 unset          |
-| 诊断自动修复执行                   | 关                        | 未打开                                                     | 保持关              |
-| 诊断外部投递 / 活 Daibai           | 不在本轮启用              | 未打开外部投递；官方路径 `deliver:false`，且仅 canary 会话 | 保持关              |
-| 四个编排主开关                     | 默认关                    | 未打开                                                     | 保持关              |
+| 项                                 | 生产当前默认              | 隔离验证取值                                               | 恢复方法                                                                 |
+| ---------------------------------- | ------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `OPENBOT_PROGRESS_LEDGER_ENABLED`  | 关（unset / 非显式真）    | 测试内设为 `1`，测后恢复                                   | 仅设 env=0 并不完整；见 `canary-task-progress.md` 的 shutdown 与全部来源 |
+| ConversationTask activation 五开关 | 默认关；activation 仍禁止 | 未打开                                                     | 保持 unset                                                               |
+| `OPENBOT_KNOWLEDGE_AUTO_GENERATE`  | 关                        | 未打开                                                     | 保持 unset                                                               |
+| 诊断自动修复执行                   | 关                        | 未打开                                                     | 保持关                                                                   |
+| 诊断外部投递 / 活 Daibai           | 不在本轮启用              | 未打开外部投递；官方路径 `deliver:false`，且仅 canary 会话 | 保持关                                                                   |
+| 四个编排主开关                     | 默认关                    | 未打开                                                     | 保持关                                                                   |
 
 ## 按闭环的成功标准
 
