@@ -224,7 +224,9 @@ function firstSurfacePathOrFallback(candidates: Array<string | null | undefined>
   return fallback;
 }
 
-export function hintFromIncomingMessage(req: IncomingMessage): SurfaceRequestHint {
+export function hintFromIncomingMessage(
+  req: Pick<IncomingMessage, "url" | "headers">,
+): SurfaceRequestHint {
   const urlParts = requestUrlParts(req.url);
   return {
     origin: headerValue(req.headers.origin),

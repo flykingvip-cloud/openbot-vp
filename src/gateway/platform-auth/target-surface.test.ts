@@ -1,4 +1,3 @@
-import type { IncomingMessage } from "node:http";
 import { describe, expect, it } from "vitest";
 import type { PlatformAuthStore } from "./store-types.js";
 import {
@@ -177,7 +176,7 @@ describe("request surface agreement", () => {
     const hint = hintFromIncomingMessage({
       url: "/enterprise/001/overview",
       headers: { host: "127.0.0.1:18789" },
-    } as IncomingMessage);
+    });
     expect(hint.pathname).toBe("/enterprise/001/overview");
     expect(resolveRequestSessionSurface(hint)).toEqual({
       kind: "authoritative",
@@ -189,7 +188,7 @@ describe("request surface agreement", () => {
     const hint = hintFromIncomingMessage({
       url: "/__openbot/platform-auth/session",
       headers: { host: "127.0.0.1:18789" },
-    } as IncomingMessage);
+    });
     expect(resolveRequestSessionSurface(hint)).toEqual({
       kind: "ambiguous",
       localDefault: "employee",
@@ -203,7 +202,7 @@ describe("request surface agreement", () => {
         host: "127.0.0.1:18789",
         "x-openbot-page-path": "/enterprise/001/overview",
       },
-    } as IncomingMessage);
+    });
     expect(hint.pathname).toBe("/enterprise/001/overview");
     expect(resolveRequestSessionSurface(hint)).toEqual({
       kind: "authoritative",
@@ -215,7 +214,7 @@ describe("request surface agreement", () => {
     const hint = hintFromIncomingMessage({
       url: "/__openbot/platform-auth/session?pagePath=%2Fenterprise%2F001%2Foverview",
       headers: { host: "127.0.0.1:18789" },
-    } as IncomingMessage);
+    });
     expect(hint.pathname).toBe("/enterprise/001/overview");
     expect(resolveRequestSessionSurface(hint)).toEqual({
       kind: "authoritative",
@@ -227,7 +226,7 @@ describe("request surface agreement", () => {
     const hint = hintFromIncomingMessage({
       url: "/__openbot/platform-auth/session",
       headers: { host: "biz.openbot.love" },
-    } as IncomingMessage);
+    });
     expect(resolveRequestSessionSurface(hint)).toEqual({
       kind: "authoritative",
       surface: "enterprise",
