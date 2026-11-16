@@ -26,6 +26,7 @@ import {
 import { replayDiagnosticRunGraph } from "../diagnosis/runner.js";
 import type { TrustedTenantContext } from "../diagnosis/types.js";
 import { appendSkillInvocationEvent } from "../gateway/skill-invocation/event-store.js";
+import { readBoundSha } from "./bound-sha.js";
 
 export const CONTROLLED_FAULT_AGENT_ID = "agent-batch1-isolated";
 export const CONTROLLED_FAULT_SESSION_KEY = "batch1:isolated:controlled-fault";
@@ -273,6 +274,7 @@ export async function runControlledFaultDiagnosis(params: {
 
   const result = {
     kind: "controlled-fault",
+    boundSha: readBoundSha(),
     notGoldenFixture: true,
     notCompleteModelBusinessVerification: true,
     realImplementations: [

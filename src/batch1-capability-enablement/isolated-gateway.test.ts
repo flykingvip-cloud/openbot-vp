@@ -360,7 +360,7 @@ describe("batch1 isolated loopback gateway", () => {
     };
   }
 
-  async function tracedRpc<T = Record<string, unknown>>(
+  async function tracedRpc<T extends Record<string, unknown> = Record<string, unknown>>(
     caseName: string,
     method: string,
     params: Record<string, unknown>,
@@ -389,12 +389,13 @@ describe("batch1 isolated loopback gateway", () => {
   }
 
   async function snapshotSession(caseName: string, key: string, label: "before" | "after") {
-    const history = await tracedRpc<{ messages?: unknown[] }>(caseName, "chat.history", {
+    const history = await tracedRpc(caseName, "chat.history", {
       sessionKey: key,
       limit: 50,
     });
     const got = await tracedRpc(caseName, "sessions.get", { key, limit: 20 });
-    const messages = history.payload?.messages ?? [];
+    const historyPayload = history.payload as { messages?: unknown[] } | undefined;
+    const messages = historyPayload?.messages ?? [];
     return {
       label,
       sessionKey: key,
@@ -447,12 +448,13 @@ describe("batch1 isolated loopback gateway", () => {
     expect(dupRun).toBe(firstRun);
     const after = await snapshotSession("send-success-duplicate", "main", "after");
     const history = after;
-    const historyPayload = await tracedRpc<{ messages?: unknown[] }>(
-      "send-success-duplicate",
-      "chat.history",
-      { sessionKey: "main", limit: 50 },
-    );
-    const userMessages = (historyPayload.payload?.messages ?? []).filter((message) => {
+    const historyPayload = await tracedRpc("send-success-duplicate", "chat.history", {
+      sessionKey: "main",
+      limit: 50,
+    });
+    const historyMessages =
+      (historyPayload.payload as { messages?: unknown[] } | undefined)?.messages ?? [];
+    const userMessages = historyMessages.filter((message) => {
       if (!message || typeof message !== "object") {
         return false;
       }
