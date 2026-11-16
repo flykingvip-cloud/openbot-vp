@@ -384,7 +384,6 @@ import {
   prepareChatDeliverablePublish,
   type PreparedChatDeliverable,
 } from "../knowledge/deliverables/chat-deliverable-publish.js";
-import { maybeAutoCaptureAgentDeliverable } from "../knowledge/deliverables/maybe-auto-capture-agent-deliverable.js";
 import { formatClientSessionNotFoundDetail } from "../operator-shared-session-heal.js";
 import {
   findUserByEmail,
@@ -3340,34 +3339,6 @@ function nextChatSeq(context: { agentRunSeq: Map<string, number> }, runId: strin
   return next;
 }
 
-function extractAssistantFinalText(message?: Record<string, unknown>): string {
-  if (!message) {
-    return "";
-  }
-  const role = typeof message.role === "string" ? message.role : "assistant";
-  if (role !== "assistant") {
-    return "";
-  }
-  const content = message.content;
-  if (typeof content === "string") {
-    return content.trim();
-  }
-  if (Array.isArray(content)) {
-    return content
-      .map((entry) => {
-        if (!entry || typeof entry !== "object") {
-          return "";
-        }
-        const part = entry as { type?: string; text?: string };
-        return part.type === "text" && typeof part.text === "string" ? part.text.trim() : "";
-      })
-      .filter(Boolean)
-      .join("\n")
-      .trim();
-  }
-  return typeof message.text === "string" ? message.text.trim() : "";
-}
-
 function broadcastChatFinal(params: {
   context: Pick<GatewayRequestContext, "broadcastChat" | "nodeSendToSession" | "agentRunSeq"> & {
     logGateway?: { warn: (message: string) => void };
@@ -3412,27 +3383,8 @@ function broadcastChatFinal(params: {
     send();
   }
   params.context.agentRunSeq.delete(params.runId);
-  const captureText = extractAssistantFinalText(strippedEnvelopeMessage);
-  if (captureText && params.prepared?.structured !== true) {
-    try {
-      const messageAgentId =
-        params.message && typeof params.message.agentId === "string"
-          ? params.message.agentId.trim()
-          : "";
-      maybeAutoCaptureAgentDeliverable({
-        sessionKey: params.sessionKey,
-        agentId:
-          params.deliverableAgentId?.trim() ||
-          messageAgentId ||
-          resolveSessionAgentId({ sessionKey: params.sessionKey }),
-        ownerId: params.deliverableOwnerId,
-        messageId: params.runId,
-        content: captureText,
-      });
-    } catch {
-      // Deliverable auto-capture must never break chat final delivery.
-    }
-  }
+  // Delivery is not consent to save a knowledge copy. Explicit user save
+  // remains on save-and-archive; a final broadcast must have no capture writes.
 }
 
 function broadcastCollaborationRoundPlan(params: {
