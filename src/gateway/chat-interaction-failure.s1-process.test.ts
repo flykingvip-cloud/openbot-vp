@@ -20,7 +20,7 @@ import {
   CHAT_TURN_ERROR_UNCONFIRMED_TEXT,
   INTERACTION_RECORD_UNAVAILABLE_TEXT,
   INTERACTION_TIMEOUT_TEXT,
-} from "../agent-runtime/model/interaction-resource-wait.js";
+} from "../agent-runtime/model/index.js";
 import { bindAdmittedTurnHost } from "../agent-runtime/wiring/admitted-turn-host.js";
 import { makeZeroUsageSnapshot } from "../agents/usage.js";
 import { CONFIG_DIR } from "../utils.js";

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { getAcpSessionManager } from "../acp/control-plane/manager.js";
+import { unbindCurrentTaskOnSessionReset } from "../agent-runtime/state/index.js";
 import { resolveDefaultAgentId } from "../agents/agent-scope.js";
 import { clearBootstrapSnapshot } from "../agents/bootstrap-cache.js";
 import { abortEmbeddedPiRun, waitForEmbeddedPiRunEnd } from "../agents/pi-embedded.js";
@@ -23,7 +24,6 @@ import {
   normalizeAgentId,
   parseAgentSessionKey,
 } from "../routing/session-key.js";
-import { unbindCurrentTaskOnSessionReset } from "../agent-runtime/state/mutations/session-reset-focus.js";
 import { ErrorCodes, errorShape } from "./protocol/index.js";
 import type { GatewayClient } from "./server-methods/types.js";
 import {

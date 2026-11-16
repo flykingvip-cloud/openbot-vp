@@ -7,7 +7,7 @@ import {
   INTERACTION_RECORD_UNAVAILABLE_TEXT,
   INTERACTION_TIMEOUT_TEXT,
   classifyInteractionFailure,
-} from "../agent-runtime/model/interaction-resource-wait.js";
+} from "../agent-runtime/model/index.js";
 import { SESSION_TASK_BOARD_LOCK_OPTIONS, withFileLock } from "../infra/file-lock.js";
 import { createAsyncLock } from "../infra/json-files.js";
 import { resolveConfigDir } from "../utils.js";
@@ -36,10 +36,7 @@ export function shortChatRunId(runId: string): string {
   return createHash("sha256").update(runId).digest("hex").slice(0, 12);
 }
 
-function describeInteractionFailureForLog(
-  error: unknown,
-  runId?: string,
-): Record<string, unknown> {
+function describeInteractionFailureForLog(error: unknown, runId?: string): Record<string, unknown> {
   const errorClass = error instanceof Error ? error.name : typeof error;
   const phase =
     error && typeof error === "object" && "interactionPhase" in error
@@ -50,7 +47,9 @@ function describeInteractionFailureForLog(
       ? String((error as { reason?: unknown }).reason)
       : undefined;
   const usageRecorded =
-    error && typeof error === "object" && (error as { usageRecorded?: unknown }).usageRecorded === true;
+    error &&
+    typeof error === "object" &&
+    (error as { usageRecorded?: unknown }).usageRecorded === true;
   const shape =
     error && typeof error === "object" ? (error as { shape?: unknown }).shape : undefined;
   return {
