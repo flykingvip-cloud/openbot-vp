@@ -163,4 +163,46 @@ describe("official diagnosis live send", () => {
     expect(t.methods).toEqual(["chat.send", "chat.inject", "sessions.reset", "chat.inject"]);
     expect(t.resetKeys).toEqual([DIAGNOSIS_P24_5_LIVE_SESSION_KEY]);
   });
+  it("does not accept a chat.send payload with ok:false; falls back or reports unavailable", async () => {
+    const t = trace();
+    const result = await deliverDiagnosisViaOfficialLiveGateway(input(), {
+      trace: t,
+      call: async (opts) => {
+        if (opts.method === "chat.send") {
+          return { ok: false, error: "original send rejected" };
+        }
+        return { ok: true };
+      },
+    });
+    expect(result).toBe("accepted");
+    expect(t.methods).toEqual(["chat.send", "chat.inject"]);
+  });
+
+  it("returns unavailable when both send and inject return ok:false without throwing", async () => {
+    const t = trace();
+    const result = await deliverDiagnosisViaOfficialLiveGateway(input(), {
+      trace: t,
+      call: async () => ({ ok: false, error: "not written" }),
+    });
+    expect(result).toBe("unavailable");
+    expect(t.methods).toEqual(["chat.send", "chat.inject"]);
+  });
+
+  it("cannot reset a non-canary session through the official bridge", async () => {
+    const t = trace();
+    const calls: Array<{ method: string; key?: string; sessionKey?: string }> = [];
+    await expect(
+      deliverDiagnosisViaOfficialLiveGateway(input({ sessionKey: "agent:other:t20" }), {
+        trace: t,
+        call: async (opts) => {
+          const params = (opts.params ?? {}) as { key?: string; sessionKey?: string };
+          calls.push({ method: opts.method, key: params.key, sessionKey: params.sessionKey });
+          return { ok: true };
+        },
+      }),
+    ).rejects.toMatchObject({ code: "canary_session_mismatch" });
+    expect(calls).toEqual([]);
+    expect(t.methods).toEqual([]);
+    expect(t.resetKeys).toEqual([]);
+  });
 });
