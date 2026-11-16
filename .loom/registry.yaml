@@ -14576,6 +14576,10 @@ tasks:
     paths:
       - .kiro/specs/batch1-capability-enablement-20261116/**
       - src/batch1-capability-enablement/**
+      - src/diagnosis/official-live-send.ts
+      - src/diagnosis/official-live-send.test.ts
+      - src/diagnosis/bootstrap.ts
+      - src/diagnosis/production-cutover.ts
     state: active
     sessions:
       - id: f0968f98-6660-470c-b7ff-d635fb9f345a
