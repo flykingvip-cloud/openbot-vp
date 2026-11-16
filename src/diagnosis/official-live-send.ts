@@ -95,6 +95,31 @@ export function isSessionNotFoundError(error: unknown): boolean {
   return /session not found/i.test(message);
 }
 
+export function throwIfGatewayCallRejected(result: unknown): void {
+  if (!result || typeof result !== "object") {
+    return;
+  }
+  const record = result as { ok?: unknown; error?: unknown };
+  if (record.ok !== false) {
+    return;
+  }
+  if (record.error instanceof Error) {
+    throw record.error;
+  }
+  if (typeof record.error === "string" && record.error.trim()) {
+    throw new Error(record.error);
+  }
+  if (
+    record.error &&
+    typeof record.error === "object" &&
+    "message" in record.error &&
+    typeof (record.error as { message?: unknown }).message === "string"
+  ) {
+    throw new Error((record.error as { message: string }).message);
+  }
+  throw new Error("gateway call returned ok=false");
+}
+
 export async function deliverDiagnosisViaOfficialLiveGateway(
   input: OfficialLiveSendInput,
   options: {
@@ -125,40 +150,46 @@ export async function deliverDiagnosisViaOfficialLiveGateway(
 
   const injectOnce = async () => {
     record("chat.inject");
-    await call({
-      method: "chat.inject",
-      params: {
-        sessionKey,
-        message: input.text,
-        label: "诊断提醒",
-      },
-      timeoutMs: injectTimeout,
-    });
+    throwIfGatewayCallRejected(
+      await call({
+        method: "chat.inject",
+        params: {
+          sessionKey,
+          message: input.text,
+          label: "诊断提醒",
+        },
+        timeoutMs: injectTimeout,
+      }),
+    );
   };
 
   const ensureCanarySession = async () => {
     record("sessions.reset");
     trace?.resetKeys.push(sessionKey);
-    await call({
-      method: "sessions.reset",
-      params: { key: sessionKey, reason: "new" },
-      timeoutMs: resetTimeout,
-    });
+    throwIfGatewayCallRejected(
+      await call({
+        method: "sessions.reset",
+        params: { key: sessionKey, reason: "new" },
+        timeoutMs: resetTimeout,
+      }),
+    );
   };
 
   try {
     // Prefer chat.send (P24.5 contract). deliver:false keeps canary off external channels.
     record("chat.send");
-    await call({
-      method: "chat.send",
-      params: {
-        sessionKey,
-        message: input.text,
-        idempotencyKey: input.deliveryId,
-        deliver: false,
-      },
-      timeoutMs: sendTimeout,
-    });
+    throwIfGatewayCallRejected(
+      await call({
+        method: "chat.send",
+        params: {
+          sessionKey,
+          message: input.text,
+          idempotencyKey: input.deliveryId,
+          deliver: false,
+        },
+        timeoutMs: sendTimeout,
+      }),
+    );
     return "accepted";
   } catch (sendErr) {
     if (isGatewayAuthOrAuthorizationError(sendErr)) {

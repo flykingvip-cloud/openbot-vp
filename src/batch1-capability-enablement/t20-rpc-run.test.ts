@@ -33,12 +33,16 @@ import {
   testState,
 } from "../gateway/test-helpers.js";
 import { readBoundSha } from "./bound-sha.js";
+import {
+  observationFromCallGatewayError,
+  observationFromCallGatewayPayload,
+} from "./gateway-call-observation.js";
+import { deriveCaseHonesty } from "./rpc-summary.js";
 
 installGatewayTestHooks({ scope: "suite" });
 
 const RUN_ID = `t20-rpc-${Date.now()}`;
-const EVIDENCE_DIR =
-  process.env.OPENBOT_T20_RPC_EVIDENCE_DIR ?? "/workspace/openbot-vp-audit/batch1-evidence/t20-rpc";
+const EVIDENCE_DIR = process.env.OPENBOT_T20_RPC_EVIDENCE_DIR ?? "/tmp/openbot-t20-rpc-evidence";
 const TEST_TOKEN = "test-gateway-token-1234567890";
 const INHERITED_ENV_KEYS = [
   "OPENCLAW_GATEWAY_URL",
@@ -283,9 +287,7 @@ describe("t20 clean isolated RPC run", () => {
       const before =
         typeof params.sessionKey === "string" ? await historyFingerprints(params.sessionKey) : [];
       const startedAt = new Date().toISOString();
-      let ok = false;
-      let error: string | null = null;
-      let runId: string | null = null;
+      let observation = observationFromCallGatewayError("not started");
       try {
         const result = await callGateway({
           ...opts,
@@ -293,17 +295,13 @@ describe("t20 clean isolated RPC run", () => {
           token,
           timeoutMs: 8_000,
         });
-        ok = result.ok === true;
-        error =
-          typeof result.error === "string"
-            ? result.error
-            : result.error == null
-              ? null
-              : JSON.stringify(result.error);
-        runId = (result.payload as { runId?: string } | undefined)?.runId ?? null;
+        observation = observationFromCallGatewayPayload(result);
+        if (!observation.ok) {
+          throw new Error(observation.error ?? "gateway call returned ok=false");
+        }
         return result;
       } catch (caught) {
-        error = caught instanceof Error ? caught.message : String(caught);
+        observation = observationFromCallGatewayError(caught);
         throw caught;
       } finally {
         const afterKey = typeof params.sessionKey === "string" ? params.sessionKey : null;
@@ -316,9 +314,9 @@ describe("t20 clean isolated RPC run", () => {
           caseName,
           method: opts.method,
           params: summarizeParams(params),
-          ok,
-          error,
-          returnSummary: { runId },
+          ok: observation.ok,
+          error: observation.error,
+          returnSummary: { runId: observation.runId, status: observation.status },
           messages: { before, after, diff: messageDiff(before, after) },
         });
       }
@@ -436,11 +434,29 @@ describe("t20 clean isolated RPC run", () => {
         messages: { before, after, diff: messageDiff(before, after) },
       });
       expect(t.methods).toContain("chat.inject");
+      const honesty = deriveCaseHonesty(
+        {
+          caseName: "timeout-fallback",
+          requirePersistence: true,
+          officialOutcome: outcome,
+          expectedFailures: [{ method: "chat.send", phase: "under_test" }],
+        },
+        [
+          {
+            phase: "verification",
+            caseName: "timeout-fallback",
+            method: "chat.history",
+            ok: true,
+            messages: { diff: messageDiff(before, after) },
+          },
+        ],
+      );
       cases["timeout-fallback"] = {
         outcome,
         methods: t.methods,
         messageDiff: messageDiff(before, after),
-        result: t.methods.includes("chat.inject") ? "pass" : "fail",
+        honesty,
+        result: honesty.result,
       };
     } finally {
       if (previous == null) {
@@ -547,12 +563,29 @@ describe("t20 clean isolated RPC run", () => {
       otherGetOk: otherGet.response.ok,
       canaryDiff: messageDiff(canaryBefore, canaryAfter),
     };
+    const concurrencyHonesty = deriveCaseHonesty(
+      {
+        caseName: "concurrency",
+        requirePersistence: true,
+        officialOutcome: a === "accepted" && b === "accepted" ? "accepted" : null,
+      },
+      [
+        {
+          phase: "verification",
+          caseName: "concurrency",
+          method: "chat.history",
+          ok: true,
+          messages: { diff: messageDiff(canaryBefore, canaryAfter) },
+        },
+      ],
+    );
     cases.concurrency = {
       a,
       b,
       methodsA: tA.methods,
       methodsB: tB.methods,
-      result: a && b ? "pass" : "fail",
+      honesty: concurrencyHonesty,
+      result: concurrencyHonesty.result,
     };
     expect(otherGet.response.ok).toBe(true);
   }, 60_000);
