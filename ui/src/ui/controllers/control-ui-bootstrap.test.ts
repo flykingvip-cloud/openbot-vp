@@ -401,7 +401,6 @@ describe("loadControlUiBootstrapConfig", () => {
     Object.defineProperty(window, "location", {
       configurable: true,
       value: {
-        ...original,
         pathname: "/enterprise/001/overview",
         href: "http://127.0.0.1:18789/enterprise/001/overview",
         host: "127.0.0.1:18789",
