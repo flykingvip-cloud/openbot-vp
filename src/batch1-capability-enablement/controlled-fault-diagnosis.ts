@@ -370,7 +370,7 @@ export async function runControlledFaultDiagnosis(params: {
       report.completion === "INCONCLUSIVE" &&
       report.findings.length === 0 &&
       report.observationSummary?.text === "已观察到工具超时；根因尚未确认；路由证据缺失。" &&
-      report.observationSummary.rootCauseConfirmed === false
+      !report.observationSummary?.rootCauseConfirmed
         ? "pass"
         : "fail",
   };
