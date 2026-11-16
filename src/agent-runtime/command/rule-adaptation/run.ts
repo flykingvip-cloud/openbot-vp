@@ -251,20 +251,23 @@ function handleTools(
   ctx: LoopContext,
   completion: Extract<ModelCompletion, { kind: "tool_calls" }>,
 ): void {
-  const outputs: unknown[] = [];
+  ctx.messages.push({
+    role: "assistant",
+    content: completion.text ?? "",
+    toolCalls: completion.toolCalls,
+  });
   for (const call of completion.toolCalls) {
-    outputs.push({
+    const output = ctx.tools.execute(call.name, call.arguments);
+    ctx.messages.push({
+      role: "tool",
       toolCallId: call.id,
-      ...ctx.tools.execute(call.name, call.arguments),
+      toolName: call.name,
+      content: JSON.stringify({
+        untrustedMaterial: true,
+        results: [{ toolCallId: call.id, ...output }],
+      }),
     });
   }
-  if (completion.text) {
-    ctx.messages.push({ role: "assistant", content: completion.text });
-  }
-  ctx.messages.push({
-    role: "tool",
-    content: JSON.stringify({ untrustedMaterial: true, results: outputs }),
-  });
 }
 
 function handleFinalMessage(ctx: LoopContext, text: string): ShadowRunResult | "revise" {

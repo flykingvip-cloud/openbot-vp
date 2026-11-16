@@ -14533,6 +14533,27 @@ tasks:
         No merge or deploy until authorized. Does not include A/B fidelity files
         or #281 content."
     paths:
+      - src/agent-runtime/command/rule-adaptation/normal-task-host.test.ts
+      - src/agent-runtime/command/rule-adaptation/run.ts
+      - src/agent-runtime/contracts/rule-adaptation-shadow.ts
+      - src/agent-runtime/execution/runner/admitted-candidate-embedded.ts
+      - src/agent-runtime/execution/runner/embedded-request.ts
+      - src/agent-runtime/execution/runner/embedded-run-auth.ts
+      - src/agent-runtime/execution/runner/turn-contract.ts
+      - src/agent-runtime/model/interaction-completion.ts
+      - src/agent-runtime/model/prepare-embedded-model.ts
+      - src/agent-runtime/model/rule-adaptation/complex-rule-decision.test.ts
+      - src/agent-runtime/model/rule-adaptation/complex-rule-decision.ts
+      - src/agent-runtime/model/rule-adaptation/context-cap-selection.ts
+      - src/agent-runtime/model/rule-adaptation/model-port.ts
+      - src/agent-runtime/policy/rule-adaptation/execution-adoption.test.ts
+      - src/agent-runtime/policy/rule-adaptation/execution-adoption.ts
+      - src/agent-runtime/policy/rule-adaptation/index.ts
+      - src/agent-runtime/wiring/interaction-turn.ts
+      - src/agent-runtime/wiring/reply-turn.ts
+      - src/config/types.agent-defaults.ts
+      - src/config/zod-schema.agent-defaults.ts
+      - src/gateway/collaboration-dispatch/visible-reply-limit.test.ts
       - src/agent-runtime/command/rule-adaptation/index.ts
       - src/agent-runtime/model/prepare-embedded-model.ts
       - src/agent-runtime/command/rule-adaptation/context-window-decision.test.ts
@@ -14585,6 +14606,27 @@ landingStreams:
   - id: rule-adaptation-shadow-host-min
     landingPolicy: serial
     paths:
+      - src/agent-runtime/command/rule-adaptation/normal-task-host.test.ts
+      - src/agent-runtime/command/rule-adaptation/run.ts
+      - src/agent-runtime/contracts/rule-adaptation-shadow.ts
+      - src/agent-runtime/execution/runner/admitted-candidate-embedded.ts
+      - src/agent-runtime/execution/runner/embedded-request.ts
+      - src/agent-runtime/execution/runner/embedded-run-auth.ts
+      - src/agent-runtime/execution/runner/turn-contract.ts
+      - src/agent-runtime/model/interaction-completion.ts
+      - src/agent-runtime/model/prepare-embedded-model.ts
+      - src/agent-runtime/model/rule-adaptation/complex-rule-decision.test.ts
+      - src/agent-runtime/model/rule-adaptation/complex-rule-decision.ts
+      - src/agent-runtime/model/rule-adaptation/context-cap-selection.ts
+      - src/agent-runtime/model/rule-adaptation/model-port.ts
+      - src/agent-runtime/policy/rule-adaptation/execution-adoption.test.ts
+      - src/agent-runtime/policy/rule-adaptation/execution-adoption.ts
+      - src/agent-runtime/policy/rule-adaptation/index.ts
+      - src/agent-runtime/wiring/interaction-turn.ts
+      - src/agent-runtime/wiring/reply-turn.ts
+      - src/config/types.agent-defaults.ts
+      - src/config/zod-schema.agent-defaults.ts
+      - src/gateway/collaboration-dispatch/visible-reply-limit.test.ts
       - src/agent-runtime/command/rule-adaptation/index.ts
       - src/agent-runtime/model/prepare-embedded-model.ts
       - src/agent-runtime/command/rule-adaptation/context-window-decision.test.ts

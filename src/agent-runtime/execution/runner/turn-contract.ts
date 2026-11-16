@@ -38,6 +38,8 @@ export type AgentRunLoopResult =
   | { kind: "final"; payload: ReplyPayload };
 
 export type AgentTurnExecutionParams = {
+  /** Trusted server binding only; never sourced from the user message. */
+  resolveExecutionConstraints?: import("./embedded-request.js").RunEmbeddedPiAgentParams["resolveExecutionConstraints"];
   commandBody: string;
   followupRun: FollowupRun;
   sessionCtx: TemplateContext;

@@ -21,10 +21,18 @@ import type { TaskBoardScope } from "../../contracts/task.js";
 import { CONTEXT_WINDOW_HARD_MIN_TOKENS, type ContextWindowInfo } from "../../policy/index.js";
 import { boardScopesEqual, isSafeIntegerNumber } from "../../policy/rule-adaptation/index.js";
 
-export const CONTEXT_CAP_SELECTION_MODES = ["original", "personal_activated_snapshot"] as const;
+export const CONTEXT_CAP_SELECTION_MODES = [
+  "original",
+  "personal_activated_snapshot",
+  "dynamic_run",
+] as const;
 export type ContextCapSelectionMode = (typeof CONTEXT_CAP_SELECTION_MODES)[number];
 
-export const CONTEXT_CAP_SELECTION_SOURCES = ["original", "personal_activated_snapshot"] as const;
+export const CONTEXT_CAP_SELECTION_SOURCES = [
+  "original",
+  "personal_activated_snapshot",
+  "dynamic_run",
+] as const;
 export type ContextCapSelectionSource = (typeof CONTEXT_CAP_SELECTION_SOURCES)[number];
 
 export const PERSONAL_CONTEXT_WINDOW_RULE_ID = "model.context_window.guard";

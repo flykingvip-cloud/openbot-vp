@@ -128,5 +128,13 @@ export async function prepareEmbeddedModel(input: {
     );
   }
 
-  return { authStorage, modelRegistry, authOverride, ctxInfo, effectiveModel, contextCapSelection };
+  return {
+    authStorage,
+    modelRegistry,
+    authOverride,
+    ctxInfo,
+    effectiveModel,
+    contextCapSelection,
+    constraintDecision: decision,
+  };
 }

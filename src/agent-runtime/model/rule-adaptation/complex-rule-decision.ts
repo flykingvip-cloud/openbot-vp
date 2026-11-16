@@ -57,6 +57,7 @@ export type ConfirmedContextWindowDecision = {
 export type ContextWindowDecisionSwitch = {
   mode: ComplexRuleDecisionMode;
   snapshot?: ConfirmedContextWindowDecision;
+  revalidate?: () => boolean;
   fallback: "legacy" | "block";
 };
 
@@ -73,6 +74,7 @@ export function consumeContextWindowDecision(input: {
   const snapshot = input.policy.snapshot;
   if (
     snapshot &&
+    input.policy.revalidate?.() === true &&
     snapshot.domain === "context_window" &&
     snapshot.ruleId === "model.context_window.guard" &&
     snapshot.decisionId === input.decisionId &&
@@ -85,8 +87,8 @@ export function consumeContextWindowDecision(input: {
   ) {
     const selection: ContextCapSelectionResult = {
       outcome: "applied",
-      mode: "original",
-      source: "original",
+      mode: "dynamic_run",
+      source: "dynamic_run",
       originalTokens: input.original.tokens,
       tokens: snapshot.effectiveTokens,
     };

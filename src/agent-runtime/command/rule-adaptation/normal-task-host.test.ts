@@ -88,9 +88,15 @@ for (const failure of [false, true]) {
       } as never;
     });
     try {
-      await expect(
-        recordNormalTaskRuleAdvice(params, interaction, shadow),
-      ).resolves.toBeUndefined();
+      const advice = await recordNormalTaskRuleAdvice(params, interaction, shadow);
+      if (failure) {
+        expect(advice).toBeUndefined();
+      } else {
+        expect(advice).toMatchObject({
+          currentTokens: 32000,
+          result: { outcomeCode: "no_change_needed" },
+        });
+      }
       expect(shadow).toHaveBeenCalledOnce();
       expect(shadow.mock.calls[0]).toBeDefined();
       expect(interaction).toEqual(before);
@@ -99,3 +105,64 @@ for (const failure of [false, true]) {
     }
   });
 }
+it("uses current-turn admission without inventing a persistent task", async () => {
+  const current = vi.spyOn(sessionTaskState, "turnAdmissionCurrent").mockReturnValue(true);
+  const binding = vi.spyOn(sessionTaskState, "bindingCurrent");
+  const shadow = vi.fn(
+    async () =>
+      ({
+        outcomeCode: "no_change_needed",
+        controlUnchanged: true,
+        usage: { modelCalls: 1 },
+      }) as never,
+  );
+  try {
+    const result = await recordNormalTaskRuleAdvice(
+      params,
+      {
+        kind: "execution_admission",
+        result: {
+          kind: "accepted_turn",
+          admission: {
+            requestId: params.requestId,
+            sessionFile: params.sessionFile,
+            goal: "fixture",
+            acceptance: ["fixture"],
+            focusRevision: 0,
+            writeEpoch: 0,
+          },
+        },
+      },
+      shadow,
+    );
+    expect(result?.result.outcomeCode).toBe("no_change_needed");
+    expect(shadow).toHaveBeenCalledOnce();
+    expect(binding).not.toHaveBeenCalled();
+  } finally {
+    current.mockRestore();
+    binding.mockRestore();
+  }
+});
+
+it("refuses an unauthorized host before credential resolution", async () => {
+  const shadow = vi.fn();
+  await recordNormalTaskRuleAdvice(
+    { ...params, authorized: false },
+    {
+      kind: "execution_admission",
+      result: {
+        kind: "accepted_turn",
+        admission: {
+          requestId: params.requestId,
+          sessionFile: params.sessionFile,
+          goal: "fixture",
+          acceptance: ["fixture"],
+          focusRevision: 0,
+          writeEpoch: 0,
+        },
+      },
+    },
+    shadow,
+  );
+  expect(shadow).not.toHaveBeenCalled();
+});

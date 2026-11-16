@@ -394,11 +394,58 @@ export function createHostShadowCompletion(
       candidate.model,
       {
         systemPrompt: input.system,
-        messages: input.messages.map((message) => ({
-          role: "user" as const,
-          content: JSON.stringify({ source: message.role, content: message.content }),
-          timestamp: Date.now(),
-        })),
+        messages: input.messages.map((message): import("@earendil-works/pi-ai/compat").Message => {
+          if (message.role === "tool") {
+            if (!message.toolCallId || !message.toolName) {
+              throw new Error("Missing shadow tool correlation");
+            }
+            return {
+              role: "toolResult",
+              toolCallId: message.toolCallId,
+              toolName: message.toolName,
+              content: [{ type: "text", text: message.content }],
+              isError: false,
+              timestamp: Date.now(),
+            };
+          }
+          if (message.role === "assistant") {
+            return {
+              role: "assistant",
+              api: candidate.model.api,
+              provider: candidate.model.provider,
+              model: candidate.model.id,
+              content: [
+                ...(message.content ? [{ type: "text" as const, text: message.content }] : []),
+                ...(message.toolCalls ?? []).map((call) => {
+                  if (
+                    !call.arguments ||
+                    typeof call.arguments !== "object" ||
+                    Array.isArray(call.arguments)
+                  ) {
+                    throw new Error("Invalid shadow tool arguments");
+                  }
+                  return {
+                    type: "toolCall" as const,
+                    id: call.id,
+                    name: call.name,
+                    arguments: call.arguments as Record<string, unknown>,
+                  };
+                }),
+              ],
+              stopReason: message.toolCalls?.length ? "toolUse" : "stop",
+              usage: {
+                input: 0,
+                output: 0,
+                cacheRead: 0,
+                cacheWrite: 0,
+                totalTokens: 0,
+                cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+              },
+              timestamp: Date.now(),
+            };
+          }
+          return { role: "user", content: message.content, timestamp: Date.now() };
+        }),
         tools: input.tools.map((tool) => ({
           name: tool.name,
           description: tool.description,

@@ -1,4 +1,5 @@
 import { resolveRunModelFallbacksOverride } from "../../agents/agent-scope.js";
+import { DEFAULT_CONTEXT_TOKENS } from "../../agents/defaults.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import type { ExecutionIdentityRunFields } from "../../gateway/execution-identity-context.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
@@ -11,7 +12,9 @@ import {
 import { runOfficialShadowRuleAdaptation } from "../command/rule-adaptation/index.js";
 import type { InteractionModelInput } from "../contracts/interaction.js";
 import { createHostShadowCompletion } from "../model/rule-adaptation/index.js";
+import { resolveContextWindowInfo } from "../policy/index.js";
 import { listRuntimeRuleDeclarations, CONTEXT_WINDOW_HARD_MIN_TOKENS } from "../policy/index.js";
+import { validateExecutionRuleProposal } from "../policy/rule-adaptation/index.js";
 import { sessionTaskState } from "../state/index.js";
 import { bindAdmittedTurnHost } from "./admitted-turn-host.js";
 import { bindInteractionCandidate } from "./interaction-candidate.js";
@@ -75,7 +78,7 @@ export async function runGatewayInteraction(
     return runGovernedInteraction(params, ports, shadowHost);
   }
   const interaction = await runGovernedInteraction(params, ports);
-  await recordNormalTaskRuleAdvice(params, interaction);
+  // Rule decisions belong to execution preparation; do not run a second shadow call here.
   return interaction;
 }
 
@@ -94,23 +97,37 @@ export async function recordNormalTaskRuleAdvice(
   interaction: import("../command/index.js").GovernedInteractionResult,
   runShadow = runOfficialShadowRuleAdaptation,
 ) {
-  if (interaction.kind !== "execution_admission" || interaction.result.kind !== "accepted") {
+  if (
+    interaction.kind !== "execution_admission" ||
+    (interaction.result.kind !== "accepted" && interaction.result.kind !== "accepted_turn")
+  ) {
     return;
   }
   if (params.identity.executionIdentity?.collaborationGroupId) {
     return;
   }
-  const binding = interaction.result.binding;
+  const binding = interaction.result.kind === "accepted" ? interaction.result.binding : undefined;
+  const turn =
+    interaction.result.kind === "accepted_turn" ? interaction.result.admission : undefined;
+  const scopeId = binding?.taskId ?? `turn:${params.requestId}`;
   const ruleRunId = `${params.runId}:rule-adaptation`;
   const correlation = {
     runId: params.runId,
     ruleRunId,
     requestId: params.requestId,
-    taskId: binding.taskId,
+    taskId: binding?.taskId ?? null,
+    turnId: turn?.requestId ?? null,
   };
   try {
+    if (!params.authorized) {
+      return;
+    }
     params.input.abortSignal?.throwIfAborted();
-    if (!sessionTaskState.bindingCurrent(params.sessionFile, binding)) {
+    if (
+      binding
+        ? !sessionTaskState.bindingCurrent(params.sessionFile, binding)
+        : !turn || !sessionTaskState.turnAdmissionCurrent(params.sessionFile, turn)
+    ) {
       ruleAdviceLog.info(
         JSON.stringify({ ...correlation, phase: "skipped", reason: "stale_binding" }),
       );
@@ -128,8 +145,13 @@ export async function recordNormalTaskRuleAdvice(
     });
     const candidate = await resolveCandidate(params.provider, params.model);
     const modelWindow = candidate.model.contextWindow;
-    const cap = params.config.agents?.defaults?.contextTokens;
-    const current = typeof cap === "number" && cap > 0 ? Math.min(cap, modelWindow) : modelWindow;
+    const current = resolveContextWindowInfo({
+      cfg: params.config,
+      provider: params.provider,
+      modelId: params.model,
+      modelContextWindow: modelWindow,
+      defaultTokens: DEFAULT_CONTEXT_TOKENS,
+    }).tokens;
     if (!Number.isFinite(current) || current <= 0) {
       throw new Error("effective_window_unavailable");
     }
@@ -145,17 +167,39 @@ export async function recordNormalTaskRuleAdvice(
         requestId: `${params.requestId}:rule-adaptation`,
         situation: {
           summary: params.input.message,
-          scope: { type: "personal", id: binding.taskId },
+          scope: { type: "personal", id: scopeId },
           knownFacts: {
-            taskId: binding.taskId,
+            taskId: binding?.taskId ?? null,
+            turnId: turn?.requestId ?? null,
             currentEffectiveValue: current,
             hardMin: CONTEXT_WINDOW_HARD_MIN_TOKENS,
           },
         },
-        budget: { maxDurationMs: 5000, maxModelCalls: 3, maxRevisions: 0, maxOutputTokens: 1024 },
+        budget: {
+          maxDurationMs: Math.min(params.timeoutMs, 45_000),
+          maxModelCalls: 3,
+          maxRevisions: 0,
+          maxOutputTokens: 1024,
+        },
         signal: params.input.abortSignal,
       },
       {
+        validate: (proposal) =>
+          validateExecutionRuleProposal(proposal, {
+            mode: "dynamic",
+            authorized: params.authorized,
+            scope: { type: "personal", id: scopeId },
+            proposalScope: { type: "personal", id: scopeId },
+            bindingCurrent: binding
+              ? sessionTaskState.bindingCurrent(params.sessionFile, binding)
+              : Boolean(turn && sessionTaskState.turnAdmissionCurrent(params.sessionFile, turn)),
+            cancelled: params.input.abortSignal?.aborted ?? false,
+            ruleId: "model.context_window.guard",
+            field: "agents.defaults.contextTokens",
+            action: "tune",
+            currentValue: current,
+            proposedValue: current,
+          }),
         view: {
           rules: [
             {
@@ -209,6 +253,7 @@ export async function recordNormalTaskRuleAdvice(
         modelCalls: result.usage.modelCalls,
       }),
     );
+    return { result, currentTokens: current, ruleVersion: rule.version };
   } catch {
     // No user text, credentials or proposal content in operational logs.
     ruleAdviceLog.info(

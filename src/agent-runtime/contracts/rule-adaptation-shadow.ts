@@ -318,6 +318,8 @@ export type ModelMessage = {
   role: "user" | "assistant" | "tool";
   content: string;
   toolCallId?: string;
+  toolName?: string;
+  toolCalls?: readonly ModelToolCall[];
 };
 
 export type ModelCompletion =
