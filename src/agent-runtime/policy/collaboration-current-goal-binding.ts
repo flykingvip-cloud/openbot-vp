@@ -79,7 +79,7 @@ const REVISION_LANGUAGE =
 const BLOCK_LANGUAGE = /(?:阻塞|被挡住|无法继续|blocked|cannot proceed)/iu;
 
 const NEW_WORK_LANGUAGE =
-  /(?:另外(?:再)?(?:做|建|开)|再开一个|新的项目|新任务|另作一个|start a new (?:task|project))/iu;
+  /(?:^(?:请|现在)?\s*新建[^，。；;\n]{0,24}(?:任务|项目)|另外(?:再)?(?:做|建|开)|再开一个|新的项目|新任务|另作一个|start a new (?:task|project))/iu;
 
 const ROLE_PLAY_LANGUAGE = /(?:我(?:来)?扮演|角色扮演|role[- ]?play|pretend (?:to be|I am))/iu;
 

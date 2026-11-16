@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { parseAppointedProjectOwner } from "./collaboration-current-goal-binding.js";
+import {
+  classifyLaterMessageSpeech,
+  parseAppointedProjectOwner,
+} from "./collaboration-current-goal-binding.js";
 
 const members = [
   { id: "uat-lead", name: "项目经理" },
@@ -37,5 +40,15 @@ describe("appointment clause live seam", () => {
         knownMembers: members,
       }),
     ).toBeNull();
+  });
+
+  it("recognizes explicit new work before incidental plan confirmation wording", () => {
+    expect(
+      classifyLaterMessageSpeech(
+        "新建独立长程任务「经营复盘」。先建立草案，不确认计划、不推进历史任务。",
+      ),
+    ).toBe("new_work");
+    expect(classifyLaterMessageSpeech("请新建一项独立任务，确认前只保留草案。")).toBe("new_work");
+    expect(classifyLaterMessageSpeech("不要新建独立任务，确认原计划。")).not.toBe("new_work");
   });
 });
