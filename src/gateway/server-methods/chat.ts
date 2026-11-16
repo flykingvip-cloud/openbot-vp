@@ -7316,6 +7316,14 @@ export const chatHandlers: GatewayRequestHandlers = {
               const settledReply = turnSettled.visibleText.trim()
                 ? turnSettled.visibleText
                 : sourceText;
+              // Fallback replies must use the same authorized workspace as
+              // execution/preview, not a second tenant/user path formula.
+              const deliverableWorkspaceDir = await resolveCallerWorkspaceCwd({
+                cfg,
+                sessionKey: resolvedSessionKey,
+                agentId,
+                client: client ?? null,
+              });
               prepared = prepareChatDeliverablePublish({
                 text: settledReply,
                 publishIntent: "direct-fallback-final",
@@ -7326,6 +7334,7 @@ export const chatHandlers: GatewayRequestHandlers = {
                 userId: replyGovernance.ownerUserId,
                 clientRunId,
                 taskId: null,
+                agentWorkspaceRoot: deliverableWorkspaceDir,
               });
               const fallbackArtifacts = declaredDeliverableArtifactFields(prepared.text, {
                 timestamp: Date.now(),
