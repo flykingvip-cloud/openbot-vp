@@ -878,6 +878,10 @@ export function createAgentEventHandler({
           userId: identity.userId,
           clientRunId,
           taskId: null,
+          // This private run hint is bound by the authorized execution host,
+          // never by model text or chat params. Settle the bytes tools actually
+          // wrote instead of reconstructing another root from the chatting user.
+          ...(hint?.workspaceDir?.trim() ? { agentWorkspaceRoot: hint.workspaceDir.trim() } : {}),
         });
         // Materialize chip artifacts from tagged text, then strip tags for the bubble.
         finalArtifacts = declaredDeliverableArtifactFields(prepared.text, {
