@@ -12,7 +12,12 @@ import {
   recordCanonicalValidation,
   selectExistingClosingEvidence,
 } from "../progress-ledger/cron-binding.js";
-import { isProgressLedgerEnabled } from "../progress-ledger/feature.js";
+import {
+  isProgressLedgerEnabled,
+  isProgressLedgerShutdown,
+  isProgressLedgerTenantAdmitted,
+  type ProgressLedgerConfigReader,
+} from "../progress-ledger/feature.js";
 import { projectProgress } from "../progress-ledger/project.js";
 import { inferTurnContractFromLedger } from "../progress-ledger/read.js";
 import {
@@ -72,12 +77,34 @@ export function isConversationTaskCloseRequiresEvidence(
  */
 export function isConversationTaskEvidenceLedgerEnabled(
   env: NodeJS.ProcessEnv = process.env,
-  readConfig?: () => boolean,
+  readConfig?: ProgressLedgerConfigReader,
 ): boolean {
   if (isConversationTaskCloseRequiresEvidence(env)) {
     return true;
   }
-  return readConfig ? isProgressLedgerEnabled(env, readConfig) : isProgressLedgerEnabled(env);
+  return isProgressLedgerEnabled(env, readConfig);
+}
+
+/**
+ * Conversation-task progress writes and projections. Applies shutdown and
+ * tenant admission on top of the evidence-ledger source combination.
+ * Close-requires-evidence stays default ON, so this can be true even when
+ * the process-global progress-ledger switch is unset. A missing tenant id
+ * fail-closes only when an allowlist is configured.
+ */
+export function isConversationTaskProgressEnabled(params: {
+  tenantId?: string | null;
+  env?: NodeJS.ProcessEnv;
+  readConfig?: ProgressLedgerConfigReader;
+}): boolean {
+  const env = params.env ?? process.env;
+  if (isProgressLedgerShutdown(env, params.readConfig)) {
+    return false;
+  }
+  if (!isProgressLedgerTenantAdmitted(params.tenantId, env, params.readConfig)) {
+    return false;
+  }
+  return isConversationTaskEvidenceLedgerEnabled(env, params.readConfig);
 }
 
 export function conversationLedgerClosedOnCanonicalEvidence(
@@ -256,7 +283,7 @@ export async function completeConversationTaskLedgerOnReply(params: {
   cronStorePath?: string;
   atMs?: number;
   env?: NodeJS.ProcessEnv;
-  readConfig?: () => boolean;
+  readConfig?: ProgressLedgerConfigReader;
 }): Promise<ExecutionLedger | null> {
   return (await completeConversationTaskLedgerOnReplyOutcome(params)).ledger;
 }
@@ -266,10 +293,14 @@ export async function completeConversationTaskLedgerOnReplyOutcome(params: {
   cronStorePath?: string;
   atMs?: number;
   env?: NodeJS.ProcessEnv;
-  readConfig?: () => boolean;
+  readConfig?: ProgressLedgerConfigReader;
 }): Promise<{ ledger: ExecutionLedger | null; closedNow: boolean }> {
   const env = params.env ?? process.env;
-  const enabled = isConversationTaskEvidenceLedgerEnabled(env, params.readConfig);
+  const enabled = isConversationTaskProgressEnabled({
+    tenantId: params.task.tenantId,
+    env,
+    readConfig: params.readConfig,
+  });
   if (!enabled) {
     return { ledger: null, closedNow: false };
   }
@@ -383,12 +414,13 @@ export async function ensureConversationTaskLedgerSeeded(params: {
   cronStorePath?: string;
   atMs?: number;
   env?: NodeJS.ProcessEnv;
-  readConfig?: () => boolean;
+  readConfig?: ProgressLedgerConfigReader;
 }): Promise<ExecutionLedger | null> {
-  const enabled = isConversationTaskEvidenceLedgerEnabled(
-    params.env ?? process.env,
-    params.readConfig,
-  );
+  const enabled = isConversationTaskProgressEnabled({
+    tenantId: params.task.tenantId,
+    env: params.env ?? process.env,
+    readConfig: params.readConfig,
+  });
   if (!enabled) {
     return null;
   }
@@ -418,12 +450,13 @@ export async function readConversationTaskProgressView(params: {
   cronStorePath?: string;
   nowMs?: number;
   env?: NodeJS.ProcessEnv;
-  readConfig?: () => boolean;
+  readConfig?: ProgressLedgerConfigReader;
 }): Promise<ProgressView | null> {
-  const enabled = isConversationTaskEvidenceLedgerEnabled(
-    params.env ?? process.env,
-    params.readConfig,
-  );
+  const enabled = isConversationTaskProgressEnabled({
+    tenantId: params.task.tenantId,
+    env: params.env ?? process.env,
+    readConfig: params.readConfig,
+  });
   if (!enabled) {
     return null;
   }
@@ -489,7 +522,7 @@ export async function observeConversationToolEvent(params: {
   cronStorePath?: string;
   atMs?: number;
   env?: NodeJS.ProcessEnv;
-  readConfig?: () => boolean;
+  readConfig?: ProgressLedgerConfigReader;
 }): Promise<ExecutionLedger | null> {
   if (params.evt.stream !== "tool") {
     return null;
@@ -605,13 +638,17 @@ export function createConversationTurnToolObserver(params: {
   storeRoot: string;
   cronStorePath?: string;
   env?: NodeJS.ProcessEnv;
-  readConfig?: () => boolean;
+  readConfig?: ProgressLedgerConfigReader;
 }): ((evt: ConversationToolAgentEvent) => void) | null {
   if (params.isHeartbeat) {
     return null;
   }
   const env = params.env ?? process.env;
-  const ledgerOn = isConversationTaskEvidenceLedgerEnabled(env, params.readConfig);
+  const ledgerOn = isConversationTaskProgressEnabled({
+    tenantId: params.tenantId,
+    env,
+    readConfig: params.readConfig,
+  });
   if (!ledgerOn) {
     return null;
   }
