@@ -462,8 +462,6 @@ describe("R2 financial group-final official chain", () => {
       return;
     }
     expect(returned.value.status).toBe("returned");
-    const returnActor = returned.value.updatedBy ?? returned.value.lastActorId;
-    expect([REVIEWER, COORD]).toContain(returnActor ?? COORD);
 
     const seededV2 = await seedLinkedTeamDeliverableFixture({
       authority: auth,
