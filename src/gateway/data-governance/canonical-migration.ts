@@ -90,7 +90,7 @@ export async function migrateCanonicalWorkspace(params: {
   if (!artifactSet.length) {
     throw new Error("migration_artifacts_empty");
   }
-  fs.mkdirSync(target);
+  fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.cpSync(source, target, { recursive: true, errorOnExist: true, force: false });
   const checksum = digestSet(artifactSet);
   if (
