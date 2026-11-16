@@ -1,5 +1,5 @@
-import { collectBlockedFollowupDeliveryPersistRoots } from "../../agent-runtime/state/repository/blocked-followup-delivery-recovery.js";
-import { listBlockedFollowupDeliveries } from "../../agent-runtime/state/repository/blocked-followup-delivery.js";
+import { collectBlockedFollowupDeliveryPersistRoots } from "../../agent-runtime/state/index.js";
+import { listBlockedFollowupDeliveries } from "../../agent-runtime/state/index.js";
 import { loadConfig } from "../../config/config.js";
 import type { GatewayClient } from "../server-methods/types.js";
 import { requireTenantContext } from "../tenant-context.js";

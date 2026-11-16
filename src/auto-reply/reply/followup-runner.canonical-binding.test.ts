@@ -7,7 +7,7 @@ import {
   listBlockedFollowupDeliveries,
   listRecoverableFollowupDeliveries,
   planFollowupRecoveryRetry,
-} from "../../agent-runtime/state/repository/blocked-followup-delivery.js";
+} from "../../agent-runtime/state/index.js";
 import { drainNextQueueItem } from "../../utils/queue-helpers.js";
 import type { VerifiedMigrationReceiptEvidence } from "./followup-workspace-change.js";
 import type { FollowupRun } from "./queue.js";
