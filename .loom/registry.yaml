@@ -14616,6 +14616,10 @@ tasks:
       - src/gateway/governance/account-runtime-snapshot.ts
       - src/gateway/governance/account-worker-runtime.ts
       - src/agents/sandbox/account-scope.ts
+      - src/gateway/knowledge/deliverables/chat-deliverable-publish.test.ts
+      - src/gateway/knowledge/deliverables/chat-deliverable-publish.ts
+      - src/gateway/knowledge/deliverables/maybe-auto-capture-agent-deliverable.test.ts
+      - src/gateway/knowledge/deliverables/maybe-auto-capture-agent-deliverable.ts
     state: active
     sessions:
       - id: codex-canonical-20261114
@@ -14686,6 +14690,10 @@ landingStreams:
       - src/gateway/governance/account-runtime-snapshot.ts
       - src/gateway/governance/account-worker-runtime.ts
       - src/agents/sandbox/account-scope.ts
+      - src/gateway/knowledge/deliverables/chat-deliverable-publish.test.ts
+      - src/gateway/knowledge/deliverables/chat-deliverable-publish.ts
+      - src/gateway/knowledge/deliverables/maybe-auto-capture-agent-deliverable.test.ts
+      - src/gateway/knowledge/deliverables/maybe-auto-capture-agent-deliverable.ts
     canLandWith: []
     metadata:
       owner: codex-observation
@@ -29858,6 +29866,22 @@ landingStreams:
       agent: codex-runtime-manager
       purpose: Three-way registry merge preserving tasks, sessions and landing history.
 sharedPaths:
+  - glob: src/gateway/knowledge/deliverables/chat-deliverable-publish.test.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: User-authorized canonical publish and auto-capture convergence.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/knowledge/deliverables/chat-deliverable-publish.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: User-authorized canonical publish and auto-capture convergence.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/knowledge/deliverables/maybe-auto-capture-agent-deliverable.test.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: User-authorized canonical publish and auto-capture convergence.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/knowledge/deliverables/maybe-auto-capture-agent-deliverable.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: User-authorized canonical publish and auto-capture convergence.
+    reviewAfter: 2026-11-30
   - glob: src/agents/sandbox/account-scope.ts
     landerTask: canonical-execution-workspace-20261114
     reason: Trusted group identity type propagation for canonical worker.

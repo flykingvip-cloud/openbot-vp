@@ -1,7 +1,14 @@
+const configMode = vi.hoisted(() => ({ managed: false, registry: "" }));
+vi.mock("../../../config/config.js", () => ({
+  loadConfig: () => ({ data: { mode: configMode.managed ? "managed" : "local" } }),
+}));
+vi.mock("../../agent-registry/store.js", () => ({
+  resolveAgentRegistryStorePath: () => configMode.registry,
+}));
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { vi, afterEach, describe, expect, it } from "vitest";
 import { extractDeliverableEnvelope } from "../../../shared/preview-artifact/deliverable-envelope.js";
 import { settleCollaborationDeclaredDeliverable } from "../../workspace-resolver/settle-declared-deliverable.js";
 import {
@@ -16,6 +23,7 @@ import { readGroupDeliverableManifest } from "./group-manifest.js";
 const tempDirs: string[] = [];
 
 afterEach(() => {
+  configMode.managed = false;
   for (const dir of tempDirs.splice(0)) {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -376,4 +384,87 @@ describe("scrubFalseDeliveryClaims / delivery copy gate", () => {
     );
     expect(scrubFalseDeliveryClaims("可以直接打开这份 PDF。")).not.toMatch(/可以直接打开/);
   });
+});
+
+it("production managed publish reads only the official nonlegacy canonical root", () => {
+  const dirs = roots();
+  configMode.managed = true;
+  const canonical = path.join(dirs.stateDir, "tenants", "tenant", "workspaces", "hash", "plan");
+  fs.mkdirSync(canonical, { recursive: true });
+  fs.writeFileSync(path.join(canonical, "result.md"), "ACTUAL EXECUTED BODY");
+  configMode.registry = path.join(dirs.stateDir, "registry.json");
+  fs.writeFileSync(
+    configMode.registry,
+    JSON.stringify({
+      version: 1,
+      assets: {
+        asset: {
+          agentAssetId: "asset",
+          enterpriseId: "tenant",
+          legacyAgentId: "robot",
+          status: "active",
+        },
+      },
+      ownerBindings: {
+        owner: {
+          enterpriseId: "tenant",
+          agentAssetId: "asset",
+          ownerType: "seat",
+          ownerId: "seat",
+          isPrimary: true,
+        },
+      },
+    }),
+  );
+  const resourceId = "ws:tenant:seat:seat:asset:asset";
+  fs.mkdirSync(path.join(dirs.stateDir, "data-governance"));
+  fs.writeFileSync(
+    path.join(dirs.stateDir, "data-governance", "catalog.json"),
+    JSON.stringify({
+      schemaVersion: 1,
+      revision: 1,
+      records: {
+        [resourceId]: {
+          envelope: {
+            resourceId,
+            resourceType: "workspace",
+            schemaVersion: 1,
+            tenantId: "tenant",
+            owner: { kind: "position", seatId: "seat" },
+            scope: { kind: "tenant", tenantId: "tenant" },
+            lifecycleState: "active",
+            classification: "internal",
+            governanceVersion: 1,
+            canonicalBindingId: "canonical",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+          bindings: [
+            {
+              bindingId: "canonical",
+              resourceId,
+              role: "canonical",
+              storageKind: "filesystem",
+              locator: canonical,
+              state: "active",
+              contentVersion: "1",
+            },
+          ],
+        },
+      },
+    }),
+  );
+  const result = prepareChatDeliverablePublish({
+    text: declare("result.md"),
+    publishIntent: "agent-run-final",
+    sessionKey: "agent:robot:main",
+    tenantId: "tenant",
+    userId: "user",
+    agentId: "robot",
+    stateDir: dirs.stateDir,
+    skipCapture: true,
+  });
+  expect(result.view.verification).toBe("pass");
+  expect(fs.readFileSync(path.join(canonical, "result.md"), "utf8")).toBe("ACTUAL EXECUTED BODY");
+  expect(fs.existsSync(path.join(dirs.stateDir, "operators"))).toBe(false);
 });
