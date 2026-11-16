@@ -704,9 +704,18 @@ export type GatewayConfig = {
   fabric?: { enabled?: boolean };
   /**
    * Task Progress Ledger (event-sourced execution observability). Default OFF.
-   * Equivalent to the OPENBOT_PROGRESS_LEDGER_ENABLED env flag (env OR config wins).
+   * Env OR config enables the process-global switch. Env=0 does not override
+   * config.enabled=true. Shutdown (env or config) wins over every enablement
+   * source. A non-empty tenantAllowlist is required before a shared instance
+   * may be called a single-tenant canary; an empty allowlist is process-wide.
+   * Conversation-task projections may still be on via the default-on close-
+   * requires-evidence path unless shutdown or tenant admission applies.
    */
-  progressLedger?: { enabled?: boolean };
+  progressLedger?: {
+    enabled?: boolean;
+    shutdown?: boolean;
+    tenantAllowlist?: string[];
+  };
   /**
    * Development Supervisor (autonomous dev task orchestration). Default OFF.
    * Equivalent to the OPENBOT_SUPERVISOR_ENABLED env flag (env OR config wins).

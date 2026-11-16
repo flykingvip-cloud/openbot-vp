@@ -17,6 +17,7 @@ import {
   buildDiagnoseConversationActions,
   type DiagnoseConversationAction,
 } from "./diagnose-next-actions.js";
+import type { DiagnoseObservationSummary } from "./diagnose-observation-summary.js";
 import { extractDiagnoseSpaceGroupId } from "./diagnose-policy.js";
 import {
   BOOTSTRAP_COMPLETE_TEXT,
@@ -57,6 +58,7 @@ export type DiagnoseReportTextInput = {
   skipped: number;
   reportId: string | null;
   reportIds: string[];
+  observationSummary?: DiagnoseObservationSummary;
   reason?: string;
   locators?: Array<{ agentId: string; sessionKey: string }>;
   growths?: DiagnoseGrowthAssessment[];
@@ -88,6 +90,7 @@ export type ProfessionalDiagnosisReport = {
     scanned: number;
     skipped: number;
     findings: DiagnoseReportTextInput["findings"];
+    observationSummary?: DiagnoseObservationSummary;
   };
   growthAssessment: DiagnoseGrowthAssessment[];
   capabilityAssessment: Array<{
@@ -134,6 +137,7 @@ export function buildProfessionalDiagnosisReport(
       scanned: payload.scanned,
       skipped: payload.skipped,
       findings: payload.findings ?? [],
+      ...(payload.observationSummary ? { observationSummary: payload.observationSummary } : {}),
     },
     growthAssessment: growths,
     capabilityAssessment: growths.map((row) => ({
@@ -321,16 +325,19 @@ function runtimeSection(
   growths: DiagnoseGrowthAssessment[],
 ): string[] {
   const findings = report.runtimeAssessment.findings.slice(0, 8);
-  const lines = [
+  const observation = report.runtimeAssessment.observationSummary?.text?.trim();
+  const findingLines =
     findings.length === 0
-      ? DIAGNOSIS_ZERO_FINDINGS_TEXT
+      ? observation
+        ? observation
+        : DIAGNOSIS_ZERO_FINDINGS_TEXT
       : findings
           .map((finding) => {
             const code = finding.code?.trim() || finding.findingId;
             return `- ${finding.severity} ${finding.status} ${code}`;
           })
-          .join("\n"),
-  ];
+          .join("\n");
+  const lines = [...(observation && findings.length > 0 ? [observation] : []), findingLines];
   if (findings.some((finding) => finding.code === "locator_failed")) {
     lines.unshift(DATA_PLANE_LOCATOR_FAILED_TEXT);
   }

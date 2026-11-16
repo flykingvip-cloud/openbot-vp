@@ -3,6 +3,7 @@
  * Read-only JSON boundary. No HTTP/RPC, Markdown, model summary, or stores.
  */
 import { isSessionlessTargetType, type EvidenceRef } from "./cross-target.js";
+import type { DiagnoseObservationSummary } from "./diagnose-observation-summary.js";
 import { assertGraphRelation } from "./graph.js";
 import {
   COMPOSITE_DIAGNOSIS_REPORT_SCHEMA_VERSION,
@@ -108,6 +109,7 @@ export function validateCompositeDiagnosisReport(
   const completion = validateDiagnosisCompletion(raw.completion, "completion");
   const impactScope = mapItems(raw, "impactScope", (item, path) => requireTargetType(item, path));
   const confidence = validateReportConfidence(raw.confidence);
+  const observationSummary = validateObservationSummary(raw.observationSummary);
 
   assertSingleTenant(tenantId, cases, findings, evidenceRefs, targets);
   assertReferences(
@@ -157,6 +159,7 @@ export function validateCompositeDiagnosisReport(
     completion,
     missingEvidence,
     confidence,
+    ...(observationSummary ? { observationSummary } : {}),
   };
 }
 
@@ -677,4 +680,70 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function joinPath(base: string, key: string): string {
   return base ? `${base}.${key}` : key;
+}
+
+function validateObservationSummary(raw: unknown): DiagnoseObservationSummary | undefined {
+  if (raw == null) {
+    return undefined;
+  }
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new DiagnosisContractError(
+      "invalid_type",
+      "observationSummary must be an object when present",
+      "observationSummary",
+    );
+  }
+  const row = raw as Record<string, unknown>;
+  if (typeof row.text !== "string" || row.text.trim() === "") {
+    throw new DiagnosisContractError(
+      "invalid_type",
+      "observationSummary.text must be a non-empty string",
+      "observationSummary.text",
+    );
+  }
+  if (typeof row.observedToolTimeout !== "boolean") {
+    throw new DiagnosisContractError(
+      "invalid_type",
+      "observationSummary.observedToolTimeout must be a boolean",
+      "observationSummary.observedToolTimeout",
+    );
+  }
+  if (typeof row.rootCauseConfirmed !== "boolean") {
+    throw new DiagnosisContractError(
+      "invalid_type",
+      "observationSummary.rootCauseConfirmed must be a boolean",
+      "observationSummary.rootCauseConfirmed",
+    );
+  }
+  if (typeof row.routeResolutionMissing !== "boolean") {
+    throw new DiagnosisContractError(
+      "invalid_type",
+      "observationSummary.routeResolutionMissing must be a boolean",
+      "observationSummary.routeResolutionMissing",
+    );
+  }
+  const runnerCompletion =
+    row.runnerCompletion == null
+      ? null
+      : typeof row.runnerCompletion === "string"
+        ? row.runnerCompletion
+        : (() => {
+            throw new DiagnosisContractError(
+              "invalid_type",
+              "observationSummary.runnerCompletion must be a string or null",
+              "observationSummary.runnerCompletion",
+            );
+          })();
+  const reportCompletion =
+    row.reportCompletion == null
+      ? null
+      : validateDiagnosisCompletion(row.reportCompletion, "observationSummary.reportCompletion");
+  return {
+    text: row.text,
+    observedToolTimeout: row.observedToolTimeout,
+    rootCauseConfirmed: row.rootCauseConfirmed,
+    routeResolutionMissing: row.routeResolutionMissing,
+    runnerCompletion,
+    reportCompletion,
+  };
 }

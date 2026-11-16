@@ -187,8 +187,8 @@ function defaultDeps(): WorkbenchPendingTasksDeps {
         unreadOnly: true,
       }),
     listHumanGates: async ({ userId, userEmail, tenantId }) => {
-      const { isProgressLedgerEnabled } = await import("../../progress-ledger/feature.js");
-      if (!isProgressLedgerEnabled()) {
+      const { isProgressLedgerProjected } = await import("../../progress-ledger/feature.js");
+      if (!isProgressLedgerProjected({ tenantId })) {
         return [];
       }
       try {

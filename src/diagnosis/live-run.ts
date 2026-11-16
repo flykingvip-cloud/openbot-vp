@@ -11,6 +11,7 @@ import {
 import { loadSessionStore } from "../config/sessions/store.js";
 import { readSkillInvocationEvents } from "../gateway/skill-invocation/event-store.js";
 import type { SkillInvocationEvent } from "../gateway/skill-invocation/types.js";
+import type { DiagnoseObservationSummary } from "./diagnose-observation-summary.js";
 import { budgetForEnterpriseMode } from "./diagnose-policy.js";
 import { diagnose, type DiagnoseOutput } from "./diagnose.js";
 import { buildCompositeDiagnosisReportFromDiagnoseOutput } from "./report-query-projection-snapshot.js";
@@ -36,6 +37,7 @@ export type LiveDiagnoseSummary = {
   completion: string;
   findingCount: number;
   findings: Array<{ findingId: string; severity: string; status: string; code?: string }>;
+  observationSummary?: DiagnoseObservationSummary;
 };
 
 export function attachSessionFileIfPresent(target: LiveDiagnoseTarget): LiveDiagnoseTarget {
@@ -199,6 +201,7 @@ export async function diagnoseLiveTarget(params: {
         status: finding.status,
         ...(finding.code ? { code: finding.code } : {}),
       })),
+      ...(report.observationSummary ? { observationSummary: report.observationSummary } : {}),
     },
   };
 }
