@@ -878,6 +878,10 @@ export function createAgentEventHandler({
           userId: identity.userId,
           clientRunId,
           taskId: null,
+          // This private run hint is bound by the authorized execution host,
+          // never by model text or chat params. Settle the bytes tools actually
+          // wrote instead of reconstructing another root from the chatting user.
+          ...(hint?.workspaceDir?.trim() ? { agentWorkspaceRoot: hint.workspaceDir.trim() } : {}),
         });
         // Materialize chip artifacts from tagged text, then strip tags for the bubble.
         finalArtifacts = declaredDeliverableArtifactFields(prepared.text, {
@@ -1006,6 +1010,31 @@ export function createAgentEventHandler({
       chatRunState.abortedRuns.has(clientRunId) || chatRunState.abortedRuns.has(evt.runId);
     // Include sessionKey so Control UI can filter tool streams per session.
     const agentPayload = sessionKey ? { ...eventForClients, sessionKey } : eventForClients;
+    // This is a persisted host verification receipt, not another model end
+    // or a task transition. Keep its own stable message identity so late
+    // acceptance does not erase the already-visible artifact response.
+    if (evt.stream === "delivery" && evt.data.phase === "acceptance_pending") {
+      if (!isControlUiVisible || !sessionKey || isAborted || typeof evt.data.text !== "string") {
+        return;
+      }
+      const receiptRunId = `${clientRunId}:acceptance`;
+      const payload = {
+        runId: receiptRunId,
+        sessionKey,
+        seq: evt.seq,
+        state: "final" as const,
+        message: {
+          id: `${evt.runId}:acceptance:assistant`,
+          idempotencyKey: `${evt.runId}:acceptance:assistant`,
+          role: "assistant",
+          content: [{ type: "text", text: evt.data.text }],
+          timestamp: evt.ts,
+        },
+      };
+      broadcastChat(sessionKey, payload);
+      nodeSendToSession(sessionKey, "chat", payload);
+      return;
+    }
     const last = agentRunSeq.get(evt.runId) ?? 0;
     const isToolEvent = evt.stream === "tool";
     const toolVerbose = isToolEvent ? resolveToolVerboseLevel(evt.runId, sessionKey) : "off";

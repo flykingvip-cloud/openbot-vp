@@ -25,7 +25,9 @@ const row = (taskId: string, extra: Record<string, unknown> = {}) => ({
   decidedAt: new Date(time).toISOString(),
   acceptance: { status: "passed" },
   delivery: { status: "delivered" },
-  runs: [{ runId: "run", attemptIds: ["attempt"], effectiveAttemptId: "attempt", status: "succeeded" }],
+  runs: [
+    { runId: "run", attemptIds: ["attempt"], effectiveAttemptId: "attempt", status: "succeeded" },
+  ],
   attempts: [
     {
       attemptId: "attempt",
@@ -72,7 +74,10 @@ describe("platform window snapshot", () => {
   it("assembles coverage over the window cohort, not a single precise task id", () => {
     for (const taskId of ["task-a", "task-b"]) {
       const record = row(taskId);
-      fs.writeFileSync(path.join(dir, "task-outcomes/tips", `${taskId}.json`), JSON.stringify(record));
+      fs.writeFileSync(
+        path.join(dir, "task-outcomes/tips", `${taskId}.json`),
+        JSON.stringify(record),
+      );
       fs.writeFileSync(
         path.join(dir, "task-outcomes/versions", `${taskId}__v1.json`),
         JSON.stringify(record),
@@ -218,7 +223,10 @@ describe("platform window snapshot", () => {
       from: time + 60_000,
       to: time + 120_000,
       projectedAt: time + 120_000,
-      executionStore: createExecutionEvidenceStore({ enabled: () => false, now: () => time + 61_000 }),
+      executionStore: createExecutionEvidenceStore({
+        enabled: () => false,
+        now: () => time + 61_000,
+      }),
       activity: null,
     });
     expect(snapshot.ok).toBe(true);

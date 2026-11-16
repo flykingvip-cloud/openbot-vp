@@ -45,10 +45,7 @@ export function configuredAgentHeartbeatPeriodMs(
   return ms && ms > 0 ? ms : null;
 }
 
-function configuredTenantId(entry: {
-  ownerType?: string;
-  ownerId?: string;
-}): string | null {
+function configuredTenantId(entry: { ownerType?: string; ownerId?: string }): string | null {
   if (entry.ownerType !== "tenant") {
     return null;
   }
@@ -61,9 +58,7 @@ export function listScheduledHeartbeatRobots(cfg: OpenBotConfig): ScheduledHeart
   if (entries.length === 0) {
     const fallbackId = listAgentIds(cfg)[0] ?? "";
     const period = configuredAgentHeartbeatPeriodMs(cfg, fallbackId);
-    return period
-      ? [{ agentId: fallbackId, expectedPeriodMs: period, tenantId: null }]
-      : [];
+    return period ? [{ agentId: fallbackId, expectedPeriodMs: period, tenantId: null }] : [];
   }
   const seen = new Set<string>();
   const robots: ScheduledHeartbeatRobot[] = [];
@@ -135,12 +130,15 @@ export function observeScheduledHeartbeatRobots(input: {
   const windowEvents = input.events.filter(
     (event) => Number.isFinite(event.ts) && event.ts >= start && event.ts < input.to,
   );
-  const unattributedInWindow = windowEvents.filter((event) => eventAgentId(event.agentId) == null)
-    .length;
+  const unattributedInWindow = windowEvents.filter(
+    (event) => eventAgentId(event.agentId) == null,
+  ).length;
   return {
     unattributedInWindow,
     robots: robots.map((robot) => {
-      const attributed = windowEvents.filter((event) => eventAgentId(event.agentId) === robot.agentId);
+      const attributed = windowEvents.filter(
+        (event) => eventAgentId(event.agentId) === robot.agentId,
+      );
       const samples = deriveHeartbeatSamples({
         expectedPeriodMs: robot.expectedPeriodMs,
         events: attributed,
@@ -204,9 +202,10 @@ export function rollupHeartbeatCohort(
       scheduledRobotCount,
       confirmedRobotCount: 0,
       onCadenceRobotCount: null,
-      expectedPeriodMs: uniquePositive(robots.map((robot) => robot.expectedPeriodMs)).length === 1
-        ? robots[0].expectedPeriodMs
-        : null,
+      expectedPeriodMs:
+        uniquePositive(robots.map((robot) => robot.expectedPeriodMs)).length === 1
+          ? robots[0].expectedPeriodMs
+          : null,
       expectedSamples: null,
       observedSamples: null,
       reasons: [...reasons],

@@ -143,8 +143,7 @@ describe("diagnosis panel observation origin", () => {
     );
     expect(component.querySelector("#original-diagnosis")).not.toBeNull();
     expect(
-      component.querySelector<HTMLSelectElement>('[data-testid="diagnosis-target-select"]')
-        ?.value,
+      component.querySelector<HTMLSelectElement>('[data-testid="diagnosis-target-select"]')?.value,
     ).toBe("agent:main");
     expect(component.textContent).toContain("申请开实验");
     expect(
@@ -1077,9 +1076,7 @@ it("shows the paused-job handling preview in admin language and never offers 立
   );
   const panel = container.querySelector("openbot-diagnosis-panel") as OpenBotDiagnosisPanel;
   await panel.updateComplete;
-  await waitFor(() =>
-    expect(panel.querySelector("openbot-observation-workbench")).not.toBeNull(),
-  );
+  await waitFor(() => expect(panel.querySelector("openbot-observation-workbench")).not.toBeNull());
   expect(panel.querySelector("#original-diagnosis")).toBeNull();
   await revealOriginalDiagnosis(panel);
   await waitFor(() =>
@@ -1204,9 +1201,7 @@ describe("enterprise diagnosis first-screen close", () => {
     expect(
       [...panel.querySelectorAll("h1, h2, h3")].map((node) => node.textContent?.trim()),
     ).not.toContain("原诊断工作区");
-    expect(panel.textContent).not.toContain(
-      "下面的数据来自真实诊断接口，不受上方样例模式影响。",
-    );
+    expect(panel.textContent).not.toContain("下面的数据来自真实诊断接口，不受上方样例模式影响。");
     expect(panel.querySelector("#original-diagnosis")).toBeNull();
     expectNoEvidenceDump(panel);
 
@@ -1303,9 +1298,9 @@ describe("enterprise diagnosis first-screen close", () => {
     expect(original?.querySelector('[data-testid="enterprise-diagnosis"]')).not.toBeNull();
     expect(original?.querySelector('[data-testid="diagnosis-target-picker"]')).not.toBeNull();
     expect(original?.querySelector('[data-testid="observation-evidence-status"]')).not.toBeNull();
-    expect(original?.querySelector('[data-testid="observation-query-scope"]')?.textContent).toContain(
-      "精确任务真实查询，不受连接工作台样例选择影响；仍按当前身份授权读取。",
-    );
+    expect(
+      original?.querySelector('[data-testid="observation-query-scope"]')?.textContent,
+    ).toContain("精确任务真实查询，不受连接工作台样例选择影响；仍按当前身份授权读取。");
     expect(original?.querySelector('[aria-label="运行证据投影"]')).not.toBeNull();
     expect(original?.querySelector('[aria-label="推理假设旁路"]')).not.toBeNull();
     container.remove();

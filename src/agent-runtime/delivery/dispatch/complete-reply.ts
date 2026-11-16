@@ -24,6 +24,8 @@ export type ReplyDeliveryResult =
       kind: "visible";
       payloads: ReplyPayload[];
       acceptanceStatus?: "passed" | "failed" | "pending" | "not_required";
+      /** Supplied by the host, never inferred from model completion prose. */
+      taskBound?: boolean;
     };
 
 /** Fixed host effects, supplied by the original turn owner, never executable configuration. */
@@ -34,6 +36,7 @@ type ReplyDeliveryPorts<T> = {
   commitOutcome: (success: boolean, opts: GrowthOutcomeCommitOpts) => unknown;
   recordEmptyGap: (reason: "direct_chat_silent_or_empty_reply") => void;
   considerContinuation: (payloads: ReplyPayload[]) => void;
+  onPendingAcceptance?: (notice: string) => void;
   finalize: (payload: ReplyPayload | ReplyPayload[] | undefined) => T;
 };
 
@@ -50,6 +53,20 @@ export function completeReplyDelivery<T>(
   let considerContinuation = false;
   if (result.kind === "visible") {
     payloads = result.payloads;
+    if (result.taskBound && result.acceptanceStatus === "pending" && payloads.length > 0) {
+      const notice =
+        ports.language === "en"
+          ? "The result is ready, but task acceptance is still pending; not all requirements have been verified."
+          : "成果已生成，任务仍待验收，尚未确认全部要求已满足。";
+      ports.onPendingAcceptance?.(notice);
+      const lastText = payloads.findLastIndex((payload) => Boolean(payload.text?.trim()));
+      payloads =
+        lastText >= 0
+          ? payloads.map((payload, index) =>
+              index === lastText ? { ...payload, text: `${payload.text}\n\n${notice}` } : payload,
+            )
+          : [...payloads, { text: notice }];
+    }
     // Pending acceptance is a verification wait, not permission to repeat business work.
     // Only a failed prepared acceptance may request the existing recovery path.
     considerContinuation =

@@ -112,9 +112,7 @@ describe("enterprise diagnosis observation host wiring", () => {
     expect(
       [...panel.querySelectorAll("h1, h2, h3")].map((node) => node.textContent?.trim()),
     ).not.toContain("原诊断工作区");
-    expect(panel.textContent).not.toContain(
-      "下面的数据来自真实诊断接口，不受上方样例模式影响。",
-    );
+    expect(panel.textContent).not.toContain("下面的数据来自真实诊断接口，不受上方样例模式影响。");
     expect(panel.querySelector("#original-diagnosis")).toBeNull();
     expect(panel.querySelector('[data-testid="observation-query-scope"]')).toBeNull();
     expect(panel.textContent).not.toContain("执行器技术调用");

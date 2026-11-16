@@ -1,3 +1,7 @@
+import { createHash } from "node:crypto";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { loadConfig } from "../config/config.js";
 import { registerAgentRunContext, resetAgentRunContextForTest } from "../infra/agent-events.js";
@@ -121,6 +125,101 @@ describe("agent event handler", () => {
     });
     return harness;
   }
+
+  it("settles the actual execution file instead of writing an envelope copy to a legacy root", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "runtime-egress-root-"));
+    const workspace = path.join(root, "authorized-execution");
+    const legacy = path.join(root, "old-config-workspace");
+    fs.mkdirSync(workspace);
+    fs.mkdirSync(legacy);
+    const bytes = "# 实际工具写入的经营核算\n收入120，成本78，利润42。\n";
+    fs.writeFileSync(path.join(workspace, "report.md"), bytes);
+    vi.stubEnv("OPENBOT_STATE_DIR", root);
+    vi.mocked(loadConfig).mockReturnValue({
+      gateway: { security: { profile: "personal_local" } },
+      agents: { defaults: { workspace: legacy } },
+    });
+    try {
+      const h = createHarness();
+      registerAgentRunContext("run-1", {
+        sessionKey: "agent:main:main",
+        turnCompletion: { workspaceDir: workspace, userText: "创建report.md并交付" },
+      });
+      h.chatRunState.registry.add("run-1", {
+        sessionKey: "agent:main:main",
+        clientRunId: "client-1",
+      });
+      h.handler({
+        runId: "run-1",
+        seq: 1,
+        stream: "assistant",
+        ts: Date.now(),
+        data: {
+          text: '<<DELIVERABLE title="经营核算" type="report" file="report.md">>短摘要<</DELIVERABLE>>',
+        },
+      });
+      emitLifecycleEnd(h.handler, "run-1");
+      await vi.waitFor(() => {
+        const final = h.broadcastChat.mock.calls.find(
+          ([, payload]) => payload.state === "final",
+        )?.[1];
+        expect(final?.message?.deliverablePublish?.versionChecksum).toBe(
+          createHash("sha256").update(bytes).digest("hex"),
+        );
+      });
+      expect(fs.existsSync(path.join(legacy, "report.md"))).toBe(false);
+      expect(fs.readFileSync(path.join(workspace, "report.md"), "utf8")).toBe(bytes);
+    } finally {
+      vi.unstubAllEnvs();
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("publishes a late persisted host acceptance receipt without replacing artifacts or clearing another run", () => {
+    const h = createHarness({ resolveSessionKeyForRun: () => "session-1" });
+    h.chatRunState.buffers.set("other-run", "Still running");
+    const data = { phase: "acceptance_pending", text: "成果已生成，任务仍待验收" };
+    h.handler({
+      runId: "run-1",
+      seq: 10,
+      ts: 100,
+      sessionKey: "session-1",
+      stream: "delivery",
+      data,
+    });
+    expect(h.broadcastChat).toHaveBeenCalledWith(
+      "session-1",
+      expect.objectContaining({
+        runId: "run-1:acceptance",
+        state: "final",
+        message: expect.objectContaining({
+          id: "run-1:acceptance:assistant",
+          content: [{ type: "text", text: data.text }],
+        }),
+      }),
+    );
+    expect(h.chatRunState.buffers.get("other-run")).toBe("Still running");
+  });
+  it("does not expose hidden or aborted host acceptance receipts", () => {
+    const h = createHarness({ resolveSessionKeyForRun: () => "session-1" });
+    registerAgentRunContext("hidden", { isControlUiVisible: false });
+    h.handler({
+      runId: "hidden",
+      seq: 1,
+      ts: 1,
+      stream: "delivery",
+      data: { phase: "acceptance_pending", text: "private" },
+    });
+    h.chatRunState.abortedRuns.set("aborted", Date.now());
+    h.handler({
+      runId: "aborted",
+      seq: 1,
+      ts: 1,
+      stream: "delivery",
+      data: { phase: "acceptance_pending", text: "private" },
+    });
+    expect(h.broadcastChat).not.toHaveBeenCalled();
+  });
 
   it("retains original engine identity when publishing a client-mapped lifecycle event", () => {
     const harness = createHarness();

@@ -384,7 +384,6 @@ import {
   prepareChatDeliverablePublish,
   type PreparedChatDeliverable,
 } from "../knowledge/deliverables/chat-deliverable-publish.js";
-import { maybeAutoCaptureAgentDeliverable } from "../knowledge/deliverables/maybe-auto-capture-agent-deliverable.js";
 import { formatClientSessionNotFoundDetail } from "../operator-shared-session-heal.js";
 import {
   findUserByEmail,
@@ -3340,34 +3339,6 @@ function nextChatSeq(context: { agentRunSeq: Map<string, number> }, runId: strin
   return next;
 }
 
-function extractAssistantFinalText(message?: Record<string, unknown>): string {
-  if (!message) {
-    return "";
-  }
-  const role = typeof message.role === "string" ? message.role : "assistant";
-  if (role !== "assistant") {
-    return "";
-  }
-  const content = message.content;
-  if (typeof content === "string") {
-    return content.trim();
-  }
-  if (Array.isArray(content)) {
-    return content
-      .map((entry) => {
-        if (!entry || typeof entry !== "object") {
-          return "";
-        }
-        const part = entry as { type?: string; text?: string };
-        return part.type === "text" && typeof part.text === "string" ? part.text.trim() : "";
-      })
-      .filter(Boolean)
-      .join("\n")
-      .trim();
-  }
-  return typeof message.text === "string" ? message.text.trim() : "";
-}
-
 function broadcastChatFinal(params: {
   context: Pick<GatewayRequestContext, "broadcastChat" | "nodeSendToSession" | "agentRunSeq"> & {
     logGateway?: { warn: (message: string) => void };
@@ -3412,27 +3383,8 @@ function broadcastChatFinal(params: {
     send();
   }
   params.context.agentRunSeq.delete(params.runId);
-  const captureText = extractAssistantFinalText(strippedEnvelopeMessage);
-  if (captureText && params.prepared?.structured !== true) {
-    try {
-      const messageAgentId =
-        params.message && typeof params.message.agentId === "string"
-          ? params.message.agentId.trim()
-          : "";
-      maybeAutoCaptureAgentDeliverable({
-        sessionKey: params.sessionKey,
-        agentId:
-          params.deliverableAgentId?.trim() ||
-          messageAgentId ||
-          resolveSessionAgentId({ sessionKey: params.sessionKey }),
-        ownerId: params.deliverableOwnerId,
-        messageId: params.runId,
-        content: captureText,
-      });
-    } catch {
-      // Deliverable auto-capture must never break chat final delivery.
-    }
-  }
+  // Delivery is not consent to save a knowledge copy. Explicit user save
+  // remains on save-and-archive; a final broadcast must have no capture writes.
 }
 
 function broadcastCollaborationRoundPlan(params: {
@@ -5743,6 +5695,8 @@ export const chatHandlers: GatewayRequestHandlers = {
             | undefined;
           let discussToTaskPrincipalActor: string | undefined;
           let discussToTaskCoordinatorBinding: string | undefined;
+          let formalTaskBoardPublished = false;
+          let formalTaskReceiptMessage: Record<string, unknown> | undefined;
           const runStageBot = async (params: {
             bot: GroupDiscussionBotTarget;
             isWrapTurn: boolean;
@@ -6149,6 +6103,8 @@ export const chatHandlers: GatewayRequestHandlers = {
                     })
                   : { d2tResult: null };
               const d2tApplied = applyDiscussToTaskChatTurnToChatHandler(d2tTurn);
+              formalTaskBoardPublished = d2tTurn.d2tResult?.stages.boardPublished === true;
+              formalTaskReceiptMessage = d2tApplied.transcriptPersist?.message;
               if (d2tApplied.formalTaskEstablish) {
                 formalTaskEstablish = d2tApplied.formalTaskEstablish;
               }
@@ -6207,6 +6163,44 @@ export const chatHandlers: GatewayRequestHandlers = {
                 nodeSendToSession: context.nodeSendToSession,
                 tenantId: collabTenant?.tenantId ?? client?.sessionEnterpriseId ?? null,
               });
+            }
+
+            if (
+              groupUnderstanding?.kind === "understood" &&
+              groupUnderstanding.decision.kind === "execution_request" &&
+              groupUnderstanding.decision.request.lifecycle === "long_task" &&
+              !formalTaskBoardPublished
+            ) {
+              // A durable draft id is not execution admission. Participant
+              // selection must not launch tool-capable member turns to repair
+              // or recreate the still-unconfirmed contract themselves.
+              setGatewayDedupeEntry({
+                dedupe: context.dedupe,
+                key: `chat:${clientRunId}`,
+                entry: {
+                  ts: Date.now(),
+                  ok: true,
+                  payload: { runId: clientRunId, status: "ok" as const },
+                },
+              });
+              broadcastChatFinal({
+                context,
+                runId: clientRunId,
+                sessionKey: rawSessionKey,
+                message: formalTaskReceiptMessage ?? {
+                  role: "assistant",
+                  content: [
+                    {
+                      type: "text",
+                      text:
+                        formalTaskEstablish?.userMessage ||
+                        "正式任务尚未获准启动，本轮没有派发成员执行。",
+                    },
+                  ],
+                  timestamp: Date.now(),
+                },
+              });
+              return;
             }
 
             if (
@@ -7274,6 +7268,14 @@ export const chatHandlers: GatewayRequestHandlers = {
               const settledReply = turnSettled.visibleText.trim()
                 ? turnSettled.visibleText
                 : sourceText;
+              // Fallback replies must use the same authorized workspace as
+              // execution/preview, not a second tenant/user path formula.
+              const deliverableWorkspaceDir = await resolveCallerWorkspaceCwd({
+                cfg,
+                sessionKey: resolvedSessionKey,
+                agentId,
+                client: client ?? null,
+              });
               prepared = prepareChatDeliverablePublish({
                 text: settledReply,
                 publishIntent: "direct-fallback-final",
@@ -7284,6 +7286,7 @@ export const chatHandlers: GatewayRequestHandlers = {
                 userId: replyGovernance.ownerUserId,
                 clientRunId,
                 taskId: null,
+                agentWorkspaceRoot: deliverableWorkspaceDir,
               });
               const fallbackArtifacts = declaredDeliverableArtifactFields(prepared.text, {
                 timestamp: Date.now(),

@@ -59,22 +59,21 @@ function taskCoverage(input: {
       outcomeVersion: tip.record.outcomeVersion,
     });
     const located = resolveConfiguredTaskOutcomeRoot(input.cfg, tip.agentId);
-    const durable =
-      located.ok
-        ? projectDurableExecutorExecutions({
-            view: readExecutorEvidence({
-              agentId: tip.agentId,
-              scope: tip.record.scope,
-              taskId: tip.record.taskId,
-              outcomeVersion: tip.record.outcomeVersion,
-              storeRoot: located.root,
-            }),
+    const durable = located.ok
+      ? projectDurableExecutorExecutions({
+          view: readExecutorEvidence({
+            agentId: tip.agentId,
+            scope: tip.record.scope,
             taskId: tip.record.taskId,
             outcomeVersion: tip.record.outcomeVersion,
-            from: input.from,
-            to: input.to,
-          })
-        : [];
+            storeRoot: located.root,
+          }),
+          taskId: tip.record.taskId,
+          outcomeVersion: tip.record.outcomeVersion,
+          from: input.from,
+          to: input.to,
+        })
+      : [];
     const assembled = assembleObservationSamples({
       scope: tip.record.scope,
       from: input.from,
@@ -128,9 +127,8 @@ export function queryPlatformTaskIndex(input: {
   }
   const agents = configuredAgentIds(input.cfg).map((id) => ({ id }));
   const requestedAgent = input.agentId?.trim() || "";
-  const requestedTenant = input.tenantId?.trim() && input.tenantId.trim() !== "all"
-    ? input.tenantId.trim()
-    : "";
+  const requestedTenant =
+    input.tenantId?.trim() && input.tenantId.trim() !== "all" ? input.tenantId.trim() : "";
   const granted = new Set(input.grantedTenantIds.map((id) => id.trim()).filter(Boolean));
   if (requestedTenant && !granted.has(requestedTenant)) {
     return {
