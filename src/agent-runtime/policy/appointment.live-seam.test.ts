@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  classifyLaterMessageSpeech,
-  parseAppointedProjectOwner,
-} from "./collaboration-current-goal-binding.js";
+import { classifyLaterMessageSpeech, parseAppointedProjectOwner } from "./index.js";
 
 const members = [
   { id: "uat-lead", name: "项目经理" },
