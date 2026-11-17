@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
 import {
   clearActiveEmbeddedRun,
+  getActiveEmbeddedRunId,
   setActiveEmbeddedRun,
 } from "../../agent-runtime/execution/runner/run-registry.js";
 import {
@@ -659,6 +660,7 @@ describe("R1 owned-work stop cascade", () => {
         status: "pending",
       }),
     ]);
+    expect(listOwnedChildExecutions("task-a").map((row) => row.id)).toEqual(["child-live"]);
 
     const exitingHandle = {
       queueMessage: async () => {},
@@ -684,10 +686,114 @@ describe("R1 owned-work stop cascade", () => {
     expect(confirmedFacts).toEqual([
       expect.objectContaining({
         kind: "child_execution",
+        id: "child-live",
+        taskId: "task-a",
+        status: "unsupported",
+      }),
+      expect.objectContaining({
+        kind: "child_execution",
         id: "child-exited",
         taskId: "task-a",
         status: "confirmed_stopped",
       }),
     ]);
+    expect(listOwnedChildExecutions("task-a")).toEqual([]);
+  });
+
+  test("default adapter keeps affiliation when cancel confirmation is pending", async () => {
+    const requested: string[] = [];
+    const liveHandle = {
+      queueMessage: async () => {},
+      isStreaming: () => false,
+      isCompacting: () => false,
+      abort: () => {
+        requested.push("child-pending");
+      },
+    };
+    const otherHandle = {
+      queueMessage: async () => {},
+      isStreaming: () => false,
+      isCompacting: () => false,
+      abort: () => {
+        requested.push("child-other");
+      },
+    };
+    setActiveEmbeddedRun("session-pending", liveHandle, undefined, "child-pending");
+    registerOwnedChildExecution({
+      taskId: "task-a",
+      id: "child-pending",
+      sessionId: "session-pending",
+    });
+    setActiveEmbeddedRun("session-other", otherHandle, undefined, "child-other");
+    registerOwnedChildExecution({
+      taskId: "task-b",
+      id: "child-other",
+      sessionId: "session-other",
+    });
+    try {
+      const first = await cancelOwnedWorkAfterAcceptedStop({
+        taskId: "task-a",
+        stopAccepted: true,
+        ports: createDefaultOwnedStopPorts(),
+      });
+      expect(requested).toEqual(["child-pending"]);
+      expect(first).toEqual([
+        expect.objectContaining({
+          kind: "child_execution",
+          id: "child-pending",
+          taskId: "task-a",
+          status: "pending",
+        }),
+      ]);
+      expect(listOwnedChildExecutions("task-a").map((row) => row.id)).toEqual(["child-pending"]);
+      expect(getActiveEmbeddedRunId("session-pending")).toBe("child-pending");
+
+      const second = await cancelOwnedWorkAfterAcceptedStop({
+        taskId: "task-a",
+        stopAccepted: true,
+        ports: createDefaultOwnedStopPorts(),
+      });
+      expect(requested).toEqual(["child-pending", "child-pending"]);
+      expect(second).toEqual([
+        expect.objectContaining({
+          kind: "child_execution",
+          id: "child-pending",
+          taskId: "task-a",
+          status: "pending",
+        }),
+      ]);
+      expect(listOwnedChildExecutions("task-a").map((row) => row.id)).toEqual(["child-pending"]);
+      expect(listOwnedChildExecutions("task-b").map((row) => row.id)).toEqual(["child-other"]);
+
+      const exitingHandle = {
+        queueMessage: async () => {},
+        isStreaming: () => false,
+        isCompacting: () => false,
+        abort: () => {
+          requested.push("child-exited");
+          clearActiveEmbeddedRun("session-pending", exitingHandle);
+        },
+      };
+      setActiveEmbeddedRun("session-pending", exitingHandle, undefined, "child-pending");
+      const confirmed = await cancelOwnedWorkAfterAcceptedStop({
+        taskId: "task-a",
+        stopAccepted: true,
+        ports: createDefaultOwnedStopPorts(),
+      });
+      expect(confirmed).toEqual([
+        expect.objectContaining({
+          kind: "child_execution",
+          id: "child-pending",
+          taskId: "task-a",
+          status: "confirmed_stopped",
+        }),
+      ]);
+      expect(listOwnedChildExecutions("task-a")).toEqual([]);
+      expect(listOwnedChildExecutions("task-b").map((row) => row.id)).toEqual(["child-other"]);
+      expect(requested).not.toContain("child-other");
+    } finally {
+      clearActiveEmbeddedRun("session-pending", liveHandle);
+      clearActiveEmbeddedRun("session-other", otherHandle);
+    }
   });
 });
