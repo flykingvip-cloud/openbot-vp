@@ -1,4 +1,24 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
+import {
+  clearActiveEmbeddedRun,
+  setActiveEmbeddedRun,
+} from "../../agent-runtime/execution/runner/run-registry.js";
+import {
+  listOwnedChildExecutions,
+  registerOwnedChildExecution,
+  registerOwnedRemoteJob,
+  resetOwnedStopAffiliationsForTests,
+} from "../../agent-runtime/state/owned-stop-affiliation.js";
+import {
+  clearAsyncWaitJobsForTests,
+  listAsyncWaitJobRefsForTask,
+  readAsyncWaitJobIntent,
+  recordAsyncWaitJobIntent,
+  resetAsyncWaitJobIndexForTests,
+} from "../../agent-runtime/state/repository/async-wait-job.js";
 import {
   clearFollowupQueue,
   clearFollowupQueueItemsForTask,
@@ -56,6 +76,8 @@ describe("R1 owned-work stop cascade", () => {
     clearSupervisorRunsForTest();
     clearFollowupQueue("session-a");
     clearFollowupQueue("session-b");
+    resetOwnedStopAffiliationsForTests();
+    resetAsyncWaitJobIndexForTests();
   });
 
   test("1: stopping A cancels A and descendants only; B continues", async () => {
@@ -314,5 +336,178 @@ describe("R1 owned-work stop cascade", () => {
     expect(queueB.items).toEqual([]);
     clearFollowupQueue("session-shared");
     clearFollowupQueue("session-other");
+  });
+
+  test("default adapter cancels only owned child executions by explicit taskId", async () => {
+    const aborted: string[] = [];
+    const handleA = {
+      queueMessage: async () => {},
+      isStreaming: () => false,
+      isCompacting: () => false,
+      abort: () => {
+        aborted.push("child-a1");
+      },
+    };
+    const handleB = {
+      queueMessage: async () => {},
+      isStreaming: () => false,
+      isCompacting: () => false,
+      abort: () => {
+        aborted.push("child-b1");
+      },
+    };
+    setActiveEmbeddedRun("session-child-a", handleA);
+    setActiveEmbeddedRun("session-child-b", handleB);
+    registerOwnedChildExecution({
+      taskId: "task-a",
+      id: "child-a1",
+      sessionId: "session-child-a",
+    });
+    registerOwnedChildExecution({
+      taskId: "task-b",
+      id: "child-b1",
+      sessionId: "session-child-b",
+    });
+    const facts = await cancelOwnedWorkAfterAcceptedStop({
+      taskId: "task-a",
+      stopAccepted: true,
+      ports: createDefaultOwnedStopPorts(),
+    });
+    expect(facts).toEqual([
+      expect.objectContaining({
+        kind: "child_execution",
+        id: "child-a1",
+        taskId: "task-a",
+        status: "confirmed_stopped",
+      }),
+    ]);
+    expect(aborted).toEqual(["child-a1"]);
+    expect(listOwnedChildExecutions("task-a")).toEqual([]);
+    expect(listOwnedChildExecutions("task-b").map((row) => row.id)).toEqual(["child-b1"]);
+    clearActiveEmbeddedRun("session-child-a", handleA);
+    clearActiveEmbeddedRun("session-child-b", handleB);
+  });
+
+  test("default adapter does not cancel a child registered after the list snapshot", async () => {
+    const facts = await cancelOwnedWorkAfterAcceptedStop({
+      taskId: "task-a",
+      stopAccepted: true,
+      ports: {
+        ...createDefaultOwnedStopPorts(),
+        listOwnedTargets: (taskId) => {
+          const listed = createDefaultOwnedStopPorts().listOwnedTargets(taskId);
+          registerOwnedChildExecution({
+            taskId: "task-a",
+            id: "child-late",
+            sessionId: "session-late",
+          });
+          return listed;
+        },
+      },
+    });
+    expect(facts).toEqual([]);
+    expect(listOwnedChildExecutions("task-a").map((row) => row.id)).toEqual(["child-late"]);
+  });
+
+  test("default adapter cancels owned remotes with job+lease+authorization only", async () => {
+    const cancelled: string[] = [];
+    registerOwnedRemoteJob({
+      taskId: "task-a",
+      jobId: "job-incomplete",
+      leaseId: "lease-missing-auth",
+      authorized: false,
+      cancel: async () => {
+        cancelled.push("job-incomplete");
+        return true;
+      },
+    });
+    registerOwnedRemoteJob({
+      taskId: "task-a",
+      jobId: "job-owned",
+      leaseId: "lease-owned",
+      authorized: true,
+      cancel: async () => {
+        cancelled.push("job-owned");
+        return true;
+      },
+    });
+    registerOwnedRemoteJob({
+      taskId: "task-b",
+      jobId: "job-other",
+      leaseId: "lease-other",
+      authorized: true,
+      cancel: async () => {
+        cancelled.push("job-other");
+        return true;
+      },
+    });
+    const facts = await cancelOwnedWorkAfterAcceptedStop({
+      taskId: "task-a",
+      stopAccepted: true,
+      ports: createDefaultOwnedStopPorts(),
+    });
+    expect(facts).toEqual([
+      expect.objectContaining({
+        kind: "remote_job",
+        id: "job-incomplete",
+        taskId: "task-a",
+        status: "unsupported",
+      }),
+      expect.objectContaining({
+        kind: "remote_job",
+        id: "job-owned",
+        taskId: "task-a",
+        status: "confirmed_stopped",
+      }),
+    ]);
+    expect(cancelled).toEqual(["job-owned"]);
+  });
+
+  test("default adapter clears only owned async-wait jobs by explicit taskId", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "owned-stop-async-wait-"));
+    const sessionA = path.join(root, "session-a.jsonl");
+    const sessionB = path.join(root, "session-b.jsonl");
+    fs.writeFileSync(sessionA, "");
+    fs.writeFileSync(sessionB, "");
+    try {
+      recordAsyncWaitJobIntent({
+        jobId: "wait-a",
+        sessionKey: "session-a",
+        sessionFile: sessionA,
+        taskId: "task-a",
+        executionAttempt: "attempt-a",
+        deliverableVersion: "v1",
+        startedAt: Date.now(),
+      });
+      recordAsyncWaitJobIntent({
+        jobId: "wait-b",
+        sessionKey: "session-b",
+        sessionFile: sessionB,
+        taskId: "task-b",
+        executionAttempt: "attempt-b",
+        deliverableVersion: "v1",
+        startedAt: Date.now(),
+      });
+      expect(listAsyncWaitJobRefsForTask("task-a").map((row) => row.jobId)).toEqual(["wait-a"]);
+      const facts = await cancelOwnedWorkAfterAcceptedStop({
+        taskId: "task-a",
+        stopAccepted: true,
+        ports: createDefaultOwnedStopPorts(),
+      });
+      expect(facts).toEqual([
+        expect.objectContaining({
+          kind: "async_wait_job",
+          id: "wait-a",
+          taskId: "task-a",
+          status: "confirmed_stopped",
+        }),
+      ]);
+      expect(readAsyncWaitJobIntent(sessionA, "wait-a")?.status).toBe("cleared");
+      expect(readAsyncWaitJobIntent(sessionB, "wait-b")?.status).toBe("waiting");
+    } finally {
+      clearAsyncWaitJobsForTests(sessionA);
+      clearAsyncWaitJobsForTests(sessionB);
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 });
