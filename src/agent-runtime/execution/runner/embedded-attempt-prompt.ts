@@ -131,7 +131,7 @@ export async function runEmbeddedAttemptPrompt(
     isCompacting: () => s.subscription.isCompacting(),
     abort: s.abortRun,
   };
-  setActiveEmbeddedRun(params.sessionId, s.queueHandle, params.sessionKey);
+  setActiveEmbeddedRun(params.sessionId, s.queueHandle, params.sessionKey, params.runId);
 
   s.abortWarnTimer = undefined;
   s.isProbeSession = params.sessionId?.startsWith("probe-") ?? false;
