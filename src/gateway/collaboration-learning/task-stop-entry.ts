@@ -8,15 +8,15 @@
 import type { Task } from "@openbot/collaboration-core";
 import { isEmbeddedPiRunActive } from "../../agent-runtime/execution/runner/run-registry.js";
 import {
+  clearAsyncWaitJobIntent,
+  listAsyncWaitJobRefsForTask,
+} from "../../agent-runtime/state/index.js";
+import {
   listOwnedChildExecutions,
   listOwnedRemoteJobs,
   unregisterOwnedChildExecution,
   unregisterOwnedRemoteJob,
 } from "../../agent-runtime/state/owned-stop-affiliation.js";
-import {
-  clearAsyncWaitJobIntent,
-  listAsyncWaitJobRefsForTask,
-} from "../../agent-runtime/state/repository/async-wait-job.js";
 import { interruptInteractionTask } from "../../agent-runtime/wiring/interaction-effects.js";
 import {
   clearFollowupQueueItemsForTask,
