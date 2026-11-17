@@ -5,6 +5,7 @@
  */
 export { runShadowRuleAdaptation, type ShadowRunDependencies } from "./run.js";
 export {
+  bindShadowHostAbortSignal,
   runOfficialShadowRuleAdaptation,
   type OfficialShadowHostBinding,
 } from "./official-shadow.js";

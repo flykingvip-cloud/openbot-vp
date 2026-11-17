@@ -13,24 +13,24 @@
 
 ## 0. 汇总
 
-| 集合 | 数量 |
-| --- | --- |
-| 目录已登记 | 27 |
-| 其中 `disposition: retain` | 25 |
-| 其中 `disposition: pending_migration` | 2（`task.focus.switch`、`task.reply.completion`） |
-| 本盘点现役未登记（临时编号 `INV-P0-*`，不冒充正式规则） | 5 |
-| 明确不升格为规则 / 观察保留 | 见 §3 |
-| 证据不足、未当作现役规则登记 | 见 §4 |
+| 集合                                                    | 数量                                              |
+| ------------------------------------------------------- | ------------------------------------------------- |
+| 目录已登记                                              | 27                                                |
+| 其中 `disposition: retain`                              | 25                                                |
+| 其中 `disposition: pending_migration`                   | 2（`task.focus.switch`、`task.reply.completion`） |
+| 本盘点现役未登记（临时编号 `INV-P0-*`，不冒充正式规则） | 5                                                 |
+| 明确不升格为规则 / 观察保留                             | 见 §3                                             |
+| 证据不足、未当作现役规则登记                            | 见 §4                                             |
 
 按本盘点主性质（一条规则若混合，取对适配约束更严的主标签；细节见各条）：
 
-| 主性质 | 已登记条数 | ID |
-| --- | --- | --- |
-| 硬约束 | 13 | `task.binding.current`，`execution.admitted.binding`，`delivery.receipt.identity`，`execution.lifecycle.preparation`，`task.control.explicit`，`input.stamp.strip`，`task.acceptance.checks`，`task.constraints.normalize`，`task.park.abort_inflight`，`execution.async_wait.job_transition`，`execution.queue.claim`，`collab.submit.review_versioning`，`collab.governance.gate` |
-| 条件强制 | 9 | `interaction.semantic.decision`，`execution.queue.action`，`execution.blocker.grade`，`interaction.source.recoverable`，`task.constraint.owner_gate`，`task.focus.switch`，`task.reply.completion`，`collab.peer.review_gate`，`collab.plan.gate` |
-| 有界参数（常与硬下限并存） | 5 | `execution.retry.bounds`，`execution.continuation.bounds`，`model.context_window.guard`，`task.focus.wake`，`collab.policy.compile` |
-| 偏好（目录主标签） | 0 | 协作 `replyLanguage` 挂在 `collab.policy.compile` 字段下，不单列目录 ID |
-| 兼容 / 待退役（目录 disposition） | 2 | 同上 pending_migration 两条 |
+| 主性质                            | 已登记条数 | ID                                                                                                                                                                                                                                                                                                                                                                                  |
+| --------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 硬约束                            | 13         | `task.binding.current`，`execution.admitted.binding`，`delivery.receipt.identity`，`execution.lifecycle.preparation`，`task.control.explicit`，`input.stamp.strip`，`task.acceptance.checks`，`task.constraints.normalize`，`task.park.abort_inflight`，`execution.async_wait.job_transition`，`execution.queue.claim`，`collab.submit.review_versioning`，`collab.governance.gate` |
+| 条件强制                          | 9          | `interaction.semantic.decision`，`execution.queue.action`，`execution.blocker.grade`，`interaction.source.recoverable`，`task.constraint.owner_gate`，`task.focus.switch`，`task.reply.completion`，`collab.peer.review_gate`，`collab.plan.gate`                                                                                                                                   |
+| 有界参数（常与硬下限并存）        | 5          | `execution.retry.bounds`，`execution.continuation.bounds`，`model.context_window.guard`，`task.focus.wake`，`collab.policy.compile`                                                                                                                                                                                                                                                 |
+| 偏好（目录主标签）                | 0          | 协作 `replyLanguage` 挂在 `collab.policy.compile` 字段下，不单列目录 ID                                                                                                                                                                                                                                                                                                             |
+| 兼容 / 待退役（目录 disposition） | 2          | 同上 pending_migration 两条                                                                                                                                                                                                                                                                                                                                                         |
 
 动态适配资格总原则：硬约束 = **不可调整**；清洗 helper 不是可选规则；分类证据不足 = **待核准**，不自行放宽。
 
@@ -512,14 +512,14 @@
 
 ## 3. 明确不升格为规则 / 观察保留
 
-| 项 | 理由（当前树） |
-| --- | --- |
+| 项                                                                 | 理由（当前树）                                                                                                                                                                              |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `resolvePromptModeForSession`（`policy/prompt-mode.ts` 第 3–8 行） | 按 sessionKey 是否 cron/subagent 在 `minimal`/`full` 之间硬分支。是提示装配 helper，不是用户可选策略。生产消费者：`embedded-attempt-tools.ts`。历史 coverage 已将其排除出目录，本盘点同意。 |
-| ClaimContract / 群板数据形状 / 任务对象 / 能力声明 | 领域对象或声明，不是授权，也不是可开关规则。目录测试仍断言不把 ClaimContract 登记为规则。 |
-| `classifyTurnRelation` | 仍定义于 `conversation-task/turn-relation.ts`，源码调用见于 `task-orchestration/complex-task-loop.ts`。保持观察，不登记。不得用它替换 `interaction.semantic.decision`。 |
-| `normalizeDeliveryTarget`（cron 本地函数） | 同名不同义的字符串整形 helper，不是出站授权规则。 |
-| 输入清洗、正文 trim、hash、deepFreeze | helper / 身份原语，不是可选规则。 |
-| hooks / plugin `getGlobalHookRunner` | before-call 会动态 import hook runtime；这是扩展点，不是已登记规则，也不足以在本阶段升格为可适配策略（证据不足，见 §4）。 |
+| ClaimContract / 群板数据形状 / 任务对象 / 能力声明                 | 领域对象或声明，不是授权，也不是可开关规则。目录测试仍断言不把 ClaimContract 登记为规则。                                                                                                   |
+| `classifyTurnRelation`                                             | 仍定义于 `conversation-task/turn-relation.ts`，源码调用见于 `task-orchestration/complex-task-loop.ts`。保持观察，不登记。不得用它替换 `interaction.semantic.decision`。                     |
+| `normalizeDeliveryTarget`（cron 本地函数）                         | 同名不同义的字符串整形 helper，不是出站授权规则。                                                                                                                                           |
+| 输入清洗、正文 trim、hash、deepFreeze                              | helper / 身份原语，不是可选规则。                                                                                                                                                           |
+| hooks / plugin `getGlobalHookRunner`                               | before-call 会动态 import hook runtime；这是扩展点，不是已登记规则，也不足以在本阶段升格为可适配策略（证据不足，见 §4）。                                                                   |
 
 ## 4. 覆盖边界与证据不足
 
@@ -538,11 +538,11 @@
 
 不得把“`inventory:efdb1b98…` 与 HEAD 不同”单独解释为规则版本无效。须区分：
 
-| 种类 | 本盘点中的所指 | 与 HEAD 不同是否自动无效 |
-| --- | --- | --- |
-| 目录 inventory version | 全部 27 条声明的 `version=inventory:efdb1b98d83e096a31e251095080de954f5883ec` | 否。这是目录盘点元数据，预期可落后于 HEAD，也可落后于本盘点实现 SHA `9b65109f…`。 |
-| 实现版本 implementation version | 规则实现源码。本文件行号与行为引用固定在 `9b65109f…`。工作树已快进到 `4a786626…`（#277） | 否。仅当政策实现路径相对绑定 SHA 发生未再盘点的变更，或提案绑定的实现版本未知/不匹配时，才判不兼容。#277 未触及政策实现，故对已盘点规则：`4a786626` 与 `9b65109f` 兼容。 |
-| 有效策略版本 effective policy version | 运行时真正生效者，如 `POLICY_COMPILER_REVISION=1.2.0`、`COLLABORATION_POLICY_PROTOCOL_VERSION=1.1`、已编译 `policyHash`、现行有效窗口 / `collaboration.lane` / operatingState | 取决于提案绑定的预期版本。未知则不得生成可执行调参提案。滞后或过期状态应明确拒绝。 |
+| 种类                                  | 本盘点中的所指                                                                                                                                                                | 与 HEAD 不同是否自动无效                                                                                                                                                 |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 目录 inventory version                | 全部 27 条声明的 `version=inventory:efdb1b98d83e096a31e251095080de954f5883ec`                                                                                                 | 否。这是目录盘点元数据，预期可落后于 HEAD，也可落后于本盘点实现 SHA `9b65109f…`。                                                                                        |
+| 实现版本 implementation version       | 规则实现源码。本文件行号与行为引用固定在 `9b65109f…`。工作树已快进到 `4a786626…`（#277）                                                                                      | 否。仅当政策实现路径相对绑定 SHA 发生未再盘点的变更，或提案绑定的实现版本未知/不匹配时，才判不兼容。#277 未触及政策实现，故对已盘点规则：`4a786626` 与 `9b65109f` 兼容。 |
+| 有效策略版本 effective policy version | 运行时真正生效者，如 `POLICY_COMPILER_REVISION=1.2.0`、`COLLABORATION_POLICY_PROTOCOL_VERSION=1.1`、已编译 `policyHash`、现行有效窗口 / `collaboration.lane` / operatingState | 取决于提案绑定的预期版本。未知则不得生成可执行调参提案。滞后或过期状态应明确拒绝。                                                                                       |
 
 其他目录漂移（记录，不修代码）：
 

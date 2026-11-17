@@ -531,3 +531,49 @@ it("does not mutate the returned snapshot when a delayed session.dispose throws"
     (result as unknown as { sessionDisposeFailed: boolean }).sessionDisposeFailed = true;
   }).toThrow();
 });
+
+it("passes the fallback-selected provider and model into complete, not the deps defaults", async () => {
+  const ports = stubPorts();
+  ports.model.runWithModelFallback = vi.fn(
+    async (options: {
+      run: (provider: string, model: string, extra?: unknown) => Promise<unknown>;
+    }) => ({
+      result: await options.run("other-provider", "other-model"),
+      provider: "other-provider",
+      model: "other-model",
+      attempts: [],
+    }),
+  ) as unknown as ModelSessionPorts["model"]["runWithModelFallback"];
+  const complete = vi.fn(async () => ({
+    kind: "message" as const,
+    text: noChangeOutput(),
+    usage: fixtureUsage(),
+  }));
+  const port = createGovernedShadowModelPort({
+    runId: "shadow-selected-model",
+    sessionPorts: ports,
+    createSession: createAuthorizedModelSession,
+    complete,
+    config: {},
+    env: {},
+    provider: "deepseek",
+    model: "deepseek-v4-flash",
+  });
+  await port.complete({
+    system: "sys",
+    messages: [],
+    tools: [],
+    maxTokens: 16,
+    timeoutMs: 100,
+  });
+  expect(complete).toHaveBeenCalledTimes(1);
+  const first = (
+    complete.mock.calls as unknown as Array<[{ selectedProvider?: string; selectedModel?: string }]>
+  )[0]?.[0];
+  expect(first).toMatchObject({
+    selectedProvider: "other-provider",
+    selectedModel: "other-model",
+  });
+  expect(first?.selectedProvider).not.toBe("deepseek");
+  expect(first?.selectedModel).not.toBe("deepseek-v4-flash");
+});

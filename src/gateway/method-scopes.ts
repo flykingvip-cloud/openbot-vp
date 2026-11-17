@@ -563,6 +563,8 @@ const BASE_METHOD_SCOPE_GROUPS: Record<OperatorScope, readonly string[]> = {
     "node.invoke",
     "management-governance.node.assign",
     "chat.send",
+    "runtime-rule-adaptation.advice",
+    "runtime-rule-adaptation.advice.cancel",
     "chat.guide.append",
     "chat.abort",
     "chat.restore",

@@ -115,6 +115,7 @@ import { pushHandlers } from "./server-methods/push.js";
 import { resourceCatalogHandlers } from "./server-methods/resource-catalog.js";
 import { resourcesHandlers } from "./server-methods/resources.js";
 import { robotWorkspaceHandlers } from "./server-methods/robot-workspace.js";
+import { runtimeRuleAdaptationAdviceHandlers } from "./server-methods/runtime-rule-adaptation-advice.js";
 import { scheduleHandlers } from "./server-methods/schedule.js";
 import { seatsHandlers } from "./server-methods/seats.js";
 import { secureFormHandlers } from "./server-methods/secure-form.js";
@@ -301,6 +302,7 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...enterpriseModelCatalogHandlers,
   ...enterpriseAllocationHandlers,
   ...employeeModelAccessHandlers,
+  ...runtimeRuleAdaptationAdviceHandlers,
   ...configHandlers,
   ...wizardHandlers,
   ...talkHandlers,
