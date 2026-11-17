@@ -12,6 +12,10 @@ import {
   type ModelCallCloseoutLink,
 } from "../../../task-outcome/runtime-from-runner.js";
 import { isInternalMessageChannel } from "../../../utils/message-channel.js";
+import {
+  registerOwnedChildExecution,
+  unregisterOwnedChildExecution,
+} from "../../state/owned-stop-affiliation.js";
 import { createTurnOutcomeRecorder } from "../outcomes/index.js";
 import { runAdmittedTurnAttempt } from "./admitted-turn-attempt.js";
 import type { AdmittedTurnHost } from "./admitted-turn-host.js";
@@ -254,6 +258,15 @@ export async function runAdmittedTurn(
 
   const controlledExecution = createExecutionLifecycle(runId, host);
   assertControlledExecutionStages(controlledExecution, "Chat admitted turn");
+  const ownedTaskId = params.followupRun.run.taskCompletionBinding?.taskId?.trim() ?? "";
+  if (ownedTaskId) {
+    registerOwnedChildExecution({
+      taskId: ownedTaskId,
+      id: runId,
+      sessionId: params.followupRun.run.sessionId,
+      sessionKey: params.sessionKey,
+    });
+  }
   try {
     while (true) {
       state.commercialToolCallCount = 0;
@@ -338,6 +351,9 @@ export async function runAdmittedTurn(
       commitGrowthOutcome: recordGrowthTaskOutcome,
     };
   } finally {
+    if (ownedTaskId) {
+      unregisterOwnedChildExecution(ownedTaskId, runId);
+    }
     await controlledExecution.dispose();
   }
 }

@@ -18,6 +18,61 @@ import {
  * Atomic read → decide → write under the per-job lock.
  * Decide must not perform nested locks on the same job file.
  */
+type AsyncWaitJobRef = { sessionFile: string; jobId: string; taskId: string };
+
+const asyncWaitRefsByTaskId = new Map<string, Map<string, AsyncWaitJobRef>>();
+
+function compactTaskId(value: string | null | undefined): string {
+  return value?.trim() ?? "";
+}
+
+function indexAsyncWaitJobIntent(intent: {
+  taskId: string;
+  sessionFile: string;
+  jobId: string;
+  status?: string;
+}): void {
+  const taskId = compactTaskId(intent.taskId);
+  const jobId = intent.jobId.trim();
+  const sessionFile = intent.sessionFile.trim();
+  if (!taskId || !jobId || !sessionFile) {
+    return;
+  }
+  if (intent.status === "cleared") {
+    unindexAsyncWaitJobIntent(taskId, jobId);
+    return;
+  }
+  let bucket = asyncWaitRefsByTaskId.get(taskId);
+  if (!bucket) {
+    bucket = new Map();
+    asyncWaitRefsByTaskId.set(taskId, bucket);
+  }
+  bucket.set(jobId, { taskId, sessionFile, jobId });
+}
+
+function unindexAsyncWaitJobIntent(taskId: string, jobId: string): void {
+  const tid = compactTaskId(taskId);
+  const id = jobId.trim();
+  const bucket = asyncWaitRefsByTaskId.get(tid);
+  if (!bucket) {
+    return;
+  }
+  bucket.delete(id);
+  if (bucket.size === 0) {
+    asyncWaitRefsByTaskId.delete(tid);
+  }
+}
+
+/** Explicit taskId affiliation only — used by the default stop-cascade adapter. */
+export function listAsyncWaitJobRefsForTask(taskId: string): AsyncWaitJobRef[] {
+  const bucket = asyncWaitRefsByTaskId.get(compactTaskId(taskId));
+  return bucket ? [...bucket.values()] : [];
+}
+
+export function resetAsyncWaitJobIndexForTests(): void {
+  asyncWaitRefsByTaskId.clear();
+}
+
 export function transitionAsyncWaitJobIntent(
   sessionFile: string,
   jobId: string,
@@ -36,10 +91,17 @@ export function transitionAsyncWaitJobIntent(
       return current;
     }
     if (!decided) {
+      if (current) {
+        unindexAsyncWaitJobIntent(current.taskId, current.jobId);
+      }
       return undefined;
     }
     const next = normalizeIntent({ ...decided, version: 2 });
     writeFileUnlocked(file, next);
+    if (current && (current.taskId !== next.taskId || current.jobId !== next.jobId)) {
+      unindexAsyncWaitJobIntent(current.taskId, current.jobId);
+    }
+    indexAsyncWaitJobIntent(next);
     return next;
   });
 }
@@ -201,6 +263,12 @@ export function clearAsyncWaitJobsForTask(sessionFile: string, taskId: string): 
 }
 
 export function clearAsyncWaitJobsForTests(sessionFile: string): void {
+  const file = sessionFile.trim();
+  if (file) {
+    for (const intent of listAsyncWaitJobIntents(file)) {
+      unindexAsyncWaitJobIntent(intent.taskId, intent.jobId);
+    }
+  }
   const dir = jobsDir(sessionFile);
   try {
     fs.rmSync(dir, { recursive: true, force: true });
