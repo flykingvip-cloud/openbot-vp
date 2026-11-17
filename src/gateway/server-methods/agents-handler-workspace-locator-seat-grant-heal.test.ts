@@ -195,6 +195,58 @@ describe("Path B seat-visible agent grant heal", () => {
     ensureGovernedWorkspaceCatalogIdentityMock.mockResolvedValue({});
   });
 
+  it("honors a formal seat grant when config and catalog still name a foreign seat", async () => {
+    const store = seatStore();
+    store.seats[SEAT_ID].defaultAgentAssetIds = [AGENT_ID];
+    loadSeatAssetsStoreForTenantIdMock.mockResolvedValue(store);
+    let projectedLocator = "";
+    ensureOccupiedSeatWorkspaceCatalogMock.mockImplementation(
+      async (params: { locator: string; agentAssetId: string }) => {
+        expect(params.agentAssetId).toBe(ASSET_ID);
+        projectedLocator = params.locator;
+      },
+    );
+    loadExistingGovernedWorkspaceIdentityMock.mockImplementation(async () => {
+      if (!projectedLocator) {
+        return {
+          catalog: positionCatalog("seat-old-handover", FOREIGN_LOCATOR),
+          agentAssetId: ASSET_ID,
+        };
+      }
+      return {
+        catalog: mergedCatalog(projectedLocator),
+        agentAssetId: ASSET_ID,
+      };
+    });
+
+    const result = await resolveAgentsHandlerWorkspaceLocator({
+      client: { user: "daniel.hhd@gmail.com" } as never,
+      cfg: {
+        ...managedCfg,
+        agents: {
+          ...managedCfg.agents,
+          list: managedCfg.agents.list.map((agent) => ({ ...agent, ownerId: "seat-old-handover" })),
+        },
+      },
+      agentId: AGENT_ID,
+      purpose: "trusted.agent.locator",
+    });
+
+    expect(result).toMatchObject({ ok: true });
+    if (result.ok) {
+      expect(result.handle.locator).toBe(projectedLocator);
+      expect(result.handle.locator).not.toBe(FOREIGN_LOCATOR);
+    }
+    expect(projectedLocator).toContain(
+      path.join("tenants", TENANT_ID, "users", USER_ID, "OpenBot", "agents", AGENT_ID, "workspace"),
+    );
+    expect(projectedLocator).not.toContain(`workspace-${AGENT_ID}`);
+    expect(projectedLocator).not.toContain("/legacy/");
+    expect(ensureGovernedWorkspaceCatalogIdentityMock).not.toHaveBeenCalled();
+    expect(store.seats[SEAT_ID]?.defaultAgentAssetIds).toEqual([AGENT_ID]);
+    expect(store.seats[SEAT_ID]?.defaultAgentAssetIds).not.toContain(ASSET_ID);
+  });
+
   it("projects the occupied seat when catalog is a foreign seat and grants are empty", async () => {
     const store = seatStore();
     loadSeatAssetsStoreForTenantIdMock.mockResolvedValue(store);

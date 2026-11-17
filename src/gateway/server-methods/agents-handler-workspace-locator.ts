@@ -10,6 +10,7 @@ import {
 } from "../data-governance/workspace-catalog-projection.js";
 import { findSeatContextForLegacyAgent } from "../data-governance/workspace-identity-repair.js";
 import { restorePersonalWorkbenchActor } from "../employee-workbench-actor-restore.js";
+import { resolveSeatGrantedAgentAssetIds } from "../enterprise-seat-assets-store.js";
 import { findActiveOwnershipRecord } from "../ownership-store.js";
 import { loadPlatformAuthStore, resolvePlatformAuthConfig } from "../platform-auth.js";
 import {
@@ -449,7 +450,24 @@ export async function resolveAgentsHandlerWorkspaceLocator(params: {
     seatId: occupiedSeatId,
     agentAssetId: identity.agentAssetId,
   });
-  const seatVisible = configOwnedByOccupiedSeat || catalogOwnedByOccupiedSeat;
+  // Seat grants are authoritative even when config/catalog retain a prior seat.
+  // The occupancy check below still gates projection and access.
+  const grantedSeatStore = occupiedSeatId
+    ? await loadSeatAssetsStoreForTenantId(tenantContext.tenantId, params.cfg).catch(() => null)
+    : null;
+  const occupiedSeat = grantedSeatStore?.seats[occupiedSeatId];
+  const formallyGrantedToOccupiedSeat = Boolean(
+    grantedSeatStore &&
+    occupiedSeat &&
+    occupiedSeat.tenantId === tenantContext.tenantId &&
+    resolveSeatGrantedAgentAssetIds({
+      store: grantedSeatStore,
+      tenantId: tenantContext.tenantId,
+      seat: occupiedSeat,
+    }).includes(params.agentId),
+  );
+  const seatVisible =
+    configOwnedByOccupiedSeat || catalogOwnedByOccupiedSeat || formallyGrantedToOccupiedSeat;
   let constrainToOccupiedSeat = false;
   if (seatVisible && occupiedSeatId) {
     let seatStore = null;
