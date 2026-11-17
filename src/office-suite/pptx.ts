@@ -7,11 +7,17 @@ export type PptxChart = {
   series: { name: string; values: number[] }[];
 };
 
+export type PptxTable = {
+  headers: string[];
+  rows: string[][];
+};
+
 export type PptxSlide = {
   title: string;
   bullets?: string[];
   imagePngBase64?: string;
   chart?: PptxChart;
+  table?: PptxTable;
 };
 
 export type PptxSpec = {
@@ -25,7 +31,7 @@ export type PptxEdit = {
 };
 
 export type PptxRead = {
-  slides: { title: string; bullets: string[] }[];
+  slides: { title: string; bullets: string[]; table?: PptxTable }[];
   charts: number;
   images: number;
   macrosPresent: boolean;
@@ -163,9 +169,17 @@ function slideXml(slide: PptxSlide, flags: { image: boolean; chart: boolean }): 
   const shapes: string[] = [];
   shapes.push(textShape(2, "Title", slide.title, 457200, 240000, 11200000, 700000, 2800, true));
   const bullets = slide.bullets ?? [];
+  const table = validTable(slide.table);
   const textWidth = flags.chart || flags.image ? 6200000 : 11200000;
   if (bullets.length > 0) {
-    shapes.push(bulletShape(3, bullets, 457200, 1100000, textWidth, 5200000));
+    const bulletHeight = table ? 1800000 : 5200000;
+    shapes.push(bulletShape(3, bullets, 457200, 1100000, textWidth, bulletHeight));
+  }
+  if (table) {
+    const tableY = bullets.length > 0 ? 3000000 : 1100000;
+    shapes.push(
+      tableFrame(6, table, 457200, tableY, textWidth, bullets.length > 0 ? 3300000 : 5200000),
+    );
   }
   if (flags.image) {
     shapes.push(
@@ -269,7 +283,51 @@ function chartXml(chart: PptxChart): string {
 <c:chartSpace xmlns:c="${C}" xmlns:a="${A}"><c:chart><c:plotArea>${plot}<c:catAx><c:axId val="1"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:axPos val="b"/><c:crossAx val="2"/></c:catAx><c:valAx><c:axId val="2"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:axPos val="l"/><c:crossAx val="1"/></c:valAx></c:plotArea><c:legend><c:legendPos val="b"/></c:legend></c:chart></c:chartSpace>`;
 }
 
-function readSlide(xml: string): { title: string; bullets: string[] } {
+function validTable(table: PptxTable | undefined): PptxTable | undefined {
+  if (!table) {
+    return undefined;
+  }
+  const headers = table.headers.map((cell) => String(cell ?? "").trim());
+  const rows = table.rows
+    .map((row) => row.map((cell) => String(cell ?? "").trim()))
+    .filter((row) => row.some((cell) => cell.length > 0));
+  if (headers.every((cell) => cell.length === 0) && rows.length === 0) {
+    return undefined;
+  }
+  return { headers, rows };
+}
+
+function tableFrame(
+  id: number,
+  table: PptxTable,
+  x: number,
+  y: number,
+  cx: number,
+  cy: number,
+): string {
+  const columns = Math.max(table.headers.length, ...table.rows.map((row) => row.length), 1);
+  const colWidth = Math.max(1, Math.floor(cx / columns));
+  const grid = Array.from({ length: columns }, () => `<a:gridCol w="${colWidth}"/>`).join("");
+  const header = tableRow(table.headers, columns, true);
+  const body = table.rows.map((row) => tableRow(row, columns, false)).join("");
+  return `<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="${id}" name="Table"/><p:cNvGraphicFramePr><a:graphicFrameLocks noGrp="1"/></p:cNvGraphicFramePr><p:nvPr/></p:nvGraphicFramePr><p:xfrm><a:off x="${x}" y="${y}"/><a:ext cx="${cx}" cy="${cy}"/></p:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/table"><a:tbl><a:tblPr/><a:tblGrid>${grid}</a:tblGrid>${header}${body}</a:tbl></a:graphicData></a:graphic></p:graphicFrame>`;
+}
+
+function tableRow(cells: string[], columns: number, header: boolean): string {
+  const height = header ? 400000 : 360000;
+  const padded = Array.from({ length: columns }, (_, index) => cells[index] ?? "");
+  const fill = header ? "1F4E79" : "FFFFFF";
+  const color = header ? "FFFFFF" : "14212B";
+  const tcs = padded
+    .map((cell) => {
+      const text = xmlEscape(cell);
+      return `<a:tc><a:txBody><a:bodyPr wrap="square" lIns="91440" tIns="45720" rIns="91440" bIns="45720"/><a:lstStyle/><a:p><a:pPr algn="ctr"/><a:r><a:rPr lang="zh-CN" sz="${header ? 1400 : 1300}" b="${header ? 1 : 0}" dirty="0"><a:solidFill><a:srgbClr val="${color}"/></a:solidFill><a:latin typeface="Calibri"/><a:ea typeface="Microsoft YaHei"/></a:rPr><a:t>${text}</a:t></a:r></a:p></a:txBody><a:tcPr><a:lnL w="12700"><a:solidFill><a:srgbClr val="D0D7DE"/></a:solidFill></a:lnL><a:lnR w="12700"><a:solidFill><a:srgbClr val="D0D7DE"/></a:solidFill></a:lnR><a:lnT w="12700"><a:solidFill><a:srgbClr val="D0D7DE"/></a:solidFill></a:lnT><a:lnB w="12700"><a:solidFill><a:srgbClr val="D0D7DE"/></a:solidFill></a:lnB><a:solidFill><a:srgbClr val="${fill}"/></a:solidFill></a:tcPr></a:tc>`;
+    })
+    .join("");
+  return `<a:tr h="${height}">${tcs}</a:tr>`;
+}
+
+function readSlide(xml: string): { title: string; bullets: string[]; table?: PptxTable } {
   const title =
     /<p:cNvPr id="2" name="Title"\/>[\s\S]*?<a:t>([\s\S]*?)<\/a:t>/.exec(xml)?.[1] ?? "";
   const body =
@@ -277,7 +335,32 @@ function readSlide(xml: string): { title: string; bullets: string[] } {
   const bullets = [...body.matchAll(/<a:t>([\s\S]*?)<\/a:t>/g)].map((match) =>
     decode(match[1] ?? ""),
   );
-  return { title: decode(title), bullets };
+  const table = readTable(xml);
+  return { title: decode(title), bullets, ...(table ? { table } : {}) };
+}
+
+function readTable(xml: string): PptxTable | undefined {
+  const block = /<a:tbl>([\s\S]*?)<\/a:tbl>/.exec(xml)?.[1];
+  if (!block) {
+    return undefined;
+  }
+  const rows: string[][] = [];
+  for (const rowXml of block.matchAll(/<a:tr\b[\s\S]*?<\/a:tr>/g)) {
+    const cells = [...rowXml[0].matchAll(/<a:tc\b[\s\S]*?<\/a:tc>/g)].map((cell) => {
+      const texts = [...cell[0].matchAll(/<a:t>([\s\S]*?)<\/a:t>/g)].map((match) =>
+        decode(match[1] ?? ""),
+      );
+      return texts.join("");
+    });
+    if (cells.length > 0) {
+      rows.push(cells);
+    }
+  }
+  if (rows.length === 0) {
+    return undefined;
+  }
+  const [headers, ...body] = rows;
+  return { headers: headers ?? [], rows: body };
 }
 
 function rewriteSlideText(xml: string, edit: PptxEdit): string {
