@@ -473,9 +473,9 @@ describe("platform window snapshot gateway", () => {
         .calls[0][0],
     ).toBe(false);
     const enterprise = client(["operator.read", "operator.platform"]);
-    expect((await invoke(handler, enterprise, { platformWindow: true } as never)).mock.calls[0][0]).toBe(
-      false,
-    );
+    expect(
+      (await invoke(handler, enterprise, { platformWindow: true } as never)).mock.calls[0][0],
+    ).toBe(false);
   });
 
   it("returns a window snapshot rather than a precise-task observation", async () => {
@@ -491,7 +491,6 @@ describe("platform window snapshot gateway", () => {
     expect(query).not.toHaveBeenCalled();
   });
 });
-
 
 describe("platform task index gateway", () => {
   const platformClient = (): GatewayClient =>
@@ -511,17 +510,21 @@ describe("platform task index gateway", () => {
 
   it("rejects mixed task index requests and non-platform sessions", async () => {
     expect(
-      (await invoke(handler(), platformClient(), { taskIndex: true, platformWindow: true } as never))
-        .mock.calls[0][0],
+      (
+        await invoke(handler(), platformClient(), {
+          taskIndex: true,
+          platformWindow: true,
+        } as never)
+      ).mock.calls[0][0],
     ).toBe(false);
     expect(
       (await invoke(handler(), platformClient(), { taskIndex: true, taskId: "task" } as never)).mock
         .calls[0][0],
     ).toBe(false);
     const enterprise = client(["operator.read", "operator.platform"]);
-    expect((await invoke(handler(), enterprise, { taskIndex: true } as never)).mock.calls[0][0]).toBe(
-      false,
-    );
+    expect(
+      (await invoke(handler(), enterprise, { taskIndex: true } as never)).mock.calls[0][0],
+    ).toBe(false);
   });
 
   it("returns a compact index rather than a precise-task observation", async () => {

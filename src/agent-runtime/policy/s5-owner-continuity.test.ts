@@ -21,8 +21,8 @@ import {
   parseAppointedProjectOwner,
   projectCollaborationWorkBrief,
   resolveOwnerAfterLaterMessage,
-} from "./collaboration-current-goal-binding.js";
-import type { TaskResponsibility } from "./collaboration-policy-model.js";
+} from "./index.js";
+import type { TaskResponsibility } from "./index.js";
 
 const tempDirs: string[] = [];
 const saved = {

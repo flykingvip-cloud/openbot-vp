@@ -29,7 +29,9 @@ const row = (taskId: string, scope = enterprise, decidedAt = new Date(time).toIS
   decidedAt,
   acceptance: { status: "passed" },
   delivery: { status: "delivered" },
-  runs: [{ runId: "run", attemptIds: ["attempt"], effectiveAttemptId: "attempt", status: "succeeded" }],
+  runs: [
+    { runId: "run", attemptIds: ["attempt"], effectiveAttemptId: "attempt", status: "succeeded" },
+  ],
   attempts: [
     {
       attemptId: "attempt",
@@ -41,7 +43,10 @@ const row = (taskId: string, scope = enterprise, decidedAt = new Date(time).toIS
 });
 
 function writeTip(record: ReturnType<typeof row>) {
-  fs.writeFileSync(path.join(dir, "task-outcomes/tips", `${record.taskId}.json`), JSON.stringify(record));
+  fs.writeFileSync(
+    path.join(dir, "task-outcomes/tips", `${record.taskId}.json`),
+    JSON.stringify(record),
+  );
   fs.writeFileSync(
     path.join(dir, "task-outcomes/versions", `${record.taskId}__v1.json`),
     JSON.stringify(record),

@@ -9,13 +9,80 @@ import {
   type RecoveryLogger,
   type RecoverySummary,
 } from "../../infra/outbound/delivery-queue.js";
-import type { MemberArtifactDeliveryIdentity } from "../policy/accepted-artifact-delivery.js";
-import {
-  claimMemberArtifactSendUnknown,
-  readMemberArtifactDeliveryIntent,
-  recordMemberArtifactReceipt,
-} from "../state/collaboration/accepted-artifact-delivery-txn.js";
+import type { MemberArtifactDeliveryIdentity } from "../policy/index.js";
 import { sendAcceptedArtifactBridge } from "./accepted-artifact-send.js";
+
+/** State-backed recovery ports. Delivery must not import state internals. */
+export type AcceptedArtifactRecoveryStore = {
+  readIntent(rootDir: string, keyHash: string): Promise<unknown>;
+  claimUnknown(params: {
+    rootDir: string;
+    authDir: string;
+    identity: MemberArtifactDeliveryIdentity;
+    recheck?: (intent: unknown) => Promise<"proceed" | "stop" | "block">;
+  }): Promise<{ ok: boolean; send?: boolean; blocked?: boolean }>;
+  recordReceipt(params: {
+    rootDir: string;
+    identity: MemberArtifactDeliveryIdentity;
+    receiptMessageIds: string[];
+  }): Promise<{ ok: true } | { ok: false; reason: string }>;
+};
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === "object" ? (value as Record<string, unknown>) : null;
+}
+
+function asString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function asStringOrNull(value: unknown): string | null | undefined {
+  if (value == null) {
+    return value;
+  }
+  return typeof value === "string" ? value : undefined;
+}
+
+function asNumberOrNull(value: unknown): number | null | undefined {
+  if (value == null) {
+    return value;
+  }
+  return typeof value === "number" ? value : undefined;
+}
+
+function identityFromIntent(intent: unknown): MemberArtifactDeliveryIdentity | null {
+  const rec = asRecord(intent);
+  if (!rec) {
+    return null;
+  }
+  const tenantId = asString(rec.tenantId);
+  const groupId = asString(rec.groupId);
+  const taskId = asString(rec.taskId);
+  const itemId = asString(rec.itemId);
+  const actorId = asString(rec.actorId);
+  const target = asRecord(rec.normalizedTarget);
+  const channel = target ? asString(target.channel) : undefined;
+  const to = target ? asString(target.to) : undefined;
+  if (!tenantId || !groupId || !taskId || !itemId || !actorId || !channel || !to) {
+    return null;
+  }
+  const accountId = target ? asStringOrNull(target.accountId) : undefined;
+  return {
+    tenantId,
+    groupId,
+    taskId,
+    itemId,
+    actorId,
+    scope: rec.scope === "group_final" ? "group_final" : "member_artifact",
+    boardStatus: "accepted",
+    acceptedSubmissionId: asStringOrNull(rec.acceptedSubmissionId),
+    acceptedArtifactVersion: asStringOrNull(rec.acceptedArtifactVersion),
+    linkedDeliverableId: asStringOrNull(rec.linkedDeliverableId),
+    linkedDeliverableVersion: asNumberOrNull(rec.linkedDeliverableVersion),
+    linkedContentSha256: asStringOrNull(rec.linkedContentSha256),
+    target: { channel, accountId, to },
+  };
+}
 
 const silentLog: RecoveryLogger = { info() {}, warn() {}, error() {} };
 
@@ -31,45 +98,48 @@ export async function recoverAcceptedArtifactBridgeEntry(params: {
   authDir: string;
   queueStateDir: string;
   cfg: OpenBotConfig;
+  store: AcceptedArtifactRecoveryStore;
   deps?: OutboundSendDeps;
 }): Promise<"recovered" | "failed" | "deferred"> {
   const keyHash = params.entry.bridgeKeyHash;
   if (!keyHash) {
     return "deferred";
   }
-  const intent = await readMemberArtifactDeliveryIntent(params.rootDir, keyHash);
-  if (!intent) {
+  const identity = identityFromIntent(await params.store.readIntent(params.rootDir, keyHash));
+  if (!identity) {
     return "deferred";
   }
-  const identity: MemberArtifactDeliveryIdentity = {
-    tenantId: intent.tenantId,
-    groupId: intent.groupId,
-    taskId: intent.taskId,
-    itemId: intent.itemId,
-    actorId: intent.actorId,
-    scope: intent.scope === "group_final" ? "group_final" : "member_artifact",
-    boardStatus: "accepted",
-    acceptedSubmissionId: intent.acceptedSubmissionId,
-    acceptedArtifactVersion: intent.acceptedArtifactVersion,
-    linkedDeliverableId: intent.linkedDeliverableId,
-    linkedDeliverableVersion: intent.linkedDeliverableVersion,
-    linkedContentSha256: intent.linkedContentSha256,
-    target: intent.normalizedTarget,
-  };
   return sendAcceptedArtifactBridge({
     snapshot: params.entry,
     queueStateDir: params.queueStateDir,
     cfg: params.cfg,
     deps: params.deps,
     claim: (recheck) =>
-      claimMemberArtifactSendUnknown({
+      params.store.claimUnknown({
         rootDir: params.rootDir,
         authDir: params.authDir,
         identity,
-        recheck,
+        recheck: async (intent) => {
+          const rec = asRecord(intent);
+          const target = rec ? asRecord(rec.normalizedTarget) : null;
+          const channel = target ? asString(target.channel) : undefined;
+          const to = target ? asString(target.to) : undefined;
+          const digest = rec ? asString(rec.linkedContentSha256) : undefined;
+          if (!channel || !to || !digest) {
+            return "block";
+          }
+          return recheck({
+            normalizedTarget: {
+              channel,
+              accountId: (target ? asStringOrNull(target.accountId) : undefined) ?? null,
+              to,
+            },
+            linkedContentSha256: digest,
+          });
+        },
       }),
     recordReceipt: async (ids) => {
-      const recorded = await recordMemberArtifactReceipt({
+      const recorded = await params.store.recordReceipt({
         rootDir: params.rootDir,
         identity,
         receiptMessageIds: ids,
@@ -87,6 +157,7 @@ export async function recoverAcceptedArtifactBridgeEntry(params: {
 /** Same recovery entry the gateway boot uses. Ordinary rows stay on `deliver`. */
 export async function recoverAcceptedArtifactDeliveries(params: {
   cfg: OpenBotConfig;
+  store: AcceptedArtifactRecoveryStore;
   stateDir?: string;
   deps?: OutboundSendDeps;
   deliver?: Parameters<typeof recoverPendingDeliveries>[0]["deliver"];
@@ -105,6 +176,7 @@ export async function recoverAcceptedArtifactDeliveries(params: {
         authDir: dirs.authDir,
         queueStateDir: dirs.queueStateDir,
         cfg: params.cfg,
+        store: params.store,
         deps: params.deps,
       }),
   });

@@ -66,8 +66,8 @@ import {
 } from "../local-files/events.js";
 import { startDiagnosticHeartbeat, stopDiagnosticHeartbeat } from "../logging/diagnostic.js";
 import { createSubsystemLogger, runtimeForLogger } from "../logging/subsystem.js";
-import { resolveConfiguredHeartbeatPeriodMs } from "../observation/heartbeat-activity.js";
 import { createHeartbeatActivityLifecycle } from "../observation/heartbeat-activity-lifecycle.js";
+import { resolveConfiguredHeartbeatPeriodMs } from "../observation/heartbeat-activity.js";
 import { createObservationQueryHandlers } from "../observation/query-gateway.js";
 import { createObservationReasoningOptions } from "../observation/reasoning-model-resolver.js";
 import { getGlobalHookRunner, runGlobalGatewayStopSafely } from "../plugins/hook-runner-global.js";
@@ -773,7 +773,7 @@ export async function startGatewayServer(
     void (async () => {
       const { deliverOutboundPayloads } = await import("../infra/outbound/deliver.js");
       const { recoverAcceptedArtifactDeliveries } =
-        await import("../agent-runtime/delivery/accepted-artifact-recover.js");
+        await import("../agent-runtime/wiring/accepted-artifact-delivery.js");
       const logRecovery = log.child("delivery-recovery");
       await recoverAcceptedArtifactDeliveries({
         deliver: deliverOutboundPayloads,

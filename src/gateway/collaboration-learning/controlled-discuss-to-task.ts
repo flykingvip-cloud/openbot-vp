@@ -17,7 +17,7 @@ import {
   shouldReuseCurrentGoalTask,
   shouldStartNewFormalTask,
   type LiveBindingTask,
-} from "../../agent-runtime/policy/collaboration-current-goal-binding.js";
+} from "../../agent-runtime/policy/index.js";
 import type { OpenBotConfig } from "../../config/types.js";
 import { isCollabTaskClaimContractEnabled } from "../collaboration-dispatch/claim-contract.js";
 import { applyBusinessTaskPatchUnderControlLock } from "../collaboration-dispatch/task-control-cas.js";

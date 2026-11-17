@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import type { ObservationRun } from "./model.ts";
 import {
   attentionCounts,
   classifyAttention,
@@ -10,6 +9,7 @@ import {
   formatRatioOrUnknown,
   percentile,
 } from "./enterprise-overview.ts";
+import type { ObservationRun } from "./model.ts";
 
 const run = (overrides: Partial<ObservationRun> & Pick<ObservationRun, "id">): ObservationRun => ({
   label: "example",
@@ -75,7 +75,9 @@ describe("computeOverviewMetrics", () => {
 
 describe("attention classification", () => {
   it("classifies link breaks and does not invent rule findings", () => {
-    const link = classifyAttention(run({ id: "l", reasons: ["scenario_task_ref", "outcome_revision"] }));
+    const link = classifyAttention(
+      run({ id: "l", reasons: ["scenario_task_ref", "outcome_revision"] }),
+    );
     const review = classifyAttention(run({ id: "r", reasons: ["sequence_gap_or_reorder"] }));
     const rows = [link, review];
     expect(link.status).toBe("关联断链");

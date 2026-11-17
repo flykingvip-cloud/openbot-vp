@@ -22,7 +22,7 @@ import * as commandFacade from "../agent-runtime/command/index.js";
 import {
   INTERACTION_RECORD_UNAVAILABLE_TEXT,
   INTERACTION_TIMEOUT_TEXT,
-} from "../agent-runtime/model/interaction-resource-wait.js";
+} from "../agent-runtime/model/index.js";
 import { replyTurnRuntime } from "../agent-runtime/wiring/reply-turn.js";
 import { makeZeroUsageSnapshot } from "../agents/usage.js";
 import * as dispatchModule from "../auto-reply/dispatch.js";

@@ -9,6 +9,7 @@ import {
   listModelAdmissions,
   previewRoutingDecision,
 } from "../models/capability-admission/index.js";
+import { resolveOfficialProbeConnectionOk } from "../models/model-probe-store.js";
 import {
   ErrorCodes,
   errorShape,
@@ -26,7 +27,9 @@ import {
 import type { GatewayRequestHandlers } from "./types.js";
 import { assertValidParams } from "./validation.js";
 
-const service = createGatewayVerificationService();
+const service = createGatewayVerificationService({
+  resolveConnectionOk: resolveOfficialProbeConnectionOk,
+});
 
 export const modelsAdmissionHandlers: GatewayRequestHandlers = {
   "models.admission.discoverCapabilities": async ({ params, respond }) => {

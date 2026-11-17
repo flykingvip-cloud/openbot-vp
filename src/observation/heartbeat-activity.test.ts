@@ -246,7 +246,10 @@ describe("resolveConfiguredHeartbeatPeriodMs", () => {
       resolveConfiguredHeartbeatPeriodMs({
         agents: {
           defaults: { heartbeat: { every: "2m" } },
-          list: [{ id: "a", heartbeat: { every: "2m" } }, { id: "b", heartbeat: { every: "1m" } }],
+          list: [
+            { id: "a", heartbeat: { every: "2m" } },
+            { id: "b", heartbeat: { every: "1m" } },
+          ],
         },
       }),
     ).toBeNull();

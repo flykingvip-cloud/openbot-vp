@@ -1194,11 +1194,11 @@ export function renderEnterpriseDiagnosisSurface(
         handlers.embedded
           ? nothing
           : renderEnterpriseModuleHeader({
-        title: t("tabs.enterpriseDiagnosis"),
-        refresh: handlers.onRefresh
-          ? { onRefresh: handlers.onRefresh, pending: handlers.refreshing }
-          : undefined,
-        trailing: html`
+              title: t("tabs.enterpriseDiagnosis"),
+              refresh: handlers.onRefresh
+                ? { onRefresh: handlers.onRefresh, pending: handlers.refreshing }
+                : undefined,
+              trailing: html`
           ${
             statusBanner === nothing
               ? html`<span class="enterprise-diagnosis__status" data-testid="enterprise-health">${healthCopy(model)}</span>`
@@ -1253,7 +1253,8 @@ export function renderEnterpriseDiagnosisSurface(
                 `
           }
         `,
-      })}
+            })
+      }
       <div class="enterprise-page__content enterprise-page__content--narrow">
         ${handlers.embedded ? html`<div class="enterprise-diagnosis__embedded-tools">${targetPicker(handlers)}</div>` : nothing}
         ${statusBanner}

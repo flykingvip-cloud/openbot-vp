@@ -7,7 +7,7 @@ import {
   INTERACTION_RECORD_UNAVAILABLE_TEXT,
   INTERACTION_TIMEOUT_TEXT,
   classifyInteractionFailure,
-} from "../agent-runtime/model/interaction-resource-wait.js";
+} from "../agent-runtime/model/index.js";
 import { SESSION_TASK_BOARD_LOCK_OPTIONS, withFileLock } from "../infra/file-lock.js";
 import { createAsyncLock } from "../infra/json-files.js";
 import { resolveConfigDir } from "../utils.js";

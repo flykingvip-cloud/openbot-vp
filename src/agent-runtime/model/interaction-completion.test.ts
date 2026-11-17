@@ -1,7 +1,7 @@
 import type { Api, Model } from "@earendil-works/pi-ai/compat";
 import { beforeEach, expect, it, vi } from "vitest";
 import { makeZeroUsageSnapshot } from "../../agents/usage.js";
-import { interactionAdmissionFact, routeInteraction } from "../command/route-interaction.js";
+import { interactionAdmissionFact, routeInteraction } from "../command/index.js";
 import { INTERACTION_PROSE_PROTOCOL_DOWNGRADE } from "../contracts/interaction.js";
 import {
   buildInteractionCompletionContext,

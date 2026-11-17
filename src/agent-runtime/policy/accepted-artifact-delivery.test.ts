@@ -12,7 +12,7 @@ import {
   type AcceptedArtifactIssuanceFacts,
   type ChannelAccountOutboundScopeFacts,
   type MemberArtifactDeliveryIdentity,
-} from "./accepted-artifact-delivery.js";
+} from "./index.js";
 
 function identity(
   patch: Partial<MemberArtifactDeliveryIdentity> = {},

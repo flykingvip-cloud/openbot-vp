@@ -9,7 +9,7 @@ import {
   deriveAcceptedArtifactIssuanceBasis,
   type MemberArtifactDeliveryIdentity,
   type AcceptedArtifactIssuanceFacts,
-} from "./accepted-artifact-delivery.js";
+} from "./index.js";
 
 function identity(
   patch: Partial<MemberArtifactDeliveryIdentity> = {},

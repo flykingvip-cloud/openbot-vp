@@ -7,7 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, expect, it } from "vitest";
 import { handleChatEvent, type ChatEventState } from "../../../ui/src/ui/controllers/chat.ts";
-import { interactionAdmissionFact } from "../../agent-runtime/command/route-interaction.js";
+import { interactionAdmissionFact } from "../../agent-runtime/command/index.js";
 import { INTERACTION_PROSE_PROTOCOL_DOWNGRADE } from "../../agent-runtime/contracts/interaction.js";
 import { resetSharedDataGovernanceCatalogForTests } from "../data-governance/runtime-catalog.js";
 import { appendUserTranscriptMessage, ensureTranscriptFile } from "./chat.js";

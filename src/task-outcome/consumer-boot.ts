@@ -4,7 +4,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { confirmPendingTurnDeliveryWithPorts } from "../agent-runtime/delivery/dispatch/confirm-pending.js";
+import { confirmPendingTurnDeliveryWithPorts } from "../agent-runtime/delivery/index.js";
 import { markAsyncWaitRecoveryDelivered } from "../agent-runtime/state/index.js";
 import { listAgentIds, resolveAgentDir } from "../agents/agent-scope.js";
 import type { OpenBotConfig } from "../config/config.js";

@@ -66,7 +66,9 @@ export function formatLifecycleRate(complete: number, denominator: number): Over
 }
 
 export function computeOverviewMetrics(runs: readonly ObservationRun[]): OverviewMetric[] {
-  const active = runs.filter((row) => row.toolState === "running" || row.toolState === "waiting").length;
+  const active = runs.filter(
+    (row) => row.toolState === "running" || row.toolState === "waiting",
+  ).length;
   const events = runs.reduce((sum, row) => sum + row.eventCount, 0);
   const complete = runs.filter((row) => row.latencyMs !== null).length;
   const latencies = runs
@@ -191,7 +193,10 @@ export function filterAttention(
 export function groupTargetsByAgent(
   targets: readonly DiagnosisTargetOption[],
 ): { agentId: string; label: string; sessions: readonly DiagnosisTargetOption[] }[] {
-  const groups = new Map<string, { agentId: string; label: string; sessions: DiagnosisTargetOption[] }>();
+  const groups = new Map<
+    string,
+    { agentId: string; label: string; sessions: DiagnosisTargetOption[] }
+  >();
   for (const target of targets) {
     const existing = groups.get(target.agentId);
     if (existing) {

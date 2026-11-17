@@ -7,8 +7,8 @@
  * parallel UI or a second policy engine. Gateway boot must not call this
  * without a grant.
  */
-import type { ResumeFollowupDeliveryAfterReauthorizationResult } from "../../agent-runtime/state/repository/blocked-followup-delivery-recovery.js";
-import { resumeFollowupDeliveryAfterReauthorization } from "../../agent-runtime/state/repository/blocked-followup-delivery-recovery.js";
+import type { ResumeFollowupDeliveryAfterReauthorizationResult } from "../../agent-runtime/state/index.js";
+import { resumeFollowupDeliveryAfterReauthorization } from "../../agent-runtime/state/index.js";
 import type { FollowupReauthorizationGrant } from "../../auto-reply/reply/followup-workspace-change.js";
 import type { OpenBotConfig } from "../../config/config.js";
 

@@ -1,10 +1,10 @@
 /** Passive platform activity. Liveness denominators appear only when a period is known. */
 import { randomUUID } from "node:crypto";
 import { listAgentEntries } from "../agents/agent-scope.js";
-import { normalizeAgentId } from "../routing/session-key.js";
 import type { OpenBotConfig } from "../config/config.js";
 import { onHeartbeatEvent, type HeartbeatEventPayload } from "../infra/heartbeat-events.js";
 import { resolveHeartbeatIntervalMs } from "../infra/heartbeat-runner.js";
+import { normalizeAgentId } from "../routing/session-key.js";
 export const HEARTBEAT_ACTIVITY_FLAG = "OPENBOT_HEARTBEAT_ACTIVITY_OBSERVATION";
 
 export function resolveConfiguredHeartbeatPeriodMs(cfg: OpenBotConfig): number | null {
@@ -77,8 +77,9 @@ export function deriveHeartbeatSamples(input: {
   if (expectedSamples <= 0) {
     return { expectedPeriodMs: period, expectedSamples: null, observedSamples: null, reasons };
   }
-  const observedSamples = input.events.filter((event) => event.ts >= start && event.ts < input.to)
-    .length;
+  const observedSamples = input.events.filter(
+    (event) => event.ts >= start && event.ts < input.to,
+  ).length;
   return { expectedPeriodMs: period, expectedSamples, observedSamples, reasons };
 }
 
@@ -245,9 +246,7 @@ export function startHeartbeatActivity(
       }
       const at = now();
       const retainedFrom =
-        collectionStartedAt != null
-          ? Math.max(at - ttlMs, collectionStartedAt)
-          : at - ttlMs;
+        collectionStartedAt != null ? Math.max(at - ttlMs, collectionStartedAt) : at - ttlMs;
       const samples = deriveHeartbeatSamples({
         expectedPeriodMs,
         events,

@@ -9,7 +9,8 @@ export function createHeartbeatActivityLifecycle(options: {
   if (options.minimalTestGateway) {
     return null;
   }
-  const activity = (options.startActivity ??
+  const activity = (
+    options.startActivity ??
     (() =>
       startHeartbeatActivity({
         enabled: () => {
@@ -20,7 +21,8 @@ export function createHeartbeatActivityLifecycle(options: {
           return /^(1|true|yes|on)$/i.test(raw);
         },
         resolveExpectedPeriodMs: options.resolveExpectedPeriodMs,
-      })))();
+      }))
+  )();
   let broadcastStop: (() => void) | undefined;
   try {
     broadcastStop = options.subscribeBroadcast();

@@ -11,11 +11,8 @@ const dirsState = vi.hoisted(() => ({
   current: null as null | { rootDir: string; authDir: string; queueStateDir: string },
 }));
 
-vi.mock("../../agent-runtime/command/accepted-artifact-delivery.js", async (importOriginal) => {
-  const actual =
-    await importOriginal<
-      typeof import("../../agent-runtime/command/accepted-artifact-delivery.js")
-    >();
+vi.mock("../../agent-runtime/command/index.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../agent-runtime/command/index.js")>();
   return {
     ...actual,
     acceptedArtifactDeliveryDirs: (stateDir?: string) => {

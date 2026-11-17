@@ -55,7 +55,12 @@ describe("listScheduledHeartbeatRobots", () => {
         agents: {
           list: [
             { id: "owned", heartbeat: { every: "1m" }, ownerType: "tenant", ownerId: "tenant-a" },
-            { id: "platform-owned", heartbeat: { every: "1m" }, ownerType: "platform", ownerId: "tenant-a" },
+            {
+              id: "platform-owned",
+              heartbeat: { every: "1m" },
+              ownerType: "platform",
+              ownerId: "tenant-a",
+            },
             { id: "plain", heartbeat: { every: "1m" } },
           ],
         },
@@ -151,10 +156,7 @@ describe("observeScheduledHeartbeatRobots and rollupHeartbeatCohort", () => {
   it("does not treat unattributed events as a confirmed miss, and does not invent tenants", () => {
     const { robots, unattributedInWindow } = observeScheduledHeartbeatRobots({
       cfg,
-      events: [
-        { ts: 10 },
-        { ts: 110, agentId: "fast" },
-      ],
+      events: [{ ts: 10 }, { ts: 110, agentId: "fast" }],
       ...window,
     });
     expect(unattributedInWindow).toBe(1);

@@ -4,7 +4,7 @@ import {
   issuanceFactsFromBoard,
   requestAcceptedArtifactDelivery,
   revokeAcceptedArtifactDelivery,
-} from "../../agent-runtime/command/accepted-artifact-delivery.js";
+} from "../../agent-runtime/command/index.js";
 import { readAcceptedArtifactDelivery } from "../../agent-runtime/state/collaboration/accepted-artifact-delivery-read.js";
 import { createOutboundSendDeps, type CliDeps } from "../../cli/deps.js";
 import { loadConfig } from "../../config/config.js";
@@ -1721,6 +1721,7 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
           task: result.task,
           stopControl: result.stopControl,
           alreadyStopped: result.alreadyStopped,
+          cascadeFacts: result.cascadeFacts,
         },
         undefined,
       );

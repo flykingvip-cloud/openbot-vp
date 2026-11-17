@@ -48,7 +48,9 @@ describe("formatLinkCoverage", () => {
     expect(formatLinkCoverage({ fullyLinkedCount: 0, attemptedCount: 0 }).value).toBe("未知");
     expect(formatLinkCoverage({ fullyLinkedCount: 1, attemptedCount: 0 }).value).toBe("未知");
     expect(formatLinkCoverage({ fullyLinkedCount: 0 }).value).toBe("未知");
-    expect(formatLinkCoverage({ fullyLinkedCount: 0, attemptedCount: 0 }).value).not.toContain("0%");
+    expect(formatLinkCoverage({ fullyLinkedCount: 0, attemptedCount: 0 }).value).not.toContain(
+      "0%",
+    );
   });
 
   it("formats a confirmed numerator and positive denominator", () => {
@@ -73,9 +75,13 @@ describe("formatHeartbeat", () => {
     expect(formatHeartbeat({ expectedSamples: null, observedSamples: 1 }).value).toBe("未知");
     expect(formatHeartbeat({ expectedSamples: 0, observedSamples: 0 }).value).toBe("未知");
     expect(formatHeartbeat({ scheduledRobotCount: 0, onCadenceRobotCount: 0 }).value).toBe("未知");
-    expect(formatHeartbeat({ scheduledRobotCount: 2, onCadenceRobotCount: null }).value).toBe("未知");
+    expect(formatHeartbeat({ scheduledRobotCount: 2, onCadenceRobotCount: null }).value).toBe(
+      "未知",
+    );
     expect(formatHeartbeat(null).note).toContain("source_unavailable");
-    expect(formatHeartbeat({ scheduledRobotCount: 0, onCadenceRobotCount: 0 }).value).not.toContain("0%");
+    expect(formatHeartbeat({ scheduledRobotCount: 0, onCadenceRobotCount: 0 }).value).not.toContain(
+      "0%",
+    );
   });
 
   it("formats a confirmed expected and observed count", () => {
@@ -84,10 +90,12 @@ describe("formatHeartbeat", () => {
 
   it("formats a confirmed scheduled-robot cadence cohort, including an honest 0%", () => {
     expect(
-      formatHeartbeat({ scheduledRobotCount: 2, confirmedRobotCount: 2, onCadenceRobotCount: 1 }).value,
+      formatHeartbeat({ scheduledRobotCount: 2, confirmedRobotCount: 2, onCadenceRobotCount: 1 })
+        .value,
     ).toBe("1/2 · 50%");
     expect(
-      formatHeartbeat({ scheduledRobotCount: 2, confirmedRobotCount: 2, onCadenceRobotCount: 0 }).value,
+      formatHeartbeat({ scheduledRobotCount: 2, confirmedRobotCount: 2, onCadenceRobotCount: 0 })
+        .value,
     ).toBe("0/2 · 0%");
     // Mixed-period payloads must use the cohort, never a mashed tick ratio.
     expect(
@@ -207,7 +215,9 @@ describe("exactRunMatches", () => {
   ];
 
   it("matches only exact identifiers and does not fold case or take prefixes", () => {
-    expect(exactRunMatches(runs, "sample-personal").map((row) => row.id)).toEqual(["sample-personal"]);
+    expect(exactRunMatches(runs, "sample-personal").map((row) => row.id)).toEqual([
+      "sample-personal",
+    ]);
     expect(exactRunMatches(runs, "client_01").map((row) => row.id)).toEqual(["sample-personal"]);
     expect(exactRunMatches(runs, "task_review@2").map((row) => row.id)).toEqual(["sample-partial"]);
     expect(exactRunMatches(runs, "SAMPLE-PERSONAL")).toEqual([]);
@@ -253,7 +263,10 @@ describe("heartbeat activity presentation", () => {
       observedSamples: null,
       observedEventCount: 2,
       lastEventAt: 1_000,
-      events: [{ ts: 500, status: "sent" }, { ts: 1_000, status: "ok-empty" }],
+      events: [
+        { ts: 500, status: "sent" },
+        { ts: 1_000, status: "ok-empty" },
+      ],
     };
     expect(formatHeartbeat(activity).value).toBe("未知");
     expect(heartbeatFraction(activity)).toBeNull();

@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
-import { admittedTaskQueryContinuation } from "../../agent-runtime/command/admitted-task-query-continuation.js";
-import { hostBoundTaskTarget } from "../../agent-runtime/command/host-task-target.js";
+import { admittedTaskQueryContinuation } from "../../agent-runtime/command/index.js";
+import { hostBoundTaskTarget } from "../../agent-runtime/command/index.js";
 import {
   formatTaskProposalReply,
   queryCurrentTaskStatus,
@@ -26,8 +26,8 @@ import {
   isEmbeddedPiRunStreaming,
   waitForEmbeddedPiRunEnd,
 } from "../../agent-runtime/execution/index.js";
-import { resolveInteractionResourceWaitMs } from "../../agent-runtime/model/interaction-resource-wait.js";
-import { INTERACTION_RECORD_UNAVAILABLE_TEXT } from "../../agent-runtime/model/interaction-resource-wait.js";
+import { resolveInteractionResourceWaitMs } from "../../agent-runtime/model/index.js";
+import { INTERACTION_RECORD_UNAVAILABLE_TEXT } from "../../agent-runtime/model/index.js";
 import { activeConstraintTexts } from "../../agent-runtime/policy/index.js";
 import { replyTurnRuntime } from "../../agent-runtime/wiring/reply-turn.js";
 import { resolveSessionAuthProfileOverride } from "../../agents/auth-profiles/session-override.js";
@@ -1663,7 +1663,9 @@ export async function runPreparedReply(
               )
             : { kind: "rejected" as const, reason: "unauthorized" };
         if (applied.kind === "applied" && applied.abort) {
-          replyTurnRuntime.interrupt(sessionIdFinal, sessionKey);
+          const stopTaskId =
+            "target" in routed.decision ? routed.decision.target?.taskId : undefined;
+          replyTurnRuntime.interrupt(sessionIdFinal, sessionKey, stopTaskId);
           if (routed.decision.kind === "task_control" && routed.decision.action !== "resume") {
             await opts?.onInteractionTaskEffect?.({
               kind: routed.decision.action,

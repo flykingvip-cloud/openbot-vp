@@ -26,7 +26,7 @@ import {
   recordBlockedFollowupDelivery,
   resolveBlockedFollowupDeliveryPersistRoot,
   type FollowupDeliveryResumeSnapshot,
-} from "../../agent-runtime/state/repository/blocked-followup-delivery.js";
+} from "../../agent-runtime/state/index.js";
 import { bindAdmittedTurnHost } from "../../agent-runtime/wiring/admitted-turn-host.js";
 import { confirmPendingTurnDelivery } from "../../agent-runtime/wiring/delivery-confirm.js";
 import { replyTurnRuntime } from "../../agent-runtime/wiring/reply-turn.js";

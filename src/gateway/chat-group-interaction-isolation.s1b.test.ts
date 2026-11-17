@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -42,7 +43,8 @@ vi.mock("@earendil-works/pi-ai/compat", async (original) => ({
   complete: completeMock,
 }));
 
-const { chatHandlers, appendUserTranscriptMessage } = await import("./server-methods/chat.js");
+const { chatHandlers, appendUserTranscriptMessage, resolveCallerWorkspaceCwd } =
+  await import("./server-methods/chat.js");
 const collaborationShared = await import("./collaboration-learning/shared.js");
 const { createWorkspaceCollaborationStores } = collaborationShared;
 const { resolveGroupPublicTranscriptPath } =
@@ -1066,6 +1068,11 @@ describe("checkpoint B isolated Gateway group interaction isolation", () => {
     await vi.waitFor(() => expect(context.chatAbortControllers.has(runA)).toBe(true), {
       timeout: 15_000,
     });
+    // Occupancy is registered before understanding/admission finishes. Wait
+    // for the controlled hang itself so B actually overlaps running A and the
+    // release below cannot be lost before the stub receives its resolver.
+    await vi.waitFor(() => expect(releaseA).toBeTypeOf("function"), { timeout: 15_000 });
+    const releaseRunningA = releaseA!;
     const aController = context.chatAbortControllers.get(runA);
     const sendB = await sendGroupChat({
       fixture,
@@ -1084,7 +1091,7 @@ describe("checkpoint B isolated Gateway group interaction isolation", () => {
 
     const bTextAfterB = collectTranscriptText(fixture.root);
     expect(bTextAfterB).toContain(GREETING_REPLY);
-    releaseA?.(asDispatchResult({ ok: true, text: "A业务结果" }));
+    releaseRunningA(asDispatchResult({ ok: true, text: "A业务结果" }));
     await vi.waitFor(
       () => {
         expect(findTerminal(context, runA), "A should emit a terminal after release").toBeTruthy();
@@ -1663,11 +1670,55 @@ describe("checkpoint B isolated Gateway group interaction isolation", () => {
     });
     await vi.waitFor(() => expect(findTerminal(context, runId)).toBeTruthy(), { timeout: 15_000 });
     await send.pending;
-    // Official discussion dispatch may still run after admission; mention bypass must stay zero.
+    // A draft/blocked formal request has not admitted any member work, even
+    // when participant selection has already selected the mentioned robot.
     await expectZeroMentionBypass(spies, fixture.root);
     expectOperatingStateIdentityUnchanged(osPath, osBefore);
     expect(findTerminal(context, runId)).toBeTruthy();
-    expect(dispatchSpy.mock.calls.length).toBeLessThanOrEqual(1);
+    expect(dispatchSpy).not.toHaveBeenCalled();
+  }, 30_000);
+
+  it("direct fallback settles the authorized file without reconstructing an identity root", async () => {
+    const fixture = await isolateTrustedGroupGateway();
+    const cfg = JSON.parse(
+      fs.readFileSync(process.env.OPENBOT_CONFIG_PATH!, "utf8"),
+    ) as OpenBotConfig;
+    const workspace = await resolveCallerWorkspaceCwd({
+      cfg,
+      sessionKey: "agent:main:main",
+      agentId: "main",
+      client: null,
+    });
+    expect(workspace).toBeTruthy();
+    fs.mkdirSync(workspace!, { recursive: true });
+    const bytes = "# Actual authorized file\n120 - 78 = 42\n";
+    fs.writeFileSync(path.join(workspace!, "fallback.md"), bytes);
+    vi.spyOn(dispatchModule, "dispatchInboundMessage").mockImplementation(
+      async ({ dispatcher }) => {
+        dispatcher.sendFinalReply({
+          text: '<<DELIVERABLE title="报告" type="report" file="fallback.md">>brief summary<</DELIVERABLE>>',
+        });
+        await dispatcher.waitForIdle();
+        return asDispatchResult({ queuedFinal: true });
+      },
+    );
+    const context = createChatContext();
+    const runId = `run-direct-root-${path.basename(fixture.root)}`;
+    const send = await sendPrivateChat({ fixture, context, runId, message: "交付fallback.md" });
+    await vi.waitFor(
+      () => {
+        const final = collectChatEvents(context, runId).find(
+          (row) => row.payload?.state === "final",
+        )?.payload as
+          | { message?: { deliverablePublish?: { versionChecksum?: string } } }
+          | undefined;
+        expect(final?.message?.deliverablePublish?.versionChecksum).toBe(
+          createHash("sha256").update(bytes).digest("hex"),
+        );
+      },
+      { timeout: 15_000 },
+    );
+    await send.pending;
   }, 30_000);
 
   it("S2-4: the same message and idempotencyKey do not double-dispatch, including a late replay", async () => {

@@ -79,7 +79,7 @@ const REVISION_LANGUAGE =
 const BLOCK_LANGUAGE = /(?:阻塞|被挡住|无法继续|blocked|cannot proceed)/iu;
 
 const NEW_WORK_LANGUAGE =
-  /(?:另外(?:再)?(?:做|建|开)|再开一个|新的项目|新任务|另作一个|start a new (?:task|project))/iu;
+  /(?:^(?:请|现在)?\s*新建[^，。；;\n]{0,24}(?:任务|项目)|另外(?:再)?(?:做|建|开)|再开一个|新的项目|新任务|另作一个|start a new (?:task|project))/iu;
 
 const ROLE_PLAY_LANGUAGE = /(?:我(?:来)?扮演|角色扮演|role[- ]?play|pretend (?:to be|I am))/iu;
 
@@ -125,6 +125,30 @@ function extractMentionedIds(message: string, members: readonly KnownBindingMemb
   return uniqueIds(found);
 }
 
+/** Contribution mentions outside the appointment clause do not nominate an owner. */
+function extractAppointedIds(message: string, members: readonly KnownBindingMember[]): string[] {
+  const candidates: string[] = [];
+  const clauses = message.matchAll(
+    /(?:任命|指定|请(?:让)?|设为|让|appoint(?:ed)?|make|name)\s*([^，。；;\n]{0,100}?)(?:项目负责人|负责人|(?<![a-z0-9_-])(?:project\s+owner|owner)(?![a-z0-9_-]))/giu,
+  );
+  for (const clause of clauses) {
+    const text = clause[1];
+    for (const member of members) {
+      if (
+        memberTokens(member).some((token) => {
+          const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          const before = /^[a-z0-9_]/i.test(token) ? "(?<![a-z0-9_-])" : "";
+          const after = /[a-z0-9_]$/i.test(token) ? "(?![a-z0-9_-])" : "";
+          return new RegExp(`${before}${escaped}${after}`, "iu").test(text);
+        })
+      ) {
+        candidates.push(member.id);
+      }
+    }
+  }
+  return uniqueIds(candidates);
+}
+
 export type AppointmentSpeech = "none" | "appoint" | "negated" | "unsettled";
 
 export type AppointmentProposal = {
@@ -150,6 +174,7 @@ export function proposeAppointedProjectOwner(params: {
   const message = compact(params.message);
   const members = params.knownMembers ?? [];
   const mentioned = message ? extractMentionedIds(message, members) : [];
+  const appointed = message ? extractAppointedIds(message, members) : [];
   if (message && APPOINTMENT_NEGATION.test(message)) {
     return {
       source: explicit ? "explicit_field" : "appointment_language",
@@ -158,11 +183,19 @@ export function proposeAppointedProjectOwner(params: {
     };
   }
   if (explicit) {
-    if (message && (UNSETTLED_APPOINTMENT.test(message) || mentioned.length > 1)) {
+    if (
+      message &&
+      (UNSETTLED_APPOINTMENT.test(message) ||
+        (APPOINTMENT_LANGUAGE.test(message) &&
+          (appointed.length !== 1 ||
+            !members.some(
+              (member) => member.id === appointed[0] && memberMatchesIdentity(member, explicit),
+            ))))
+    ) {
       return {
         source: "explicit_field",
         speech: "unsettled",
-        candidateIds: uniqueIds([explicit, ...mentioned]),
+        candidateIds: uniqueIds([explicit, ...appointed]),
       };
     }
     return { source: "explicit_field", speech: "appoint", candidateIds: [explicit] };
@@ -170,20 +203,19 @@ export function proposeAppointedProjectOwner(params: {
   if (!message || !APPOINTMENT_LANGUAGE.test(message)) {
     return { source: "none", speech: "none", candidateIds: [] };
   }
-  // A plain @mention without appointment wording never reaches here.
-  // Multiple mentions or an explicit pending choice stay unsettled; do not pick
-  // the first member from the roster order.
-  if (UNSETTLED_APPOINTMENT.test(message) || mentioned.length !== 1) {
+  // Multiple nominees or an explicit pending choice stay unsettled; do not pick
+  // the first member from the roster order, or a contributor elsewhere in the message.
+  if (UNSETTLED_APPOINTMENT.test(message) || appointed.length !== 1) {
     return {
       source: "appointment_language",
       speech: "unsettled",
-      candidateIds: mentioned,
+      candidateIds: appointed,
     };
   }
   return {
     source: "appointment_language",
     speech: "appoint",
-    candidateIds: mentioned,
+    candidateIds: appointed,
   };
 }
 

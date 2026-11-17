@@ -5,7 +5,7 @@ import { CURRENT_SESSION_VERSION } from "@earendil-works/pi-coding-agent";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Stub the run registry itself; eagerly importing its heavy public barrel
 // before reply-turn changes cyclic module initialization in this host test.
-import * as executionRuntime from "../../agent-runtime/execution/runner/run-registry.js";
+import * as executionRuntime from "../../agent-runtime/execution/index.js";
 import { replyTurnRuntime } from "../../agent-runtime/wiring/reply-turn.js";
 import { resolveBootstrapContextForRun } from "../../agents/bootstrap-files.js";
 import { STEWARD_REQUIRED_SKILLS } from "../../agents/builtin-steward/required-skills.js";

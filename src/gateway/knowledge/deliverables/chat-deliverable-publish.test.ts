@@ -8,7 +8,7 @@ vi.mock("../../agent-registry/store.js", () => ({
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { vi, afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { extractDeliverableEnvelope } from "../../../shared/preview-artifact/deliverable-envelope.js";
 import { settleCollaborationDeclaredDeliverable } from "../../workspace-resolver/settle-declared-deliverable.js";
 import {
@@ -19,10 +19,12 @@ import {
   scrubFalseDeliveryClaims,
 } from "./chat-deliverable-publish.js";
 import { readGroupDeliverableManifest } from "./group-manifest.js";
+import * as automaticCapture from "./maybe-auto-capture-agent-deliverable.js";
 
 const tempDirs: string[] = [];
 
 afterEach(() => {
+  vi.restoreAllMocks();
   configMode.managed = false;
   for (const dir of tempDirs.splice(0)) {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -78,6 +80,24 @@ function prepareGroup(
 }
 
 describe("prepareChatDeliverablePublish", () => {
+  it("registers delivery without automatically capturing or saving a knowledge copy", () => {
+    const dirs = roots();
+    const capture = vi
+      .spyOn(automaticCapture, "maybeAutoCaptureAgentDeliverable")
+      .mockReturnValue(null);
+    fs.writeFileSync(path.join(dirs.agent, "actual.md"), "actual tool bytes");
+    const result = prepareChatDeliverablePublish({
+      text: declare("actual.md", "summary is not the file"),
+      publishIntent: "agent-run-final",
+      sessionKey: "agent:main:main",
+      agentId: "main",
+      agentWorkspaceRoot: dirs.agent,
+      stateDir: dirs.stateDir,
+    });
+    expect(result.view.registration).toBe("registered");
+    expect(capture).not.toHaveBeenCalled();
+    expect(fs.readFileSync(path.join(dirs.agent, "actual.md"), "utf8")).toBe("actual tool bytes");
+  });
   it("persists a group text deliverable before the caller broadcasts success", () => {
     const dirs = roots();
     const relative = "analysis/model.md";

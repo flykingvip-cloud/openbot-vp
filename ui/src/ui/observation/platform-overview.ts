@@ -3,10 +3,7 @@
  * Coverage and heartbeat stay unknown unless the caller supplies a confirmed
  * numerator and a positive denominator. This module never invents grants.
  */
-import {
-  resolveTenantGrant,
-  type TenantGrant,
-} from "./access-state.ts";
+import { resolveTenantGrant, type TenantGrant } from "./access-state.ts";
 import type { ObservationRun } from "./model.ts";
 
 export type LinkCoverageInput = {
@@ -99,7 +96,9 @@ export type FormattedMetric = {
 
 const UNKNOWN_COVERAGE_DETAIL = "关联覆盖率，非业务成功率。分母未供给或为 0 时显示未知，不填 0%。";
 
-export function linkCoverageFraction(coverage: LinkCoverageInput | null | undefined): number | null {
+export function linkCoverageFraction(
+  coverage: LinkCoverageInput | null | undefined,
+): number | null {
   const formatted = formatLinkCoverage(coverage);
   if (formatted.value === "未知") {
     return null;
@@ -118,7 +117,9 @@ export function linkCoverageFraction(coverage: LinkCoverageInput | null | undefi
   return Math.min(1, Math.max(0, linked / attempted));
 }
 
-export function formatLinkCoverage(coverage: LinkCoverageInput | null | undefined): FormattedMetric {
+export function formatLinkCoverage(
+  coverage: LinkCoverageInput | null | undefined,
+): FormattedMetric {
   const attempted = coverage?.attemptedCount;
   const linked = coverage?.fullyLinkedCount;
   if (
@@ -360,13 +361,7 @@ export function tenantGrantNote(grant: TenantGrant, sample: boolean): string {
 }
 
 export function runExactIdentifiers(run: ObservationRun): string[] {
-  const ids = [
-    run.id,
-    run.clientRunId,
-    run.sourceRunId,
-    run.admittedWorkId,
-    run.scenarioTaskRef,
-  ];
+  const ids = [run.id, run.clientRunId, run.sourceRunId, run.admittedWorkId, run.scenarioTaskRef];
   if (run.scenarioTaskRef && run.outcomeRevision) {
     ids.push(`${run.scenarioTaskRef}@${run.outcomeRevision}`);
   }
@@ -385,7 +380,9 @@ export function exactRunMatches(
   return runs.filter((run) => runExactIdentifiers(run).includes(needle));
 }
 
-export function formatUnmappedEvents(input: UnmappedEventsInput | null | undefined): FormattedMetric {
+export function formatUnmappedEvents(
+  input: UnmappedEventsInput | null | undefined,
+): FormattedMetric {
   const count = input?.count;
   if (count == null || !Number.isFinite(count) || count < 0) {
     return { value: "未知", detail: "", note: "未映射事件计数未供给" };
@@ -403,7 +400,9 @@ export function heartbeatActivityMarks(
   if (!events) {
     return [];
   }
-  return events.filter((event) => Number.isFinite(event.ts)).toSorted((left, right) => left.ts - right.ts);
+  return events
+    .filter((event) => Number.isFinite(event.ts))
+    .toSorted((left, right) => left.ts - right.ts);
 }
 
 export function formatHeartbeatFreshness(
@@ -426,7 +425,11 @@ export function formatHeartbeatFreshness(
   }
   const minutes = Math.floor(delta / 60_000);
   const freshness =
-    minutes < 1 ? "刚刚" : minutes < 60 ? `${minutes} 分钟前` : `${Math.floor(minutes / 60)} 小时前`;
+    minutes < 1
+      ? "刚刚"
+      : minutes < 60
+        ? `${minutes} 分钟前`
+        : `${Math.floor(minutes / 60)} 小时前`;
   if (count != null && Number.isFinite(count)) {
     return `${freshness} · ${count} 次`;
   }

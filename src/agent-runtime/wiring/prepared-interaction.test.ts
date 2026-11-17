@@ -3,7 +3,7 @@ import { expect, it, vi } from "vitest";
 import type { FallbackAttempt } from "../../agents/model-fallback.types.js";
 import { makeZeroUsageSnapshot } from "../../agents/usage.js";
 import { runGovernedInteraction, runGovernedUnderstanding } from "../command/index.js";
-import { INTERACTION_TIMEOUT_TEXT } from "../model/interaction-resource-wait.js";
+import { INTERACTION_TIMEOUT_TEXT } from "../model/index.js";
 import { bindAdmittedTurnHost } from "./admitted-turn-host.js";
 const calls = vi.hoisted(() => ({ complete: vi.fn() }));
 vi.mock("@earendil-works/pi-ai/compat", async (original) => ({

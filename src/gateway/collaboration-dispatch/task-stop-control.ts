@@ -90,3 +90,92 @@ export function buildAcceptedTaskStopControl(params: {
     externalEffect: params.externalEffect ?? "unknown",
   };
 }
+
+/**
+ * R1 — after an accepted stop fence, cancel only explicitly owned work.
+ * Facts are recorded per target; this is not a second stop state machine.
+ * Session identity, bot identity, similar names, or close timestamps are not ownership.
+ */
+export type OwnedStopTargetKind =
+  | "current_run"
+  | "queue_item"
+  | "child_execution"
+  | "async_wait_job"
+  | "supervisor_run"
+  | "remote_job";
+
+export type OwnedStopTargetFactStatus =
+  | "accepted"
+  | "confirmed_stopped"
+  | "unsupported"
+  | "pending"
+  | "failed";
+
+export type OwnedStopTargetFact = {
+  kind: OwnedStopTargetKind;
+  id: string;
+  taskId: string;
+  status: OwnedStopTargetFactStatus;
+  detail?: string;
+};
+
+export type OwnedRemoteBinding = {
+  jobId: string;
+  leaseId: string;
+  authorized: boolean;
+};
+
+export type OwnedStopTarget = {
+  kind: OwnedStopTargetKind;
+  id: string;
+  taskId: string;
+  remote?: OwnedRemoteBinding;
+};
+
+export type OwnedStopPorts = {
+  /** Return only targets with explicit ownership evidence for this taskId. */
+  listOwnedTargets: (taskId: string) => OwnedStopTarget[] | Promise<OwnedStopTarget[]>;
+  cancelTarget: (target: OwnedStopTarget) => Promise<OwnedStopTargetFact>;
+  /** Already-accepted fence should refuse admission of not-yet-started children. */
+  refuseUnstartedAdmission?: (taskId: string) => Promise<void> | void;
+};
+
+export function remoteJobCancelable(remote: OwnedRemoteBinding | undefined): boolean {
+  return Boolean(remote?.jobId?.trim() && remote?.leaseId?.trim() && remote.authorized);
+}
+
+/**
+ * Cascade cancel after the stop fence is already accepted.
+ * Does not write the fence, does not invent ownership, and never cancels
+ * a target whose taskId does not match.
+ */
+export async function cancelOwnedWorkAfterAcceptedStop(params: {
+  taskId: string;
+  stopAccepted: boolean;
+  ports: OwnedStopPorts;
+}): Promise<OwnedStopTargetFact[]> {
+  const taskId = params.taskId.trim();
+  if (!taskId || !params.stopAccepted) {
+    return [];
+  }
+  await params.ports.refuseUnstartedAdmission?.(taskId);
+  const targets = await params.ports.listOwnedTargets(taskId);
+  const facts: OwnedStopTargetFact[] = [];
+  for (const target of targets) {
+    if (target.taskId.trim() !== taskId) {
+      continue;
+    }
+    if (target.kind === "remote_job" && !remoteJobCancelable(target.remote)) {
+      facts.push({
+        kind: "remote_job",
+        id: target.id,
+        taskId,
+        status: "unsupported",
+        detail: "unowned or unauthorized remote job remains unconfirmed; not cancelled",
+      });
+      continue;
+    }
+    facts.push(await params.ports.cancelTarget(target));
+  }
+  return facts;
+}

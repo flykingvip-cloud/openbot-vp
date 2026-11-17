@@ -13,7 +13,7 @@ import {
 } from "../../../infra/outbound/delivery-queue.js";
 import { sendAcceptedArtifactBridge } from "../../delivery/accepted-artifact-send.js";
 import { writeAcceptedArtifactQueueFile } from "../../delivery/accepted-artifact-send.js";
-import type { MemberArtifactDeliveryIdentity } from "../../policy/accepted-artifact-delivery.js";
+import type { MemberArtifactDeliveryIdentity } from "../../policy/index.js";
 import {
   claimMemberArtifactSendUnknown,
   commitMemberArtifactDeliveryAssociation,
