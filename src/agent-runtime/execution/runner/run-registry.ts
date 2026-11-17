@@ -12,6 +12,7 @@ type EmbeddedPiQueueHandle = {
 };
 
 const ACTIVE_EMBEDDED_RUNS = new Map<string, EmbeddedPiQueueHandle>();
+const ACTIVE_EMBEDDED_RUN_IDS = new Map<string, string>();
 type EmbeddedRunWaiter = {
   resolve: (ended: boolean) => void;
   timer: NodeJS.Timeout;
@@ -200,13 +201,47 @@ function notifyEmbeddedRunEnded(sessionId: string) {
   }
 }
 
+export function getActiveEmbeddedRunId(sessionId: string): string | undefined {
+  return ACTIVE_EMBEDDED_RUN_IDS.get(sessionId);
+}
+
+/** Abort only if the current session run is this owned run identity. */
+export function abortEmbeddedPiRunIfCurrent(sessionId: string, runId: string): boolean {
+  const sid = sessionId.trim();
+  const rid = runId.trim();
+  if (!sid || !rid) {
+    return false;
+  }
+  const handle = ACTIVE_EMBEDDED_RUNS.get(sid);
+  const currentId = ACTIVE_EMBEDDED_RUN_IDS.get(sid);
+  if (!handle || currentId !== rid) {
+    diag.debug(`abort skipped: sessionId=${sid} reason=run_identity_mismatch`);
+    return false;
+  }
+  diag.debug(`aborting run: sessionId=${sid} runId=${rid}`);
+  try {
+    handle.abort();
+  } catch (err) {
+    diag.warn(`abort failed: sessionId=${sid} err=${String(err)}`);
+    return false;
+  }
+  return true;
+}
+
 export function setActiveEmbeddedRun(
   sessionId: string,
   handle: EmbeddedPiQueueHandle,
   sessionKey?: string,
+  runId?: string,
 ) {
   const wasActive = ACTIVE_EMBEDDED_RUNS.has(sessionId);
   ACTIVE_EMBEDDED_RUNS.set(sessionId, handle);
+  const ownedRunId = runId?.trim();
+  if (ownedRunId) {
+    ACTIVE_EMBEDDED_RUN_IDS.set(sessionId, ownedRunId);
+  } else {
+    ACTIVE_EMBEDDED_RUN_IDS.delete(sessionId);
+  }
   logSessionStateChange({
     sessionId,
     sessionKey,
@@ -225,6 +260,7 @@ export function clearActiveEmbeddedRun(
 ) {
   if (ACTIVE_EMBEDDED_RUNS.get(sessionId) === handle) {
     ACTIVE_EMBEDDED_RUNS.delete(sessionId);
+    ACTIVE_EMBEDDED_RUN_IDS.delete(sessionId);
     logSessionStateChange({ sessionId, sessionKey, state: "idle", reason: "run_completed" });
     if (!sessionId.startsWith("probe-")) {
       diag.debug(`run cleared: sessionId=${sessionId} totalActive=${ACTIVE_EMBEDDED_RUNS.size}`);
@@ -245,6 +281,7 @@ export const __testing = {
     }
     EMBEDDED_RUN_WAITERS.clear();
     ACTIVE_EMBEDDED_RUNS.clear();
+    ACTIVE_EMBEDDED_RUN_IDS.clear();
   },
 };
 
