@@ -20,6 +20,7 @@ const DIGEST_PINNED_DOCKERFILES = [
 
 type DependabotDockerGroup = {
   patterns?: string[];
+  "update-types"?: string[];
 };
 
 type DependabotUpdate = {
@@ -94,5 +95,6 @@ describe("docker base image pinning", () => {
     expect(dockerUpdate).toBeDefined();
     expect(dockerUpdate?.schedule?.interval).toBe("weekly");
     expect(dockerUpdate?.groups?.["docker-images"]?.patterns).toContain("*");
+    expect(dockerUpdate?.groups?.["docker-images"]?.["update-types"]).toEqual(["minor", "patch"]);
   });
 });

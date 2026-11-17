@@ -14720,6 +14720,15 @@ tasks:
     since: 2026-11-16
     metadata: {}
 landingStreams:
+  - id: dependabot-docker-group-minor-patch-20261117
+    landingPolicy: serial
+    paths:
+      - .github/dependabot.yml
+      - src/docker-image-digests.test.ts
+    canLandWith: []
+    metadata:
+      owner: grok-bot
+      note: Limit the docker-images Dependabot group to minor/patch so Node majors stay ungrouped.
   - id: gate-debt-delivery-c1-c2-c3-20261116
     landingPolicy: serial
     paths:
