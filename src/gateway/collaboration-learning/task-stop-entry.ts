@@ -224,16 +224,21 @@ export function createDefaultOwnedStopPorts(): OwnedStopPorts {
         clearSessionQueueItemsForTask([sessionId, child?.sessionKey], target.taskId);
         const exited = await waitForEmbeddedPiRunEnd(sessionId, 50);
         const stillCurrent = getActiveEmbeddedRunId(sessionId)?.trim() === ownedRunId;
-        unregisterOwnedChildExecution(target.taskId, target.id);
+        if (exited && !stillCurrent) {
+          unregisterOwnedChildExecution(target.taskId, ownedRunId);
+          return {
+            kind: target.kind,
+            id: target.id,
+            taskId: target.taskId,
+            status: "confirmed_stopped",
+          };
+        }
         return {
           kind: target.kind,
           id: target.id,
           taskId: target.taskId,
-          status: exited && !stillCurrent ? "confirmed_stopped" : "pending",
-          detail:
-            exited && !stillCurrent
-              ? undefined
-              : "child cancel was requested but exit was not confirmed",
+          status: "pending",
+          detail: "child cancel was requested but exit was not confirmed",
         };
       }
       if (target.kind === "async_wait_job") {
