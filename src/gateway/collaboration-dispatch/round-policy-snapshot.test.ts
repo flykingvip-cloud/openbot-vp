@@ -4,6 +4,7 @@ import { hashEffectiveCollaborationPolicy } from "./policy-compiler-hash.js";
 import { compileEffectiveCollaborationPolicy } from "./policy-compiler.js";
 import {
   createRoundPolicySnapshot,
+  createAdoptedGroupReplySnapshot,
   deepFreeze,
   generatePolicySnapshotId,
   hashProvenanceAndClamps,
@@ -77,11 +78,56 @@ describe("round-policy-snapshot (P0.0b)", () => {
     expect(SYSTEM_INVARIANTS.protocolVersion).toBe("1.1");
     const empty = compileEffectiveCollaborationPolicy({});
     expect(empty.protocolVersion).toBe("1.1");
-    expect(empty.participation.maxVisibleBotRepliesPerRound).toBe(3);
-    expect(empty.participation.openDiscussionWithoutMention).toBe(true);
+    expect(empty.participation.maxVisibleBotRepliesPerRound).toBe(5);
+    expect(empty.participation.openDiscussionWithoutMention).toBe(false);
     expect(empty.participation.mentionBotMustRespond).toBe(false);
     expect(empty.dispatch.supplementEnabled).toBe(true);
     expect(empty.governance.botMaySelfAdvanceWithoutHuman).toBe(false);
     expect(empty.strategy).toEqual(MODE_TEMPLATES.discussion_driven);
   });
+});
+
+it("adopts a smaller group ceiling through the real frozen compiler", () => {
+  const snapshot = createAdoptedGroupReplySnapshot({
+    scope: { groupId: "g", rawSessionKey: "space:g", title: "g", bots: [] },
+    proposedValue: 2,
+    proposalGroupId: "g",
+    authorized: true,
+    bindingCurrent: true,
+    cancelled: false,
+    now: 1700000000000,
+  });
+  expect(snapshot.effective.participation.maxVisibleBotRepliesPerRound).toBe(2);
+  expect(snapshot.input.maxVisibleBotRepliesPerRound).toBe(2);
+  expect(Object.isFrozen(snapshot.effective)).toBe(true);
+  expect(snapshot.policyHash).toBe(hashEffectiveCollaborationPolicy(snapshot.effective as never));
+});
+
+it.each([
+  { authorized: false, bindingCurrent: true, cancelled: false, proposalGroupId: "g" },
+  { authorized: true, bindingCurrent: false, cancelled: false, proposalGroupId: "g" },
+  { authorized: true, bindingCurrent: true, cancelled: true, proposalGroupId: "g" },
+  { authorized: true, bindingCurrent: true, cancelled: false, proposalGroupId: "other" },
+])("rejects stale, cancelled, unauthorized and cross-group adoption %j", (flags) => {
+  expect(() =>
+    createAdoptedGroupReplySnapshot({
+      scope: { groupId: "g", rawSessionKey: "space:g", title: "g", bots: [] },
+      proposedValue: 2,
+      now: 1700000000000,
+      ...flags,
+    }),
+  ).toThrow();
+});
+it("never widens the existing group ceiling", () => {
+  expect(() =>
+    createAdoptedGroupReplySnapshot({
+      scope: { groupId: "g", rawSessionKey: "space:g", title: "g", bots: [] },
+      proposedValue: 12,
+      proposalGroupId: "g",
+      authorized: true,
+      bindingCurrent: true,
+      cancelled: false,
+      now: 1700000000000,
+    }),
+  ).toThrow();
 });

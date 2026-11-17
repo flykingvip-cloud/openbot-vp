@@ -51,6 +51,13 @@ export const AgentDefaultsSchema = z
     envelopeTimestamp: z.union([z.literal("on"), z.literal("off")]).optional(),
     envelopeElapsed: z.union([z.literal("on"), z.literal("off")]).optional(),
     contextTokens: z.number().int().positive().optional(),
+    contextWindowRuleDecision: z
+      .object({
+        mode: z.enum(["legacy", "dynamic"]),
+        fallback: z.enum(["legacy", "block"]),
+      })
+      .strict()
+      .optional(),
     cliBackends: z.record(z.string(), CliBackendSchema).optional(),
     memorySearch: MemorySearchSchema,
     contextPruning: z

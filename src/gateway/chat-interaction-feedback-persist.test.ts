@@ -7,16 +7,15 @@ import { persistInteractionMessage } from "../agent-runtime/state/index.js";
 import { openSessionManager } from "../agents/pi-sdk/session.js";
 import { SILENT_REPLY_TOKEN } from "../auto-reply/tokens.js";
 import {
+  formatChatTurnTerminalText,
+  persistRejectedInteractionTurn,
+} from "./chat-interaction-failure.js";
+import {
   EMPTY_FINAL_ASSISTANT_TEXT,
   planDirectChatFallbackPersist,
   transcriptHasVisibleAssistantAfterUser,
   visibleAssistantTextAfterUser,
 } from "./server-methods/chat-terminal-transcript.js";
-import {
-  formatChatTurnTerminalText,
-  persistRejectedInteractionTurn,
-  REJECTED_INTERACTION_TURN_TEXT,
-} from "./chat-interaction-failure.js";
 
 const ADMISSION_REJECTED_TEXT = "任务状态已变化或执行未获准，本次未启动；请确认当前目标后重试。";
 const ADMISSION_DUPLICATE_TEXT = "该执行请求已经接纳，未重复启动。";
@@ -164,9 +163,9 @@ describe("t339 interaction feedback persistence contract", () => {
       role: "assistant",
       text: ADMISSION_DUPLICATE_TEXT,
     });
-    expect(assistantRoles(sessionFile).filter((text) => text === ADMISSION_DUPLICATE_TEXT)).toEqual([
-      ADMISSION_DUPLICATE_TEXT,
-    ]);
+    expect(assistantRoles(sessionFile).filter((text) => text === ADMISSION_DUPLICATE_TEXT)).toEqual(
+      [ADMISSION_DUPLICATE_TEXT],
+    );
   });
 
   it("plans an EMPTY_FINAL persist when the interaction path ends with no executor and no reply", () => {

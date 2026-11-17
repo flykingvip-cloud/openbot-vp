@@ -1116,6 +1116,12 @@ export function createPlatformPortActions({
         ),
     },
     systemSettings: {
+      onSetPersonalRuleAgent: (enabled: boolean) =>
+        configCapability.updateFormValue(
+          configFormState,
+          ["agents", "defaults", "contextWindowRuleDecision"],
+          { mode: enabled ? "dynamic" : "legacy", fallback: "legacy" },
+        ),
       onRefresh: () => actionState.loadOverview(),
       onSetPlatformModelsMode: (mode: "native" | "aor_enhanced") =>
         configCapability.updateFormValue(

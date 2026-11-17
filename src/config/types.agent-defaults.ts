@@ -231,6 +231,11 @@ export type AgentDefaultsConfig = {
   envelopeElapsed?: "on" | "off";
   /** Optional context window cap (used for runtime estimates + status %). */
   contextTokens?: number;
+  /** Server-managed selection for the context-window constraint domain only. */
+  contextWindowRuleDecision?: {
+    mode: "legacy" | "dynamic";
+    fallback: "legacy" | "block";
+  };
   /** Optional CLI backends for text-only fallback (claude-cli, etc.). */
   cliBackends?: Record<string, CliBackendConfig>;
   /** Opt-in: prune old tool results from the LLM context to reduce token usage. */

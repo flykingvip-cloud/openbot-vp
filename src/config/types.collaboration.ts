@@ -4,6 +4,14 @@ export type CollaborationDefaultsConfig = {
 };
 
 export type CollaborationConfig = {
+  /** Server-managed group overrides; never inherited from personal rule mode. */
+  ruleDecisionByGroupId?: Record<
+    string,
+    {
+      mode: "legacy" | "dynamic";
+      fallback: "legacy" | "block";
+    }
+  >;
   defaults?: CollaborationDefaultsConfig;
   /**
    * Floor Runtime v2.1 P0.0a flag `collab.runtimeNamespace` (default false).

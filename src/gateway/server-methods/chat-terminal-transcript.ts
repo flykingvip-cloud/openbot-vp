@@ -20,7 +20,9 @@ export function buildWebchatInteractionIngress(params: {
   clientRunId: string;
   systemInputProvenance?: unknown;
   growthBirthTurn?: boolean;
-}): { interactionIngress: { userMessageId: string; persistOwnTranscript: true } } | Record<string, never> {
+}):
+  | { interactionIngress: { userMessageId: string; persistOwnTranscript: true } }
+  | Record<string, never> {
   if (params.systemInputProvenance || params.growthBirthTurn) {
     return {};
   }

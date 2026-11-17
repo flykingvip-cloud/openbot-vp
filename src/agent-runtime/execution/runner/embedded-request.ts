@@ -159,6 +159,14 @@ export type RunEmbeddedPiAgentParams = {
   bashElevated?: ExecElevatedDefaults;
   timeoutMs: number;
   runId: string;
+  /** Server-only pre-execution rule decision. Never decoded from chat/RPC payloads. */
+  resolveExecutionConstraints?: (input: {
+    runId: string;
+    sessionFile: string;
+    provider: string;
+    modelId: string;
+    signal?: AbortSignal;
+  }) => Promise<import("../../model/rule-adaptation/index.js").ContextWindowDecisionSwitch>;
   abortSignal?: AbortSignal;
   shouldEmitToolResult?: () => boolean;
   shouldEmitToolOutput?: () => boolean;

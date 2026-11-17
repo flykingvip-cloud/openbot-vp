@@ -8,6 +8,8 @@ import type { FocusSwitchGateDecision } from "../../agent-runtime/contracts/task
 import { CHAT_TURN_ERROR_UNCONFIRMED_TEXT } from "../../agent-runtime/model/index.js";
 import { shouldTaskParkAbortInFlight } from "../../agent-runtime/policy/index.js";
 import { sessionTaskState } from "../../agent-runtime/state/index.js";
+import { resolveGroupRuleReplyLimit } from "../../agent-runtime/wiring/interaction-turn.js";
+import { resolveAgentDir } from "../../agents/agent-scope.js";
 import { resolveSessionAgentId } from "../../agents/agent-scope.js";
 import {
   extractEmployeeStewardUserIdFromSessionKey,
@@ -253,6 +255,7 @@ import {
 } from "../collaboration-dispatch/reply-language.js";
 import {
   createRoundPolicySnapshotFromScope,
+  createAdoptedGroupReplySnapshot,
   isCollabPolicySnapshotEnabled,
   persistPolicySnapshotBody,
   type RoundPolicySnapshot,
@@ -5208,7 +5211,7 @@ export const chatHandlers: GatewayRequestHandlers = {
       const policySnapshotEnabled = isCollabPolicySnapshotEnabled(policySnapshotCfg);
       const episodeId = episodeIdForClientRun(clientRunId);
       const beatId = beatIdForEpisode(episodeId, 0);
-      const flagSnapshot: RoundPolicySnapshot | null = policySnapshotEnabled
+      let flagSnapshot: RoundPolicySnapshot | null = policySnapshotEnabled
         ? createRoundPolicySnapshotFromScope(scope, { cfg: policySnapshotCfg })
         : null;
       // P0 thin hardening: trust comes from resolveCollaborationTenantResolution
@@ -5216,7 +5219,90 @@ export const chatHandlers: GatewayRequestHandlers = {
       // tenantId still flows from scope; tenantTrust is no longer defaulted to
       // actor_fallback solely because scope.tenantId is present.
       const collabTenant = await resolveCollaborationTenantResolution(client);
-      const {
+      const groupRuleMode = policySnapshotCfg.collaboration?.ruleDecisionByGroupId?.[scope.groupId];
+      const resolveDynamicGroupRules = async () => {
+        if (groupRuleMode?.mode === "dynamic") {
+          try {
+            const governance = scope.operatingState?.governance;
+            const actor = client?.platformUserId;
+            const authorized = Boolean(
+              actor &&
+              (governance?.ownerUserId === actor || governance?.adminUserIds?.includes(actor)),
+            );
+            const coordinator = scope.bots.find((bot) => bot.agentId === scope.coordinatorBotId);
+            if (!authorized || !coordinator || collabTenant.trust === "none") {
+              throw new Error("Group rule authority unavailable");
+            }
+            const original = createRoundPolicySnapshotFromScope(scope, {
+              cfg: policySnapshotCfg,
+            });
+            const ref = resolveSessionModelRef(policySnapshotCfg, undefined, coordinator.agentId);
+            const value = await resolveGroupRuleReplyLimit({
+              config: policySnapshotCfg,
+              runId: clientRunId,
+              groupId: scope.groupId,
+              agentId: coordinator.agentId,
+              agentDir: resolveAgentDir(policySnapshotCfg, coordinator.agentId),
+              provider: ref.provider,
+              model: ref.model,
+              authorized,
+              identity: {
+                executionIdentity: {
+                  enterpriseId: scope.tenantId ?? undefined,
+                  collaborationGroupId: scope.groupId,
+                },
+                gatewayClientUser: client?.user,
+                gatewayClientPlatformUserId: actor,
+                gatewayClientSessionDomain: client?.sessionDomain,
+              },
+              currentValue: original.effective.participation.maxVisibleBotRepliesPerRound,
+              message: bodyTrimmed,
+              signal: parentAbortController.signal,
+            });
+            parentAbortController.signal.throwIfAborted();
+            const refreshed = await resolveGroupDiscussionScope(rawSessionKey, client, {
+              logGateway: context.logGateway,
+            });
+            const refreshedGovernance = refreshed.operatingState?.governance;
+            const stillAuthorized = Boolean(
+              actor &&
+              (refreshedGovernance?.ownerUserId === actor ||
+                refreshedGovernance?.adminUserIds?.includes(actor)),
+            );
+            const currentSnapshot = createRoundPolicySnapshotFromScope(refreshed, {
+              cfg: loadConfig(),
+            });
+            if (
+              !stillAuthorized ||
+              refreshed.groupId !== scope.groupId ||
+              refreshed.tenantId !== scope.tenantId ||
+              currentSnapshot.policyHash !== original.policyHash ||
+              refreshed.coordinatorBotId !== scope.coordinatorBotId
+            ) {
+              throw new Error("Group rule authority or policy changed during inference");
+            }
+            flagSnapshot = createAdoptedGroupReplySnapshot({
+              scope: refreshed,
+              proposedValue: value,
+              proposalGroupId: scope.groupId,
+              authorized: stillAuthorized,
+              bindingCurrent: currentSnapshot.policyHash === original.policyHash,
+              cancelled: parentAbortController.signal.aborted,
+              now: Date.now(),
+            });
+          } catch (error) {
+            context.logGateway.warn(
+              "Group dynamic rule decision unavailable; applying configured fallback",
+            );
+            if (parentAbortController.signal.aborted || groupRuleMode.fallback === "block") {
+              context.chatAbortControllers.delete(clientRunId);
+              throw error;
+            }
+          }
+        }
+      };
+
+      let {
         authority,
         facts,
         snapshot: policySnapshot,
@@ -5227,7 +5313,7 @@ export const chatHandlers: GatewayRequestHandlers = {
         tenantTrust: collabTenant.trust,
         ...(flagSnapshot ? { snapshot: flagSnapshot } : {}),
       });
-      const collaborationEventKey: CollaborationEventKey | null = policySnapshotEnabled
+      let collaborationEventKey: CollaborationEventKey | null = policySnapshotEnabled
         ? eventKeyOf(authority, beatId)
         : null;
       if (policySnapshotEnabled) {
@@ -5266,7 +5352,7 @@ export const chatHandlers: GatewayRequestHandlers = {
         respond(true, { runId: clientRunId, status: "stopped" as const, message: stopAck });
         return;
       }
-      const decision = decideParticipants(authority, facts, {
+      let decision = decideParticipants(authority, facts, {
         message: mentionMessage,
         roundId: clientRunId,
         explicitMentions: resolveExplicitMentionTokens(p.mentions),
@@ -5976,6 +6062,38 @@ export const chatHandlers: GatewayRequestHandlers = {
             }
             if (understanding.decision.kind !== "execution_request") {
               throw new Error("尚未取得有效的组任务关联，本轮没有修改任务。");
+            }
+          }
+
+          if (!systemInputProvenance && groupRuleMode?.mode === "dynamic") {
+            await resolveDynamicGroupRules();
+            parentAbortController.signal.throwIfAborted();
+            const resolved = buildGroupRuntimeAuthority({
+              scope,
+              episodeId,
+              cfg: policySnapshotCfg,
+              tenantTrust: collabTenant.trust,
+              ...(flagSnapshot ? { snapshot: flagSnapshot } : {}),
+            });
+            authority = resolved.authority;
+            facts = resolved.facts;
+            policySnapshot = resolved.snapshot;
+            collaborationEventKey = policySnapshotEnabled ? eventKeyOf(authority, beatId) : null;
+            decision = decideParticipants(authority, facts, {
+              message: mentionMessage,
+              roundId: clientRunId,
+              explicitMentions: resolveExplicitMentionTokens(p.mentions),
+              explicitMentionRefs: resolveExplicitMentionRefs(p.mentions),
+              recentGroupMessages,
+              operatingState: scope.operatingState ?? null,
+            });
+            if (policySnapshotEnabled) {
+              await persistPolicySnapshotBody({
+                snapshot: policySnapshot,
+                groupId: scope.groupId,
+                tenantId: scope.tenantId ?? null,
+                cfg: policySnapshotCfg,
+              });
             }
           }
 

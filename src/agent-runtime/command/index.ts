@@ -37,7 +37,16 @@ export { bindExecutionAdmissionPorts } from "./execution-admission.js";
 
 export { openCommandOutcomeEntry } from "./command-outcome-entry.js";
 
-export { runGovernedInteraction, runGovernedUnderstanding } from "./governed-interaction.js";
+export {
+  runGovernedInteraction,
+  runGovernedUnderstanding,
+  governedShadowHostBoundary,
+} from "./governed-interaction.js";
+export type {
+  GovernedInteractionResult,
+  GovernedInteractionWithShadow,
+  GovernedShadowHostInjection,
+} from "./governed-interaction.js";
 export {
   createInteractionSourceBoundary,
   formatRestrictedInteractionNotice,

@@ -39,3 +39,9 @@ export {
   boardScopesEqual,
 } from "./activation-precheck.js";
 export { isSafeIntegerNumber } from "./inspect.js";
+export {
+  evaluateExecutionRuleAdoption,
+  type ExecutionRuleAdoptionInput,
+  type ExecutionRuleScope,
+} from "./execution-adoption.js";
+export { validateExecutionRuleProposal } from "./execution-adoption.js";

@@ -158,6 +158,21 @@ afterEach(() => {
 });
 
 describe("renderPlatformSystemSettingsSurface", () => {
+  it("shows rule agent off by default and keeps unwired collaboration disabled", () => {
+    const { container, props } = mount("#platform-system-settings:defaults");
+    const onSet = vi.fn();
+    Object.assign(props.actions.systemSettings, { onSetPersonalRuleAgent: onSet });
+    render(renderPlatformSystemSettingsSurface(props), container);
+    const personal = container.querySelector<HTMLInputElement>(
+      '[aria-label="个人规则 Agent 开关"]',
+    );
+    expect(personal?.checked).toBe(false);
+    personal?.click();
+    expect(onSet).toHaveBeenCalledWith(true);
+    const group = container.querySelector<HTMLInputElement>('[aria-label="协作规则 Agent 开关"]');
+    expect(group?.disabled).toBe(true);
+    expect(group?.checked).toBe(false);
+  });
   it("switches hash tabs without a synthetic popstate refresh", () => {
     const popSpy = vi.fn();
     window.addEventListener("popstate", popSpy);

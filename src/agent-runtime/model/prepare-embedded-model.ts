@@ -11,9 +11,10 @@ import {
 import {
   ContextCapSelectionBlockedError,
   isContextCapSelectionBlocked,
-  selectPersonalContextCap,
+  consumeContextWindowDecision,
+  type ContextWindowDecisionSwitch,
   type PersonalContextCapSelectionPort,
-} from "./rule-adaptation/context-cap-selection.js";
+} from "./rule-adaptation/index.js";
 /** Resolve a model and its effective context limit before credentials or execution. */
 export async function prepareEmbeddedModel(input: {
   config?: OpenBotConfig;
@@ -28,6 +29,7 @@ export async function prepareEmbeddedModel(input: {
    * Production default path must omit this port (production path stays closed).
    */
   contextCapSelection?: PersonalContextCapSelectionPort;
+  contextWindowDecision?: ContextWindowDecisionSwitch;
 }) {
   const { provider, modelId, agentDir, log } = input;
   const { model, error, authStorage, modelRegistry } = await resolveModel(
@@ -75,10 +77,13 @@ export async function prepareEmbeddedModel(input: {
     modelContextWindow: modelForRun.contextWindow,
     defaultTokens: DEFAULT_CONTEXT_TOKENS,
   });
-  const contextCapSelection = selectPersonalContextCap({
+  const decision = consumeContextWindowDecision({
     original: originalCtxInfo,
+    policy: input.contextWindowDecision,
     port: input.contextCapSelection,
+    decisionId: `${provider}/${modelId}:context-window`,
   });
+  const contextCapSelection = decision.selection;
   if (isContextCapSelectionBlocked(contextCapSelection)) {
     log.error(
       `blocked model (context cap selection ${contextCapSelection.reason}): ${provider}/${modelId} original=${contextCapSelection.originalTokens}`,
@@ -123,5 +128,13 @@ export async function prepareEmbeddedModel(input: {
     );
   }
 
-  return { authStorage, modelRegistry, authOverride, ctxInfo, effectiveModel, contextCapSelection };
+  return {
+    authStorage,
+    modelRegistry,
+    authOverride,
+    ctxInfo,
+    effectiveModel,
+    contextCapSelection,
+    constraintDecision: decision,
+  };
 }

@@ -132,16 +132,76 @@ export async function prepareEmbeddedRunAuth(args: {
     log.info(`[hooks] model overridden to ${session.modelId}`);
   }
 
-  const { authStorage, modelRegistry, authOverride, ctxInfo, effectiveModel, contextCapSelection } =
-    await prepareEmbeddedModel({
-      config: params.config,
+  params.abortSignal?.throwIfAborted();
+  const ruleMode = params.config?.agents?.defaults?.contextWindowRuleDecision;
+  if (
+    ruleMode?.mode === "dynamic" &&
+    !params.resolveExecutionConstraints &&
+    ruleMode.fallback === "block"
+  ) {
+    throw new Error("Dynamic context rule resolver is unavailable; no model execution started");
+  }
+  const contextWindowDecision =
+    ruleMode?.mode === "dynamic"
+      ? await params.resolveExecutionConstraints?.({
+          runId: params.runId,
+          sessionFile: params.sessionFile,
+          provider: session.provider,
+          modelId: session.modelId,
+          signal: params.abortSignal,
+        })
+      : undefined;
+  params.abortSignal?.throwIfAborted();
+  if (ruleMode?.mode === "dynamic" && !contextWindowDecision) {
+    if (ruleMode.fallback === "block") {
+      throw new Error("Dynamic context resolver returned no decision; no model execution started");
+    }
+    log.info(
+      JSON.stringify({
+        event: "execution.constraints.fallback",
+        runId: params.runId,
+        requestedMode: "dynamic",
+        appliedMode: "legacy",
+        reason: "resolver_unavailable",
+      }),
+    );
+  }
+  const {
+    authStorage,
+    modelRegistry,
+    authOverride,
+    ctxInfo,
+    effectiveModel,
+    contextCapSelection,
+    constraintDecision,
+  } = await prepareEmbeddedModel({
+    config: params.config,
+    provider: session.provider,
+    modelId: session.modelId,
+    agentDir,
+    providerAuthOverride: params.providerAuthOverride,
+    log,
+    contextCapSelection: args.contextCapSelection,
+    contextWindowDecision,
+  });
+  log.info(
+    JSON.stringify({
+      event: "execution.constraints.consumed",
+      runId: params.runId,
       provider: session.provider,
       modelId: session.modelId,
-      agentDir,
-      providerAuthOverride: params.providerAuthOverride,
-      log,
-      contextCapSelection: args.contextCapSelection,
-    });
+      requestedMode: contextWindowDecision?.mode ?? "legacy",
+      appliedMode: constraintDecision.mode,
+      appliedSource: constraintDecision.source,
+      effectiveTokens: ctxInfo.tokens,
+      decisionId: constraintDecision.mode === "dynamic" ? constraintDecision.decisionId : null,
+      policyHash:
+        constraintDecision.mode === "dynamic"
+          ? (contextWindowDecision?.snapshot?.policyHash ?? null)
+          : null,
+      resolverPresent: Boolean(params.resolveExecutionConstraints),
+    }),
+  );
 
   const authStore = ensureAuthProfileStore(agentDir, { allowKeychainPrompt: false });
   const { lockedProfileId, profileCandidates } = resolveRunAuthProfileCandidates({

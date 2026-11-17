@@ -9,6 +9,7 @@ export { createCombinedDeadline, type CombinedDeadline } from "./deadline.js";
 export { invokeLimitedCompletion, type LimitedCompletion } from "./completion-limits.js";
 export {
   createGovernedShadowModelPort,
+  createHostShadowCompletion,
   resolveShadowRuleAdaptationGovernance,
   type GovernedShadowModelPortDeps,
   type GovernedModelCompletion,
@@ -40,3 +41,13 @@ export {
   type PersonalContextCapSelectionPort,
   type PersonalContextCapFixtureResolvePort,
 } from "./context-cap-selection.js";
+export {
+  createLegacyContextWindowDecisionProvider,
+  consumeContextWindowDecision,
+  type ContextWindowDecisionSwitch,
+  type ConfirmedContextWindowDecision,
+  selectComplexRuleProvider,
+  type ComplexRuleDecision,
+  type ComplexRuleDecisionMode,
+  type ComplexRuleDecisionProvider,
+} from "./complex-rule-decision.js";

@@ -151,6 +151,7 @@ export function invokeAdmittedCandidateEmbedded(args: {
       host.assertOriginalTaskCurrent();
       const result = await runEmbeddedPiAgent({
         ...embeddedContext,
+        resolveExecutionConstraints: params.resolveExecutionConstraints,
         trigger: params.isHeartbeat ? "heartbeat" : "user",
         groupId: resolveGroupSessionKey(params.sessionCtx)?.id,
         groupChannel:

@@ -41,3 +41,4 @@ export {
   type ActivationBoardIo,
 } from "./activate.js";
 export { createOfficialFixtureContextCapPort } from "./fixture-context-cap-port.js";
+export { decideDynamicContextWindow } from "./context-window-decision.js";

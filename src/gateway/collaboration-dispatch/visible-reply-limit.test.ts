@@ -128,7 +128,7 @@ describe("elastic visible reply limit", () => {
     expect(resolved.policyCeiling).toBe(1);
   });
 
-  test("missing operating state uses compiled L1 policy default (3), not legacy scan constant", () => {
+  test("missing operating state uses the established compiled L1 policy default (5)", () => {
     const scope: CollaborationDispatchScope = {
       groupId: "alpha",
       rawSessionKey: "space:alpha",
@@ -141,7 +141,7 @@ describe("elastic visible reply limit", () => {
       })),
     };
     const resolved = resolveLimit("请分析方案风险", scope);
-    expect(resolved.policyCeiling).toBe(3);
-    expect(resolved.limit).toBe(3);
+    expect(resolved.policyCeiling).toBe(5);
+    expect(resolved.limit).toBe(5);
   });
 });

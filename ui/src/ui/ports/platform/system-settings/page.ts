@@ -3360,6 +3360,30 @@ function renderDefaultsTab(
       ? [...PLATFORM_NATIVE_MODE_CAPABILITIES, ...PLATFORM_AOR_ENHANCEMENTS]
       : PLATFORM_NATIVE_MODE_CAPABILITIES;
   return html`
+    <section class="card" aria-label="规则 Agent">
+      <div class="card-title">规则 Agent</div>
+      <label>
+        <span>个人任务约束适配</span>
+        <input type="checkbox" role="switch" aria-label="个人规则 Agent 开关"
+          .checked=${asRecord(asRecord(asRecord(props.channelsProps.configForm?.agents)?.defaults)?.contextWindowRuleDecision)?.mode === "dynamic"}
+          ?disabled=${!canManagePlatform || configSaving}
+          @change=${(event: Event) => {
+            (
+              props.actions.systemSettings as {
+                onSetPersonalRuleAgent?: (enabled: boolean) => void;
+              }
+            ).onSetPersonalRuleAgent?.((event.target as HTMLInputElement).checked);
+          }} />
+        <span>${asRecord(asRecord(asRecord(props.channelsProps.configForm?.agents)?.defaults)?.contextWindowRuleDecision)?.mode === "dynamic" ? "开" : "关"}</span>
+      </label>
+      <div class="card-follow">
+        <span>协作规则 Agent</span>
+        <input type="checkbox" role="switch" aria-label="协作规则 Agent 开关" disabled />
+        <span>关</span>
+        <div class="card-sub">协作消费者尚未接通，暂不可开启。</div>
+      </div>
+      ${canManagePlatform ? html`<button class="btn" ?disabled=${!configDirty || configSaving} @click=${() => onSaveConfig?.()}>保存</button>` : nothing}
+    </section>
     <section aria-label="租户创建默认策略">
       <div class="card-title">租户创建默认策略</div>
       ${
