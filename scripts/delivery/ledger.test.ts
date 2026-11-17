@@ -973,7 +973,7 @@ describe("repaired ledger warning profile", () => {
     expect(audit.findings.some((f) => f.code === "open-interval")).toBe(false);
   });
 
-  it("production releases.jsonl Path B SoT reaches seq151 tip d37bed5117d6", () => {
+  it("production releases.jsonl has a unique open tip with successor-closed predecessors", () => {
     const text = readFileSync("deploy/production/releases.jsonl", "utf8");
     const { rows, errors } = parseLedger(text);
     expect(errors).toEqual([]);
@@ -982,15 +982,72 @@ describe("repaired ledger warning profile", () => {
       return { code: result.status ?? 1, stdout: result.stdout ?? "" };
     };
     const audit = auditLedger(rows, git);
-    // Path B SoT structure (history rewrite means many gatewaySha values are no longer
-    // in this GitHub repo, so ancestry regression ERRORs are expected delivery debt).
+
+    // Structural invariants. Do not pin Math.max(seq) to a frozen tip number.
+    // The seq 151 equality was a snapshot of the then-current tip after #172 / #176,
+    // not a permanent SoT ceiling. Later LIVE rows (seq 152 in #194 through seq 165
+    // in #267) landed without updating that snapshot, which is why the old pin went stale.
+    const seqs = rows.map((r) => r.seq);
+    expect(new Set(seqs).size).toBe(seqs.length);
     expect(rows.length).toBeGreaterThanOrEqual(142);
-    expect(Math.max(...rows.map((r) => r.seq))).toBe(151);
-    // #172 closed seq 127 liveTo with successor-StartedAt attestation; sole open tip is seq 151.
-    expect(rows.filter((r) => r.liveTo === undefined).map((r) => r.seq)).toEqual([151]);
+    const maxSeq = Math.max(...seqs);
+    const minSeq = Math.min(...seqs);
+    const documentedGaps = new Set([110, 111]);
+    const unexpectedGaps: number[] = [];
+    for (let seq = minSeq; seq <= maxSeq; seq++) {
+      if (!seqs.includes(seq) && !documentedGaps.has(seq)) {
+        unexpectedGaps.push(seq);
+      }
+    }
+    expect(unexpectedGaps).toEqual([]);
+
+    const open = rows.filter((r) => r.liveTo === undefined);
+    expect(open.map((r) => r.seq)).toEqual([maxSeq]);
     expect(audit.findings.some((f) => f.code === "open-interval")).toBe(false);
+
+    // Successor-close: after the documented 2026-09-28 holes (seq 99-102) and the
+    // allowed 110/111 gap, each predecessor liveTo equals the next row's liveFrom.
+    // This is the interval invariant #172 restored for seq 127, not a tip-number pin.
+    const bySeq = new Map(rows.map((r) => [r.seq, r]));
+    const successorCloseFrom = 103;
+    for (const seq of [...bySeq.keys()].toSorted((a, b) => a - b)) {
+      if (seq < successorCloseFrom) {
+        continue;
+      }
+      const next = bySeq.get(seq + 1);
+      if (!next) {
+        continue;
+      }
+      expect(bySeq.get(seq)?.liveTo).toBe(next.liveFrom);
+    }
+
     expect(audit.findings.some((f) => f.seq === 1 && f.code === "missing-tag")).toBe(true);
     expect(audit.findings.some((f) => f.code === "overlay-debt")).toBe(true);
+    expect(audit.findings.some((f) => f.code === "unverified-live")).toBe(false);
+    // Historical missing objects remain delivery-guard errors. This test must not
+    // require audit.ok, and must not weaken pnpm delivery:ledger:audit.
+  });
+
+  it("production releases.jsonl preserves documented historical intervals through seq 151", () => {
+    const text = readFileSync("deploy/production/releases.jsonl", "utf8");
+    const { rows, errors } = parseLedger(text);
+    expect(errors).toEqual([]);
+    const git: GitRunner = (args) => {
+      const result = spawnSync("git", args, { encoding: "utf8" });
+      return { code: result.status ?? 1, stdout: result.stdout ?? "" };
+    };
+    const audit = auditLedger(rows, git);
+    // Historical fixtures for the #172 / #176 era. Seq 151 is no longer the open tip
+    // (closed by seq 152 in #194) but its identity and the seq 127 successor-StartedAt
+    // close must remain intact. Path B SoT structure still carries missing-object
+    // delivery debt for rewritten history; that is asserted by delivery:ledger:audit,
+    // not by freezing the tip seq.
+    expect(rows.length).toBeGreaterThanOrEqual(142);
+    // #172 closed seq 127 liveTo with successor-StartedAt attestation
+    // (host FinishedAt unrecoverable). liveTo equals seq 128 liveFrom.
+    expect(rows.find((r) => r.seq === 127)?.liveTo).toBe("2026-10-14T16:31:38Z");
+    expect(rows.find((r) => r.seq === 128)?.liveFrom).toBe("2026-10-14T16:31:38Z");
+    expect(rows.find((r) => r.seq === 127)?.liveVerified).toBe(true);
     // seq 99-102 were backfilled from host metadata; their real stop times keep the
     // 2026-09-28 holes visible instead of being papered over.
     expect(rows.find((r) => r.seq === 98)?.liveTo).toBe("2026-09-26T15:39:59.221Z");
@@ -1142,14 +1199,16 @@ describe("repaired ledger warning profile", () => {
       "sha256:baff3fa97596e284681a62f2d27523d0dded5b7ebcfba7ea8875bfec97ce684d",
     );
     expect(rows.find((r) => r.seq === 151)?.liveFrom).toBe("2026-10-31T03:21:00.871Z");
-    expect(rows.find((r) => r.seq === 151)?.liveTo).toBeUndefined();
+    // Seq 151 was the sole open tip at #172/#176; #194 closed it at seq 152 liveFrom.
+    expect(rows.find((r) => r.seq === 151)?.liveTo).toBe("2026-11-01T23:04:06.294Z");
+    expect(rows.find((r) => r.seq === 152)?.liveFrom).toBe("2026-11-01T23:04:06.294Z");
     expect(rows.find((r) => r.seq === 151)?.gatewaySha).toBe(
       "d37bed5117d6969e5ad0ee47b32e4efa8b6d715a",
     );
     expect(rows.find((r) => r.seq === 151)?.artifactDigest).toBe(
       "sha256:09c9b4c0db843c8b977f21cc0e5fb78c43ab408dbd633cda9e41573756442c48",
     );
-    // Sole open tip (seq 151) is allowed; dual-open was cleared by #172.
+    // Dual-open (seq 127 + tip) was cleared by #172; later tips stay uniquely open.
     expect(audit.findings.some((f) => f.code === "open-interval")).toBe(false);
     expect(rows.filter((r) => r.seq >= 99 && r.seq <= 103).map((r) => r.executor)).toEqual(
       Array(5).fill("cursor"),

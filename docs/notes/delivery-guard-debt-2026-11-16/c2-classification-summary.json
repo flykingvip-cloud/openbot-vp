@@ -1,0 +1,37 @@
+{
+  "recorded_at_cst": "2026-11-16 19:33:10 CST",
+  "origin_main_sha": "a78c5b66959dac3db4ecb2ecd2065aaec029b3c3",
+  "head_sha": "a78c5b66959dac3db4ecb2ecd2065aaec029b3c3",
+  "is_shallow": "false",
+  "shallow_file_exists": false,
+  "rev_list_head": 422,
+  "rev_list_all": 2124,
+  "remote_branch_count": 205,
+  "local_tag_count": 0,
+  "remote_tag_count": 0,
+  "provenance_tag_count_local": 0,
+  "remotes": "origin\thttps://github.com/flykingvip-cloud/openbot-vp.git (fetch)\norigin\thttps://github.com/flykingvip-cloud/openbot-vp.git (push)",
+  "ledger_rows": 163,
+  "unique_shas": 159,
+  "sha_classification_counts": {
+    "absent-from-this-github-remote": 138,
+    "present-in-this-github-object-graph": 21
+  },
+  "rows_with_any_missing_sha": 142,
+  "rows_with_both_shas_present": 21,
+  "present_seqs": [
+    145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163,
+    164, 165
+  ],
+  "missing_row_seqs": [
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
+    27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50,
+    51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74,
+    75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98,
+    99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 112, 113, 114, 115, 116, 117, 118, 119,
+    120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138,
+    139, 140, 141, 142, 143, 144
+  ],
+  "zero_tags_on_origin": true,
+  "probe_ref_namespace": "refs/ledger-object-probe/* (local only; not pushed; will be deleted after classification)"
+}
