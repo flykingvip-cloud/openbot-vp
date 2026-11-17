@@ -173,6 +173,18 @@ export async function recordNormalTaskRuleAdvice(
             turnId: turn?.requestId ?? null,
             currentEffectiveValue: current,
             hardMin: CONTEXT_WINDOW_HARD_MIN_TOKENS,
+            modelCallLimit: 3,
+            retrievalBudget:
+              "Use at most two retrieval responses; the third model response must be the final structured decision. Batch independent read tools if needed. Do not guess missing facts.",
+            allowedProposalFields: [
+              "kind",
+              "scope",
+              "implementationVersion",
+              "expectedPolicyVersion",
+              "items",
+            ],
+            allowedItemFields: ["ruleId", "field", "action", "proposedValue"],
+            allowedAction: "tune",
           },
         },
         budget: {
@@ -251,6 +263,15 @@ export async function recordNormalTaskRuleAdvice(
         activationAllowed: result.activationAllowed,
         controlUnchanged: result.controlUnchanged,
         modelCalls: result.usage.modelCalls,
+        toolStages: result.toolsInvoked.map((entry) => ({
+          name: entry.name,
+          status: entry.status,
+          code: entry.code,
+        })),
+        reasons: result.reasons.map((entry) => ({ code: entry.code, path: entry.path })),
+        exhausted: result.limitProof.exhausted,
+        inputTokens: result.usage.inputTokens,
+        outputTokens: result.usage.outputTokens,
       }),
     );
     return { result, currentTokens: current, ruleVersion: rule.version };
@@ -265,4 +286,118 @@ export async function recordNormalTaskRuleAdvice(
       }),
     );
   }
+}
+
+/** Group-scoped rule inference before the existing round-policy freeze. */
+export async function resolveGroupRuleReplyLimit(params: {
+  config: OpenBotConfig;
+  runId: string;
+  groupId: string;
+  agentId: string;
+  agentDir: string;
+  provider: string;
+  model: string;
+  identity: ExecutionIdentityRunFields;
+  authorized: boolean;
+  currentValue: number;
+  message: string;
+  signal?: AbortSignal;
+}) {
+  if (!params.authorized) {
+    throw new Error("Group rule host is unauthorized");
+  }
+  const rule = listRuntimeRuleDeclarations().find((r) => r.id === "collab.policy.compile");
+  if (!rule) {
+    throw new Error("Group rule catalog unavailable");
+  }
+  const candidate = bindInteractionCandidate({
+    config: params.config,
+    agentId: params.agentId,
+    agentDir: params.agentDir,
+    identity: params.identity,
+    primaryProvider: params.provider,
+    signal: params.signal,
+  });
+  const scope = { type: "group" as const, id: params.groupId };
+  const result = await runOfficialShadowRuleAdaptation(
+    {
+      requestId: params.runId + ":group-rules",
+      signal: params.signal,
+      situation: {
+        summary: params.message,
+        scope,
+        knownFacts: {
+          currentValue: params.currentValue,
+          ruleId: rule.id,
+          field: "maxVisibleBotRepliesPerRound",
+          allowedAction: "tune",
+        },
+      },
+      budget: { maxDurationMs: 45000, maxModelCalls: 3, maxRevisions: 0, maxOutputTokens: 1024 },
+    },
+    {
+      validate: (proposal) =>
+        validateExecutionRuleProposal(proposal, {
+          mode: "dynamic",
+          authorized: params.authorized,
+          scope,
+          proposalScope: scope,
+          bindingCurrent: true,
+          cancelled: params.signal?.aborted ?? false,
+          ruleId: rule.id,
+          field: "maxVisibleBotRepliesPerRound",
+          action: "tune",
+          currentValue: params.currentValue,
+          proposedValue: params.currentValue,
+        }),
+      view: {
+        rules: [
+          {
+            id: rule.id,
+            version: rule.version,
+            scope: "group",
+            fieldHints: ["maxVisibleBotRepliesPerRound"],
+            summary: rule.configuration,
+          },
+        ],
+        effectivePolicy: [
+          { field: "maxVisibleBotRepliesPerRound", currentEffectiveValue: params.currentValue },
+        ],
+        hostFacts: {},
+      },
+      model: {
+        runId: params.runId + ":group-rules",
+        config: params.config,
+        sessionPorts: bindAdmittedTurnHost(),
+        provider: params.provider,
+        model: params.model,
+        complete: createHostShadowCompletion(candidate),
+        authorizeInput: {
+          agentId: params.agentId,
+          groupId: params.groupId,
+          modelGateInput: {
+            cfg: params.config,
+            agentId: params.agentId,
+            enterpriseIdHint: params.identity.executionIdentity?.enterpriseId,
+            gatewayClientUser: params.identity.gatewayClientUser ?? undefined,
+            gatewayClientSessionDomain: params.identity.gatewayClientSessionDomain ?? undefined,
+            taskText: params.message,
+          },
+        },
+      },
+    },
+  );
+  params.signal?.throwIfAborted();
+  if (result.outcomeCode === "no_change_needed") {
+    return params.currentValue;
+  }
+  if (result.validation?.resultKind !== "shadow_accepted" || !result.controlUnchanged) {
+    throw new Error("Group rule decision rejected");
+  }
+  const proposal = result.proposal as { items?: { proposedValue?: unknown }[] };
+  const value = proposal.items?.[0]?.proposedValue;
+  if (typeof value !== "number") {
+    throw new Error("Group rule value missing");
+  }
+  return value;
 }

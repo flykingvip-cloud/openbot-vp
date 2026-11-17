@@ -10,6 +10,7 @@
 import { randomBytes } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { evaluateExecutionRuleAdoption } from "../../agent-runtime/policy/rule-adaptation/index.js";
 import { loadConfig } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
 import { resolveLegacyGroupRuntimeFactPaths } from "../collaboration-learning/collaboration-paths.js";
@@ -288,4 +289,41 @@ export async function replayFrozenPolicyFromKey(params: {
     effective: deepFreeze(structuredClone(body.effective)),
     body,
   };
+}
+
+/** Compile an adopted run-local ceiling through the same compiler/hash/freeze path. */
+export function createAdoptedGroupReplySnapshot(params: {
+  scope: CollaborationDispatchScope;
+  proposedValue: number;
+  proposalGroupId: string;
+  authorized: boolean;
+  bindingCurrent: boolean;
+  cancelled: boolean;
+  now: number;
+}): RoundPolicySnapshot {
+  const input = resolveGroupPolicyInput(groupPolicySourceFromScope(params.scope));
+  const original = compileGroupEffectivePolicy(groupPolicySourceFromScope(params.scope));
+  const decision = evaluateExecutionRuleAdoption({
+    mode: "dynamic",
+    authorized: params.authorized,
+    scope: { type: "group", id: params.scope.groupId },
+    proposalScope: { type: "group", id: params.proposalGroupId },
+    bindingCurrent: params.bindingCurrent,
+    cancelled: params.cancelled,
+    ruleId: "collab.policy.compile",
+    field: "maxVisibleBotRepliesPerRound",
+    action: "tune",
+    currentValue: original.participation.maxVisibleBotRepliesPerRound,
+    proposedValue: params.proposedValue,
+  });
+  if (!decision.allowed) {
+    throw new Error(`Group rule adoption rejected: ${decision.reason}`);
+  }
+  return createRoundPolicySnapshot(
+    { ...input, maxVisibleBotRepliesPerRound: decision.value },
+    {
+      now: params.now,
+      idGen: () => generatePolicySnapshotId(params.now),
+    },
+  );
 }

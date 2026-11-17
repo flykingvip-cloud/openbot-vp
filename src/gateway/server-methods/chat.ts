@@ -8,6 +8,8 @@ import type { FocusSwitchGateDecision } from "../../agent-runtime/contracts/task
 import { CHAT_TURN_ERROR_UNCONFIRMED_TEXT } from "../../agent-runtime/model/interaction-resource-wait.js";
 import { shouldTaskParkAbortInFlight } from "../../agent-runtime/policy/index.js";
 import { sessionTaskState } from "../../agent-runtime/state/index.js";
+import { resolveGroupRuleReplyLimit } from "../../agent-runtime/wiring/interaction-turn.js";
+import { resolveAgentDir } from "../../agents/agent-scope.js";
 import { resolveSessionAgentId } from "../../agents/agent-scope.js";
 import {
   extractEmployeeStewardUserIdFromSessionKey,
@@ -253,6 +255,7 @@ import {
 } from "../collaboration-dispatch/reply-language.js";
 import {
   createRoundPolicySnapshotFromScope,
+  createAdoptedGroupReplySnapshot,
   isCollabPolicySnapshotEnabled,
   persistPolicySnapshotBody,
   type RoundPolicySnapshot,
@@ -5256,7 +5259,7 @@ export const chatHandlers: GatewayRequestHandlers = {
       const policySnapshotEnabled = isCollabPolicySnapshotEnabled(policySnapshotCfg);
       const episodeId = episodeIdForClientRun(clientRunId);
       const beatId = beatIdForEpisode(episodeId, 0);
-      const flagSnapshot: RoundPolicySnapshot | null = policySnapshotEnabled
+      let flagSnapshot: RoundPolicySnapshot | null = policySnapshotEnabled
         ? createRoundPolicySnapshotFromScope(scope, { cfg: policySnapshotCfg })
         : null;
       // P0 thin hardening: trust comes from resolveCollaborationTenantResolution
@@ -5264,730 +5267,910 @@ export const chatHandlers: GatewayRequestHandlers = {
       // tenantId still flows from scope; tenantTrust is no longer defaulted to
       // actor_fallback solely because scope.tenantId is present.
       const collabTenant = await resolveCollaborationTenantResolution(client);
-      const {
-        authority,
-        facts,
-        snapshot: policySnapshot,
-      } = buildGroupRuntimeAuthority({
-        scope,
-        episodeId,
-        cfg: policySnapshotCfg,
-        tenantTrust: collabTenant.trust,
-        ...(flagSnapshot ? { snapshot: flagSnapshot } : {}),
-      });
-      const collaborationEventKey: CollaborationEventKey | null = policySnapshotEnabled
-        ? eventKeyOf(authority, beatId)
-        : null;
-      if (policySnapshotEnabled) {
-        void persistPolicySnapshotBody({
-          snapshot: policySnapshot,
-          groupId: scope.groupId,
-          tenantId: scope.tenantId ?? null,
-          cfg: policySnapshotCfg,
-        }).catch((err) => {
-          context.logGateway.warn(
-            `collaboration policy snapshot persist failed: ${formatForLog(err)}`,
-          );
-        });
-      }
-      // v1-only — P0.2 15:13 roll-call hotfix chat hooks (allow-list only; default off).
-      const v1RollCallHooks = prepareV1RollCallChatHooks({
-        tenantId: scope.tenantId,
-        groupId: scope.groupId,
-        message: mentionMessage,
-        cfg: policySnapshotCfg,
-      });
-      let v1RollCallSenderLabel: string | undefined;
-      if (v1RollCallHooks.preferEarlySenderLabel) {
-        v1RollCallSenderLabel = (await resolveChatTranscriptSenderLabel(client)) ?? undefined;
-      }
-      if (v1RollCallHooks.stop) {
-        // Abort any in-flight turns on this session; do not open a new round (P0-9).
-        for (const [activeRunId, active] of context.chatAbortControllers) {
-          if (active.sessionKey !== rawSessionKey) {
-            continue;
-          }
-          active.controller.abort();
-          context.chatAbortControllers.delete(activeRunId);
-        }
-        const stopAck = v1RollCallHooks.stopAck ?? "好的，本轮已停止。";
-        respond(true, { runId: clientRunId, status: "stopped" as const, message: stopAck });
-        return;
-      }
-      const decision = decideParticipants(authority, facts, {
-        message: mentionMessage,
-        roundId: clientRunId,
-        explicitMentions: resolveExplicitMentionTokens(p.mentions),
-        explicitMentionRefs: resolveExplicitMentionRefs(p.mentions),
-        recentGroupMessages,
-        ...(v1RollCallSenderLabel ? { senderLabel: v1RollCallSenderLabel } : {}),
-        // P1-A5 ①: real OS for participation lane legacy BP-01/02 reads.
-        operatingState: scope.operatingState ?? null,
-      });
-      // C2 follow-up: best-effort Wake Contract ledger on human @ / multi-@ nudge.
-      // Flag collaboration.task.wakeContract OFF → no writes. Does not open Floor live.
-      const wakeFromAgentId =
-        (typeof client?.user === "string" && client.user.trim()) ||
-        (typeof client?.platformUserId === "string" && client.platformUserId.trim()) ||
-        v1RollCallSenderLabel ||
-        "human";
-      const wakeTaskId =
-        (
-          scope.operatingState as
-            | { activeContext?: { currentTaskId?: string | null } }
-            | null
-            | undefined
-        )?.activeContext?.currentTaskId?.trim() || undefined;
-      // C4: best-effort OGUI→handoff projection when message carries ogui-answer.
-      // Flag collaboration.task.oguiHandoffProjection OFF → no writes. No Floor live / ui.*.
-      void recordChatSendOguiProjectionBestEffort({
-        authority,
-        cfg: policySnapshotCfg,
-        groupId: scope.groupId,
-        message: mentionMessage,
-        fromAgentId: wakeFromAgentId,
-        relatedId: clientRunId,
-        ...(wakeTaskId ? { taskId: wakeTaskId } : {}),
-      }).catch(() => undefined);
-      // TEAM-REAL R5: NL plan confirm — schema-backed binding fields, handler-resolved
-      // trusted locator, await formal result, persist assistant line into transcript
-      // so chat.history / UI see success or 尚未确认. Auto-advance NOT wired.
-      {
-        const confirmActor =
-          (await resolveDeliveryAclActor(client, scope.groupId)) || wakeFromAgentId;
-        const tenant = collabTenant;
-        const readBound = (value: unknown): string | undefined =>
-          typeof value === "string" && value.trim() ? value.trim() : undefined;
-        const readBoundNum = (value: unknown): number | undefined =>
-          typeof value === "number" && Number.isFinite(value) ? Math.floor(value) : undefined;
-        // Schema fields on ChatSendParamsSchema (not type-assertion-only).
-        const explicitTaskId = readBound(p.planConfirmTaskId);
-        const explicitBoard = readBound(p.planConfirmBoardItemId);
-        const explicitTodolist = readBound(p.planConfirmTodolistId);
-        const explicitDecision = readBound(p.planConfirmDecisionId);
-        const explicitVersion = readBoundNum(p.planConfirmExpectedVersion);
-        const confirmIntent = parseChatPlanConfirmIntent(mentionMessage);
-        const composed =
-          confirmIntent.kind === "not_confirm"
-            ? null
-            : await resolveCompositionTrustedTeamContext({
-                groupId: scope.groupId,
-                actor: confirmActor || "",
-                client,
-                tenant,
-                action: "write",
-                cfg: policySnapshotCfg,
-                stampedEnterpriseId: client?.sessionEnterpriseId,
-                identityAliases: [client?.user, client?.platformUserId, client?.sessionMembershipId]
-                  .map((value) => (typeof value === "string" ? value.trim() : ""))
-                  .filter(Boolean),
-              });
-        let confirmHook: Awaited<ReturnType<typeof maybeConfirmPlanFromChatSend>>;
-        try {
-          if (composed && !composed.ok) {
-            // Do not call list/confirm without a trusted locator. The previous
-            // fallthrough masked ACL failures as trusted_group_locator_required.
-            confirmHook = {
-              handled: true,
-              result: {
-                status: "blocked",
-                confirmed: false,
-                reason: composed.reason,
-                detail: composed.detail,
-              },
-              userMessage: `尚未确认：${composed.reason}${composed.detail ? `（${composed.detail}）` : ""}。`,
-              blockDependentExecution: true,
-              autoAdvanceWired: false,
-            };
-          } else {
-            confirmHook = await maybeConfirmPlanFromChatSend({
-              groupId: scope.groupId,
-              message: mentionMessage,
-              actor: confirmActor,
-              // Prefer explicit card/reply binding; group currentTaskId alone is unreliable.
-              taskId: explicitTaskId || wakeTaskId,
-              boardItemId: explicitBoard,
-              todolistId: explicitTodolist,
-              decisionId: explicitDecision,
-              expectedVersion: explicitVersion,
-              taskIdFromGroupCurrent: !explicitTaskId && Boolean(wakeTaskId),
-              tenant: composed?.ok ? composed.tenant : tenant,
-              cfg: policySnapshotCfg,
-              ...(composed?.ok
-                ? {
-                    auth: composed.auth,
-                    stores: composed.stores,
-                    trusted: composed.trusted,
-                  }
-                : {}),
-            });
-          }
-        } catch (confirmError) {
-          const errMsg = `尚未确认：确认入口异常（${
-            confirmError instanceof Error ? confirmError.message : String(confirmError)
-          }）。`;
-          let transcriptPersist: { ok: boolean; error?: string } = {
-            ok: false,
-            error: "session_context_missing",
-          };
-          if (groupSession.entry.sessionId && groupSession.storePath) {
-            try {
-              transcriptPersist = await appendAssistantTranscriptMessage({
-                message: errMsg,
-                sessionId: groupSession.entry.sessionId,
-                storePath: groupSession.storePath,
-                sessionFile: groupSession.entry.sessionFile,
-                createIfMissing: true,
-                idempotencyKey: `${clientRunId}:plan-confirm-error`,
-              });
-            } catch (persistErr) {
-              transcriptPersist = {
-                ok: false,
-                error: persistErr instanceof Error ? persistErr.message : String(persistErr),
-              };
-            }
-          }
-          respond(
-            true,
-            {
-              runId: clientRunId,
-              status: "stopped" as const,
-              message: errMsg,
-              transcriptPersist,
-              transcriptVisible: transcriptPersist.ok,
-            },
-            undefined,
-            { runId: clientRunId },
-          );
-          return;
-        }
-        if (confirmHook.handled) {
-          let transcriptPersist: { ok: boolean; error?: string } = {
-            ok: false,
-            error: "session_context_missing",
-          };
-          if (groupSession.entry.sessionId && groupSession.storePath) {
-            try {
-              transcriptPersist = await appendAssistantTranscriptMessage({
-                message: confirmHook.userMessage,
-                sessionId: groupSession.entry.sessionId,
-                storePath: groupSession.storePath,
-                sessionFile: groupSession.entry.sessionFile,
-                createIfMissing: true,
-                idempotencyKey: `${clientRunId}:plan-confirm`,
-              });
-            } catch (persistErr) {
-              transcriptPersist = {
-                ok: false,
-                error: persistErr instanceof Error ? persistErr.message : String(persistErr),
-              };
-            }
-          }
-          const visibleMessage = transcriptPersist.ok
-            ? confirmHook.userMessage
-            : `${confirmHook.userMessage}（展示写入失败：${transcriptPersist.error ?? "unknown"}）`;
-          respond(
-            true,
-            {
-              runId: clientRunId,
-              status: "stopped" as const,
-              // Transcript + response: chat.history can paint the same userMessage when persist ok.
-              message: visibleMessage,
-              planConfirm: confirmHook.result,
-              autoAdvanceWired: confirmHook.autoAdvanceWired,
-              transcriptPersist,
-              transcriptVisible: transcriptPersist.ok,
-              ...(composed?.ok
-                ? {
-                    trustedGroupLocator: composed.stores.groupLocator,
-                    trustedGroupsRoot: composed.stores.groupsRoot,
-                  }
-                : {}),
-            },
-            undefined,
-            { runId: clientRunId },
-          );
-          // Confirm turn never starts dependent execution here (auto-advance not wired).
-          return;
-        }
-      }
-      let v1RollCallExtraLines: string[] | undefined;
-      if (v1RollCallHooks.active) {
-        const lines: string[] = [];
-        if (v1RollCallHooks.briefHint) {
-          lines.push(v1RollCallHooks.briefHint);
-        }
-        let roster: V1RollCallRoster;
-        try {
-          const archive = await readCollaborationLedgerArchive({
-            groupId: scope.groupId,
-            tenantId: scope.tenantId,
-            kinds: ["execution"],
-            limit: 500,
-          });
-          const executions = archive.records.filter(
-            (record): record is CollaborationExecutionRecord => record.kind === "execution",
-          );
-          roster = buildV1RollCallRosterFromExecutions({
-            bots: scope.bots,
-            executions,
-          });
-        } catch (err) {
-          roster = buildV1RollCallRosterUnavailable(formatForLog(err));
-        }
-        lines.push(...buildV1RollCallRosterPromptLines(roster));
-        v1RollCallExtraLines = lines;
-      }
-      const groupTranscriptPath = resolveTranscriptPath({
-        sessionId: groupSession.entry.sessionId,
-        storePath: groupSession.storePath,
-        sessionFile: groupSession.entry.sessionFile,
-      });
-      if (!groupTranscriptPath) {
-        respond(
-          false,
-          undefined,
-          errorShape(ErrorCodes.UNAVAILABLE, "failed to resolve group transcript path"),
-        );
-        return;
-      }
-      const groupTranscriptCfg = loadConfig();
-      const groupTranscriptProfile = resolveSecurityProfile(groupTranscriptCfg, process.env);
-      const groupTenant =
-        groupTranscriptProfile.profile === "managed_enterprise"
-          ? await resolveTenantContext(client)
-          : null;
-      const ensuredGroupTranscript = await ensureTranscriptFile({
-        transcriptPath: groupTranscriptPath,
-        sessionId: groupSession.entry.sessionId,
-        cwd: resolveTrustedGroupLocator({
-          groupId: scope.groupId,
-          tenantId: groupTenant?.tenantId ?? null,
-          profile: groupTranscriptProfile.profile,
-          cfg: groupTranscriptCfg,
-        }),
-        tenantId: groupTenant?.tenantId ?? null,
-        ownerUserId: groupTenant?.userId ?? null,
-        groupId: scope.groupId,
-        failClosed: groupTranscriptProfile.profile === "managed_enterprise",
-      });
-      if (!ensuredGroupTranscript.ok) {
-        respond(
-          false,
-          undefined,
-          errorShape(
-            ErrorCodes.UNAVAILABLE,
-            `failed to create group transcript: ${ensuredGroupTranscript.error ?? "unknown error"}`,
-          ),
-        );
-        return;
-      }
-      const senderLabel = v1RollCallSenderLabel ?? (await resolveChatTranscriptSenderLabel(client));
-      const appendedUser = appendRawTranscriptMessage({
-        transcriptPath: groupTranscriptPath,
-        message: {
-          id: `local-${clientRunId}`,
-          role: "user",
-          content: buildUserTranscriptContentBlocks({
-            message: rawMessage,
-            attachments: normalizedAttachments,
-          }),
-          timestamp: Date.now(),
-          collaborationRoundId: clientRunId,
-          ...(senderLabel ? { senderLabel } : {}),
-        },
-      });
-      if (!appendedUser.ok) {
-        respond(
-          false,
-          undefined,
-          errorShape(
-            ErrorCodes.UNAVAILABLE,
-            `failed to write group transcript: ${appendedUser.error ?? "unknown error"}`,
-          ),
-        );
-        return;
-      }
-
-      if (appendedUser.message) {
-        broadcastChatUserEcho({
-          context,
-          runId: `${clientRunId}:user`,
-          sessionKey: rawSessionKey,
-          message: appendedUser.message,
-        });
-      }
-
-      const stagedMediaContext = await stageChatImagesForAgentMediaContext({
-        images: parsedImages,
-        files: parsedFiles,
-        runId: clientRunId,
-        log: context.logGateway,
-      });
-
-      const groupCfg = (await loadSessionEntryForClient("main", client)).cfg;
-      const groupTimeoutMs = resolveAgentTimeoutMs({
-        cfg: groupCfg,
-        overrideMs: p.timeoutMs,
-      });
-      const groupRunStartedAtMs = Date.now();
-      // Parent run tracks the whole collaboration round so Cancel / maintenance
-      // timeout can clear UI "处理中…" even when a child bot turn hangs after compaction.
       const parentAbortController = new AbortController();
+      const ruleStartedAtMs = Date.now();
       context.chatAbortControllers.set(clientRunId, {
         controller: parentAbortController,
         sessionId: groupSession.entry.sessionId ?? clientRunId,
         sessionKey: rawSessionKey,
-        startedAtMs: groupRunStartedAtMs,
+        startedAtMs: ruleStartedAtMs,
         expiresAtMs: resolveChatRunExpiresAtMs({
-          now: groupRunStartedAtMs,
-          timeoutMs: groupTimeoutMs,
+          now: ruleStartedAtMs,
+          timeoutMs: resolveAgentTimeoutMs({ cfg: policySnapshotCfg, overrideMs: p.timeoutMs }),
         }),
         undoable: false,
         userMessageId: `local-${clientRunId}`,
         userMessageText: bodyTrimmed,
       });
-      parentAbortController.signal.addEventListener(
-        "abort",
-        () => {
-          for (const [activeRunId, active] of context.chatAbortControllers) {
-            if (activeRunId === clientRunId) {
-              continue;
+      let parentLifecycleTransferred = false;
+      try {
+        const groupRuleMode =
+          policySnapshotCfg.collaboration?.ruleDecisionByGroupId?.[scope.groupId];
+        const resolveDynamicGroupRules = async () => {
+          if (groupRuleMode?.mode === "dynamic") {
+            try {
+              const governance = scope.operatingState?.governance;
+              const actor = client?.platformUserId;
+              const authorized = Boolean(
+                actor &&
+                (governance?.ownerUserId === actor || governance?.adminUserIds?.includes(actor)),
+              );
+              const coordinator = scope.bots.find((bot) => bot.agentId === scope.coordinatorBotId);
+              if (!authorized || !coordinator || collabTenant.trust === "none") {
+                throw new Error("Group rule authority unavailable");
+              }
+              const original = createRoundPolicySnapshotFromScope(scope, {
+                cfg: policySnapshotCfg,
+              });
+              const ref = resolveSessionModelRef(policySnapshotCfg, undefined, coordinator.agentId);
+              const value = await resolveGroupRuleReplyLimit({
+                config: policySnapshotCfg,
+                runId: clientRunId,
+                groupId: scope.groupId,
+                agentId: coordinator.agentId,
+                agentDir: resolveAgentDir(policySnapshotCfg, coordinator.agentId),
+                provider: ref.provider,
+                model: ref.model,
+                authorized,
+                identity: {
+                  executionIdentity: {
+                    enterpriseId: scope.tenantId ?? undefined,
+                    collaborationGroupId: scope.groupId,
+                  },
+                  gatewayClientUser: client?.user,
+                  gatewayClientPlatformUserId: actor,
+                  gatewayClientSessionDomain: client?.sessionDomain,
+                },
+                currentValue: original.effective.participation.maxVisibleBotRepliesPerRound,
+                message: bodyTrimmed,
+                signal: parentAbortController.signal,
+              });
+              parentAbortController.signal.throwIfAborted();
+              const refreshed = await resolveGroupDiscussionScope(rawSessionKey, client, {
+                logGateway: context.logGateway,
+              });
+              const refreshedGovernance = refreshed.operatingState?.governance;
+              const stillAuthorized = Boolean(
+                actor &&
+                (refreshedGovernance?.ownerUserId === actor ||
+                  refreshedGovernance?.adminUserIds?.includes(actor)),
+              );
+              const currentSnapshot = createRoundPolicySnapshotFromScope(refreshed, {
+                cfg: loadConfig(),
+              });
+              if (
+                !stillAuthorized ||
+                refreshed.groupId !== scope.groupId ||
+                refreshed.tenantId !== scope.tenantId ||
+                currentSnapshot.policyHash !== original.policyHash ||
+                refreshed.coordinatorBotId !== scope.coordinatorBotId
+              ) {
+                throw new Error("Group rule authority or policy changed during inference");
+              }
+              flagSnapshot = createAdoptedGroupReplySnapshot({
+                scope: refreshed,
+                proposedValue: value,
+                proposalGroupId: scope.groupId,
+                authorized: stillAuthorized,
+                bindingCurrent: currentSnapshot.policyHash === original.policyHash,
+                cancelled: parentAbortController.signal.aborted,
+                now: Date.now(),
+              });
+            } catch (error) {
+              context.logGateway.warn(
+                "Group dynamic rule decision unavailable; applying configured fallback",
+              );
+              if (parentAbortController.signal.aborted || groupRuleMode.fallback === "block") {
+                context.chatAbortControllers.delete(clientRunId);
+                throw error;
+              }
             }
+          }
+        };
+
+        let {
+          authority,
+          facts,
+          snapshot: policySnapshot,
+        } = buildGroupRuntimeAuthority({
+          scope,
+          episodeId,
+          cfg: policySnapshotCfg,
+          tenantTrust: collabTenant.trust,
+          ...(flagSnapshot ? { snapshot: flagSnapshot } : {}),
+        });
+        let collaborationEventKey: CollaborationEventKey | null = policySnapshotEnabled
+          ? eventKeyOf(authority, beatId)
+          : null;
+        if (policySnapshotEnabled) {
+          void persistPolicySnapshotBody({
+            snapshot: policySnapshot,
+            groupId: scope.groupId,
+            tenantId: scope.tenantId ?? null,
+            cfg: policySnapshotCfg,
+          }).catch((err) => {
+            context.logGateway.warn(
+              `collaboration policy snapshot persist failed: ${formatForLog(err)}`,
+            );
+          });
+        }
+        // v1-only — P0.2 15:13 roll-call hotfix chat hooks (allow-list only; default off).
+        const v1RollCallHooks = prepareV1RollCallChatHooks({
+          tenantId: scope.tenantId,
+          groupId: scope.groupId,
+          message: mentionMessage,
+          cfg: policySnapshotCfg,
+        });
+        let v1RollCallSenderLabel: string | undefined;
+        if (v1RollCallHooks.preferEarlySenderLabel) {
+          v1RollCallSenderLabel = (await resolveChatTranscriptSenderLabel(client)) ?? undefined;
+        }
+        if (v1RollCallHooks.stop) {
+          // Abort any in-flight turns on this session; do not open a new round (P0-9).
+          for (const [activeRunId, active] of context.chatAbortControllers) {
             if (active.sessionKey !== rawSessionKey) {
               continue;
             }
             active.controller.abort();
+            context.chatAbortControllers.delete(activeRunId);
           }
-          void abortPersistedRound({
-            groupId: scope.groupId,
-            roundId: clientRunId,
-            tenantId: scope.tenantId,
-          }).catch((err) => {
-            context.logGateway.warn(
-              `collaboration round abort persist failed: ${formatForLog(err)}`,
+          const stopAck = v1RollCallHooks.stopAck ?? "好的，本轮已停止。";
+          respond(true, { runId: clientRunId, status: "stopped" as const, message: stopAck });
+          return;
+        }
+        let decision = decideParticipants(authority, facts, {
+          message: mentionMessage,
+          roundId: clientRunId,
+          explicitMentions: resolveExplicitMentionTokens(p.mentions),
+          explicitMentionRefs: resolveExplicitMentionRefs(p.mentions),
+          recentGroupMessages,
+          ...(v1RollCallSenderLabel ? { senderLabel: v1RollCallSenderLabel } : {}),
+          // P1-A5 ①: real OS for participation lane legacy BP-01/02 reads.
+          operatingState: scope.operatingState ?? null,
+        });
+        // C2 follow-up: best-effort Wake Contract ledger on human @ / multi-@ nudge.
+        // Flag collaboration.task.wakeContract OFF → no writes. Does not open Floor live.
+        const wakeFromAgentId =
+          (typeof client?.user === "string" && client.user.trim()) ||
+          (typeof client?.platformUserId === "string" && client.platformUserId.trim()) ||
+          v1RollCallSenderLabel ||
+          "human";
+        const wakeTaskId =
+          (
+            scope.operatingState as
+              | { activeContext?: { currentTaskId?: string | null } }
+              | null
+              | undefined
+          )?.activeContext?.currentTaskId?.trim() || undefined;
+        // C4: best-effort OGUI→handoff projection when message carries ogui-answer.
+        // Flag collaboration.task.oguiHandoffProjection OFF → no writes. No Floor live / ui.*.
+        void recordChatSendOguiProjectionBestEffort({
+          authority,
+          cfg: policySnapshotCfg,
+          groupId: scope.groupId,
+          message: mentionMessage,
+          fromAgentId: wakeFromAgentId,
+          relatedId: clientRunId,
+          ...(wakeTaskId ? { taskId: wakeTaskId } : {}),
+        }).catch(() => undefined);
+        // TEAM-REAL R5: NL plan confirm — schema-backed binding fields, handler-resolved
+        // trusted locator, await formal result, persist assistant line into transcript
+        // so chat.history / UI see success or 尚未确认. Auto-advance NOT wired.
+        {
+          const confirmActor =
+            (await resolveDeliveryAclActor(client, scope.groupId)) || wakeFromAgentId;
+          const tenant = collabTenant;
+          const readBound = (value: unknown): string | undefined =>
+            typeof value === "string" && value.trim() ? value.trim() : undefined;
+          const readBoundNum = (value: unknown): number | undefined =>
+            typeof value === "number" && Number.isFinite(value) ? Math.floor(value) : undefined;
+          // Schema fields on ChatSendParamsSchema (not type-assertion-only).
+          const explicitTaskId = readBound(p.planConfirmTaskId);
+          const explicitBoard = readBound(p.planConfirmBoardItemId);
+          const explicitTodolist = readBound(p.planConfirmTodolistId);
+          const explicitDecision = readBound(p.planConfirmDecisionId);
+          const explicitVersion = readBoundNum(p.planConfirmExpectedVersion);
+          const confirmIntent = parseChatPlanConfirmIntent(mentionMessage);
+          const composed =
+            confirmIntent.kind === "not_confirm"
+              ? null
+              : await resolveCompositionTrustedTeamContext({
+                  groupId: scope.groupId,
+                  actor: confirmActor || "",
+                  client,
+                  tenant,
+                  action: "write",
+                  cfg: policySnapshotCfg,
+                  stampedEnterpriseId: client?.sessionEnterpriseId,
+                  identityAliases: [
+                    client?.user,
+                    client?.platformUserId,
+                    client?.sessionMembershipId,
+                  ]
+                    .map((value) => (typeof value === "string" ? value.trim() : ""))
+                    .filter(Boolean),
+                });
+          let confirmHook: Awaited<ReturnType<typeof maybeConfirmPlanFromChatSend>>;
+          try {
+            if (composed && !composed.ok) {
+              // Do not call list/confirm without a trusted locator. The previous
+              // fallthrough masked ACL failures as trusted_group_locator_required.
+              confirmHook = {
+                handled: true,
+                result: {
+                  status: "blocked",
+                  confirmed: false,
+                  reason: composed.reason,
+                  detail: composed.detail,
+                },
+                userMessage: `尚未确认：${composed.reason}${composed.detail ? `（${composed.detail}）` : ""}。`,
+                blockDependentExecution: true,
+                autoAdvanceWired: false,
+              };
+            } else {
+              confirmHook = await maybeConfirmPlanFromChatSend({
+                groupId: scope.groupId,
+                message: mentionMessage,
+                actor: confirmActor,
+                // Prefer explicit card/reply binding; group currentTaskId alone is unreliable.
+                taskId: explicitTaskId || wakeTaskId,
+                boardItemId: explicitBoard,
+                todolistId: explicitTodolist,
+                decisionId: explicitDecision,
+                expectedVersion: explicitVersion,
+                taskIdFromGroupCurrent: !explicitTaskId && Boolean(wakeTaskId),
+                tenant: composed?.ok ? composed.tenant : tenant,
+                cfg: policySnapshotCfg,
+                ...(composed?.ok
+                  ? {
+                      auth: composed.auth,
+                      stores: composed.stores,
+                      trusted: composed.trusted,
+                    }
+                  : {}),
+              });
+            }
+          } catch (confirmError) {
+            const errMsg = `尚未确认：确认入口异常（${
+              confirmError instanceof Error ? confirmError.message : String(confirmError)
+            }）。`;
+            let transcriptPersist: { ok: boolean; error?: string } = {
+              ok: false,
+              error: "session_context_missing",
+            };
+            if (groupSession.entry.sessionId && groupSession.storePath) {
+              try {
+                transcriptPersist = await appendAssistantTranscriptMessage({
+                  message: errMsg,
+                  sessionId: groupSession.entry.sessionId,
+                  storePath: groupSession.storePath,
+                  sessionFile: groupSession.entry.sessionFile,
+                  createIfMissing: true,
+                  idempotencyKey: `${clientRunId}:plan-confirm-error`,
+                });
+              } catch (persistErr) {
+                transcriptPersist = {
+                  ok: false,
+                  error: persistErr instanceof Error ? persistErr.message : String(persistErr),
+                };
+              }
+            }
+            respond(
+              true,
+              {
+                runId: clientRunId,
+                status: "stopped" as const,
+                message: errMsg,
+                transcriptPersist,
+                transcriptVisible: transcriptPersist.ok,
+              },
+              undefined,
+              { runId: clientRunId },
             );
-          });
-        },
-        { once: true },
-      );
-
-      respond(true, { runId: clientRunId, status: "started" as const }, undefined, {
-        runId: clientRunId,
-      });
-
-      broadcastCollaborationRoundPlan({
-        context,
-        payload: decision.roundPlan,
-      });
-      void appendCollaborationDispatchRecord({
-        groupId: scope.groupId,
-        tenantId: scope.tenantId,
-        message: transcriptMessage,
-        decision,
-        ...(collaborationEventKey ? { key: collaborationEventKey } : {}),
-      }).catch((err) => {
-        context.logGateway.warn(`collaboration ledger append failed: ${formatForLog(err)}`);
-      });
-
-      const groupSourceAgentId = resolveSessionAgentId({
-        sessionKey: rawSessionKey,
-        config: groupCfg,
-      });
-      // Group @mentions already informed decideParticipants above. They are not
-      // an execution grant: do not start independent org delivery before
-      // understanding and admission. Admitted work is dispatched once by the
-      // original collaboration scheduler (runStageBot / dispatchInboundMessage).
-      // deliverChatSendMentions stays on the individual / internal-message path.
-
-      void (async () => {
-        try {
-          if (parentAbortController.signal.aborted) {
             return;
           }
-          const groupExecutionProposalCapture = await readFreshGroupExecutionProposalSnapshot({
-            groupId: scope.groupId,
-            client,
-          });
-          const participationTierByAgentId = new Map(
-            decision.roundPlan.participants.map((participant) => [
-              participant.agentId,
-              participant.tier,
-            ]),
-          );
-          const contributionRoleByAgentId = new Map(
-            decision.roundPlan.participants.map((participant) => [
-              participant.agentId,
-              participant.contributionRole,
-            ]),
-          );
-          const sameRoundReplies: SameRoundReply[] = [];
-          let roundFailed = false;
-          let roundFailureMessage = "协作回合执行失败";
-          let lastSkipReason: CollaborationSkipReason | undefined;
-          let lastSkipDetail: string | undefined;
-          let lastSkipAgentName: string | undefined;
-
-          let groupUnderstanding:
-            | Awaited<ReturnType<typeof understandGroupInteraction>>
-            | undefined;
-          let formalTaskEstablish:
-            | {
-                attempted: boolean;
-                status?: string;
-                taskId?: string | null;
-                reason?: string;
-                userMessage?: string;
-                stagesSummary?: string;
+          if (confirmHook.handled) {
+            let transcriptPersist: { ok: boolean; error?: string } = {
+              ok: false,
+              error: "session_context_missing",
+            };
+            if (groupSession.entry.sessionId && groupSession.storePath) {
+              try {
+                transcriptPersist = await appendAssistantTranscriptMessage({
+                  message: confirmHook.userMessage,
+                  sessionId: groupSession.entry.sessionId,
+                  storePath: groupSession.storePath,
+                  sessionFile: groupSession.entry.sessionFile,
+                  createIfMissing: true,
+                  idempotencyKey: `${clientRunId}:plan-confirm`,
+                });
+              } catch (persistErr) {
+                transcriptPersist = {
+                  ok: false,
+                  error: persistErr instanceof Error ? persistErr.message : String(persistErr),
+                };
               }
-            | undefined;
-          let discussToTaskPrincipalActor: string | undefined;
-          let discussToTaskCoordinatorBinding: string | undefined;
-          const runStageBot = async (params: {
-            bot: GroupDiscussionBotTarget;
-            isWrapTurn: boolean;
-            contributionRole?: ContributionRole;
-            dispatchRole?: "primary" | "explicit_member" | "fallback" | "supplement" | "close";
-            collabEdge?: CollabEdge;
-          }) => {
+            }
+            const visibleMessage = transcriptPersist.ok
+              ? confirmHook.userMessage
+              : `${confirmHook.userMessage}（展示写入失败：${transcriptPersist.error ?? "unknown"}）`;
+            respond(
+              true,
+              {
+                runId: clientRunId,
+                status: "stopped" as const,
+                // Transcript + response: chat.history can paint the same userMessage when persist ok.
+                message: visibleMessage,
+                planConfirm: confirmHook.result,
+                autoAdvanceWired: confirmHook.autoAdvanceWired,
+                transcriptPersist,
+                transcriptVisible: transcriptPersist.ok,
+                ...(composed?.ok
+                  ? {
+                      trustedGroupLocator: composed.stores.groupLocator,
+                      trustedGroupsRoot: composed.stores.groupsRoot,
+                    }
+                  : {}),
+              },
+              undefined,
+              { runId: clientRunId },
+            );
+            // Confirm turn never starts dependent execution here (auto-advance not wired).
+            return;
+          }
+        }
+        let v1RollCallExtraLines: string[] | undefined;
+        if (v1RollCallHooks.active) {
+          const lines: string[] = [];
+          if (v1RollCallHooks.briefHint) {
+            lines.push(v1RollCallHooks.briefHint);
+          }
+          let roster: V1RollCallRoster;
+          try {
+            const archive = await readCollaborationLedgerArchive({
+              groupId: scope.groupId,
+              tenantId: scope.tenantId,
+              kinds: ["execution"],
+              limit: 500,
+            });
+            const executions = archive.records.filter(
+              (record): record is CollaborationExecutionRecord => record.kind === "execution",
+            );
+            roster = buildV1RollCallRosterFromExecutions({
+              bots: scope.bots,
+              executions,
+            });
+          } catch (err) {
+            roster = buildV1RollCallRosterUnavailable(formatForLog(err));
+          }
+          lines.push(...buildV1RollCallRosterPromptLines(roster));
+          v1RollCallExtraLines = lines;
+        }
+        const groupTranscriptPath = resolveTranscriptPath({
+          sessionId: groupSession.entry.sessionId,
+          storePath: groupSession.storePath,
+          sessionFile: groupSession.entry.sessionFile,
+        });
+        if (!groupTranscriptPath) {
+          respond(
+            false,
+            undefined,
+            errorShape(ErrorCodes.UNAVAILABLE, "failed to resolve group transcript path"),
+          );
+          return;
+        }
+        const groupTranscriptCfg = loadConfig();
+        const groupTranscriptProfile = resolveSecurityProfile(groupTranscriptCfg, process.env);
+        const groupTenant =
+          groupTranscriptProfile.profile === "managed_enterprise"
+            ? await resolveTenantContext(client)
+            : null;
+        const ensuredGroupTranscript = await ensureTranscriptFile({
+          transcriptPath: groupTranscriptPath,
+          sessionId: groupSession.entry.sessionId,
+          cwd: resolveTrustedGroupLocator({
+            groupId: scope.groupId,
+            tenantId: groupTenant?.tenantId ?? null,
+            profile: groupTranscriptProfile.profile,
+            cfg: groupTranscriptCfg,
+          }),
+          tenantId: groupTenant?.tenantId ?? null,
+          ownerUserId: groupTenant?.userId ?? null,
+          groupId: scope.groupId,
+          failClosed: groupTranscriptProfile.profile === "managed_enterprise",
+        });
+        if (!ensuredGroupTranscript.ok) {
+          respond(
+            false,
+            undefined,
+            errorShape(
+              ErrorCodes.UNAVAILABLE,
+              `failed to create group transcript: ${ensuredGroupTranscript.error ?? "unknown error"}`,
+            ),
+          );
+          return;
+        }
+        const senderLabel =
+          v1RollCallSenderLabel ?? (await resolveChatTranscriptSenderLabel(client));
+        const appendedUser = appendRawTranscriptMessage({
+          transcriptPath: groupTranscriptPath,
+          message: {
+            id: `local-${clientRunId}`,
+            role: "user",
+            content: buildUserTranscriptContentBlocks({
+              message: rawMessage,
+              attachments: normalizedAttachments,
+            }),
+            timestamp: Date.now(),
+            collaborationRoundId: clientRunId,
+            ...(senderLabel ? { senderLabel } : {}),
+          },
+        });
+        if (!appendedUser.ok) {
+          respond(
+            false,
+            undefined,
+            errorShape(
+              ErrorCodes.UNAVAILABLE,
+              `failed to write group transcript: ${appendedUser.error ?? "unknown error"}`,
+            ),
+          );
+          return;
+        }
+
+        if (appendedUser.message) {
+          broadcastChatUserEcho({
+            context,
+            runId: `${clientRunId}:user`,
+            sessionKey: rawSessionKey,
+            message: appendedUser.message,
+          });
+        }
+
+        const stagedMediaContext = await stageChatImagesForAgentMediaContext({
+          images: parsedImages,
+          files: parsedFiles,
+          runId: clientRunId,
+          log: context.logGateway,
+        });
+
+        const groupCfg = (await loadSessionEntryForClient("main", client)).cfg;
+        const groupTimeoutMs = resolveAgentTimeoutMs({
+          cfg: groupCfg,
+          overrideMs: p.timeoutMs,
+        });
+        const groupRunStartedAtMs = Date.now();
+        // Parent run tracks the whole collaboration round so Cancel / maintenance
+        // timeout can clear UI "处理中…" even when a child bot turn hangs after compaction.
+        parentAbortController.signal.throwIfAborted();
+        context.chatAbortControllers.set(clientRunId, {
+          controller: parentAbortController,
+          sessionId: groupSession.entry.sessionId ?? clientRunId,
+          sessionKey: rawSessionKey,
+          startedAtMs: groupRunStartedAtMs,
+          expiresAtMs: resolveChatRunExpiresAtMs({
+            now: groupRunStartedAtMs,
+            timeoutMs: groupTimeoutMs,
+          }),
+          undoable: false,
+          userMessageId: `local-${clientRunId}`,
+          userMessageText: bodyTrimmed,
+        });
+        parentLifecycleTransferred = true;
+        parentAbortController.signal.addEventListener(
+          "abort",
+          () => {
+            for (const [activeRunId, active] of context.chatAbortControllers) {
+              if (activeRunId === clientRunId) {
+                continue;
+              }
+              if (active.sessionKey !== rawSessionKey) {
+                continue;
+              }
+              active.controller.abort();
+            }
+            void abortPersistedRound({
+              groupId: scope.groupId,
+              roundId: clientRunId,
+              tenantId: scope.tenantId,
+            }).catch((err) => {
+              context.logGateway.warn(
+                `collaboration round abort persist failed: ${formatForLog(err)}`,
+              );
+            });
+          },
+          { once: true },
+        );
+
+        respond(true, { runId: clientRunId, status: "started" as const }, undefined, {
+          runId: clientRunId,
+        });
+
+        broadcastCollaborationRoundPlan({
+          context,
+          payload: decision.roundPlan,
+        });
+        void appendCollaborationDispatchRecord({
+          groupId: scope.groupId,
+          tenantId: scope.tenantId,
+          message: transcriptMessage,
+          decision,
+          ...(collaborationEventKey ? { key: collaborationEventKey } : {}),
+        }).catch((err) => {
+          context.logGateway.warn(`collaboration ledger append failed: ${formatForLog(err)}`);
+        });
+
+        const groupSourceAgentId = resolveSessionAgentId({
+          sessionKey: rawSessionKey,
+          config: groupCfg,
+        });
+        // Group @mentions already informed decideParticipants above. They are not
+        // an execution grant: do not start independent org delivery before
+        // understanding and admission. Admitted work is dispatched once by the
+        // original collaboration scheduler (runStageBot / dispatchInboundMessage).
+        // deliverChatSendMentions stays on the individual / internal-message path.
+
+        void (async () => {
+          try {
             if (parentAbortController.signal.aborted) {
               return;
             }
-            try {
-              // Read the authorized public transcript again for every member; a
-              // round-start snapshot misses human interjections during prior turns.
-              const memberContext = readCollaborationMemberContext({
-                readMessages: () =>
-                  readSessionMessages(
-                    groupSession.entry.sessionId,
-                    groupSession.storePath,
-                    groupSession.entry.sessionFile,
-                  ),
-                triggeringMessageId: `local-${clientRunId}`,
-                completedReplies: sameRoundReplies,
-              });
+            const groupExecutionProposalCapture = await readFreshGroupExecutionProposalSnapshot({
+              groupId: scope.groupId,
+              client,
+            });
+            const participationTierByAgentId = new Map(
+              decision.roundPlan.participants.map((participant) => [
+                participant.agentId,
+                participant.tier,
+              ]),
+            );
+            const contributionRoleByAgentId = new Map(
+              decision.roundPlan.participants.map((participant) => [
+                participant.agentId,
+                participant.contributionRole,
+              ]),
+            );
+            const sameRoundReplies: SameRoundReply[] = [];
+            let roundFailed = false;
+            let roundFailureMessage = "协作回合执行失败";
+            let lastSkipReason: CollaborationSkipReason | undefined;
+            let lastSkipDetail: string | undefined;
+            let lastSkipAgentName: string | undefined;
+
+            let groupUnderstanding:
+              | Awaited<ReturnType<typeof understandGroupInteraction>>
+              | undefined;
+            let formalTaskEstablish:
+              | {
+                  attempted: boolean;
+                  status?: string;
+                  taskId?: string | null;
+                  reason?: string;
+                  userMessage?: string;
+                  stagesSummary?: string;
+                }
+              | undefined;
+            let discussToTaskPrincipalActor: string | undefined;
+            let discussToTaskCoordinatorBinding: string | undefined;
+            const runStageBot = async (params: {
+              bot: GroupDiscussionBotTarget;
+              isWrapTurn: boolean;
+              contributionRole?: ContributionRole;
+              dispatchRole?: "primary" | "explicit_member" | "fallback" | "supplement" | "close";
+              collabEdge?: CollabEdge;
+            }) => {
               if (parentAbortController.signal.aborted) {
                 return;
               }
-              const humanWork =
-                groupUnderstanding?.kind === "understood" &&
-                groupUnderstanding.decision.kind === "execution_request"
-                  ? groupUnderstanding.decision.request
-                  : undefined;
-              const admission = await resolveMemberAdmission({
-                authority,
-                agentId: params.bot.agentId,
-                runId: `${clientRunId}:${params.bot.agentId}`,
-                taskId: humanWork
-                  ? formalTaskEstablish?.taskId
-                  : scope.operatingState?.activeContext.currentTaskId,
-                executionRequested:
-                  params.contributionRole === "executor" &&
-                  (!humanWork ||
-                    (humanWork.lifecycle === "long_task" && Boolean(formalTaskEstablish?.taskId))),
-                cfg: groupCfg,
-              });
-              if (admission.purpose === "blocked") {
-                throw new Error(`正式执行尚未准入：${admission.reason}`);
-              }
-              const reply = await runGroupBotDiscussionTurn({
-                ...(admission.purpose === "formal_execution"
-                  ? { executionDeliverableBinding: admission.binding }
-                  : {}),
-                context,
-                client,
-                bot: params.bot,
-                scope,
-                decision,
-                clientRunId,
-                inboundPrincipalActor: discussToTaskPrincipalActor,
-                collaborationRoundId: clientRunId,
-                participationTier: participationTierByAgentId.get(params.bot.agentId) ?? "duty",
-                contributionRole:
-                  params.contributionRole ?? contributionRoleByAgentId.get(params.bot.agentId),
-                isWrapTurn: params.isWrapTurn,
-                message:
-                  admission.purpose === "formal_execution"
-                    ? `${transcriptMessage}\n\n${formatExecutionTaskBagForPrompt(admission.taskBag)}`
-                    : discussToTaskCoordinatorBinding
-                      ? `${discussToTaskCoordinatorBinding}\n\n${transcriptMessage}`
-                      : transcriptMessage,
-                thinking: p.thinking,
-                timeoutMs: p.timeoutMs,
-                deliver: p.deliver,
-                parsedImages,
-                stagedMediaContext,
-                systemInputProvenance,
-                systemProvenanceReceipt,
-                ...memberContext,
-                ...(humanWork?.lifecycle === "long_task" && formalTaskEstablish?.taskId
-                  ? { executionTaskId: formalTaskEstablish.taskId }
-                  : {}),
-                ...(groupUnderstanding?.kind === "understood" &&
-                groupUnderstanding.decision.kind === "execution_request"
-                  ? {
-                      executionLifecycle: groupUnderstanding.decision.request.lifecycle ?? "turn",
-                    }
-                  : {}),
-                dispatchRole: params.dispatchRole,
-                ...(params.collabEdge ? { collabEdge: params.collabEdge } : {}),
-                ...(p.contextScope ? { contextScopeRequest: p.contextScope } : {}),
-                ...(policySnapshot
-                  ? { effective: policySnapshot.effective as EffectiveCollaborationPolicy }
-                  : {}),
-                ...(collaborationEventKey ? { eventKey: collaborationEventKey } : {}),
-                onSkip: (reason, detail) => {
-                  lastSkipReason = reason;
-                  lastSkipAgentName = params.bot.name;
-                  const trimmed = detail?.trim();
-                  if (trimmed) {
-                    lastSkipDetail = trimmed;
-                  }
-                  // Expert #5: surface mid-round silent suppress (flag default OFF).
-                  if (isCollaborationSurfaceSilentSuppressReasonsEnabled(groupCfg)) {
-                    const kind = collaborationSuppressKindFromSkipReason(reason);
-                    const notice = formatCollaborationSuppressNotice({
-                      kind,
-                      agentName: params.bot.name,
-                      detail: trimmed,
-                    });
-                    appendRawTranscriptMessage({
-                      transcriptPath: groupTranscriptPath,
-                      message: {
-                        role: "assistant",
-                        content: [{ type: "text", text: notice }],
-                        timestamp: Date.now(),
-                        senderLabel: "协作调度",
-                        collaborationRoundId: clientRunId,
-                        collaborationMemberSkip: true,
-                        collaborationSuppressKind: kind,
-                      },
-                    });
-                  }
-                },
-                ...(v1RollCallExtraLines?.length ? { v1RollCallExtraLines } : {}),
-                authority,
-              });
-              if (reply) {
-                sameRoundReplies.push(reply);
-                // C2/C3: observe assistant inline @; when assistantMentionDispatch
-                // ON + bots resolve, ledger outcome=dispatched (edges attach in
-                // round-runtime peer_ask path). Not Floor live / no new round.
-                if (
-                  !humanWork ||
-                  (humanWork.lifecycle === "long_task" && formalTaskEstablish?.taskId)
-                ) {
-                  void observeAssistantReplyWakeBestEffort({
-                    authority,
-                    cfg: policySnapshotCfg,
-                    groupId: scope.groupId,
-                    fromAgentId: params.bot.agentId,
-                    text: reply.text,
-                    relatedId: clientRunId,
-                    bots: scope.bots,
-                    ...(humanWork
-                      ? { taskId: formalTaskEstablish?.taskId ?? undefined }
-                      : wakeTaskId
-                        ? { taskId: wakeTaskId }
-                        : {}),
-                  }).catch(() => undefined);
+              try {
+                // Read the authorized public transcript again for every member; a
+                // round-start snapshot misses human interjections during prior turns.
+                const memberContext = readCollaborationMemberContext({
+                  readMessages: () =>
+                    readSessionMessages(
+                      groupSession.entry.sessionId,
+                      groupSession.storePath,
+                      groupSession.entry.sessionFile,
+                    ),
+                  triggeringMessageId: `local-${clientRunId}`,
+                  completedReplies: sameRoundReplies,
+                });
+                if (parentAbortController.signal.aborted) {
+                  return;
                 }
-              }
-              return reply;
-            } catch (err) {
-              roundFailed = true;
-              lastSkipReason = "crash";
-              lastSkipAgentName = params.bot.name;
-              roundFailureMessage = formatCollaborationRoundFailure(err);
-              context.logGateway.warn(
-                `group discussion bot failed (${params.bot.agentId}): ${formatForLog(err)}`,
-              );
-              void appendCollaborationExecutionRecord({
-                groupId: scope.groupId,
-                tenantId: scope.tenantId,
-                ...(collaborationEventKey ? { key: collaborationEventKey } : {}),
-                sessionKey: scope.rawSessionKey,
-                roundId: clientRunId,
-                agentId: params.bot.agentId,
-                agentName: params.bot.name,
-                tier: participationTierByAgentId.get(params.bot.agentId) ?? "duty",
-                status: "failed",
-                contributionRole:
-                  params.contributionRole ?? contributionRoleByAgentId.get(params.bot.agentId),
-                latencyMs: 0,
-              }).catch((ledgerErr) => {
+                const humanWork =
+                  groupUnderstanding?.kind === "understood" &&
+                  groupUnderstanding.decision.kind === "execution_request"
+                    ? groupUnderstanding.decision.request
+                    : undefined;
+                const admission = await resolveMemberAdmission({
+                  authority,
+                  agentId: params.bot.agentId,
+                  runId: `${clientRunId}:${params.bot.agentId}`,
+                  taskId: humanWork
+                    ? formalTaskEstablish?.taskId
+                    : scope.operatingState?.activeContext.currentTaskId,
+                  executionRequested:
+                    params.contributionRole === "executor" &&
+                    (!humanWork ||
+                      (humanWork.lifecycle === "long_task" &&
+                        Boolean(formalTaskEstablish?.taskId))),
+                  cfg: groupCfg,
+                });
+                if (admission.purpose === "blocked") {
+                  throw new Error(`正式执行尚未准入：${admission.reason}`);
+                }
+                const reply = await runGroupBotDiscussionTurn({
+                  ...(admission.purpose === "formal_execution"
+                    ? { executionDeliverableBinding: admission.binding }
+                    : {}),
+                  context,
+                  client,
+                  bot: params.bot,
+                  scope,
+                  decision,
+                  clientRunId,
+                  inboundPrincipalActor: discussToTaskPrincipalActor,
+                  collaborationRoundId: clientRunId,
+                  participationTier: participationTierByAgentId.get(params.bot.agentId) ?? "duty",
+                  contributionRole:
+                    params.contributionRole ?? contributionRoleByAgentId.get(params.bot.agentId),
+                  isWrapTurn: params.isWrapTurn,
+                  message:
+                    admission.purpose === "formal_execution"
+                      ? `${transcriptMessage}\n\n${formatExecutionTaskBagForPrompt(admission.taskBag)}`
+                      : discussToTaskCoordinatorBinding
+                        ? `${discussToTaskCoordinatorBinding}\n\n${transcriptMessage}`
+                        : transcriptMessage,
+                  thinking: p.thinking,
+                  timeoutMs: p.timeoutMs,
+                  deliver: p.deliver,
+                  parsedImages,
+                  stagedMediaContext,
+                  systemInputProvenance,
+                  systemProvenanceReceipt,
+                  ...memberContext,
+                  ...(humanWork?.lifecycle === "long_task" && formalTaskEstablish?.taskId
+                    ? { executionTaskId: formalTaskEstablish.taskId }
+                    : {}),
+                  ...(groupUnderstanding?.kind === "understood" &&
+                  groupUnderstanding.decision.kind === "execution_request"
+                    ? {
+                        executionLifecycle: groupUnderstanding.decision.request.lifecycle ?? "turn",
+                      }
+                    : {}),
+                  dispatchRole: params.dispatchRole,
+                  ...(params.collabEdge ? { collabEdge: params.collabEdge } : {}),
+                  ...(p.contextScope ? { contextScopeRequest: p.contextScope } : {}),
+                  ...(policySnapshot
+                    ? { effective: policySnapshot.effective as EffectiveCollaborationPolicy }
+                    : {}),
+                  ...(collaborationEventKey ? { eventKey: collaborationEventKey } : {}),
+                  onSkip: (reason, detail) => {
+                    lastSkipReason = reason;
+                    lastSkipAgentName = params.bot.name;
+                    const trimmed = detail?.trim();
+                    if (trimmed) {
+                      lastSkipDetail = trimmed;
+                    }
+                    // Expert #5: surface mid-round silent suppress (flag default OFF).
+                    if (isCollaborationSurfaceSilentSuppressReasonsEnabled(groupCfg)) {
+                      const kind = collaborationSuppressKindFromSkipReason(reason);
+                      const notice = formatCollaborationSuppressNotice({
+                        kind,
+                        agentName: params.bot.name,
+                        detail: trimmed,
+                      });
+                      appendRawTranscriptMessage({
+                        transcriptPath: groupTranscriptPath,
+                        message: {
+                          role: "assistant",
+                          content: [{ type: "text", text: notice }],
+                          timestamp: Date.now(),
+                          senderLabel: "协作调度",
+                          collaborationRoundId: clientRunId,
+                          collaborationMemberSkip: true,
+                          collaborationSuppressKind: kind,
+                        },
+                      });
+                    }
+                  },
+                  ...(v1RollCallExtraLines?.length ? { v1RollCallExtraLines } : {}),
+                  authority,
+                });
+                if (reply) {
+                  sameRoundReplies.push(reply);
+                  // C2/C3: observe assistant inline @; when assistantMentionDispatch
+                  // ON + bots resolve, ledger outcome=dispatched (edges attach in
+                  // round-runtime peer_ask path). Not Floor live / no new round.
+                  if (
+                    !humanWork ||
+                    (humanWork.lifecycle === "long_task" && formalTaskEstablish?.taskId)
+                  ) {
+                    void observeAssistantReplyWakeBestEffort({
+                      authority,
+                      cfg: policySnapshotCfg,
+                      groupId: scope.groupId,
+                      fromAgentId: params.bot.agentId,
+                      text: reply.text,
+                      relatedId: clientRunId,
+                      bots: scope.bots,
+                      ...(humanWork
+                        ? { taskId: formalTaskEstablish?.taskId ?? undefined }
+                        : wakeTaskId
+                          ? { taskId: wakeTaskId }
+                          : {}),
+                    }).catch(() => undefined);
+                  }
+                }
+                return reply;
+              } catch (err) {
+                roundFailed = true;
+                lastSkipReason = "crash";
+                lastSkipAgentName = params.bot.name;
+                roundFailureMessage = formatCollaborationRoundFailure(err);
                 context.logGateway.warn(
-                  `collaboration execution ledger append failed: ${formatForLog(ledgerErr)}`,
+                  `group discussion bot failed (${params.bot.agentId}): ${formatForLog(err)}`,
                 );
-              });
-              return undefined;
-            }
-          };
+                void appendCollaborationExecutionRecord({
+                  groupId: scope.groupId,
+                  tenantId: scope.tenantId,
+                  ...(collaborationEventKey ? { key: collaborationEventKey } : {}),
+                  sessionKey: scope.rawSessionKey,
+                  roundId: clientRunId,
+                  agentId: params.bot.agentId,
+                  agentName: params.bot.name,
+                  tier: participationTierByAgentId.get(params.bot.agentId) ?? "duty",
+                  status: "failed",
+                  contributionRole:
+                    params.contributionRole ?? contributionRoleByAgentId.get(params.bot.agentId),
+                  latencyMs: 0,
+                }).catch((ledgerErr) => {
+                  context.logGateway.warn(
+                    `collaboration execution ledger append failed: ${formatForLog(ledgerErr)}`,
+                  );
+                });
+                return undefined;
+              }
+            };
 
-          // One human interpretation before formal writes; member execution never
-          // reclassifies the original request or binds it to a personal board.
-          if (!systemInputProvenance) {
-            const interpreter =
-              scope.bots.find((bot) => bot.agentId === decision.primaryQueue[0]) ??
-              scope.bots.find((bot) => bot.agentId === scope.coordinatorBotId);
-            if (!interpreter) {
-              throw new Error("当前没有可用的协作交互机器人，本轮未启动执行。");
-            }
-            const selected = await loadSessionEntryForClient(interpreter.sessionKey, client);
-            const ref = resolveSessionModelRef(selected.cfg, selected.entry, interpreter.agentId);
-            const ownerEntitlement = await resolveCollaborationGroupOwnerEntitlementScope(scope);
-            groupUnderstanding = await understandGroupInteraction({
-              config: selected.cfg,
-              runId: clientRunId,
-              groupId: scope.groupId,
-              agentId: interpreter.agentId,
-              sessionKey: interpreter.sessionKey,
-              workspaceDir: resolveTrustedGroupLocator({
+            // One human interpretation before formal writes; member execution never
+            // reclassifies the original request or binds it to a personal board.
+            if (!systemInputProvenance) {
+              const interpreter =
+                scope.bots.find((bot) => bot.agentId === decision.primaryQueue[0]) ??
+                scope.bots.find((bot) => bot.agentId === scope.coordinatorBotId);
+              if (!interpreter) {
+                throw new Error("当前没有可用的协作交互机器人，本轮未启动执行。");
+              }
+              const selected = await loadSessionEntryForClient(interpreter.sessionKey, client);
+              const ref = resolveSessionModelRef(selected.cfg, selected.entry, interpreter.agentId);
+              const ownerEntitlement = await resolveCollaborationGroupOwnerEntitlementScope(scope);
+              groupUnderstanding = await understandGroupInteraction({
+                config: selected.cfg,
+                runId: clientRunId,
                 groupId: scope.groupId,
-                tenantId: groupTenant?.tenantId ?? null,
-                profile: groupTranscriptProfile.profile,
-                cfg: groupTranscriptCfg,
-              }),
-              provider: ref.provider,
-              model: ref.model,
-              timeoutMs: groupTimeoutMs,
-              identity: {
-                gatewayClientUser: client?.user,
-                gatewayClientPlatformUserId: client?.platformUserId,
-                gatewayClientSessionDomain: client?.sessionDomain,
-                executionIdentity: {
-                  user: client?.user,
-                  platformUserId: client?.platformUserId,
-                  enterpriseId: scope.tenantId ?? client?.sessionEnterpriseId ?? undefined,
-                  collaborationGroupId: scope.groupId,
-                  ...(ownerEntitlement ? { collaborationOwnerEntitlement: ownerEntitlement } : {}),
+                agentId: interpreter.agentId,
+                sessionKey: interpreter.sessionKey,
+                workspaceDir: resolveTrustedGroupLocator({
+                  groupId: scope.groupId,
+                  tenantId: groupTenant?.tenantId ?? null,
+                  profile: groupTranscriptProfile.profile,
+                  cfg: groupTranscriptCfg,
+                }),
+                provider: ref.provider,
+                model: ref.model,
+                timeoutMs: groupTimeoutMs,
+                identity: {
+                  gatewayClientUser: client?.user,
+                  gatewayClientPlatformUserId: client?.platformUserId,
+                  gatewayClientSessionDomain: client?.sessionDomain,
+                  executionIdentity: {
+                    user: client?.user,
+                    platformUserId: client?.platformUserId,
+                    enterpriseId: scope.tenantId ?? client?.sessionEnterpriseId ?? undefined,
+                    collaborationGroupId: scope.groupId,
+                    ...(ownerEntitlement
+                      ? { collaborationOwnerEntitlement: ownerEntitlement }
+                      : {}),
+                  },
                 },
-              },
-              message: transcriptMessage,
-              history: recentGroupMessages,
-              groupContext: {
-                title: scope.title,
-                members: scope.members,
-                profile: scope.groupProfile,
-                operatingState: scope.operatingState,
-              },
-              images: parsedImages,
-              signal: parentAbortController.signal,
-            });
-            parentAbortController.signal.throwIfAborted();
-            const understanding = groupUnderstanding;
-            if (
-              understanding.kind === "respond" ||
-              understanding.decision.kind === "reply" ||
-              understanding.decision.kind === "clarify"
-            ) {
-              const text =
-                understanding.kind === "respond"
-                  ? understanding.text
-                  : understanding.decision.kind === "reply" ||
-                      understanding.decision.kind === "clarify"
-                    ? understanding.decision.text
-                    : "本轮没有取得有效的协作决定。";
+                message: transcriptMessage,
+                history: recentGroupMessages,
+                groupContext: {
+                  title: scope.title,
+                  members: scope.members,
+                  profile: scope.groupProfile,
+                  operatingState: scope.operatingState,
+                },
+                images: parsedImages,
+                signal: parentAbortController.signal,
+              });
+              parentAbortController.signal.throwIfAborted();
+              const understanding = groupUnderstanding;
+              if (
+                understanding.kind === "respond" ||
+                understanding.decision.kind === "reply" ||
+                understanding.decision.kind === "clarify"
+              ) {
+                const text =
+                  understanding.kind === "respond"
+                    ? understanding.text
+                    : understanding.decision.kind === "reply" ||
+                        understanding.decision.kind === "clarify"
+                      ? understanding.decision.text
+                      : "本轮没有取得有效的协作决定。";
+                const persisted = await appendAssistantTranscriptMessage({
+                  message: text,
+                  sessionId: groupSession.entry.sessionId,
+                  storePath: groupSession.storePath,
+                  sessionFile: groupSession.entry.sessionFile,
+                  createIfMissing: true,
+                  idempotencyKey: `${clientRunId}:group-interaction`,
+                });
+                if (!persisted.ok) {
+                  throw new Error("协作回复暂未保存，本轮没有启动任务。");
+                }
+                setGatewayDedupeEntry({
+                  dedupe: context.dedupe,
+                  key: `chat:${clientRunId}`,
+                  entry: {
+                    ts: Date.now(),
+                    ok: true,
+                    payload: { runId: clientRunId, status: "ok" as const },
+                  },
+                });
+                broadcastChatFinal({
+                  context,
+                  runId: clientRunId,
+                  sessionKey: rawSessionKey,
+                  message: {
+                    ...persisted.message,
+                    senderLabel: interpreter.name,
+                    collaborationRoundId: clientRunId,
+                  },
+                });
+                return;
+              }
+              if (understanding.decision.kind !== "execution_request") {
+                throw new Error("尚未取得有效的组任务关联，本轮没有修改任务。");
+              }
+            }
+
+            if (!systemInputProvenance && groupRuleMode?.mode === "dynamic") {
+              await resolveDynamicGroupRules();
+              parentAbortController.signal.throwIfAborted();
+              const resolved = buildGroupRuntimeAuthority({
+                scope,
+                episodeId,
+                cfg: policySnapshotCfg,
+                tenantTrust: collabTenant.trust,
+                ...(flagSnapshot ? { snapshot: flagSnapshot } : {}),
+              });
+              authority = resolved.authority;
+              facts = resolved.facts;
+              policySnapshot = resolved.snapshot;
+              collaborationEventKey = policySnapshotEnabled ? eventKeyOf(authority, beatId) : null;
+              decision = decideParticipants(authority, facts, {
+                message: mentionMessage,
+                roundId: clientRunId,
+                explicitMentions: resolveExplicitMentionTokens(p.mentions),
+                explicitMentionRefs: resolveExplicitMentionRefs(p.mentions),
+                recentGroupMessages,
+                operatingState: scope.operatingState ?? null,
+              });
+              if (policySnapshotEnabled) {
+                await persistPolicySnapshotBody({
+                  snapshot: policySnapshot,
+                  groupId: scope.groupId,
+                  tenantId: scope.tenantId ?? null,
+                  cfg: policySnapshotCfg,
+                });
+              }
+            }
+
+            const emitGroupInteractionText = async (text: string, senderLabel: string) => {
               const persisted = await appendAssistantTranscriptMessage({
                 message: text,
                 sessionId: groupSession.entry.sessionId,
@@ -6014,490 +6197,465 @@ export const chatHandlers: GatewayRequestHandlers = {
                 sessionKey: rawSessionKey,
                 message: {
                   ...persisted.message,
-                  senderLabel: interpreter.name,
+                  senderLabel,
                   collaborationRoundId: clientRunId,
                 },
               });
-              return;
-            }
-            if (understanding.decision.kind !== "execution_request") {
-              throw new Error("尚未取得有效的组任务关联，本轮没有修改任务。");
-            }
-          }
+            };
 
-          const emitGroupInteractionText = async (text: string, senderLabel: string) => {
-            const persisted = await appendAssistantTranscriptMessage({
-              message: text,
-              sessionId: groupSession.entry.sessionId,
-              storePath: groupSession.storePath,
-              sessionFile: groupSession.entry.sessionFile,
-              createIfMissing: true,
-              idempotencyKey: `${clientRunId}:group-interaction`,
-            });
-            if (!persisted.ok) {
-              throw new Error("协作回复暂未保存，本轮没有启动任务。");
-            }
-            setGatewayDedupeEntry({
-              dedupe: context.dedupe,
-              key: `chat:${clientRunId}`,
-              entry: {
-                ts: Date.now(),
-                ok: true,
-                payload: { runId: clientRunId, status: "ok" as const },
-              },
-            });
-            broadcastChatFinal({
-              context,
-              runId: clientRunId,
-              sessionKey: rawSessionKey,
-              message: {
-                ...persisted.message,
-                senderLabel,
-                collaborationRoundId: clientRunId,
-              },
-            });
-          };
-
-          const rejectStaleGroupExecutionProposal = async (): Promise<boolean> => {
-            if (groupExecutionProposalCapture.kind !== "ok") {
+            const rejectStaleGroupExecutionProposal = async (): Promise<boolean> => {
+              if (groupExecutionProposalCapture.kind !== "ok") {
+                context.logGateway.warn(
+                  `group execution proposal initial version capture failed group=${scope.groupId}; not starting this turn`,
+                );
+                await emitGroupInteractionText(UNREADABLE_GROUP_EXECUTION_STATE_TEXT, "协作调度");
+                return true;
+              }
+              const fresh = await readFreshGroupExecutionProposalSnapshot({
+                groupId: scope.groupId,
+                client,
+              });
+              if (fresh.kind !== "ok") {
+                context.logGateway.warn(
+                  `group execution proposal version re-read failed group=${scope.groupId}; not starting this turn`,
+                );
+                await emitGroupInteractionText(UNREADABLE_GROUP_EXECUTION_STATE_TEXT, "协作调度");
+                return true;
+              }
+              if (
+                !isStaleGroupExecutionProposal(
+                  groupExecutionProposalCapture.snapshot,
+                  fresh.snapshot,
+                )
+              ) {
+                return false;
+              }
               context.logGateway.warn(
-                `group execution proposal initial version capture failed group=${scope.groupId}; not starting this turn`,
+                `group execution proposal rejected as stale group=${scope.groupId} expected=${JSON.stringify(groupExecutionProposalCapture.snapshot)} fresh=${JSON.stringify(fresh.snapshot)}`,
               );
-              await emitGroupInteractionText(UNREADABLE_GROUP_EXECUTION_STATE_TEXT, "协作调度");
+              await emitGroupInteractionText(STALE_GROUP_EXECUTION_PROPOSAL_TEXT, "协作调度");
               return true;
-            }
-            const fresh = await readFreshGroupExecutionProposalSnapshot({
-              groupId: scope.groupId,
-              client,
-            });
-            if (fresh.kind !== "ok") {
-              context.logGateway.warn(
-                `group execution proposal version re-read failed group=${scope.groupId}; not starting this turn`,
-              );
-              await emitGroupInteractionText(UNREADABLE_GROUP_EXECUTION_STATE_TEXT, "协作调度");
-              return true;
-            }
-            if (
-              !isStaleGroupExecutionProposal(groupExecutionProposalCapture.snapshot, fresh.snapshot)
-            ) {
-              return false;
-            }
-            context.logGateway.warn(
-              `group execution proposal rejected as stale group=${scope.groupId} expected=${JSON.stringify(groupExecutionProposalCapture.snapshot)} fresh=${JSON.stringify(fresh.snapshot)}`,
-            );
-            await emitGroupInteractionText(STALE_GROUP_EXECUTION_PROPOSAL_TEXT, "协作调度");
-            return true;
-          };
+            };
 
-          if (await rejectStaleGroupExecutionProposal()) {
-            return;
-          }
-
-          await groupDiscussionQueue.enqueue(rawSessionKey, async () => {
-            if (parentAbortController.signal.aborted) {
-              return;
-            }
             if (await rejectStaleGroupExecutionProposal()) {
               return;
             }
 
-            // Phase-1 controlled discuss→task: trusted inbound → receipt → coordinator bind.
-            try {
-              const d2tActor =
-                (await resolveDeliveryAclActor(client, scope.groupId)) || wakeFromAgentId || "";
-              discussToTaskPrincipalActor = d2tActor;
-              const d2tTurn =
-                groupUnderstanding?.kind === "understood"
-                  ? await runControlledDiscussToTaskChatTurn({
-                      groupId: scope.groupId,
-                      sourceMessageId: clientRunId,
-                      message: transcriptMessage,
-                      principalActor: d2tActor,
-                      understanding: groupUnderstanding.decision,
-                      client,
-                      tenant: collabTenant,
-                      cfg: policySnapshotCfg,
-                      stampedEnterpriseId: client?.sessionEnterpriseId,
-                      identityAliases: [
-                        client?.user,
-                        client?.platformUserId,
-                        client?.sessionMembershipId,
-                      ]
-                        .map((value) => (typeof value === "string" ? value.trim() : ""))
-                        .filter(Boolean),
-                      persistReceipt: async ({ message, idempotencyKey }) => {
-                        if (!groupSession.entry.sessionId || !groupSession.storePath) {
-                          return { ok: false, error: "session_context_missing" };
-                        }
-                        try {
-                          return await appendAssistantTranscriptMessage({
-                            message,
-                            sessionId: groupSession.entry.sessionId,
-                            storePath: groupSession.storePath,
-                            sessionFile: groupSession.entry.sessionFile,
-                            createIfMissing: true,
-                            idempotencyKey,
-                          });
-                        } catch (persistErr) {
-                          return {
-                            ok: false,
-                            error:
-                              persistErr instanceof Error ? persistErr.message : String(persistErr),
-                          };
-                        }
-                      },
-                    })
-                  : { d2tResult: null };
-              const d2tApplied = applyDiscussToTaskChatTurnToChatHandler(d2tTurn);
-              if (d2tApplied.formalTaskEstablish) {
-                formalTaskEstablish = d2tApplied.formalTaskEstablish;
+            await groupDiscussionQueue.enqueue(rawSessionKey, async () => {
+              if (parentAbortController.signal.aborted) {
+                return;
               }
-              if (d2tApplied.coordinatorBindingText) {
-                discussToTaskCoordinatorBinding = d2tApplied.coordinatorBindingText;
+              if (await rejectStaleGroupExecutionProposal()) {
+                return;
               }
-              // Deterministic client feedback via existing chat event egress (broadcastChat /
-              // nodeSendToSession). Covers normal / conflict / exception / persist-failure
-              // so the client receives content even when transcript persist fails.
-              const d2tEgress = emitDiscussToTaskClientFeedback({
-                applied: d2tApplied,
-                sessionKey: rawSessionKey,
-                runId: clientRunId,
-                broadcastChat: context.broadcastChat,
-                nodeSendToSession: context.nodeSendToSession,
-                tenantId: collabTenant?.tenantId ?? client?.sessionEnterpriseId ?? null,
-              });
-              if (d2tApplied.transcriptPersist && !d2tApplied.transcriptPersist.ok) {
-                context.logGateway.warn(
-                  `discuss-to-task receipt transcript persist failed: ${d2tApplied.transcriptPersist.error ?? "unknown"}`,
-                );
-              }
-              if (!d2tEgress.emitted && d2tApplied.clientFeedbackMessage) {
-                context.logGateway.warn(
-                  "discuss-to-task client feedback egress did not emit despite clientFeedbackMessage",
-                );
-              }
-              if (d2tTurn.error) {
-                context.logGateway.warn(
-                  `controlled discuss-to-task before discussion failed: ${d2tTurn.error}`,
-                );
-              }
-            } catch (d2tErr) {
-              context.logGateway.warn(
-                `controlled discuss-to-task before discussion failed: ${formatForLog(d2tErr)}`,
-              );
-              formalTaskEstablish = {
-                attempted: true,
-                status: "blocked",
-                taskId: null,
-                reason: "discuss_to_task_hook_failed",
-                userMessage: "正式任务建立受阻，尚未建立正式任务。",
-              };
-              discussToTaskCoordinatorBinding =
-                "[正式任务入口回执 — 必须绑定] status=blocked；禁止口头宣称已派工。";
-              // Exception path: still push safe status through chat event egress.
-              emitDiscussToTaskClientFeedback({
-                applied: {
-                  formalTaskEstablish,
-                  coordinatorBindingText: discussToTaskCoordinatorBinding,
-                  clientFeedbackMessage: formalTaskEstablish.userMessage,
-                },
-                sessionKey: rawSessionKey,
-                runId: clientRunId,
-                broadcastChat: context.broadcastChat,
-                nodeSendToSession: context.nodeSendToSession,
-                tenantId: collabTenant?.tenantId ?? client?.sessionEnterpriseId ?? null,
-              });
-            }
 
-            if (
-              groupUnderstanding?.kind === "understood" &&
-              groupUnderstanding.decision.kind === "execution_request" &&
-              groupUnderstanding.decision.request.lifecycle !== "long_task"
-            ) {
-              discussToTaskCoordinatorBinding = [
-                "[Host-admitted current-turn work] No formal group task or private plan is created by this request. Do not create/replace/resume a task, claim continuing responsibility or schedule a later wake. Use the existing execution backend and report this round's actual result.",
-                `Goal: ${groupUnderstanding.decision.request.goal}`,
-                `Expected result: ${JSON.stringify(groupUnderstanding.decision.request.acceptance)}`,
-              ].join("\n");
-            }
-
-            // Current-round participants already run below. Only an admitted
-            // long task (or an existing internal wake) may mint task Wake records.
-            if (
-              !groupUnderstanding ||
-              (groupUnderstanding.kind === "understood" &&
-                groupUnderstanding.decision.kind === "execution_request" &&
-                groupUnderstanding.decision.request.lifecycle === "long_task" &&
-                formalTaskEstablish?.taskId)
-            ) {
-              void recordChatSendMentionWakesBestEffort({
-                authority,
-                cfg: policySnapshotCfg,
-                groupId: scope.groupId,
-                fromAgentId: wakeFromAgentId,
-                message: mentionMessage,
-                explicitMentions: resolveExplicitMentionTokens(p.mentions),
-                explicitMentionRefs: resolveExplicitMentionRefs(p.mentions),
-                bots: scope.bots,
-                humans: facts.humans,
-                relatedId: clientRunId,
-                ...(groupUnderstanding?.kind === "understood"
-                  ? { taskId: formalTaskEstablish?.taskId ?? undefined }
-                  : wakeTaskId
-                    ? { taskId: wakeTaskId }
-                    : {}),
-              }).catch(() => undefined);
-            }
-
-            const completedRound = await runSingleBeatEpisodeAroundRound({
-              cfg: policySnapshotCfg,
-              groupId: authority.groupId,
-              tenantId: authority.tenantId,
-              episodeId,
-              roundId: clientRunId,
-              policySnapshotId: policySnapshot.policySnapshotId,
-              policyHash: policySnapshot.policyHash,
-              provenanceHash: policySnapshot.provenanceHash,
-              compilerRevision: policySnapshot.compilerRevision,
-              key: collaborationEventKey,
-              decision,
-              message: transcriptMessage,
-              effective: policySnapshot.effective as EffectiveCollaborationPolicy,
-              executeRound: () =>
-                executeCollaborationRound(authority, facts, {
-                  decision,
-                  productionExecutor: resolveProductionCollaborationExecutor(policySnapshotCfg),
-                  message: discussToTaskCoordinatorBinding
-                    ? `${discussToTaskCoordinatorBinding}\n\n${transcriptMessage}`
-                    : transcriptMessage,
+              // Phase-1 controlled discuss→task: trusted inbound → receipt → coordinator bind.
+              try {
+                const d2tActor =
+                  (await resolveDeliveryAclActor(client, scope.groupId)) || wakeFromAgentId || "";
+                discussToTaskPrincipalActor = d2tActor;
+                const d2tTurn =
+                  groupUnderstanding?.kind === "understood"
+                    ? await runControlledDiscussToTaskChatTurn({
+                        groupId: scope.groupId,
+                        sourceMessageId: clientRunId,
+                        message: transcriptMessage,
+                        principalActor: d2tActor,
+                        understanding: groupUnderstanding.decision,
+                        client,
+                        tenant: collabTenant,
+                        cfg: policySnapshotCfg,
+                        stampedEnterpriseId: client?.sessionEnterpriseId,
+                        identityAliases: [
+                          client?.user,
+                          client?.platformUserId,
+                          client?.sessionMembershipId,
+                        ]
+                          .map((value) => (typeof value === "string" ? value.trim() : ""))
+                          .filter(Boolean),
+                        persistReceipt: async ({ message, idempotencyKey }) => {
+                          if (!groupSession.entry.sessionId || !groupSession.storePath) {
+                            return { ok: false, error: "session_context_missing" };
+                          }
+                          try {
+                            return await appendAssistantTranscriptMessage({
+                              message,
+                              sessionId: groupSession.entry.sessionId,
+                              storePath: groupSession.storePath,
+                              sessionFile: groupSession.entry.sessionFile,
+                              createIfMissing: true,
+                              idempotencyKey,
+                            });
+                          } catch (persistErr) {
+                            return {
+                              ok: false,
+                              error:
+                                persistErr instanceof Error
+                                  ? persistErr.message
+                                  : String(persistErr),
+                            };
+                          }
+                        },
+                      })
+                    : { d2tResult: null };
+                const d2tApplied = applyDiscussToTaskChatTurnToChatHandler(d2tTurn);
+                if (d2tApplied.formalTaskEstablish) {
+                  formalTaskEstablish = d2tApplied.formalTaskEstablish;
+                }
+                if (d2tApplied.coordinatorBindingText) {
+                  discussToTaskCoordinatorBinding = d2tApplied.coordinatorBindingText;
+                }
+                // Deterministic client feedback via existing chat event egress (broadcastChat /
+                // nodeSendToSession). Covers normal / conflict / exception / persist-failure
+                // so the client receives content even when transcript persist fails.
+                const d2tEgress = emitDiscussToTaskClientFeedback({
+                  applied: d2tApplied,
                   sessionKey: rawSessionKey,
-                  skipRoundIds: [clientRunId, ...context.chatAbortControllers.keys()],
-                  signal: parentAbortController.signal,
-                  isAborted: () => parentAbortController.signal.aborted,
-                  sourceMessageId: clientRunId,
+                  runId: clientRunId,
+                  broadcastChat: context.broadcastChat,
+                  nodeSendToSession: context.nodeSendToSession,
+                  tenantId: collabTenant?.tenantId ?? client?.sessionEnterpriseId ?? null,
+                });
+                if (d2tApplied.transcriptPersist && !d2tApplied.transcriptPersist.ok) {
+                  context.logGateway.warn(
+                    `discuss-to-task receipt transcript persist failed: ${d2tApplied.transcriptPersist.error ?? "unknown"}`,
+                  );
+                }
+                if (!d2tEgress.emitted && d2tApplied.clientFeedbackMessage) {
+                  context.logGateway.warn(
+                    "discuss-to-task client feedback egress did not emit despite clientFeedbackMessage",
+                  );
+                }
+                if (d2tTurn.error) {
+                  context.logGateway.warn(
+                    `controlled discuss-to-task before discussion failed: ${d2tTurn.error}`,
+                  );
+                }
+              } catch (d2tErr) {
+                context.logGateway.warn(
+                  `controlled discuss-to-task before discussion failed: ${formatForLog(d2tErr)}`,
+                );
+                formalTaskEstablish = {
+                  attempted: true,
+                  status: "blocked",
+                  taskId: null,
+                  reason: "discuss_to_task_hook_failed",
+                  userMessage: "正式任务建立受阻，尚未建立正式任务。",
+                };
+                discussToTaskCoordinatorBinding =
+                  "[正式任务入口回执 — 必须绑定] status=blocked；禁止口头宣称已派工。";
+                // Exception path: still push safe status through chat event egress.
+                emitDiscussToTaskClientFeedback({
+                  applied: {
+                    formalTaskEstablish,
+                    coordinatorBindingText: discussToTaskCoordinatorBinding,
+                    clientFeedbackMessage: formalTaskEstablish.userMessage,
+                  },
+                  sessionKey: rawSessionKey,
+                  runId: clientRunId,
+                  broadcastChat: context.broadcastChat,
+                  nodeSendToSession: context.nodeSendToSession,
+                  tenantId: collabTenant?.tenantId ?? client?.sessionEnterpriseId ?? null,
+                });
+              }
+
+              if (
+                groupUnderstanding?.kind === "understood" &&
+                groupUnderstanding.decision.kind === "execution_request" &&
+                groupUnderstanding.decision.request.lifecycle !== "long_task"
+              ) {
+                discussToTaskCoordinatorBinding = [
+                  "[Host-admitted current-turn work] No formal group task or private plan is created by this request. Do not create/replace/resume a task, claim continuing responsibility or schedule a later wake. Use the existing execution backend and report this round's actual result.",
+                  `Goal: ${groupUnderstanding.decision.request.goal}`,
+                  `Expected result: ${JSON.stringify(groupUnderstanding.decision.request.acceptance)}`,
+                ].join("\n");
+              }
+
+              // Current-round participants already run below. Only an admitted
+              // long task (or an existing internal wake) may mint task Wake records.
+              if (
+                !groupUnderstanding ||
+                (groupUnderstanding.kind === "understood" &&
+                  groupUnderstanding.decision.kind === "execution_request" &&
+                  groupUnderstanding.decision.request.lifecycle === "long_task" &&
+                  formalTaskEstablish?.taskId)
+              ) {
+                void recordChatSendMentionWakesBestEffort({
+                  authority,
+                  cfg: policySnapshotCfg,
+                  groupId: scope.groupId,
+                  fromAgentId: wakeFromAgentId,
+                  message: mentionMessage,
+                  explicitMentions: resolveExplicitMentionTokens(p.mentions),
+                  explicitMentionRefs: resolveExplicitMentionRefs(p.mentions),
+                  bots: scope.bots,
+                  humans: facts.humans,
+                  relatedId: clientRunId,
                   ...(groupUnderstanding?.kind === "understood"
-                    ? { admittedTaskId: formalTaskEstablish?.taskId ?? undefined }
-                    : {}),
-                  ...(groupUnderstanding?.kind === "understood" &&
-                  groupUnderstanding.decision.kind === "execution_request"
-                    ? { lifecycle: groupUnderstanding.decision.request.lifecycle ?? "turn" }
-                    : {}),
-                  ...(formalTaskEstablish ? { formalTaskEstablish } : {}),
-                  ...(p.contextScope ? { contextScope: p.contextScope } : {}),
-                  ...(collaborationEventKey ? { eventKey: collaborationEventKey } : {}),
-                  runBot: async ({
-                    bot,
-                    isWrapTurn,
-                    role,
-                    edge,
-                  }: {
-                    bot: CollaborationBotTarget;
-                    isWrapTurn: boolean;
-                    role: "primary" | "explicit_member" | "fallback" | "supplement" | "close";
-                    edge?: import("../collaboration-dispatch/collab-edge.js").CollabEdge;
-                    dispatchId: string;
-                  }) => {
-                    const plannedRole = contributionRoleByAgentId.get(bot.agentId);
-                    const edgeRole = edge ? collabEdgeContributionRole(edge.kind) : undefined;
-                    const reply = await runStageBot({
+                    ? { taskId: formalTaskEstablish?.taskId ?? undefined }
+                    : wakeTaskId
+                      ? { taskId: wakeTaskId }
+                      : {}),
+                }).catch(() => undefined);
+              }
+
+              const completedRound = await runSingleBeatEpisodeAroundRound({
+                cfg: policySnapshotCfg,
+                groupId: authority.groupId,
+                tenantId: authority.tenantId,
+                episodeId,
+                roundId: clientRunId,
+                policySnapshotId: policySnapshot.policySnapshotId,
+                policyHash: policySnapshot.policyHash,
+                provenanceHash: policySnapshot.provenanceHash,
+                compilerRevision: policySnapshot.compilerRevision,
+                key: collaborationEventKey,
+                decision,
+                message: transcriptMessage,
+                effective: policySnapshot.effective as EffectiveCollaborationPolicy,
+                executeRound: () =>
+                  executeCollaborationRound(authority, facts, {
+                    decision,
+                    productionExecutor: resolveProductionCollaborationExecutor(policySnapshotCfg),
+                    message: discussToTaskCoordinatorBinding
+                      ? `${discussToTaskCoordinatorBinding}\n\n${transcriptMessage}`
+                      : transcriptMessage,
+                    sessionKey: rawSessionKey,
+                    skipRoundIds: [clientRunId, ...context.chatAbortControllers.keys()],
+                    signal: parentAbortController.signal,
+                    isAborted: () => parentAbortController.signal.aborted,
+                    sourceMessageId: clientRunId,
+                    ...(groupUnderstanding?.kind === "understood"
+                      ? { admittedTaskId: formalTaskEstablish?.taskId ?? undefined }
+                      : {}),
+                    ...(groupUnderstanding?.kind === "understood" &&
+                    groupUnderstanding.decision.kind === "execution_request"
+                      ? { lifecycle: groupUnderstanding.decision.request.lifecycle ?? "turn" }
+                      : {}),
+                    ...(formalTaskEstablish ? { formalTaskEstablish } : {}),
+                    ...(p.contextScope ? { contextScope: p.contextScope } : {}),
+                    ...(collaborationEventKey ? { eventKey: collaborationEventKey } : {}),
+                    runBot: async ({
                       bot,
                       isWrapTurn,
-                      dispatchRole: role,
-                      contributionRole: isWrapTurn
-                        ? "wrap"
-                        : // Edge targets outside the plan: challenge keeps conflict; peer_ask /
-                          // handoff answer as a supplement (executor prompt allows NO_REPLY).
-                          (plannedRole ?? (edgeRole === "challenge" ? "challenge" : undefined)),
-                      ...(edge ? { collabEdge: edge } : {}),
-                    });
-                    return reply ?? undefined;
-                  },
-                }).catch((err) => {
-                  roundFailed = true;
-                  lastSkipReason = "crash";
-                  roundFailureMessage = formatCollaborationRoundFailure(err);
-                  context.logGateway.warn(
-                    `collaboration round execute failed: ${formatForLog(err)}`,
-                  );
-                  return null;
-                }),
-            });
+                      role,
+                      edge,
+                    }: {
+                      bot: CollaborationBotTarget;
+                      isWrapTurn: boolean;
+                      role: "primary" | "explicit_member" | "fallback" | "supplement" | "close";
+                      edge?: import("../collaboration-dispatch/collab-edge.js").CollabEdge;
+                      dispatchId: string;
+                    }) => {
+                      const plannedRole = contributionRoleByAgentId.get(bot.agentId);
+                      const edgeRole = edge ? collabEdgeContributionRole(edge.kind) : undefined;
+                      const reply = await runStageBot({
+                        bot,
+                        isWrapTurn,
+                        dispatchRole: role,
+                        contributionRole: isWrapTurn
+                          ? "wrap"
+                          : // Edge targets outside the plan: challenge keeps conflict; peer_ask /
+                            // handoff answer as a supplement (executor prompt allows NO_REPLY).
+                            (plannedRole ?? (edgeRole === "challenge" ? "challenge" : undefined)),
+                        ...(edge ? { collabEdge: edge } : {}),
+                      });
+                      return reply ?? undefined;
+                    },
+                  }).catch((err) => {
+                    roundFailed = true;
+                    lastSkipReason = "crash";
+                    roundFailureMessage = formatCollaborationRoundFailure(err);
+                    context.logGateway.warn(
+                      `collaboration round execute failed: ${formatForLog(err)}`,
+                    );
+                    return null;
+                  }),
+              });
 
-            // chat-checkpoint-rollback: write group continuity into the same
-            // tenant/host group memory root list uses. Group scope ignores agent
-            // cwd for memoryDir, so do not skip when resolveCallerWorkspaceCwd
-            // returns null (LIVE space sessions often have no agent workspace).
-            const fallbackAgentWorkspaceDir = await resolveCallerWorkspaceCwd({
-              cfg: groupCfg,
-              sessionKey: rawSessionKey,
-              agentId: groupSourceAgentId,
-              client,
-            });
-            const collabContinuityTenantId =
-              authority.tenantId?.trim() || client?.sessionEnterpriseId?.trim() || null;
-            const groupWorkspaceDir = resolveSessionContinuityWorkspaceDir({
-              cfg: groupCfg,
-              sessionKey: rawSessionKey,
-              sessionEntry: groupSession.entry,
-              agentId: groupSourceAgentId,
-              agentWorkspaceDir: fallbackAgentWorkspaceDir ?? process.cwd(),
-              tenantId: collabContinuityTenantId,
-            });
-            void commitSessionContinuityForCurrentSession({
-              cfg: groupCfg,
-              workspaceDir: groupWorkspaceDir,
-              agentId: groupSourceAgentId,
-              sessionKey: rawSessionKey,
-              sessionEntry: groupSession.entry,
-              reason: "turn_completed",
-              tenantId: collabContinuityTenantId,
-            }).catch(() => undefined);
-            if (parentAbortController.signal.aborted) {
-              return;
-            }
-            const abortedWithoutVisibleReply =
-              (roundFailed || completedRound?.state === "ROUND_ABORTED") &&
-              sameRoundReplies.length === 0;
-            const abortSkipReason =
-              lastSkipReason ??
-              (completedRound?.state === "MENTION_CONFIRM"
-                ? "mention_confirm"
-                : completedRound?.state === "ROUND_ABORTED"
-                  ? "timeout"
-                  : "crash");
-            const abortSuppressKind = collaborationSuppressKindFromSkipReason(
-              completedRound?.state === "MENTION_CONFIRM" && !lastSkipReason
-                ? "waiting_member"
-                : abortSkipReason,
-            );
-            const abortNotice = abortedWithoutVisibleReply
-              ? isCollaborationSurfaceSilentSuppressReasonsEnabled(groupCfg)
-                ? formatCollaborationSuppressAbortNotice({
-                    kind: abortSuppressKind,
-                    agentName: lastSkipAgentName,
-                    detail: roundFailed ? roundFailureMessage : lastSkipDetail,
-                  })
-                : formatCollaborationRoundAbortNotice({
-                    agentName: lastSkipAgentName,
-                    skipReason:
-                      lastSkipReason ??
-                      (completedRound?.state === "ROUND_ABORTED" ? "timeout" : "crash"),
-                    errorMessage: roundFailed ? roundFailureMessage : lastSkipDetail,
-                    userText: bodyTrimmed,
-                  })
-              : null;
-            const abortNoticeMessage = abortNotice
-              ? {
-                  role: "assistant",
-                  content: [{ type: "text", text: abortNotice }],
-                  timestamp: Date.now(),
-                  senderLabel: "协作调度",
-                  collaborationRoundId: clientRunId,
-                  collaborationAbort: true,
-                  ...(isCollaborationSurfaceSilentSuppressReasonsEnabled(groupCfg)
-                    ? { collaborationSuppressKind: abortSuppressKind }
-                    : {}),
-                }
-              : undefined;
-            if (abortNoticeMessage) {
-              appendRawTranscriptMessage({
-                transcriptPath: groupTranscriptPath,
-                message: abortNoticeMessage,
+              // chat-checkpoint-rollback: write group continuity into the same
+              // tenant/host group memory root list uses. Group scope ignores agent
+              // cwd for memoryDir, so do not skip when resolveCallerWorkspaceCwd
+              // returns null (LIVE space sessions often have no agent workspace).
+              const fallbackAgentWorkspaceDir = await resolveCallerWorkspaceCwd({
+                cfg: groupCfg,
+                sessionKey: rawSessionKey,
+                agentId: groupSourceAgentId,
+                client,
               });
-            }
-            const confirmQuestion =
-              completedRound?.state === "MENTION_CONFIRM"
-                ? decision.mentionConfirm?.question
+              const collabContinuityTenantId =
+                authority.tenantId?.trim() || client?.sessionEnterpriseId?.trim() || null;
+              const groupWorkspaceDir = resolveSessionContinuityWorkspaceDir({
+                cfg: groupCfg,
+                sessionKey: rawSessionKey,
+                sessionEntry: groupSession.entry,
+                agentId: groupSourceAgentId,
+                agentWorkspaceDir: fallbackAgentWorkspaceDir ?? process.cwd(),
+                tenantId: collabContinuityTenantId,
+              });
+              void commitSessionContinuityForCurrentSession({
+                cfg: groupCfg,
+                workspaceDir: groupWorkspaceDir,
+                agentId: groupSourceAgentId,
+                sessionKey: rawSessionKey,
+                sessionEntry: groupSession.entry,
+                reason: "turn_completed",
+                tenantId: collabContinuityTenantId,
+              }).catch(() => undefined);
+              if (parentAbortController.signal.aborted) {
+                return;
+              }
+              const abortedWithoutVisibleReply =
+                (roundFailed || completedRound?.state === "ROUND_ABORTED") &&
+                sameRoundReplies.length === 0;
+              const abortSkipReason =
+                lastSkipReason ??
+                (completedRound?.state === "MENTION_CONFIRM"
+                  ? "mention_confirm"
+                  : completedRound?.state === "ROUND_ABORTED"
+                    ? "timeout"
+                    : "crash");
+              const abortSuppressKind = collaborationSuppressKindFromSkipReason(
+                completedRound?.state === "MENTION_CONFIRM" && !lastSkipReason
+                  ? "waiting_member"
+                  : abortSkipReason,
+              );
+              const abortNotice = abortedWithoutVisibleReply
+                ? isCollaborationSurfaceSilentSuppressReasonsEnabled(groupCfg)
+                  ? formatCollaborationSuppressAbortNotice({
+                      kind: abortSuppressKind,
+                      agentName: lastSkipAgentName,
+                      detail: roundFailed ? roundFailureMessage : lastSkipDetail,
+                    })
+                  : formatCollaborationRoundAbortNotice({
+                      agentName: lastSkipAgentName,
+                      skipReason:
+                        lastSkipReason ??
+                        (completedRound?.state === "ROUND_ABORTED" ? "timeout" : "crash"),
+                      errorMessage: roundFailed ? roundFailureMessage : lastSkipDetail,
+                      userText: bodyTrimmed,
+                    })
+                : null;
+              const abortNoticeMessage = abortNotice
+                ? {
+                    role: "assistant",
+                    content: [{ type: "text", text: abortNotice }],
+                    timestamp: Date.now(),
+                    senderLabel: "协作调度",
+                    collaborationRoundId: clientRunId,
+                    collaborationAbort: true,
+                    ...(isCollaborationSurfaceSilentSuppressReasonsEnabled(groupCfg)
+                      ? { collaborationSuppressKind: abortSuppressKind }
+                      : {}),
+                  }
                 : undefined;
-            const confirmNoticeMessage = confirmQuestion
-              ? {
-                  role: "assistant",
-                  content: [{ type: "text", text: confirmQuestion }],
-                  timestamp: Date.now(),
-                  senderLabel: "协作调度",
-                  collaborationRoundId: clientRunId,
-                  collaborationMentionConfirm: true,
-                }
-              : undefined;
-            if (confirmNoticeMessage) {
-              appendRawTranscriptMessage({
-                transcriptPath: groupTranscriptPath,
-                message: confirmNoticeMessage,
-              });
-            }
-            // Stream close is not task completion. Failed rounds still finalize
-            // the transcript so the UI does not hang, but must not record ok.
-            if (roundFailed || abortedWithoutVisibleReply) {
-              setGatewayDedupeEntry({
-                dedupe: context.dedupe,
-                key: `chat:${clientRunId}`,
-                entry: {
-                  ts: Date.now(),
-                  ok: false,
-                  payload: { runId: clientRunId, status: "error" as const },
-                },
-              });
-              broadcastChatError({
+              if (abortNoticeMessage) {
+                appendRawTranscriptMessage({
+                  transcriptPath: groupTranscriptPath,
+                  message: abortNoticeMessage,
+                });
+              }
+              const confirmQuestion =
+                completedRound?.state === "MENTION_CONFIRM"
+                  ? decision.mentionConfirm?.question
+                  : undefined;
+              const confirmNoticeMessage = confirmQuestion
+                ? {
+                    role: "assistant",
+                    content: [{ type: "text", text: confirmQuestion }],
+                    timestamp: Date.now(),
+                    senderLabel: "协作调度",
+                    collaborationRoundId: clientRunId,
+                    collaborationMentionConfirm: true,
+                  }
+                : undefined;
+              if (confirmNoticeMessage) {
+                appendRawTranscriptMessage({
+                  transcriptPath: groupTranscriptPath,
+                  message: confirmNoticeMessage,
+                });
+              }
+              // Stream close is not task completion. Failed rounds still finalize
+              // the transcript so the UI does not hang, but must not record ok.
+              if (roundFailed || abortedWithoutVisibleReply) {
+                setGatewayDedupeEntry({
+                  dedupe: context.dedupe,
+                  key: `chat:${clientRunId}`,
+                  entry: {
+                    ts: Date.now(),
+                    ok: false,
+                    payload: { runId: clientRunId, status: "error" as const },
+                  },
+                });
+                broadcastChatError({
+                  context,
+                  runId: clientRunId,
+                  sessionKey: rawSessionKey,
+                  errorMessage: abortNotice ?? roundFailureMessage,
+                });
+              } else {
+                setGatewayDedupeEntry({
+                  dedupe: context.dedupe,
+                  key: `chat:${clientRunId}`,
+                  entry: {
+                    ts: Date.now(),
+                    ok: true,
+                    payload: { runId: clientRunId, status: "ok" as const },
+                  },
+                });
+              }
+              broadcastChatFinal({
                 context,
                 runId: clientRunId,
                 sessionKey: rawSessionKey,
-                errorMessage: abortNotice ?? roundFailureMessage,
+                message: abortNoticeMessage ?? confirmNoticeMessage,
               });
-            } else {
-              setGatewayDedupeEntry({
-                dedupe: context.dedupe,
-                key: `chat:${clientRunId}`,
-                entry: {
-                  ts: Date.now(),
-                  ok: true,
-                  payload: { runId: clientRunId, status: "ok" as const },
-                },
-              });
-            }
-            broadcastChatFinal({
+            });
+          } finally {
+            endChatRunAndMaybeFlushRestore({
               context,
               runId: clientRunId,
-              sessionKey: rawSessionKey,
-              message: abortNoticeMessage ?? confirmNoticeMessage,
+              client,
+              isWebchatConnect,
             });
-          });
-        } finally {
+          }
+        })().catch((err) => {
           endChatRunAndMaybeFlushRestore({
             context,
             runId: clientRunId,
             client,
             isWebchatConnect,
           });
-        }
-      })().catch((err) => {
-        endChatRunAndMaybeFlushRestore({
-          context,
-          runId: clientRunId,
-          client,
-          isWebchatConnect,
-        });
-        setGatewayDedupeEntry({
-          dedupe: context.dedupe,
-          key: `chat:${clientRunId}`,
-          entry: {
-            ts: Date.now(),
-            ok: false,
-            payload: {
-              runId: clientRunId,
-              status: "error" as const,
-              summary: String(err),
+          setGatewayDedupeEntry({
+            dedupe: context.dedupe,
+            key: `chat:${clientRunId}`,
+            entry: {
+              ts: Date.now(),
+              ok: false,
+              payload: {
+                runId: clientRunId,
+                status: "error" as const,
+                summary: String(err),
+              },
+              error: errorShape(ErrorCodes.UNAVAILABLE, String(err)),
             },
-            error: errorShape(ErrorCodes.UNAVAILABLE, String(err)),
-          },
+          });
+          broadcastChatError({
+            context,
+            runId: clientRunId,
+            sessionKey: rawSessionKey,
+            errorMessage: String(err),
+          });
         });
-        broadcastChatError({
-          context,
-          runId: clientRunId,
-          sessionKey: rawSessionKey,
-          errorMessage: String(err),
-        });
-      });
-      return;
+        return;
+      } finally {
+        if (
+          !parentLifecycleTransferred &&
+          context.chatAbortControllers.get(clientRunId)?.controller === parentAbortController
+        ) {
+          context.chatAbortControllers.delete(clientRunId);
+        }
+      }
     }
     const {
       cfg,

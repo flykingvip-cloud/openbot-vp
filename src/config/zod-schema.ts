@@ -169,6 +169,17 @@ const DataSchema = z
 
 const CollaborationSchema = z
   .object({
+    ruleDecisionByGroupId: z
+      .record(
+        z.string(),
+        z
+          .object({
+            mode: z.enum(["legacy", "dynamic"]),
+            fallback: z.enum(["legacy", "block"]),
+          })
+          .strict(),
+      )
+      .optional(),
     defaults: z
       .object({
         workspace: z.string().optional(),

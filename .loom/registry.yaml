@@ -14533,6 +14533,14 @@ tasks:
         No merge or deploy until authorized. Does not include A/B fidelity files
         or #281 content."
     paths:
+      - src/config/types.collaboration.ts
+      - src/config/zod-schema.ts
+      - src/gateway/collaboration-dispatch/round-policy-snapshot.test.ts
+      - src/gateway/collaboration-dispatch/round-policy-snapshot.ts
+      - src/gateway/server-methods/chat.ts
+      - ui/src/ui/ports/platform/render-actions.ts
+      - ui/src/ui/ports/platform/system-settings/page.browser.test.ts
+      - ui/src/ui/ports/platform/system-settings/page.ts
       - src/agent-runtime/command/rule-adaptation/normal-task-host.test.ts
       - src/agent-runtime/command/rule-adaptation/run.ts
       - src/agent-runtime/contracts/rule-adaptation-shadow.ts
@@ -14654,6 +14662,14 @@ landingStreams:
   - id: rule-adaptation-shadow-host-min
     landingPolicy: serial
     paths:
+      - src/config/types.collaboration.ts
+      - src/config/zod-schema.ts
+      - src/gateway/collaboration-dispatch/round-policy-snapshot.test.ts
+      - src/gateway/collaboration-dispatch/round-policy-snapshot.ts
+      - src/gateway/server-methods/chat.ts
+      - ui/src/ui/ports/platform/render-actions.ts
+      - ui/src/ui/ports/platform/system-settings/page.browser.test.ts
+      - ui/src/ui/ports/platform/system-settings/page.ts
       - src/agent-runtime/command/rule-adaptation/normal-task-host.test.ts
       - src/agent-runtime/command/rule-adaptation/run.ts
       - src/agent-runtime/contracts/rule-adaptation-shadow.ts

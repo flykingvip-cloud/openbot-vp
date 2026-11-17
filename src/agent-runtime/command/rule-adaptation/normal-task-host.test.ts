@@ -82,6 +82,9 @@ for (const failure of [false, true]) {
       }
       return {
         outcomeCode: "no_change_needed",
+        toolsInvoked: [],
+        reasons: [],
+        limitProof: { exhausted: [] },
         activationAllowed: false,
         controlUnchanged: true,
         usage: { modelCalls: 1 },
@@ -112,6 +115,9 @@ it("uses current-turn admission without inventing a persistent task", async () =
     async () =>
       ({
         outcomeCode: "no_change_needed",
+        toolsInvoked: [],
+        reasons: [],
+        limitProof: { exhausted: [] },
         controlUnchanged: true,
         usage: { modelCalls: 1 },
       }) as never,
