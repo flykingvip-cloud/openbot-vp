@@ -6,7 +6,11 @@
  * role library. Shared guard: assertTaskNotStopped / assertPersistedTaskNotStopped.
  */
 import type { Task } from "@openbot/collaboration-core";
-import { isEmbeddedPiRunActive } from "../../agent-runtime/execution/runner/run-registry.js";
+import {
+  abortEmbeddedPiRunIfCurrent,
+  getActiveEmbeddedRunId,
+  waitForEmbeddedPiRunEnd,
+} from "../../agent-runtime/execution/runner/run-registry.js";
 import {
   clearAsyncWaitJobIntent,
   listAsyncWaitJobRefsForTask,
@@ -17,9 +21,9 @@ import {
   unregisterOwnedChildExecution,
   unregisterOwnedRemoteJob,
 } from "../../agent-runtime/state/owned-stop-affiliation.js";
-import { interruptInteractionTask } from "../../agent-runtime/wiring/interaction-effects.js";
 import {
   clearFollowupQueueItemsForTask,
+  clearSessionQueueItemsForTask,
   listFollowupQueueItemsForTask,
 } from "../../auto-reply/reply/queue.js";
 import { loadConfig } from "../../config/config.js";
@@ -32,7 +36,6 @@ import {
   cancelOwnedWorkAfterAcceptedStop,
   isTaskStopAccepted,
   readTaskStopControl,
-  remoteJobCancelable,
   TaskStoppedError,
   type OwnedStopPorts,
   type OwnedStopTarget,
@@ -173,13 +176,18 @@ export function createDefaultOwnedStopPorts(): OwnedStopPorts {
     },
     cancelTarget: async (target) => {
       if (target.kind === "supervisor_run") {
-        const stopped = await cancelSupervisorRun(target.taskId);
+        const requested = await cancelSupervisorRun(target.taskId);
+        const gone = !hasSupervisorRun(target.taskId);
         return {
           kind: target.kind,
           id: target.id,
           taskId: target.taskId,
-          status: stopped ? "confirmed_stopped" : "pending",
-          detail: stopped ? undefined : "no in-process supervisor run to confirm",
+          status: gone ? "confirmed_stopped" : "pending",
+          detail: gone
+            ? undefined
+            : requested
+              ? "supervisor cancel was requested but exit was not confirmed"
+              : "no in-process supervisor run to confirm",
         };
       }
       if (target.kind === "queue_item") {
@@ -197,19 +205,35 @@ export function createDefaultOwnedStopPorts(): OwnedStopPorts {
       }
       if (target.kind === "child_execution") {
         const child = listOwnedChildExecutions(target.taskId).find((row) => row.id === target.id);
-        const sessionId = child?.sessionId?.trim();
-        const aborted = Boolean(sessionId && isEmbeddedPiRunActive(sessionId));
-        if (sessionId) {
-          // Official scoped interrupt: abort this host run, drain only this task's queue.
-          interruptInteractionTask(sessionId, child?.sessionKey, target.taskId);
+        const sessionId = child?.sessionId?.trim() ?? "";
+        const ownedRunId = child?.id.trim() ?? "";
+        const currentRunId = sessionId ? (getActiveEmbeddedRunId(sessionId)?.trim() ?? "") : "";
+        if (!sessionId || !ownedRunId || currentRunId !== ownedRunId) {
+          if (child) {
+            unregisterOwnedChildExecution(target.taskId, target.id);
+          }
+          return {
+            kind: target.kind,
+            id: target.id,
+            taskId: target.taskId,
+            status: "unsupported",
+            detail: "stale or session-only affiliation; current run not cancelled",
+          };
         }
+        abortEmbeddedPiRunIfCurrent(sessionId, ownedRunId);
+        clearSessionQueueItemsForTask([sessionId, child?.sessionKey], target.taskId);
+        const exited = await waitForEmbeddedPiRunEnd(sessionId, 50);
+        const stillCurrent = getActiveEmbeddedRunId(sessionId)?.trim() === ownedRunId;
         unregisterOwnedChildExecution(target.taskId, target.id);
         return {
           kind: target.kind,
           id: target.id,
           taskId: target.taskId,
-          status: aborted ? "confirmed_stopped" : "pending",
-          detail: aborted ? undefined : "no in-process child execution to confirm",
+          status: exited && !stillCurrent ? "confirmed_stopped" : "pending",
+          detail:
+            exited && !stillCurrent
+              ? undefined
+              : "child cancel was requested but exit was not confirmed",
         };
       }
       if (target.kind === "async_wait_job") {
@@ -234,23 +258,25 @@ export function createDefaultOwnedStopPorts(): OwnedStopPorts {
         };
       }
       if (target.kind === "remote_job") {
-        if (!remoteJobCancelable(target.remote)) {
-          return {
-            kind: target.kind,
-            id: target.id,
-            taskId: target.taskId,
-            status: "unsupported",
-            detail: "unowned or unauthorized remote job remains unconfirmed; not cancelled",
-          };
-        }
         const listed = listOwnedRemoteJobs(target.taskId).find((row) => row.jobId === target.id);
-        if (!listed?.cancel) {
+        const listedLease = target.remote?.leaseId?.trim() ?? "";
+        const currentLease = listed?.leaseId?.trim() ?? "";
+        const currentBindingCancelable = Boolean(
+          listed?.jobId?.trim() &&
+          listedLease &&
+          currentLease &&
+          currentLease === listedLease &&
+          listed?.authorized === true &&
+          typeof listed.cancel === "function",
+        );
+        if (!currentBindingCancelable || !listed?.cancel) {
           return {
             kind: target.kind,
             id: target.id,
             taskId: target.taskId,
             status: "unsupported",
-            detail: "remote job lacks a current cancel consumer; not cancelled",
+            detail:
+              "remote job missing current job, lease, authorization, or cancel consumer; not cancelled",
           };
         }
         try {

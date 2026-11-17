@@ -36,6 +36,7 @@ import {
   clearSupervisorRunsForTest,
   hasSupervisorRun,
   registerSupervisorRun,
+  unregisterSupervisorRun,
 } from "../supervisor/run-registry.js";
 import { createDefaultOwnedStopPorts } from "./task-stop-entry.js";
 
@@ -253,6 +254,7 @@ describe("R1 owned-work stop cascade", () => {
       worker: {
         cancel: async (runId) => {
           cancelled.push(`a:${runId}`);
+          unregisterSupervisorRun("task-a");
         },
       },
       workerId: "w",
@@ -263,6 +265,7 @@ describe("R1 owned-work stop cascade", () => {
       worker: {
         cancel: async (runId) => {
           cancelled.push(`b:${runId}`);
+          unregisterSupervisorRun("task-b");
         },
       },
       workerId: "w",
@@ -346,6 +349,7 @@ describe("R1 owned-work stop cascade", () => {
       isCompacting: () => false,
       abort: () => {
         aborted.push("child-a1");
+        clearActiveEmbeddedRun("session-child-a", handleA);
       },
     };
     const handleB = {
@@ -354,10 +358,11 @@ describe("R1 owned-work stop cascade", () => {
       isCompacting: () => false,
       abort: () => {
         aborted.push("child-b1");
+        clearActiveEmbeddedRun("session-child-b", handleB);
       },
     };
-    setActiveEmbeddedRun("session-child-a", handleA);
-    setActiveEmbeddedRun("session-child-b", handleB);
+    setActiveEmbeddedRun("session-child-a", handleA, undefined, "child-a1");
+    setActiveEmbeddedRun("session-child-b", handleB, undefined, "child-b1");
     registerOwnedChildExecution({
       taskId: "task-a",
       id: "child-a1",
@@ -509,5 +514,180 @@ describe("R1 owned-work stop cascade", () => {
       clearAsyncWaitJobsForTests(sessionB);
       fs.rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  test("probe 1: default adapter does not invoke cancel after list-time revoke or lease replace", async () => {
+    const cancelled: string[] = [];
+    const cancel = async () => {
+      cancelled.push("job-owned");
+      return true;
+    };
+    const registerLive = (overrides?: { leaseId?: string; authorized?: boolean }) => {
+      registerOwnedRemoteJob({
+        taskId: "task-a",
+        jobId: "job-owned",
+        leaseId: overrides?.leaseId ?? "lease-1",
+        authorized: overrides?.authorized ?? true,
+        cancel,
+      });
+    };
+
+    registerLive();
+    const revokePorts = createDefaultOwnedStopPorts();
+    const revoked = await cancelOwnedWorkAfterAcceptedStop({
+      taskId: "task-a",
+      stopAccepted: true,
+      ports: {
+        ...revokePorts,
+        listOwnedTargets: (taskId) => {
+          const listed = revokePorts.listOwnedTargets(taskId);
+          registerLive({ authorized: false });
+          return listed;
+        },
+      },
+    });
+    expect(cancelled).toEqual([]);
+    expect(revoked).toEqual([
+      expect.objectContaining({
+        kind: "remote_job",
+        id: "job-owned",
+        taskId: "task-a",
+        status: "unsupported",
+      }),
+    ]);
+
+    registerLive();
+    const replacePorts = createDefaultOwnedStopPorts();
+    const replaced = await cancelOwnedWorkAfterAcceptedStop({
+      taskId: "task-a",
+      stopAccepted: true,
+      ports: {
+        ...replacePorts,
+        listOwnedTargets: (taskId) => {
+          const listed = replacePorts.listOwnedTargets(taskId);
+          registerLive({ leaseId: "lease-2", authorized: true });
+          return listed;
+        },
+      },
+    });
+    expect(cancelled).toEqual([]);
+    expect(replaced).toEqual([
+      expect.objectContaining({
+        kind: "remote_job",
+        id: "job-owned",
+        taskId: "task-a",
+        status: "unsupported",
+      }),
+    ]);
+  });
+
+  test("probe 2: leftover session affiliation does not stop a replacement run", async () => {
+    const aborted: string[] = [];
+    const leftoverHandle = {
+      queueMessage: async () => {},
+      isStreaming: () => false,
+      isCompacting: () => false,
+      abort: () => {
+        aborted.push("leftover");
+      },
+    };
+    const replacementHandle = {
+      queueMessage: async () => {},
+      isStreaming: () => false,
+      isCompacting: () => false,
+      abort: () => {
+        aborted.push("replacement");
+      },
+    };
+    setActiveEmbeddedRun("session-shared", leftoverHandle, undefined, "child-old");
+    registerOwnedChildExecution({
+      taskId: "task-a",
+      id: "child-old",
+      sessionId: "session-shared",
+    });
+    setActiveEmbeddedRun("session-shared", replacementHandle, undefined, "child-new");
+    registerOwnedChildExecution({
+      taskId: "task-b",
+      id: "child-new",
+      sessionId: "session-shared",
+    });
+    const facts = await cancelOwnedWorkAfterAcceptedStop({
+      taskId: "task-a",
+      stopAccepted: true,
+      ports: createDefaultOwnedStopPorts(),
+    });
+    expect(facts).toEqual([
+      expect.objectContaining({
+        kind: "child_execution",
+        id: "child-old",
+        taskId: "task-a",
+        status: "unsupported",
+      }),
+    ]);
+    expect(aborted).toEqual([]);
+    expect(listOwnedChildExecutions("task-b").map((row) => row.id)).toEqual(["child-new"]);
+    clearActiveEmbeddedRun("session-shared", replacementHandle);
+  });
+
+  test("default adapter confirms stopped only after the child actually exits", async () => {
+    const requested: string[] = [];
+    const liveHandle = {
+      queueMessage: async () => {},
+      isStreaming: () => false,
+      isCompacting: () => false,
+      abort: () => {
+        requested.push("child-live");
+      },
+    };
+    setActiveEmbeddedRun("session-confirm", liveHandle, undefined, "child-live");
+    registerOwnedChildExecution({
+      taskId: "task-a",
+      id: "child-live",
+      sessionId: "session-confirm",
+    });
+    const pendingFacts = await cancelOwnedWorkAfterAcceptedStop({
+      taskId: "task-a",
+      stopAccepted: true,
+      ports: createDefaultOwnedStopPorts(),
+    });
+    expect(requested).toEqual(["child-live"]);
+    expect(pendingFacts).toEqual([
+      expect.objectContaining({
+        kind: "child_execution",
+        id: "child-live",
+        taskId: "task-a",
+        status: "pending",
+      }),
+    ]);
+
+    const exitingHandle = {
+      queueMessage: async () => {},
+      isStreaming: () => false,
+      isCompacting: () => false,
+      abort: () => {
+        requested.push("child-exited");
+        clearActiveEmbeddedRun("session-confirm", exitingHandle);
+      },
+    };
+    setActiveEmbeddedRun("session-confirm", exitingHandle, undefined, "child-exited");
+    registerOwnedChildExecution({
+      taskId: "task-a",
+      id: "child-exited",
+      sessionId: "session-confirm",
+    });
+    const confirmedFacts = await cancelOwnedWorkAfterAcceptedStop({
+      taskId: "task-a",
+      stopAccepted: true,
+      ports: createDefaultOwnedStopPorts(),
+    });
+    expect(requested).toEqual(["child-live", "child-exited"]);
+    expect(confirmedFacts).toEqual([
+      expect.objectContaining({
+        kind: "child_execution",
+        id: "child-exited",
+        taskId: "task-a",
+        status: "confirmed_stopped",
+      }),
+    ]);
   });
 });
