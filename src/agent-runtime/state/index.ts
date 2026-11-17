@@ -9,6 +9,9 @@ export {
   markAsyncWaitJobExited,
   clearAsyncWaitJobIntent,
   clearAsyncWaitJobsForTask,
+  listAsyncWaitJobRefsForTask,
+  clearAsyncWaitJobsForTests,
+  resetAsyncWaitJobIndexForTests,
   transitionAsyncWaitJobIntent,
 } from "./repository/async-wait-job.js";
 export {
