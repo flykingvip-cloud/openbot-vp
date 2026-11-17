@@ -114,6 +114,8 @@ updates:
     open-pull-requests-limit: 5
 
   # Docker base images
+  # Group only minor/patch (including digest pins). Major bumps such as
+  # Node 22→26 stay ungrouped so they are not bundled with debian updates.
   - package-ecosystem: docker
     directory: /
     schedule:
@@ -124,4 +126,7 @@ updates:
       docker-images:
         patterns:
           - "*"
+        update-types:
+          - minor
+          - patch
     open-pull-requests-limit: 5
