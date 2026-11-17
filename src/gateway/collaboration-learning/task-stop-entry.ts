@@ -6,6 +6,18 @@
  * role library. Shared guard: assertTaskNotStopped / assertPersistedTaskNotStopped.
  */
 import type { Task } from "@openbot/collaboration-core";
+import { isEmbeddedPiRunActive } from "../../agent-runtime/execution/runner/run-registry.js";
+import {
+  listOwnedChildExecutions,
+  listOwnedRemoteJobs,
+  unregisterOwnedChildExecution,
+  unregisterOwnedRemoteJob,
+} from "../../agent-runtime/state/owned-stop-affiliation.js";
+import {
+  clearAsyncWaitJobIntent,
+  listAsyncWaitJobRefsForTask,
+} from "../../agent-runtime/state/repository/async-wait-job.js";
+import { interruptInteractionTask } from "../../agent-runtime/wiring/interaction-effects.js";
 import {
   clearFollowupQueueItemsForTask,
   listFollowupQueueItemsForTask,
@@ -20,6 +32,7 @@ import {
   cancelOwnedWorkAfterAcceptedStop,
   isTaskStopAccepted,
   readTaskStopControl,
+  remoteJobCancelable,
   TaskStoppedError,
   type OwnedStopPorts,
   type OwnedStopTarget,
@@ -138,6 +151,24 @@ export function createDefaultOwnedStopPorts(): OwnedStopPorts {
           taskId,
         });
       }
+      for (const child of listOwnedChildExecutions(taskId)) {
+        targets.push({ kind: "child_execution", id: child.id, taskId });
+      }
+      for (const job of listAsyncWaitJobRefsForTask(taskId)) {
+        targets.push({ kind: "async_wait_job", id: job.jobId, taskId });
+      }
+      for (const remote of listOwnedRemoteJobs(taskId)) {
+        targets.push({
+          kind: "remote_job",
+          id: remote.jobId,
+          taskId,
+          remote: {
+            jobId: remote.jobId,
+            leaseId: remote.leaseId ?? "",
+            authorized: remote.authorized === true,
+          },
+        });
+      }
       return targets;
     },
     cancelTarget: async (target) => {
@@ -163,6 +194,86 @@ export function createDefaultOwnedStopPorts(): OwnedStopPorts {
               ? `removed ${removed} owned queue item(s)`
               : "owned queue item already gone",
         };
+      }
+      if (target.kind === "child_execution") {
+        const child = listOwnedChildExecutions(target.taskId).find((row) => row.id === target.id);
+        const sessionId = child?.sessionId?.trim();
+        const aborted = Boolean(sessionId && isEmbeddedPiRunActive(sessionId));
+        if (sessionId) {
+          // Official scoped interrupt: abort this host run, drain only this task's queue.
+          interruptInteractionTask(sessionId, child?.sessionKey, target.taskId);
+        }
+        unregisterOwnedChildExecution(target.taskId, target.id);
+        return {
+          kind: target.kind,
+          id: target.id,
+          taskId: target.taskId,
+          status: aborted ? "confirmed_stopped" : "pending",
+          detail: aborted ? undefined : "no in-process child execution to confirm",
+        };
+      }
+      if (target.kind === "async_wait_job") {
+        const refs = listAsyncWaitJobRefsForTask(target.taskId).filter(
+          (row) => row.jobId === target.id,
+        );
+        let cleared = 0;
+        for (const ref of refs) {
+          if (clearAsyncWaitJobIntent(ref.sessionFile, ref.jobId)) {
+            cleared += 1;
+          }
+        }
+        return {
+          kind: target.kind,
+          id: target.id,
+          taskId: target.taskId,
+          status: cleared > 0 ? "confirmed_stopped" : "pending",
+          detail:
+            cleared > 0
+              ? `cleared ${cleared} owned async-wait job(s)`
+              : "owned async-wait job already gone",
+        };
+      }
+      if (target.kind === "remote_job") {
+        if (!remoteJobCancelable(target.remote)) {
+          return {
+            kind: target.kind,
+            id: target.id,
+            taskId: target.taskId,
+            status: "unsupported",
+            detail: "unowned or unauthorized remote job remains unconfirmed; not cancelled",
+          };
+        }
+        const listed = listOwnedRemoteJobs(target.taskId).find((row) => row.jobId === target.id);
+        if (!listed?.cancel) {
+          return {
+            kind: target.kind,
+            id: target.id,
+            taskId: target.taskId,
+            status: "unsupported",
+            detail: "remote job lacks a current cancel consumer; not cancelled",
+          };
+        }
+        try {
+          const stopped = await listed.cancel();
+          if (stopped) {
+            unregisterOwnedRemoteJob(target.taskId, target.id);
+          }
+          return {
+            kind: target.kind,
+            id: target.id,
+            taskId: target.taskId,
+            status: stopped ? "confirmed_stopped" : "pending",
+            detail: stopped ? undefined : "remote cancel was not confirmed",
+          };
+        } catch (error) {
+          return {
+            kind: target.kind,
+            id: target.id,
+            taskId: target.taskId,
+            status: "failed",
+            detail: error instanceof Error ? error.message : String(error),
+          };
+        }
       }
       return {
         kind: target.kind,
