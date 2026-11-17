@@ -205,13 +205,10 @@ export function createDefaultOwnedStopPorts(): OwnedStopPorts {
       }
       if (target.kind === "child_execution") {
         const child = listOwnedChildExecutions(target.taskId).find((row) => row.id === target.id);
-        const sessionId = child?.sessionId?.trim();
-        const ownedRunId = child?.id.trim();
-        const currentRunId = sessionId ? getActiveEmbeddedRunId(sessionId)?.trim() : undefined;
-        const isCurrentOwnedRun = Boolean(
-          sessionId && ownedRunId && currentRunId && currentRunId === ownedRunId,
-        );
-        if (!isCurrentOwnedRun) {
+        const sessionId = child?.sessionId?.trim() ?? "";
+        const ownedRunId = child?.id.trim() ?? "";
+        const currentRunId = sessionId ? (getActiveEmbeddedRunId(sessionId)?.trim() ?? "") : "";
+        if (!sessionId || !ownedRunId || currentRunId !== ownedRunId) {
           if (child) {
             unregisterOwnedChildExecution(target.taskId, target.id);
           }
