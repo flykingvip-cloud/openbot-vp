@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { INTERACTION_PROSE_PROTOCOL_DOWNGRADE } from "../contracts/interaction.js";
 import type { SessionTaskBoard, TrackedTask } from "../contracts/task.js";
-import { admittedTaskQueryContinuation } from "./admitted-task-query-continuation.js";
+import { admittedTaskQueryContinuation } from "./index.js";
 
 function task(overrides: Partial<TrackedTask> = {}): TrackedTask {
   return {
@@ -34,9 +34,9 @@ describe("admitted task query continuation", () => {
     expect(
       admittedTaskQueryContinuation({ board: board(task({ wakeSuppress: true })) }).reason,
     ).toBe("task_paused");
-    expect(admittedTaskQueryContinuation({ board: board(task({ unfinished: false })) }).reason).toBe(
-      "already_finished",
-    );
+    expect(
+      admittedTaskQueryContinuation({ board: board(task({ unfinished: false })) }).reason,
+    ).toBe("already_finished");
     expect(admittedTaskQueryContinuation({ board: board() }).reason).toBe("no_current_task");
     expect(
       admittedTaskQueryContinuation({ board: board(task({ admittedGeneration: 0 }), 1) }).reason,

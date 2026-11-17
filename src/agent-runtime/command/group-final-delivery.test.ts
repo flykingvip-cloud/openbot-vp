@@ -6,13 +6,17 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { OpenBotConfig } from "../../config/config.js";
 import type { QueuedDelivery } from "../../infra/outbound/delivery-queue.js";
 import { recoverAcceptedArtifactBridgeEntry } from "../delivery/accepted-artifact-recover.js";
-import { readMemberArtifactDeliveryIntent } from "../state/collaboration/accepted-artifact-delivery-txn.js";
+import {
+  claimMemberArtifactSendUnknown,
+  readMemberArtifactDeliveryIntent,
+  recordMemberArtifactReceipt,
+} from "../state/index.js";
 import {
   acceptedArtifactDeliveryDirs,
   requestAcceptedArtifactDelivery,
   requestGroupFinalDelivery,
   revokeAcceptedArtifactDelivery,
-} from "./accepted-artifact-delivery.js";
+} from "./index.js";
 
 const tmpRoots: string[] = [];
 
@@ -167,6 +171,11 @@ describe("requestGroupFinalDelivery", () => {
       authDir: dirs.authDir,
       queueStateDir: dirs.queueStateDir,
       cfg: cfg(),
+      store: {
+        readIntent: readMemberArtifactDeliveryIntent,
+        claimUnknown: claimMemberArtifactSendUnknown,
+        recordReceipt: recordMemberArtifactReceipt,
+      },
       deps: {
         sendTelegram: async () => {
           throw new Error("should not send after revoke");

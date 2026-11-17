@@ -24,7 +24,11 @@ export {
   type ExecutionAdmissionResult,
   type ExecutionAdmissionPorts,
 } from "./execution-admission.js";
-export { routeInteraction, type RoutedInteraction } from "./route-interaction.js";
+export {
+  routeInteraction,
+  interactionAdmissionFact,
+  type RoutedInteraction,
+} from "./route-interaction.js";
 export { runAuthorizedInteraction } from "./authorized-interaction.js";
 export { formatTaskProposalReply } from "./task-proposal-reply.js";
 export { isHumanInteractionIngress } from "./ingress-kind.js";
@@ -43,6 +47,7 @@ export {
   acceptedArtifactDeliveryDirs,
   issuanceFactsFromBoard,
   requestAcceptedArtifactDelivery,
+  requestGroupFinalDelivery,
   revokeAcceptedArtifactDelivery,
   resolveChannelAccountOutboundScopeFacts,
 } from "./accepted-artifact-delivery.js";
@@ -51,3 +56,9 @@ export type {
   AcceptedArtifactDeliveryView,
   GroupFinalOverallAcceptanceFacts,
 } from "./accepted-artifact-delivery.js";
+
+export {
+  admittedTaskQueryContinuation,
+  type AdmittedTaskQueryContinuation,
+} from "./admitted-task-query-continuation.js";
+export { hostBoundTaskTarget } from "./host-task-target.js";

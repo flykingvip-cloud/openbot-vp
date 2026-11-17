@@ -5,7 +5,7 @@ import {
   isInteractionUserAbort,
   INTERACTION_QUEUE_TIMEOUT_TEXT,
   raceVisibleInteraction,
-} from "../model/interaction-resource-wait.js";
+} from "../model/index.js";
 import { respondIfRestrictedDecision } from "./interaction-sources.js";
 import { interpretInteraction } from "./interpret-interaction.js";
 import {

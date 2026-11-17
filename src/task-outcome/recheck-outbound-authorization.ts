@@ -6,12 +6,12 @@
  * A persisted locator, an enabled account, or a non-empty session string is not a grant.
  * Does not invent a new authorization framework.
  */
-import { resolveChannelAccountOutboundScopeFacts } from "../agent-runtime/command/accepted-artifact-delivery.js";
+import { resolveChannelAccountOutboundScopeFacts } from "../agent-runtime/command/index.js";
 import {
   evaluateChannelAccountOutboundScope,
   normalizeDeliveryTarget,
   type NormalizedDeliveryTarget,
-} from "../agent-runtime/policy/accepted-artifact-delivery.js";
+} from "../agent-runtime/policy/index.js";
 import type { OpenBotConfig } from "../config/config.js";
 import type {
   AwaitingDeliveryRegistration,

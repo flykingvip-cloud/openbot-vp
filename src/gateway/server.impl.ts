@@ -773,7 +773,7 @@ export async function startGatewayServer(
     void (async () => {
       const { deliverOutboundPayloads } = await import("../infra/outbound/deliver.js");
       const { recoverAcceptedArtifactDeliveries } =
-        await import("../agent-runtime/delivery/accepted-artifact-recover.js");
+        await import("../agent-runtime/wiring/accepted-artifact-delivery.js");
       const logRecovery = log.child("delivery-recovery");
       await recoverAcceptedArtifactDeliveries({
         deliver: deliverOutboundPayloads,

@@ -2,8 +2,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { expect, it } from "vitest";
-import { confirmPendingTurnDeliveryWithPorts } from "../agent-runtime/delivery/dispatch/confirm-pending.js";
-import { prepareVisibleDelivery } from "../agent-runtime/delivery/dispatch/prepare-visible.js";
+import { confirmPendingTurnDeliveryWithPorts } from "../agent-runtime/delivery/index.js";
+import { prepareVisibleDelivery } from "../agent-runtime/delivery/index.js";
 import { markAsyncWaitRecoveryDelivered } from "../agent-runtime/state/index.js";
 import {
   emptySessionTaskBoard,

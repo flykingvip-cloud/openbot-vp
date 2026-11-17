@@ -9,6 +9,9 @@ export {
   markAsyncWaitJobExited,
   clearAsyncWaitJobIntent,
   clearAsyncWaitJobsForTask,
+  listAsyncWaitJobRefsForTask,
+  clearAsyncWaitJobsForTests,
+  resetAsyncWaitJobIndexForTests,
   transitionAsyncWaitJobIntent,
 } from "./repository/async-wait-job.js";
 export {
@@ -128,3 +131,23 @@ export {
   appendJsonlDurable,
   writeJsonDurable,
 } from "./repository/durable-json.js";
+
+export { unbindCurrentTaskOnSessionReset } from "./mutations/session-reset-focus.js";
+export { visibleAsyncWaitIdentity } from "./repository/async-wait-visible-identity.js";
+export {
+  collectBlockedFollowupDeliveryPersistRoots,
+  resumeFollowupDeliveryAfterReauthorization,
+} from "./repository/blocked-followup-delivery-recovery.js";
+export type { ResumeFollowupDeliveryAfterReauthorizationResult } from "./repository/blocked-followup-delivery-recovery.js";
+export {
+  findBlockedFollowupDelivery,
+  listBlockedFollowupDeliveries,
+  listRecoverableFollowupDeliveries,
+  markFollowupRecoveryDeliveryStarted,
+  markFollowupRecoveryDeliverySent,
+  planFollowupRecoveryRetry,
+  recordBlockedFollowupDelivery,
+  recordFollowupWorkspaceDecision,
+  resolveBlockedFollowupDeliveryPersistRoot,
+} from "./repository/blocked-followup-delivery.js";
+export type { FollowupDeliveryResumeSnapshot } from "./repository/blocked-followup-delivery.js";

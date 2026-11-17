@@ -15,8 +15,8 @@ import {
   type FirstStageAcceptanceHold,
   type MemberContributionDecision,
   type MemberContributionKind,
-} from "../../agent-runtime/policy/collaboration-current-goal-binding.js";
-import type { TaskResponsibility } from "../../agent-runtime/policy/collaboration-policy-model.js";
+} from "../../agent-runtime/policy/index.js";
+import type { TaskResponsibility } from "../../agent-runtime/policy/index.js";
 import type { OpenBotConfig } from "../../config/types.js";
 import { applyBusinessTaskPatchUnderControlLock } from "../collaboration-dispatch/task-control-cas.js";
 

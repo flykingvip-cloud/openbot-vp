@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { recordModelProbeResults, resolveOfficialProbeConnectionOk } from "../model-probe-store.js";
 import { previewRoutingDecision } from "./routing-decision.js";
 import {
   __resetCapabilityAdmissionStoreForTest,
@@ -98,6 +99,109 @@ describe("gateway capability admission", () => {
     expect(
       admission.capabilityEvidence.some((e) => e.id === "text_chat" && e.status === "passed"),
     ).toBe(false);
+  });
+
+  it("passes formal text_chat only when official models.probe store is ok", async () => {
+    const probeStorePath = path.join(
+      os.tmpdir(),
+      `openbot-probe-test-${Date.now()}-${Math.random().toString(36).slice(2)}.json`,
+    );
+    const resolve = (modelRef: string, fingerprint?: string) =>
+      resolveOfficialProbeConnectionOk(modelRef, fingerprint, probeStorePath);
+    try {
+      const missing = createGatewayVerificationService({
+        storePath,
+        resolveConnectionOk: resolve,
+        interruptOrphansOnCreate: false,
+      });
+      const { task: missingCreated } = await missing.createVerificationTask({
+        modelRef: "deepseek/deepseek-chat",
+        capabilityIds: ["text_chat"],
+        connectionOk: true,
+      });
+      const missingTask = await waitTerminal(missing, missingCreated.taskId);
+      expect(missingTask.results?.find((r) => r.id === "text_chat")?.status).toBe("failed");
+
+      await recordModelProbeResults(
+        {
+          finishedAt: Date.now(),
+          results: [
+            {
+              provider: "deepseek",
+              model: "deepseek/deepseek-chat",
+              label: "models.json",
+              source: "models.json",
+              status: "unknown",
+              latencyMs: 5,
+              error: "not ok",
+            },
+          ],
+        },
+        probeStorePath,
+      );
+      const unknown = createGatewayVerificationService({
+        storePath,
+        resolveConnectionOk: resolve,
+        interruptOrphansOnCreate: false,
+      });
+      const { task: unknownCreated } = await unknown.createVerificationTask({
+        modelRef: "deepseek/deepseek-chat",
+        capabilityIds: ["text_chat"],
+      });
+      const unknownTask = await waitTerminal(unknown, unknownCreated.taskId);
+      expect(unknownTask.results?.find((r) => r.id === "text_chat")?.status).toBe("failed");
+
+      await recordModelProbeResults(
+        {
+          finishedAt: Date.now(),
+          results: [
+            {
+              provider: "deepseek",
+              model: "deepseek/deepseek-chat",
+              label: "models.json",
+              source: "models.json",
+              status: "ok",
+              latencyMs: 20,
+            },
+          ],
+        },
+        probeStorePath,
+      );
+      const okSvc = createGatewayVerificationService({
+        storePath,
+        resolveConnectionOk: resolve,
+        interruptOrphansOnCreate: false,
+      });
+      const { task: okCreated, authority } = await okSvc.createVerificationTask({
+        modelRef: "deepseek/deepseek-chat",
+        capabilityIds: ["text_chat"],
+      });
+      expect(authority).toBe("formal");
+      const okTask = await waitTerminal(okSvc, okCreated.taskId);
+      expect(okTask.results?.find((r) => r.id === "text_chat")?.status).toBe("passed");
+      const admission = await getModelAdmission("deepseek/deepseek-chat", storePath);
+      expect(
+        admission.capabilityEvidence.some((e) => e.id === "text_chat" && e.status === "passed"),
+      ).toBe(true);
+
+      const other = createGatewayVerificationService({
+        storePath,
+        resolveConnectionOk: resolve,
+        interruptOrphansOnCreate: false,
+      });
+      const { task: otherCreated } = await other.createVerificationTask({
+        modelRef: "ollama/llama3:latest",
+        capabilityIds: ["text_chat"],
+      });
+      const otherTask = await waitTerminal(other, otherCreated.taskId);
+      expect(otherTask.results?.find((r) => r.id === "text_chat")?.status).toBe("failed");
+    } finally {
+      try {
+        fs.unlinkSync(probeStorePath);
+      } catch {
+        // ignore
+      }
+    }
   });
 
   it("returns checker_unavailable for specialized caps without a checker", async () => {

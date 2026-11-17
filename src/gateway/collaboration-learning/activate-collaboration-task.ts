@@ -18,8 +18,8 @@ import {
   parseAppointedProjectOwner,
   proposeAppointedProjectOwner,
   type KnownBindingMember,
-} from "../../agent-runtime/policy/collaboration-current-goal-binding.js";
-import type { TaskResponsibility } from "../../agent-runtime/policy/collaboration-policy-model.js";
+} from "../../agent-runtime/policy/index.js";
+import type { TaskResponsibility } from "../../agent-runtime/policy/index.js";
 import { loadConfig } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
 import type { GroupBoardClaimItem } from "../collaboration-dispatch/claim-contract.js";

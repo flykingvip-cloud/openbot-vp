@@ -7,7 +7,7 @@ import {
   CHAT_TURN_ERROR_UNCONFIRMED_TEXT,
   INTERACTION_RECORD_UNAVAILABLE_TEXT,
   INTERACTION_TIMEOUT_TEXT,
-} from "../agent-runtime/model/interaction-resource-wait.js";
+} from "../agent-runtime/model/index.js";
 import { persistInteractionMessage } from "../agent-runtime/state/index.js";
 import { openSessionManager } from "../agents/pi-sdk/session.js";
 import {

@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { prepareVisibleDelivery } from "../agent-runtime/delivery/dispatch/prepare-visible.js";
+import { prepareVisibleDelivery } from "../agent-runtime/delivery/index.js";
 import type { OpenBotConfig } from "../config/config.js";
 import {
   emptySessionTaskBoard,

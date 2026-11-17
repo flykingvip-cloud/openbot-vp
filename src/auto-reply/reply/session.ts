@@ -4,6 +4,7 @@ import {
   buildTelegramTopicConversationId,
   parseTelegramChatIdFromTarget,
 } from "../../acp/conversation-id.js";
+import { unbindCurrentTaskOnSessionReset } from "../../agent-runtime/state/index.js";
 import { resolveSessionAgentId } from "../../agents/agent-scope.js";
 import { clearBootstrapSnapshotOnSessionRollover } from "../../agents/bootstrap-cache.js";
 import { extractEmployeeStewardUserIdFromSessionKey } from "../../agents/builtin-steward/employee-isolation.js";
@@ -48,7 +49,6 @@ import {
   resolveLastToRaw,
 } from "./session-delivery.js";
 import { forkSessionFromParent, resolveParentForkMaxTokens } from "./session-fork.js";
-import { unbindCurrentTaskOnSessionReset } from "../../agent-runtime/state/mutations/session-reset-focus.js";
 import { buildSessionEndHookPayload, buildSessionStartHookPayload } from "./session-hooks.js";
 
 const log = createSubsystemLogger("session-init");

@@ -121,6 +121,24 @@ export async function listModelProbeStatuses(storePath?: string): Promise<Map<st
   return statuses;
 }
 
+/**
+ * Server-trusted text_chat connection resolver.
+ * Formal evidence may pass only when the official models.probe store records
+ * status "ok" for this exact modelRef. Client RPC connectionOk is never read.
+ */
+export async function resolveOfficialProbeConnectionOk(
+  modelRef: string,
+  _fingerprint?: string,
+  storePath?: string,
+): Promise<boolean> {
+  const wanted = modelRef.trim();
+  if (!wanted) {
+    return false;
+  }
+  const statuses = await listModelProbeStatuses(storePath);
+  return statuses.get(wanted) === "ok";
+}
+
 export async function loadModelProbeSummary(
   storePath?: string,
 ): Promise<PersistedModelProbeSummary | null> {

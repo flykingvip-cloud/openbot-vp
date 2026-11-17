@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { normalizeDeliveryTarget } from "../../policy/accepted-artifact-delivery.js";
+import { normalizeDeliveryTarget } from "../../policy/index.js";
 import {
   readMemberArtifactDeliveryIntent,
   type MemberArtifactDeliveryIntent,

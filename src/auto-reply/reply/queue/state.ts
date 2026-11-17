@@ -78,3 +78,69 @@ export function clearFollowupQueue(key: string): number {
   FOLLOWUP_QUEUES.delete(cleaned);
   return cleared;
 }
+
+/** Explicit ownership only: ticket, completion binding, or parentTaskId. */
+export function followupItemOwnedTaskIds(item: FollowupRun): string[] {
+  const ids: string[] = [];
+  const ticket = item.taskBoardContinueTicket?.taskId?.trim();
+  if (ticket) {
+    ids.push(ticket);
+  }
+  const parent = item.parentTaskId?.trim();
+  if (parent) {
+    ids.push(parent);
+  }
+  const binding = item.run?.taskCompletionBinding?.taskId?.trim();
+  if (binding) {
+    ids.push(binding);
+  }
+  return ids;
+}
+
+export function followupItemOwnedByTask(item: FollowupRun, taskId: string): boolean {
+  const wanted = taskId.trim();
+  return Boolean(wanted) && followupItemOwnedTaskIds(item).includes(wanted);
+}
+
+export function listFollowupQueueItemsForTask(taskId: string): Array<{
+  queueKey: string;
+  item: FollowupRun;
+}> {
+  const wanted = taskId.trim();
+  if (!wanted) {
+    return [];
+  }
+  const matches: Array<{ queueKey: string; item: FollowupRun }> = [];
+  for (const [queueKey, queue] of FOLLOWUP_QUEUES) {
+    for (const item of queue.items) {
+      if (followupItemOwnedByTask(item, wanted)) {
+        matches.push({ queueKey, item });
+      }
+    }
+  }
+  return matches;
+}
+
+/** Remove only queue items with an explicit binding to this task. Unbound items stay. */
+export function clearFollowupQueueItemsForTask(taskId: string, keys?: readonly string[]): number {
+  const wanted = taskId.trim();
+  if (!wanted) {
+    return 0;
+  }
+  let removed = 0;
+  const selected =
+    keys && keys.length > 0
+      ? keys
+          .map((key) => key.trim())
+          .filter(Boolean)
+          .map((key) => [key, getExistingFollowupQueue(key)] as const)
+          .filter((entry): entry is readonly [string, FollowupQueueState] => entry[1] != null)
+      : [...FOLLOWUP_QUEUES.entries()];
+  for (const [key, queue] of selected) {
+    const next = queue.items.filter((item) => !followupItemOwnedByTask(item, wanted));
+    removed += queue.items.length - next.length;
+    queue.items = next;
+    void key;
+  }
+  return removed;
+}

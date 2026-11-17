@@ -1,10 +1,7 @@
 import { afterEach, expect, it, vi } from "vitest";
 import type { OpenBotConfig } from "../../config/config.js";
-import {
-  INTERACTION_TIMEOUT_TEXT,
-  createInteractionResourceBudget,
-} from "../model/interaction-resource-wait.js";
-import { runAuthorizedInteraction } from "./authorized-interaction.js";
+import { INTERACTION_TIMEOUT_TEXT, createInteractionResourceBudget } from "../model/index.js";
+import { runAuthorizedInteraction } from "./index.js";
 
 afterEach(() => {
   vi.useRealTimers();

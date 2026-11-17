@@ -127,9 +127,13 @@
     ],
     "exemptFiles": [
       "src/agent-runtime/command/governed-interaction.test.ts",
-      "src/agent-runtime/command/rule-adaptation/official-shadow.test.ts"
+      "src/agent-runtime/command/rule-adaptation/official-shadow.test.ts",
+      "src/agent-runtime/command/interaction-terminal.s1.test.ts"
     ],
-    "description": "Command use cases cannot directly invoke models, tools, scheduling or task persistence; effects use explicit injected ports and pure projections."
+    "description": "Command use cases cannot directly invoke models, tools, scheduling or task persistence; effects use explicit injected ports and pure projections.",
+    "exemptReasons": {
+      "src/agent-runtime/command/interaction-terminal.s1.test.ts": "S1 terminal isolation test must bind the real host run-queue, registry, and failure-persistence ports to prove command only consumes those effects; production command sources still cannot import gateway."
+    }
   },
   {
     "name": "runtime-command-auto-reply-public-entry",
@@ -228,8 +232,16 @@
       "src/agent-runtime/delivery/**",
       "src/agent-runtime/command/**"
     ],
-    "exemptFiles": ["src/agent-runtime/policy/rule-adaptation/activation-precheck.test.ts"],
-    "description": "Policy classification must not read/write task state, perform environment probes or initiate execution and delivery."
+    "exemptFiles": [
+      "src/agent-runtime/policy/rule-adaptation/activation-precheck.test.ts",
+      "src/agent-runtime/policy/review-s5-binding.test.ts",
+      "src/agent-runtime/policy/s5-owner-continuity.test.ts"
+    ],
+    "description": "Policy classification must not read/write task state, perform environment probes or initiate execution and delivery.",
+    "exemptReasons": {
+      "src/agent-runtime/policy/review-s5-binding.test.ts": "S5 binding test binds official collaboration consumers as fixed host ports; production policy sources do not import gateway or state.",
+      "src/agent-runtime/policy/s5-owner-continuity.test.ts": "S5 owner-continuity test binds official collaboration consumers as fixed host ports; production policy sources do not import gateway or state."
+    }
   },
   {
     "name": "runtime-policy-public-entry",
@@ -270,9 +282,13 @@
       "src/agent-runtime/policy/task-board-limits.ts",
       "src/agent-runtime/command/rule-adaptation/activation-test-support.ts",
       "src/agent-runtime/command/rule-adaptation/run.cases.test.ts",
-      "src/agent-runtime/command/rule-adaptation/test-support.ts"
+      "src/agent-runtime/command/rule-adaptation/test-support.ts",
+      "src/agent-runtime/policy/collaboration-current-goal-binding.ts"
     ],
-    "description": "Production code consumes policy through the public index facade or a first-level policy/*/index.ts module barrel; numeric limits and decisions share one entry. Internal references are allowed only when both importer and target belong to the same rule-adaptation subtree; imports of other components' internals must use a public entry. Listed policy sources/tests and the exact-path command test fixtures that must import policy test-support remain exempt."
+    "description": "Production code consumes policy through the public index facade or a first-level policy/*/index.ts module barrel; numeric limits and decisions share one entry. Internal references are allowed only when both importer and target belong to the same rule-adaptation subtree; imports of other components' internals must use a public entry. Listed policy sources/tests and the exact-path command test fixtures that must import policy test-support remain exempt.",
+    "exemptReasons": {
+      "src/agent-runtime/policy/collaboration-current-goal-binding.ts": "Policy source may import a sibling policy model type directly; routing this through policy/index would create a cycle. External consumers still use policy/index."
+    }
   },
   {
     "name": "runtime-context-reply-public-entry",
@@ -387,9 +403,13 @@
       "src/agent-runtime/model/rule-adaptation/context-cap-selection.test.ts",
       "src/agent-runtime/model/rule-adaptation/model-port.test.ts",
       "src/agent-runtime/model/rule-adaptation/occupancy.test.ts",
-      "src/agent-runtime/policy/rule-adaptation/activation-precheck.test.ts"
+      "src/agent-runtime/policy/rule-adaptation/activation-precheck.test.ts",
+      "src/agent-runtime/command/named-file-execution.test.ts"
     ],
-    "description": "Production code consumes command use-cases through the public command/index facade or a first-level command/*/index.ts module barrel. Internal references are allowed only when both importer and target belong to the same rule-adaptation subtree; imports of other components' internals must use a public entry. Listed command sources/tests and the exact-path test files that must bind official command test fixtures remain exempt. Existing auto-reply and gateway entry rules remain."
+    "description": "Production code consumes command use-cases through the public command/index facade or a first-level command/*/index.ts module barrel. Internal references are allowed only when both importer and target belong to the same rule-adaptation subtree; imports of other components' internals must use a public entry. Listed command sources/tests and the exact-path test files that must bind official command test fixtures remain exempt. Existing auto-reply and gateway entry rules remain.",
+    "exemptReasons": {
+      "src/agent-runtime/command/named-file-execution.test.ts": "Unit test of an unexported command helper; not promoted to the public command facade."
+    }
   },
   {
     "name": "runtime-acceptance-no-platform-effects",
@@ -565,8 +585,12 @@
       "src/agent-runtime/model/rule-adaptation/context-cap-consumer-chain.test.ts",
       "src/agent-runtime/model/rule-adaptation/context-cap-selection.test.ts",
       "src/agent-runtime/model/rule-adaptation/model-port.test.ts",
-      "src/agent-runtime/model/rule-adaptation/occupancy.test.ts"
-    ]
+      "src/agent-runtime/model/rule-adaptation/occupancy.test.ts",
+      "src/agent-runtime/model/interaction-completion.test.ts"
+    ],
+    "exemptReasons": {
+      "src/agent-runtime/model/interaction-completion.test.ts": "Binds fixed command routing ports to assert admission facts; production model sources do not import command."
+    }
   },
   {
     "name": "runtime-retired-admission-lifecycle",
