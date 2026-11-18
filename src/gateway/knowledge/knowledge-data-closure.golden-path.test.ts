@@ -174,6 +174,18 @@ vi.mock("../enterprise-seat-assets-store.js", () => ({
   }),
 }));
 
+vi.mock("../enterprise-data/streaming-store-read.js", async () => {
+  const actual = await vi.importActual<typeof import("../enterprise-data/streaming-store-read.js")>(
+    "../enterprise-data/streaming-store-read.js",
+  );
+  return {
+    ...actual,
+    readKnowledgeEnterpriseStore: (
+      input: Parameters<typeof actual.readKnowledgeEnterpriseStore>[0],
+    ) => actual.readKnowledgeEnterpriseStore({ ...input, storePath }),
+  };
+});
+
 vi.mock("../enterprise-data/store.js", async () => {
   const actual = await vi.importActual<typeof import("../enterprise-data/store.js")>(
     "../enterprise-data/store.js",

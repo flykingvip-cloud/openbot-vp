@@ -14741,6 +14741,10 @@ tasks:
       - src/gateway/enterprise-data/streaming-store-read.test.ts
       - src/gateway/enterprise-data/store.ts
       - src/auto-reply/reply/get-reply-run.ts
+      - src/gateway/knowledge/source-bundle.ts
+      - src/gateway/knowledge/resolve/context-builder.ts
+      - src/gateway/knowledge/resolve/context-builder.test.ts
+      - src/gateway/knowledge/knowledge-data-closure.golden-path.test.ts
     state: active
     sessions:
       - id: codex-interaction-20261118
@@ -14748,7 +14752,7 @@ tasks:
         ide: codex
         agent: codex-workspace-review
         status: active
-        lastSignalAt: 2026-11-18T05:34:57.570Z
+        lastSignalAt: 2026-11-18T06:14:36.965Z
         metadata: {}
     ownerHistory: []
     since: 2026-11-18
@@ -14771,6 +14775,14 @@ landingStreams:
       - src/gateway/collaboration-learning/group-interaction-understanding.test.ts
       - src/agent-runtime/command/authorized-interaction.ts
       - src/auto-reply/reply/get-reply-run.ts
+      - package.json
+      - pnpm-lock.yaml
+      - src/gateway/enterprise-data/streaming-store-read.ts
+      - src/gateway/enterprise-data/streaming-store-read.test.ts
+      - src/gateway/knowledge/source-bundle.ts
+      - src/gateway/knowledge/resolve/context-builder.ts
+      - src/gateway/knowledge/resolve/context-builder.test.ts
+      - src/gateway/knowledge/knowledge-data-closure.golden-path.test.ts
     canLandWith: []
     metadata:
       owner: codex-workspace-review

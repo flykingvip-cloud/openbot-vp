@@ -13,6 +13,35 @@ import type {
 import type { KnowledgeRelatedGroups } from "../types.js";
 import { formatKnowledgeEvidencePromptLines } from "./evidence-format.js";
 
+export const KNOWLEDGE_PROMPT_CHAR_BUDGET = 16_000;
+const KNOWLEDGE_PROMPT_LINE_LIMIT = 4_000;
+const PARTIAL_KNOWLEDGE_NOTICE =
+  "Knowledge context is a partial, budgeted view. Omitted or shortened evidence is not proof of absence or authorization. Use knowledge_search and knowledge_get with the cited object/source references for the specific missing evidence; do not infer totals or complete coverage from excerpts.";
+
+function boundedKnowledgePrompt(lines: readonly string[]): string {
+  const kept: string[] = [];
+  const available = KNOWLEDGE_PROMPT_CHAR_BUDGET - PARTIAL_KNOWLEDGE_NOTICE.length - 2;
+  let used = 0;
+  let partial = false;
+  for (const line of lines) {
+    const projected =
+      line.length > KNOWLEDGE_PROMPT_LINE_LIMIT
+        ? `${line.slice(0, KNOWLEDGE_PROMPT_LINE_LIMIT - 16)} … [excerpt]`
+        : line;
+    partial ||= projected !== line;
+    if (used + projected.length + 1 > available) {
+      partial = true;
+      continue;
+    }
+    kept.push(projected);
+    used += projected.length + 1;
+  }
+  if (partial) {
+    kept.push(PARTIAL_KNOWLEDGE_NOTICE);
+  }
+  return kept.join("\n");
+}
+
 function formatObjectLine(object: KnowledgeObject): string {
   const tags = object.tags.length ? ` [${object.tags.join(", ")}]` : "";
   return `- ${object.id} ${object.title} (${object.source}/${object.kind})${tags}: ${object.summary}`;
@@ -177,7 +206,7 @@ export function formatKnowledgeContextPromptBlock(params: {
     lines.push(...formatKnowledgeEvidencePromptLines(params.evidence));
   }
 
-  return lines.join("\n");
+  return boundedKnowledgePrompt(lines);
 }
 
 export function buildKnowledgeAgentContext(params: {
