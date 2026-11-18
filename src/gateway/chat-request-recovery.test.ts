@@ -111,3 +111,29 @@ it("preserves damaged records without blocking history or disclosing another ses
   expect(append).not.toHaveBeenCalled();
   expect(fs.readFileSync(receipt, "utf8")).toBe("broken-json");
 });
+
+it("does not append an interruption when the reply landed before the completion marker", async () => {
+  const dir = root();
+  recordAcceptedChatRequest("run", "session", dir);
+  const append = vi.fn(async () => ({ ok: true }));
+  const hasDurableReply = vi.fn(async (runId: string) => runId === "run");
+  expect(
+    await recoverInterruptedChatRequests({
+      sessionKey: "session",
+      root: dir,
+      currentBootId: "new",
+      hasDurableReply,
+      append,
+    }),
+  ).toBe(0);
+  expect(append).not.toHaveBeenCalled();
+  expect(hasDurableReply).toHaveBeenCalledWith("run");
+  expect(
+    await recoverInterruptedChatRequests({
+      sessionKey: "session",
+      root: dir,
+      currentBootId: "new",
+      append,
+    }),
+  ).toBe(0);
+});

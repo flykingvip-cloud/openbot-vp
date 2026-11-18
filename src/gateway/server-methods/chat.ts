@@ -4610,8 +4610,31 @@ export const chatHandlers: GatewayRequestHandlers = {
       return;
     }
     if (sessionId && storePath) {
+      let recoveryMessages: unknown[] | undefined;
       await recoverInterruptedChatRequests({
         sessionKey,
+        hasDurableReply: (runId) => {
+          recoveryMessages ??= readSessionMessages(sessionId, storePath, entry?.sessionFile);
+          return recoveryMessages.some((raw) => {
+            if (!raw || typeof raw !== "object") {
+              return false;
+            }
+            const row = raw as { message?: unknown; role?: unknown; idempotencyKey?: unknown };
+            const message = (
+              row.message && typeof row.message === "object" ? row.message : row
+            ) as { role?: unknown; idempotencyKey?: unknown };
+            return (
+              message.role === "assistant" &&
+              typeof message.idempotencyKey === "string" &&
+              [
+                `${runId}:assistant`,
+                `${runId}:interaction-rejected`,
+                `${runId}:interaction-rejected:assistant`,
+                `${runId}:restart-interrupted`,
+              ].includes(message.idempotencyKey)
+            );
+          });
+        },
         append: async (message, idempotencyKey) => {
           const governance = await resolveChatTranscriptGovernance({ client: historyClient, cfg });
           return appendAssistantTranscriptMessage({

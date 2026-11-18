@@ -53,6 +53,7 @@ export async function recoverInterruptedChatRequests(input: {
   sessionKey: string;
   root?: string;
   currentBootId?: string;
+  hasDurableReply?: (runId: string) => boolean | Promise<boolean>;
   append: (text: string, idempotencyKey: string) => Promise<{ ok: boolean }>;
 }): Promise<number> {
   const dir = directory(input.sessionKey, input.root);
@@ -82,6 +83,10 @@ export async function recoverInterruptedChatRequests(input: {
       continue;
     }
     if (receipt.bootId === (input.currentBootId ?? bootId)) {
+      continue;
+    }
+    if (await input.hasDurableReply?.(receipt.runId)) {
+      completeAcceptedChatRequest(receipt.runId, input.sessionKey, input.root);
       continue;
     }
     const result = await input.append(
