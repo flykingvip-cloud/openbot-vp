@@ -3,6 +3,7 @@ import path from "node:path";
 import { resolveStateDir } from "../../config/paths.js";
 import { resolveTenantsRoot } from "../tenant-store-paths.js";
 import { buildBuiltinStewardWorkspaceResourceId } from "../workspace-resolver/builders.js";
+import { resolveDataGovernanceCatalogPath } from "./paths.js";
 import type { CatalogRecord } from "./types.js";
 
 /** Retired absolute prefixes from when the gateway ran as root with HOME=/root. */

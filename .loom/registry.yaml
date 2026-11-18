@@ -14719,6 +14719,24 @@ tasks:
     ownerHistory: []
     since: 2026-11-16
     metadata: {}
+  - id: unify-official-workspace-pathways-20261118:codex-workspace-review
+    owner: codex-workspace-review
+    intent: []
+    paths:
+      - src/gateway/data-governance/workspace-locator-canonicalization.ts
+      - src/gateway/data-governance/workspace-locator-canonicalization.test.ts
+    state: active
+    sessions:
+      - id: codex-317-20261118
+        taskId: unify-official-workspace-pathways-20261118:codex-workspace-review
+        ide: codex
+        agent: codex-workspace-review
+        status: active
+        lastSignalAt: 2026-11-18T03:12:03.372Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-18
+    metadata: {}
 landingStreams:
   - id: unify-official-workspace-pathways-20261118
     landingPolicy: serial
