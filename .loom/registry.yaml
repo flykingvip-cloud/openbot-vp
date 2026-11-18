@@ -14764,6 +14764,7 @@ tasks:
       - src/batch1-capability-enablement/rpc-summary.test.ts
       - src/conversation-task/session-task-board.seed-audit.test.ts
       - ui/src/ui/app-render.boundary.node.test.ts
+      - src/agent-runtime/command/interaction-terminal.s1.test.ts
     state: active
     sessions:
       - id: codex-interaction-20261118
@@ -14771,7 +14772,7 @@ tasks:
         ide: codex
         agent: codex-workspace-review
         status: active
-        lastSignalAt: 2026-11-18T08:33:58.886Z
+        lastSignalAt: 2026-11-18T08:58:46.111Z
         metadata: {}
     ownerHistory: []
     since: 2026-11-18
@@ -14822,6 +14823,7 @@ landingStreams:
       - src/batch1-capability-enablement/rpc-summary.test.ts
       - src/conversation-task/session-task-board.seed-audit.test.ts
       - ui/src/ui/app-render.boundary.node.test.ts
+      - src/agent-runtime/command/interaction-terminal.s1.test.ts
     canLandWith: []
     metadata:
       owner: codex-workspace-review
