@@ -14725,6 +14725,13 @@ tasks:
     paths:
       - src/gateway/data-governance/workspace-locator-canonicalization.ts
       - src/gateway/data-governance/workspace-locator-canonicalization.test.ts
+      - src/gateway/knowledge/sources/knowledge-index-source.ts
+      - src/gateway/knowledge/relationship-graph-limits.test.ts
+      - ui/src/ui/views/enterprise-asset-library-usage/robot-capability-table.ts
+      - ui/src/ui/views/enterprise-capability-usage-management/robot-capability-table.ts
+      - src/agent-runtime/command/rule-adaptation/library-feedback.ts
+      - src/agent-runtime/command/rule-adaptation/library-feedback.test.ts
+      - src/agent-runtime/wiring/dynamic-rule-constraints.test.ts
     state: active
     sessions:
       - id: codex-317-20261118
@@ -14732,7 +14739,7 @@ tasks:
         ide: codex
         agent: codex-workspace-review
         status: active
-        lastSignalAt: 2026-11-18T03:12:03.372Z
+        lastSignalAt: 2026-11-18T03:23:51.215Z
         metadata: {}
     ownerHistory: []
     since: 2026-11-18
