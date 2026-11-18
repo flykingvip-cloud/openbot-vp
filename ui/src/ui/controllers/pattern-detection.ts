@@ -211,6 +211,11 @@ export async function ingestPatternSampleToServer(
     suggestedSummaryHint?: string;
   },
 ): Promise<PatternDetectionHint | null> {
+  // Synthetic UI roles are not tenant-owned agents. Do not submit an invented
+  // actor identity; group sampling needs a server-proven responding agent.
+  if (params.agentId === "group-supervisor" || params.agentId === "assistant-runtime") {
+    return null;
+  }
   if (!state.client || !state.connected) {
     return null;
   }
