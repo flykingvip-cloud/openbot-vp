@@ -38,6 +38,7 @@ import {
   collapseOwnerDecisionCardsForBoardItem,
   dismissOwnerDecisionCard,
   markOwnerDecisionHydrationAttempted,
+  releaseOwnerDecisionHydrationAttempt,
   noteOwnerDecisionDelivery,
   noteOwnerDecisionRecoveries,
   noteOwnerDecisionVersionRefusal,
@@ -1346,7 +1347,8 @@ export function renderApp(state: AppViewState) {
                 changed = true;
               }
             } catch {
-              // Ignore hydrate failures — confirm/revise still teach status via gate errors.
+              releaseOwnerDecisionHydrationAttempt(target.todolistId);
+              // A transport/authorization failure must not turn history into authority.
             }
           }
           if (changed) {

@@ -20,6 +20,7 @@ import {
 } from "./interaction-output-contract.js";
 
 const PROTOCOL = [
+  "Write the user-visible reply in the language of the current user message by default. An explicit request in the current turn for another language takes precedence. Historical language preferences must not override the language of this turn. Keep code, identifiers and quoted source text unchanged where necessary.",
   "For quantitative answers, independently substitute the final result into every original constraint, recompute totals and residual capacity, and check that the prose agrees with those numbers. Distinguish a feasible example from proof of global optimality. Do not claim exhaustive enumeration unless actually performed. If exact verification needs tools that are unavailable, state the limitation rather than inventing verification.",
   "For rules and policy conflicts, do not invent a stricter-wins, newer-wins, cumulative, replacement or legal-priority rule. Use only supplied effective dates and precedence. If replacement versus coexistence is unspecified, present both conditional outcomes and identify the missing authority. Recommendations must be explicitly separate from current policy conclusions.",
   "Understand the current user message using the supplied identity, conversation, memory and knowledge.",

@@ -2863,6 +2863,7 @@ function transcriptHasIdempotencyKey(transcriptPath: string, idempotencyKey: str
 async function appendAssistantTranscriptMessage(params: {
   message: string;
   label?: string;
+  senderLabel?: string;
   sessionId: string;
   storePath: string | undefined;
   sessionFile?: string;
@@ -2970,6 +2971,7 @@ async function appendAssistantTranscriptMessage(params: {
     transcriptPath,
     message: params.message,
     label: params.label,
+    senderLabel: params.senderLabel,
     idempotencyKey: params.idempotencyKey,
     abortMeta: params.abortMeta,
     cronResult: params.cronResult,
@@ -6083,6 +6085,7 @@ export const chatHandlers: GatewayRequestHandlers = {
                 sessionFile: groupSession.entry.sessionFile,
                 createIfMissing: true,
                 idempotencyKey: `${clientRunId}:group-interaction`,
+                senderLabel: interpreter.name,
               });
               if (!persisted.ok) {
                 throw new Error("协作回复暂未保存，本轮没有启动任务。");

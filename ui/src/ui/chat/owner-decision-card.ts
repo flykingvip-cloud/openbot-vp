@@ -378,6 +378,10 @@ export function selectStickyOwnerDecisionCards(
   const active: OwnerDecisionCardView[] = [];
   const terminals: OwnerDecisionCardView[] = [];
   for (const card of latest) {
+    // Explicit expiry is authoritative; never infer expiry from message age.
+    if (typeof card.expiresAtMs === "number" && card.expiresAtMs <= Date.now()) {
+      continue;
+    }
     const facing = getOwnerDecisionDelivery(card.todolistId, card.version);
     if (facing === "consumed" || facing === "skipped") {
       continue;
@@ -591,6 +595,13 @@ export function isOwnerDecisionVersionStale(decisionId: string): boolean {
 
 /** Todolist ids we already attempted to hydrate this page session. */
 const hydratedTodolistIds = new Set<string>();
+const hydrationRetryAfter = new Map<string, number>();
+
+/** A failed read is not authority. Allow retry after backoff without a render loop. */
+export function releaseOwnerDecisionHydrationAttempt(todolistId: string): void {
+  hydratedTodolistIds.delete(todolistId.trim());
+  hydrationRetryAfter.set(todolistId.trim(), Date.now() + 5_000);
+}
 
 /** Collect cards whose lifecycle status is still unknown (need getTodolist). */
 export function collectOwnerDecisionHydrationTargets(
@@ -600,7 +611,12 @@ export function collectOwnerDecisionHydrationTargets(
   const seen = new Set<string>();
   for (const card of cards) {
     const todolistId = card.todolistId.trim();
-    if (!todolistId || seen.has(todolistId) || hydratedTodolistIds.has(todolistId)) {
+    if (
+      !todolistId ||
+      seen.has(todolistId) ||
+      hydratedTodolistIds.has(todolistId) ||
+      (hydrationRetryAfter.get(todolistId) ?? 0) > Date.now()
+    ) {
       continue;
     }
     if (getOwnerDecisionTodolistStatus(todolistId) != null) {
@@ -648,6 +664,7 @@ export function clearOwnerDecisionDismissalsForTest(preserveStorage = false): vo
   todolistIdByDecisionId.clear();
   boardItemIdByDecisionId.clear();
   hydratedTodolistIds.clear();
+  hydrationRetryAfter.clear();
   versionStaleDecisionIds.clear();
 }
 
@@ -907,12 +924,18 @@ export function renderOwnerDecisionCards(
       const facingTerminal =
         userFacing === "consumed" || userFacing === "stale_version" || userFacing === "skipped";
       const actionable =
-        !invalid && !facingTerminal && isOwnerDecisionTodolistActionable(todolistStatus);
-      const statusCopy = invalid
-        ? ownerDecisionDeliveryStatusCopy("stale_version")
-        : todolistStatus && !isOwnerDecisionTodolistActionable(todolistStatus)
-          ? formatOwnerDecisionStatusCopy(todolistStatus)
-          : null;
+        !invalid &&
+        !facingTerminal &&
+        (!opts.onHydrateStatuses || todolistStatus !== null) &&
+        isOwnerDecisionTodolistActionable(todolistStatus);
+      const statusCopy =
+        opts.onHydrateStatuses && todolistStatus === null
+          ? "计划状态尚未核实，暂不能确认或退回。"
+          : invalid
+            ? ownerDecisionDeliveryStatusCopy("stale_version")
+            : todolistStatus && !isOwnerDecisionTodolistActionable(todolistStatus)
+              ? formatOwnerDecisionStatusCopy(todolistStatus)
+              : null;
       const deliveryFailed = userFacing === "delivery_failed_retryable";
       const authority = authorityById.get(card.decisionId) ?? "fence";
       const deliveryCopy = statusCopy

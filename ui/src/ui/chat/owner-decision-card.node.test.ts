@@ -7,6 +7,8 @@ import {
   collapseOwnerDecisionCardsForBoardItem,
   OWNER_DECISION_PEER_ACK_COPY,
   collectOwnerDecisionHydrationTargets,
+  releaseOwnerDecisionHydrationAttempt,
+  markOwnerDecisionHydrationAttempted,
   dismissOwnerDecisionCard,
   formatOwnerDecisionMentionHint,
   formatOwnerDecisionStatusCopy,
@@ -977,4 +979,44 @@ it("remembers a deferred card after module memory is cleared", () => {
   clearOwnerDecisionDismissalsForTest(true);
   expect(isOwnerDecisionDismissed("persist-decision")).toBe(true);
   expect(isOwnerDecisionDismissed("other-decision")).toBe(false);
+});
+
+it("retries failed hydration after backoff rather than trusting the historical card", () => {
+  vi.useFakeTimers();
+  try {
+    const card = {
+      kind: "todolist_confirm",
+      decisionId: "retry-decision",
+      groupId: "g",
+      taskId: "t",
+      boardItemId: "b",
+      todolistId: "retry-plan",
+      title: "请确认执行计划",
+      summary: ["1. 合成计划；"],
+      options: [
+        { id: "confirm", label: "确认计划", style: "primary" },
+        { id: "revise", label: "退回修订", style: "default" },
+        { id: "later", label: "稍后", style: "ghost" },
+      ],
+      mentionMemberIds: ["ceo"],
+      version: 1,
+    } as Parameters<typeof selectStickyOwnerDecisionCards>[0][number];
+    markOwnerDecisionHydrationAttempted(card.todolistId);
+    expect(collectOwnerDecisionHydrationTargets([card])).toEqual([]);
+    releaseOwnerDecisionHydrationAttempt(card.todolistId);
+    expect(collectOwnerDecisionHydrationTargets([card])).toEqual([]);
+    vi.advanceTimersByTime(5000);
+    expect(collectOwnerDecisionHydrationTargets([card])).toHaveLength(1);
+    const host = document.createElement("div");
+    render(
+      renderOwnerDecisionCards([{ role: "assistant", ownerDecision: card }], {
+        onHydrateStatuses: vi.fn(),
+      }),
+      host,
+    );
+    expect(host.textContent).toContain("计划状态尚未核实");
+    expect(host.querySelectorAll("button").length).toBe(0);
+  } finally {
+    vi.useRealTimers();
+  }
 });
