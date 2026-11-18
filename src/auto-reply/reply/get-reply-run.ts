@@ -26,7 +26,11 @@ import {
   isEmbeddedPiRunStreaming,
   waitForEmbeddedPiRunEnd,
 } from "../../agent-runtime/execution/index.js";
-import { resolveInteractionResourceWaitMs } from "../../agent-runtime/model/index.js";
+import {
+  createInteractionResourceBudget,
+  raceVisibleInteraction,
+  interactionTimeoutError,
+} from "../../agent-runtime/model/index.js";
 import { INTERACTION_RECORD_UNAVAILABLE_TEXT } from "../../agent-runtime/model/index.js";
 import { activeConstraintTexts } from "../../agent-runtime/policy/index.js";
 import { replyTurnRuntime } from "../../agent-runtime/wiring/reply-turn.js";
@@ -1469,6 +1473,7 @@ export async function runPreparedReply(
     | import("../../agent-runtime/contracts/execution.js").TurnExecutionAdmission
     | undefined;
   if (interactionIngress && !admittedBinding) {
+    const interactionDeadline = createInteractionResourceBudget({ capMs: timeoutMs });
     const sources = createInteractionSourceBoundary();
     const persistOwnReply = (text: string) => {
       const availability = sources.availability;
@@ -1544,17 +1549,20 @@ export async function runPreparedReply(
       () => openSessionManager(sessionFile).buildSessionContext().messages,
       [],
     );
-    const bootstrap = await sources.readAsync(
-      "context_source_unavailable",
-      () =>
-        resolveBootstrapContextForRun({
-          workspaceDir: runWorkspaceDir,
-          config: cfg,
-          sessionKey,
-          sessionId: sessionIdFinal,
-          agentId,
-        }),
-      { bootstrapFiles: [], contextFiles: [] },
+    const bootstrap = await raceVisibleInteraction(
+      sources.readAsync(
+        "context_source_unavailable",
+        () =>
+          resolveBootstrapContextForRun({
+            workspaceDir: runWorkspaceDir,
+            config: cfg,
+            sessionKey,
+            sessionId: sessionIdFinal,
+            agentId,
+          }),
+        { bootstrapFiles: [], contextFiles: [] },
+      ),
+      { signal: opts?.abortSignal, remainingMs: interactionDeadline.remainingMs() },
     );
     const systemContext = [
       ...bootstrap.contextFiles.map((file) => `## ${file.path}\n${file.content}`),
@@ -1584,7 +1592,10 @@ export async function runPreparedReply(
       storePath,
       isNewSession,
     });
-    const interactionTimeoutMs = resolveInteractionResourceWaitMs({ capMs: timeoutMs });
+    const interactionTimeoutMs = interactionDeadline.remainingMs();
+    if (interactionTimeoutMs <= 0) {
+      throw interactionTimeoutError();
+    }
     const routed = await replyTurnRuntime.interaction({
       config: cfg,
       runId: opts?.runId ?? crypto.randomUUID(),

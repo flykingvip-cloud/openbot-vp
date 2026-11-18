@@ -528,3 +528,24 @@ it("passes trusted group enterprise scope through the single commercial admissio
     }),
   );
 });
+
+it("never resolves a candidate when explicit enterprise admission is skipped", async () => {
+  const { host, params, ports } = bindReplyPorts();
+  params.identity.executionIdentity = {
+    enterpriseId: "tenant-group",
+    collaborationGroupId: "group-fixture",
+  };
+  host.admission.tryAcquireEnterpriseAgentRun = vi.fn(async () => ({
+    acquired: false as const,
+    skipped: true as const,
+  }));
+  const candidate = vi.fn(ports.candidate);
+  const result = await runGovernedInteraction(params, { ...ports, candidate });
+  expect(result).toMatchObject({
+    kind: "respond",
+    text: expect.stringContaining("企业模型准入未完成"),
+  });
+  expect(candidate).not.toHaveBeenCalled();
+  expect(host.model.runWithModelFallback).not.toHaveBeenCalled();
+  expect(host.admission.tryAcquireEnterpriseAgentRun).toHaveBeenCalledTimes(1);
+});

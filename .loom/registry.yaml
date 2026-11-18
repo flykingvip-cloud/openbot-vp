@@ -14734,6 +14734,13 @@ tasks:
       - src/gateway/server-methods/chat.ts
       - src/gateway/collaboration-learning/group-interaction-understanding.ts
       - src/gateway/collaboration-learning/group-interaction-understanding.test.ts
+      - src/agent-runtime/command/authorized-interaction.ts
+      - package.json
+      - pnpm-lock.yaml
+      - src/gateway/enterprise-data/streaming-store-read.ts
+      - src/gateway/enterprise-data/streaming-store-read.test.ts
+      - src/gateway/enterprise-data/store.ts
+      - src/auto-reply/reply/get-reply-run.ts
     state: active
     sessions:
       - id: codex-interaction-20261118
@@ -14741,7 +14748,7 @@ tasks:
         ide: codex
         agent: codex-workspace-review
         status: active
-        lastSignalAt: 2026-11-18T05:29:05.226Z
+        lastSignalAt: 2026-11-18T05:34:57.570Z
         metadata: {}
     ownerHistory: []
     since: 2026-11-18
@@ -14762,6 +14769,8 @@ landingStreams:
       - src/gateway/server-methods/chat.ts
       - src/gateway/collaboration-learning/group-interaction-understanding.ts
       - src/gateway/collaboration-learning/group-interaction-understanding.test.ts
+      - src/agent-runtime/command/authorized-interaction.ts
+      - src/auto-reply/reply/get-reply-run.ts
     canLandWith: []
     metadata:
       owner: codex-workspace-review
