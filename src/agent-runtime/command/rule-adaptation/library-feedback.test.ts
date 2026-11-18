@@ -93,7 +93,7 @@ it("prefers an in-bounds shadow tune when filling a gap, then keeps it", () => {
 
 it("records an inapplicable shrink for an ordinary task and does not reuse a pressure cap", () => {
   const file = sessionFile();
-  expect(cycle(file, "上下文太大").effectiveTokens).toBe(24_000);
+  expect(cycle(file, "上下文太大")).toMatchObject({ applied: true, effectiveTokens: 24_000 });
   const ordinary = cycle(file, "请回复这封短消息");
   expect(ordinary).toMatchObject({
     applied: true,
@@ -239,9 +239,9 @@ it("refuses unauthorized, stale, cancelled, and collaboration writes", () => {
 it("keeps one session's library from applying to another session", () => {
   const first = sessionFile();
   const second = sessionFile();
-  expect(cycle(first, "上下文太大").effectiveTokens).toBe(24_000);
+  expect(cycle(first, "上下文太大")).toMatchObject({ applied: true, effectiveTokens: 24_000 });
   expect(loadRuleLibrary(second).revision).toBe(0);
-  expect(cycle(second, "上下文太大").revision).toBe(1);
+  expect(cycle(second, "上下文太大")).toMatchObject({ applied: true, revision: 1 });
   expect(loadRuleLibrary(first).entries[0]?.parameter).toBe(24_000);
 });
 

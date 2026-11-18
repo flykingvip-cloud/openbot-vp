@@ -3,7 +3,10 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, expect, it, vi } from "vitest";
 import type { FollowupRun } from "../../auto-reply/reply/queue.js";
+import { emptyControlSnapshot } from "../command/rule-adaptation/control-snapshot.js";
 import { loadRuleLibrary } from "../command/rule-adaptation/library-feedback.js";
+import { buildShadowResult } from "../command/rule-adaptation/result.js";
+import { createBudgetTracker } from "../model/rule-adaptation/index.js";
 import { sessionTaskState } from "../state/index.js";
 import { resolveDynamicExecutionConstraints } from "./dynamic-rule-constraints.js";
 import type { recordNormalTaskRuleAdvice } from "./interaction-turn.js";
@@ -40,22 +43,37 @@ function runFor(file: string): FollowupRun["run"] {
 }
 
 function advise(): typeof recordNormalTaskRuleAdvice {
-  return (async () =>
-    ({
-      result: {
+  return async () => {
+    const budget = createBudgetTracker(undefined, Date.now);
+    return {
+      result: buildShadowResult({
         outcomeCode: "no_change_needed",
-        controlUnchanged: true,
-        activationAllowed: false,
-        toolsInvoked: [],
         reasons: [],
-        limitProof: { exhausted: [] },
-        usage: { modelCalls: 0 },
-      },
+        usage: budget.usage(),
+        limits: budget.limits,
+        exhausted: [],
+        preEnforcedExhausted: [],
+        postAccountedExhausted: [],
+        deadlineCleanupFailed: false,
+        sessionDisposeFailed: false,
+        usageKnown: true,
+        underlyingRequestStopped: true,
+        usageAccountingAttempted: false,
+        usageAccountingStatus: "not_attempted",
+        governanceOccupancyReady: false,
+        controlBefore: emptyControlSnapshot(),
+        controlAfter: emptyControlSnapshot(),
+        controlUnchanged: true,
+        toolsInvoked: [],
+        rejectedTools: [],
+        businessAttempts: [],
+        candidateToolInvoked: false,
+        diagnosedBeforeRetrieval: false,
+      }),
       currentTokens: 32_000,
       ruleVersion: "inventory:test",
-    }) as Awaited<
-      ReturnType<typeof recordNormalTaskRuleAdvice>
-    >) as typeof recordNormalTaskRuleAdvice;
+    };
+  };
 }
 
 it("updates the library on a gap and the next admitted decision uses it", async () => {
