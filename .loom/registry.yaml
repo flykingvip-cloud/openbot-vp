@@ -14745,6 +14745,14 @@ tasks:
       - src/gateway/knowledge/resolve/context-builder.ts
       - src/gateway/knowledge/resolve/context-builder.test.ts
       - src/gateway/knowledge/knowledge-data-closure.golden-path.test.ts
+      - src/gateway/enterprise-data/indexed-store.ts
+      - src/gateway/enterprise-data/indexed-store.test.ts
+      - src/gateway/enterprise-data/scheduled-connector-sync.ts
+      - src/gateway/enterprise-data/scheduled-projection-materializer.ts
+      - src/gateway/enterprise-data/audit-runtime.ts
+      - src/agent-runtime/command/rule-adaptation/library-feedback.ts
+      - src/agent-runtime/command/rule-adaptation/library-feedback.test.ts
+      - src/agent-runtime/wiring/dynamic-rule-constraints.test.ts
     state: active
     sessions:
       - id: codex-interaction-20261118
@@ -14752,7 +14760,7 @@ tasks:
         ide: codex
         agent: codex-workspace-review
         status: active
-        lastSignalAt: 2026-11-18T06:14:36.965Z
+        lastSignalAt: 2026-11-18T06:53:47.468Z
         metadata: {}
     ownerHistory: []
     since: 2026-11-18
@@ -14783,6 +14791,15 @@ landingStreams:
       - src/gateway/knowledge/resolve/context-builder.ts
       - src/gateway/knowledge/resolve/context-builder.test.ts
       - src/gateway/knowledge/knowledge-data-closure.golden-path.test.ts
+      - src/gateway/enterprise-data/indexed-store.ts
+      - src/gateway/enterprise-data/indexed-store.test.ts
+      - src/gateway/enterprise-data/store.ts
+      - src/gateway/enterprise-data/scheduled-connector-sync.ts
+      - src/gateway/enterprise-data/scheduled-projection-materializer.ts
+      - src/gateway/enterprise-data/audit-runtime.ts
+      - src/agent-runtime/command/rule-adaptation/library-feedback.ts
+      - src/agent-runtime/command/rule-adaptation/library-feedback.test.ts
+      - src/agent-runtime/wiring/dynamic-rule-constraints.test.ts
     canLandWith: []
     metadata:
       owner: codex-workspace-review

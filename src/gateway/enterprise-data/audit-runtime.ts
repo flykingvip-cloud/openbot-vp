@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { hashObjectKey, objectKeyHint } from "./digest-utils.js";
+import { queryEnterpriseRecordEntries } from "./indexed-store.js";
 import type {
   ConnectorActionRiskLevel,
   DataAuditEvent,
@@ -181,7 +182,10 @@ export function removeDataAuditForTrace(params: {
   tenantId: string;
   traceId: string;
 }): void {
-  for (const [auditId, event] of Object.entries(params.store.dataAuditEvents)) {
+  for (const [auditId, event] of queryEnterpriseRecordEntries(
+    params.store.dataAuditEvents,
+    params,
+  )) {
     if (event.tenantId === params.tenantId && event.traceId === params.traceId) {
       delete params.store.dataAuditEvents[auditId];
     }
@@ -194,9 +198,10 @@ export function findInvocationAuditForTrace(params: {
   traceId: string;
 }): InvocationAuditEvent | null {
   return (
-    Object.values(params.store.invocationAuditEvents).find(
-      (event) => event.tenantId === params.tenantId && event.traceId === params.traceId,
-    ) ?? null
+    queryEnterpriseRecordEntries(params.store.invocationAuditEvents, params)
+      .map(([, row]) => row)
+      .find((event) => event.tenantId === params.tenantId && event.traceId === params.traceId) ??
+    null
   );
 }
 
@@ -211,13 +216,15 @@ export function getAuditTrace(params: {
   dataAuditMissing: boolean;
 } {
   const invocation =
-    Object.values(params.store.invocationAuditEvents).find(
-      (event) => event.tenantId === params.tenantId && event.traceId === params.traceId,
-    ) ?? null;
+    queryEnterpriseRecordEntries(params.store.invocationAuditEvents, params)
+      .map(([, row]) => row)
+      .find((event) => event.tenantId === params.tenantId && event.traceId === params.traceId) ??
+    null;
   const data =
-    Object.values(params.store.dataAuditEvents).find(
-      (event) => event.tenantId === params.tenantId && event.traceId === params.traceId,
-    ) ?? null;
+    queryEnterpriseRecordEntries(params.store.dataAuditEvents, params)
+      .map(([, row]) => row)
+      .find((event) => event.tenantId === params.tenantId && event.traceId === params.traceId) ??
+    null;
   return {
     traceId: params.traceId,
     invocation,

@@ -14,16 +14,23 @@ afterEach(() => {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
-it("skips large audit strings before assembly and returns only tenant catalog rows", async () => {
+it("imports legacy records individually and projects only tenant catalog rows", async () => {
   const storePath = file();
   const fd = fs.openSync(storePath, "w");
-  fs.writeSync(fd, '{"dataAuditEvents":{"audit":{"tenantId":"tenant","unknownFields":[');
-  for (let i = 0; i < 20000; i++) {
-    fs.writeSync(fd, (i ? "," : "") + JSON.stringify("unneeded-path-".repeat(100)));
+  fs.writeSync(fd, '{"dataAuditEvents":{');
+  for (let row = 0; row < 40; row++) {
+    fs.writeSync(
+      fd,
+      (row ? "," : "") + JSON.stringify(`audit-${row}`) + ':{"tenantId":"tenant","unknownFields":[',
+    );
+    for (let i = 0; i < 500; i++) {
+      fs.writeSync(fd, (i ? "," : "") + JSON.stringify("unneeded-path-".repeat(100)));
+    }
+    fs.writeSync(fd, "]}");
   }
   fs.writeSync(
     fd,
-    '] }},"dataConnectorCredentials":{"secret":{"tenantId":"tenant","apiKey":"must-not-read"}},"dataSources":{"own":{"tenantId":"tenant","title":"wanted"},"foreign":{"tenantId":"other","title":"private"}}}',
+    '},"dataConnectorCredentials":{"secret":{"tenantId":"tenant","apiKey":"must-not-read"}},"dataSources":{"own":{"tenantId":"tenant","title":"wanted"},"foreign":{"tenantId":"other","title":"private"}}}',
   );
   fs.closeSync(fd);
   const store = await readKnowledgeEnterpriseStore({
@@ -77,6 +84,6 @@ it("rejects prototype-changing keys in selected data before assembly", async () 
     '{"dataSources":{"__proto__":{"tenantId":"tenant","title":"not-a-row"}}}',
   );
   await expect(readKnowledgeEnterpriseStore({ storePath, tenantId: "tenant" })).rejects.toThrow(
-    "knowledge_read_unsafe_object_key",
+    "enterprise_store_unsafe_record_key",
   );
 });
