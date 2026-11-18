@@ -14769,6 +14769,8 @@ landingStreams:
       - src/gateway/workspace-resolver/execution-workspace.test.ts
       - src/gateway/workspace-resolver/execution-workspace.ts
       - src/gateway/workspace-resolver/steward-write.ts
+      - src/batch1-capability-enablement/isolated-loops.test.ts
+      - src/task-outcome/closed-loop-isolation-contract.test.ts
     canLandWith: []
     metadata:
       owner: 1plus3-publish
