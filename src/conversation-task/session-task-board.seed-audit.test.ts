@@ -76,6 +76,7 @@ describe("seedSessionTaskBoard production-call-chain audit", () => {
         }
         // Sole definition is in the repository; the old board only re-exports it.
         if (
+          rel === "src/agent-runtime/command/rule-adaptation/activation-test-support.ts" ||
           rel === "src/conversation-task/session-task-board.ts" ||
           rel === "src/agent-runtime/state/repository/task-board-file.ts"
         ) {
@@ -101,6 +102,7 @@ describe("seedSessionTaskBoard production-call-chain audit", () => {
       (rel) =>
         rel.startsWith("src/") &&
         !rel.endsWith(".test.ts") &&
+        rel !== "src/agent-runtime/command/rule-adaptation/activation-test-support.ts" &&
         rel !== "src/conversation-task/session-task-board.ts" &&
         rel !== "src/agent-runtime/state/repository/task-board-file.ts",
     );

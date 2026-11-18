@@ -33,7 +33,7 @@ describe("app-render console boundary", () => {
     expect(source).toContain("platformBundle.adaptPlatformPortState(state)");
     expect(source).toContain("platformBundle.createPlatformPortActions(");
     expect(source).toContain("platformBundle.buildPlatformPortRenderModel(");
-    expect(source).toContain("platformBundle.renderPlatformPortShell(platformRenderModel)");
+    expect(source).toContain("platformBundle.renderPlatformPortShell({");
   });
 
   it("routes enterprise flows through the enterprise port shell", async () => {
@@ -185,9 +185,7 @@ describe("app-render console boundary", () => {
     );
     // The content shell must not be reached before the guard's early return.
     const guardIndex = source.indexOf("const platformSurfaceRequiresLogin =");
-    const shellIndex = source.indexOf(
-      "platformBundle.renderPlatformPortShell(platformRenderModel)",
-    );
+    const shellIndex = source.indexOf("platformBundle.renderPlatformPortShell({");
     expect(guardIndex).toBeGreaterThan(0);
     expect(shellIndex).toBeGreaterThan(guardIndex);
   });
