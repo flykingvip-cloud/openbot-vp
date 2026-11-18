@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -136,4 +137,41 @@ it("does not append an interruption when the reply landed before the completion 
       append,
     }),
   ).toBe(0);
+});
+
+it("recovers an accepted request across real process restarts without replaying it", async () => {
+  const dir = root();
+  const moduleUrl = new URL("./chat-request-recovery.ts", import.meta.url).href;
+  const options = { encoding: "utf8" as const };
+  execFileSync(
+    process.execPath,
+    [
+      "--import",
+      "tsx",
+      "--input-type=module",
+      "-e",
+      `import { recordAcceptedChatRequest } from ${JSON.stringify(moduleUrl)}; recordAcceptedChatRequest("process-run", "session", ${JSON.stringify(dir)});`,
+    ],
+    options,
+  );
+  const recoverCode = `import { recoverInterruptedChatRequests } from ${JSON.stringify(moduleUrl)}; const messages=[]; const recovered=await recoverInterruptedChatRequests({sessionKey:"session",root:${JSON.stringify(dir)},append:async(text,key)=>{messages.push({text,key});return {ok:true}}}); console.log(JSON.stringify({recovered,messages}));`;
+  const first = JSON.parse(
+    execFileSync(
+      process.execPath,
+      ["--import", "tsx", "--input-type=module", "-e", recoverCode],
+      options,
+    ),
+  );
+  expect(first.recovered).toBe(1);
+  expect(first.messages).toEqual([
+    { text: CHAT_RESTART_INTERRUPTED_TEXT, key: "process-run:restart-interrupted" },
+  ]);
+  const second = JSON.parse(
+    execFileSync(
+      process.execPath,
+      ["--import", "tsx", "--input-type=module", "-e", recoverCode],
+      options,
+    ),
+  );
+  expect(second).toEqual({ recovered: 0, messages: [] });
 });
