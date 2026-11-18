@@ -14732,6 +14732,9 @@ tasks:
       - src/agent-runtime/command/rule-adaptation/library-feedback.ts
       - src/agent-runtime/command/rule-adaptation/library-feedback.test.ts
       - src/agent-runtime/wiring/dynamic-rule-constraints.test.ts
+      - src/diagnosis/handling-loop.test.ts
+      - src/batch1-capability-enablement/isolated-loops.test.ts
+      - src/task-outcome/closed-loop-isolation-contract.test.ts
     state: active
     sessions:
       - id: codex-317-20261118
@@ -14739,7 +14742,7 @@ tasks:
         ide: codex
         agent: codex-workspace-review
         status: active
-        lastSignalAt: 2026-11-18T03:23:51.215Z
+        lastSignalAt: 2026-11-18T03:38:00.670Z
         metadata: {}
     ownerHistory: []
     since: 2026-11-18
