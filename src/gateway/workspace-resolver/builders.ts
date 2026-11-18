@@ -18,6 +18,29 @@ export function buildWorkspaceResourceId(params: {
   }
 }
 
+/** Official builtin-steward catalog id. Do not invent a short `:steward` alias. */
+export const STEWARD_BUILTIN_AGENT_ASSET_ID = "steward:builtin" as const;
+
+export function buildBuiltinStewardWorkspaceResourceId(params: {
+  tenantId: string;
+  userId: string;
+}): string {
+  return buildWorkspaceResourceId({
+    tenantId: params.tenantId,
+    scope: {
+      kind: "user_owned",
+      userId: params.userId,
+      agentAssetId: STEWARD_BUILTIN_AGENT_ASSET_ID,
+      proof: {
+        source: "explicit_binding",
+        ownerType: "user",
+        ownerId: params.userId,
+        agentAssetId: STEWARD_BUILTIN_AGENT_ASSET_ID,
+      },
+    },
+  });
+}
+
 export function buildGroupWorkspaceCatalogEntry(params: {
   tenantId: string;
   groupId: string;

@@ -14720,6 +14720,31 @@ tasks:
     since: 2026-11-16
     metadata: {}
 landingStreams:
+  - id: unify-official-workspace-pathways-20261118
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - src/cli/program/register.data.test.ts
+      - src/cli/program/register.data.ts
+      - src/commands/canonicalize-workspace-catalog.ts
+      - src/gateway/chat-interaction-failure.test.ts
+      - src/gateway/chat-interaction-failure.ts
+      - src/gateway/data-governance/phase1b-classified-persist.test.ts
+      - src/gateway/data-governance/workspace-catalog-projection.ts
+      - src/gateway/data-governance/workspace-locator-canonicalization.test.ts
+      - src/gateway/data-governance/workspace-locator-canonicalization.ts
+      - src/gateway/knowledge/deliverables/chat-deliverable-publish.ts
+      - src/gateway/server-methods/chat.ts
+      - src/gateway/server-methods/steward-workspace-file.managed.test.ts
+      - src/gateway/server-methods/steward-workspace-file.ts
+      - src/gateway/workspace-resolver/builders.ts
+      - src/gateway/workspace-resolver/execution-workspace.test.ts
+      - src/gateway/workspace-resolver/execution-workspace.ts
+      - src/gateway/workspace-resolver/steward-write.ts
+    canLandWith: []
+    metadata:
+      owner: 1plus3-publish
+      note: Unify steward execution, publish, and preview onto the official workspace resource id and locator; retire short :steward aliases.
   - id: dependabot-docker-group-minor-patch-20261117
     landingPolicy: serial
     paths:

@@ -607,3 +607,11 @@ it("persists a missing-text interaction decision as a durable pre-admission noti
   expect(result.text).not.toMatch(/SyntaxError|stack|\\{/);
   expect(append).toHaveBeenCalledTimes(1);
 });
+
+it("persists workspace binding failures as confirmed pre-admission errors", () => {
+  const error = new Error("workspace_binding_required:resource_missing_or_ambiguous");
+  expect(formatChatTurnTerminalText(error)).toEqual({
+    text: "workspace_binding_required:resource_missing_or_ambiguous",
+    businessExecution: "none",
+  });
+});
