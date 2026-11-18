@@ -71,12 +71,6 @@ import {
   authorizeFocusSwitchProceed,
   dismissFocusSwitchGate,
 } from "./controllers/focus-switch-gate.ts";
-import {
-  cancelRuleAdaptationAdvice,
-  getRuleAdaptationAdvicePanel,
-  requestRuleAdaptationAdvice,
-  resetRuleAdaptationAdvicePanel,
-} from "./controllers/rule-adaptation-advice.ts";
 import { resolveEmployeeEmbedRouting } from "./employee-shell/workbench-embed.ts";
 import { resolveGatewayChatBanner } from "./gateway-connection-phase.ts";
 import { icons } from "./icons.ts";
@@ -1135,7 +1129,6 @@ export function renderApp(state: AppViewState) {
         void loadOlderShellChatHistory(state as unknown as ShellChatHistoryReloadState);
       },
       onRefresh: () => {
-        resetRuleAdaptationAdvicePanel();
         void refreshShellChat(state as unknown as Parameters<typeof refreshShellChat>[0]);
       },
       onToggleFocusMode: () => {
@@ -1149,16 +1142,6 @@ export function renderApp(state: AppViewState) {
       },
       onChatScroll: (event: Event) => state.handleChatScroll(event),
       onDraftChange: (next: string) => (state.chatMessage = next),
-      ruleAdaptationAdvice: getRuleAdaptationAdvicePanel(),
-      onRequestRuleAdaptationAdvice: () => {
-        void requestRuleAdaptationAdvice({
-          client: state.client,
-          question: state.chatMessage.trim(),
-          sessionKey: chatSessionKey,
-          agentId: parseAgentSessionKey(state.sessionKey)?.agentId,
-        });
-      },
-      onCancelRuleAdaptationAdvice: () => cancelRuleAdaptationAdvice(),
       contextScope: state.chatContextScope,
       contextSources: state.chatContextSourceCatalog ?? [],
       contextSourcesLoading: Boolean(state.chatContextSourceCatalogLoading),

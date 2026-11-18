@@ -4561,15 +4561,6 @@ export const zh_CN: TranslationMap = {
     stop: "停止",
     newSession: "新建会话",
     restore: "恢复",
-    ruleAdaptationAdvice: {
-      title: "规则适配建议",
-      notEffective: "尚未生效",
-      loading: "正在生成规则适配建议…",
-      cancelled: "已取消本次建议请求。已有聊天与原任务未改动。",
-      failed: "本次建议请求失败，已有聊天与原任务未改动。",
-      cancel: "取消建议",
-      footnote: "此结果仅为建议，尚未生效。不会自动激活、修改配置或发布规则。",
-    },
     working: "处理中...",
     cancel: "取消",
     checkpoint: {

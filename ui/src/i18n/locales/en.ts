@@ -4762,17 +4762,6 @@ export const en: TranslationMap = {
     stop: "Stop",
     newSession: "New session",
     restore: "Restore",
-    ruleAdaptationAdvice: {
-      title: "Rule adaptation advice",
-      notEffective: "Not yet in effect",
-      loading: "Generating rule adaptation advice…",
-      cancelled:
-        "This advice request was cancelled. The existing chat and original task were not changed.",
-      failed: "This advice request failed. The existing chat and original task were not changed.",
-      cancel: "Cancel advice",
-      footnote:
-        "This is advice only and is not yet in effect. It does not auto-activate, change configuration, or publish rules.",
-    },
     working: "Working...",
     cancel: "Cancel",
     checkpoint: {
