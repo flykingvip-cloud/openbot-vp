@@ -766,6 +766,10 @@ describe("chat view", () => {
     );
 
     expect(container.querySelector(".chat-compose__working")).toBeNull();
+    expect(container.querySelector('[data-testid="rule-adaptation-advice-trigger"]')).toBeNull();
+    expect(container.querySelector('[data-testid="rule-adaptation-advice-panel"]')).toBeNull();
+    expect(container.textContent).not.toContain("规则适配建议");
+    expect(container.textContent).not.toContain("Rule adaptation advice");
     expect(container.textContent).not.toContain("Cancel");
 
     const stopButton = Array.from(container.querySelectorAll("button")).find(
@@ -789,6 +793,10 @@ describe("chat view", () => {
     );
 
     expect(container.querySelector(".chat-compose__cron-followup")).toBeNull();
+    expect(container.querySelector('[data-testid="rule-adaptation-advice-trigger"]')).toBeNull();
+    expect(container.querySelector('[data-testid="rule-adaptation-advice-panel"]')).toBeNull();
+    expect(container.textContent ?? "").not.toContain("规则适配建议");
+    expect(container.textContent ?? "").not.toContain("Rule adaptation advice");
     expect(container.textContent ?? "").not.toContain("可直接在下方输入");
     const tab = container.querySelector(".chat-compose__context-tab");
     const tabs = container.querySelector(".chat-compose__context-tabs");
