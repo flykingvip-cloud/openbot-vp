@@ -161,7 +161,10 @@ function collectCrossKnowledgeBaseEdges(params: {
         ORDER BY semantic_hash
         ${limitClause}`,
     )
-    .all(...(params.afterHash ? [params.afterHash] : []), ...(params.limit > 0 ? [params.limit] : [])) as Array<{
+    .all(
+      ...(params.afterHash ? [params.afterHash] : []),
+      ...(params.limit > 0 ? [params.limit] : []),
+    ) as Array<{
     hash: string | null;
   }>;
   const hashes = hashRows.map((row) => row.hash).filter((hash): hash is string => Boolean(hash));
@@ -246,7 +249,7 @@ export async function buildCrossKnowledgeBaseEdgesAsync(params: {
       limit: CROSS_KB_HASH_PAGE,
     });
     for (const edge of page.edges) {
-      const key = `${[edge.sourceId, edge.targetId].toSorted().join("::")}`;
+      const key = [edge.sourceId, edge.targetId].toSorted().join("::");
       if (seen.has(key)) {
         continue;
       }
