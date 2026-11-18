@@ -14727,6 +14727,8 @@ tasks:
       - src/agent-runtime/model/interaction-resource-wait.test.ts
       - src/gateway/chat-interaction-failure.ts
       - src/gateway/chat-interaction-failure.test.ts
+      - src/agent-runtime/command/governed-interaction.ts
+      - src/agent-runtime/command/governed-interaction.test.ts
     state: active
     sessions:
       - id: codex-interaction-20261118
@@ -14734,7 +14736,7 @@ tasks:
         ide: codex
         agent: codex-workspace-review
         status: active
-        lastSignalAt: 2026-11-18T04:17:30.028Z
+        lastSignalAt: 2026-11-18T04:53:29.152Z
         metadata: {}
     ownerHistory: []
     since: 2026-11-18
@@ -14748,6 +14750,8 @@ landingStreams:
       - src/agent-runtime/model/interaction-resource-wait.test.ts
       - src/gateway/chat-interaction-failure.ts
       - src/gateway/chat-interaction-failure.test.ts
+      - src/agent-runtime/command/governed-interaction.ts
+      - src/agent-runtime/command/governed-interaction.test.ts
     canLandWith: []
     metadata:
       owner: codex-workspace-review

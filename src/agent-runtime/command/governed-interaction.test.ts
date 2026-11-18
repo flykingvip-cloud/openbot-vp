@@ -511,3 +511,20 @@ it("still honors a caller-supplied shadow signal when the original request is no
   expect(wrapped.shadow.cancelled).toBe(true);
   expect(commit).not.toHaveBeenCalled();
 });
+
+it("passes trusted group enterprise scope through the single commercial admission", async () => {
+  const { host, params, ports } = bindReplyPorts();
+  params.identity.executionIdentity = {
+    enterpriseId: "tenant-group",
+    collaborationGroupId: "group-fixture",
+  };
+  await runGovernedInteraction(params, ports);
+  expect(host.admission.tryAcquireEnterpriseAgentRun).toHaveBeenCalledTimes(1);
+  expect(host.admission.tryAcquireEnterpriseAgentRun).toHaveBeenCalledWith(
+    expect.objectContaining({
+      enterpriseId: "tenant-group",
+      groupId: "group-fixture",
+      modelGateInput: expect.objectContaining({ enterpriseIdHint: "tenant-group" }),
+    }),
+  );
+});
