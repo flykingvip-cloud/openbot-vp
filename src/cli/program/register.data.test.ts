@@ -18,7 +18,9 @@ describe("registerDataCli", () => {
   it("registers the data command group with info/migrate/forget subcommands", () => {
     const data = buildDataCommand();
     const names = data.commands.map((c) => c.name()).toSorted();
-    expect(names).toEqual(["forget", "info", "migrate"].toSorted());
+    expect(names).toEqual(
+      ["canonicalize-workspace-catalog", "forget", "info", "migrate"].toSorted(),
+    );
   });
 
   it("requires --scope and --id for data forget", () => {
@@ -42,4 +44,12 @@ describe("registerDataCli", () => {
     const flags = (forget?.options ?? []).map((o) => o.long);
     expect(flags).toEqual(expect.arrayContaining(["--dry-run", "--yes", "--purge-temp"]));
   });
+});
+
+it("exposes canonicalize-workspace-catalog --yes and --fix-permissions", () => {
+  const data = buildDataCommand();
+  const command = data.commands.find((c) => c.name() === "canonicalize-workspace-catalog");
+  expect(command).toBeDefined();
+  const flags = (command?.options ?? []).map((o) => o.long);
+  expect(flags).toEqual(expect.arrayContaining(["--yes", "--fix-permissions"]));
 });

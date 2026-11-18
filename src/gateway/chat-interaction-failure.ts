@@ -323,6 +323,9 @@ export function formatChatTurnTerminalText(error: unknown): {
     }
     return { text: REJECTED_INTERACTION_TURN_TEXT, businessExecution: "none" };
   }
+  if (error instanceof Error && error.message.startsWith("workspace_binding_required:")) {
+    return { text: error.message, businessExecution: "none" };
+  }
   return { text: CHAT_TURN_ERROR_UNCONFIRMED_TEXT, businessExecution: "unknown" };
 }
 

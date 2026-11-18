@@ -7739,8 +7739,9 @@ export const chatHandlers: GatewayRequestHandlers = {
             err &&
             typeof err === "object" &&
             (err as { usageRecorded?: unknown }).usageRecorded === true;
+          const errorMessage = err instanceof Error ? err.message : String(err);
           context.logGateway.warn(
-            `webchat interaction dispatch failed: class=${errorClass} run=${shortChatRunId(clientRunId)} persisted=${terminal.persisted} phase=${phase} usageRecorded=${usageRecorded}`,
+            `webchat interaction dispatch failed: class=${errorClass} run=${shortChatRunId(clientRunId)} persisted=${terminal.persisted} phase=${phase} usageRecorded=${usageRecorded} message=${errorMessage}`,
           );
           if (terminal.persisted) {
             completeAcceptedChatRequest(clientRunId, resolvedSessionKey);

@@ -1870,10 +1870,10 @@ tasks:
           at: 2026-11-12T14:40:00.000Z
           paths:
             - src/agents/pi-embedded-runner/compact.ts
-          note: Limited exclusive source-path release for P4 r2 official consumer-chain and
-            selection-block landing paths. Predecessor owner and sessions remain unchanged.
-            Authorization is from the repository owner in t21u (human-governor). No predecessor
-            personal sign-off is claimed. Official loom register was not run.
+          note: Limited exclusive source-path release for P4 r2 official consumer-chain and selection-block
+            landing paths. Predecessor owner and sessions remain unchanged. Authorization is from
+            the repository owner in t21u (human-governor). No predecessor personal sign-off is
+            claimed. Official loom register was not run.
   - id: daibai-super-steward:codex-daibai
     owner: codex-daibai
     intent: []
@@ -3375,14 +3375,12 @@ tasks:
             - src/agents/pi-embedded-runner/extensions.ts
             - src/agents/pi-embedded-runner/compact.ts
             - src/agents/model-fallback.ts
-          note: Limited exclusive source-path release. Predecessor owner and
-            existing sessions remain unchanged. Authorization is from the
-            repository owner (human-governor). No predecessor personal sign-off
-            is claimed. Official loom register was not run. Covering globs were
-            replaced with residual directory globs that do not cover the
-            released paths, instead of enumerating every existing file.
-            Remaining ranges stay with this task; future files under those
-            residual directory globs continue to belong to this task.
+          note: Limited exclusive source-path release. Predecessor owner and existing sessions remain
+            unchanged. Authorization is from the repository owner (human-governor). No predecessor
+            personal sign-off is claimed. Official loom register was not run. Covering globs were
+            replaced with residual directory globs that do not cover the released paths, instead of
+            enumerating every existing file. Remaining ranges stay with this task; future files
+            under those residual directory globs continue to belong to this task.
   - id: repository-wide-branch-convergence
     owner: grok-evolution-closure
     intent:
@@ -7508,14 +7506,12 @@ tasks:
             paths:
               - src/agent-runtime/contracts/rule-adaptation.ts
               - src/agent-runtime/policy/rule-adaptation/**
-            note: Limited exclusive source-path release. Predecessor owner and
-              existing sessions remain unchanged. Authorization is from the
-              repository owner (human-governor). No predecessor personal
-              sign-off is claimed. Official loom register was not run. Covering
-              globs were replaced with residual directory globs that do not
-              cover the released paths, instead of enumerating every existing
-              file. Remaining ranges stay with this task; future files under
-              those residual directory globs continue to belong to this task.
+            note: Limited exclusive source-path release. Predecessor owner and existing sessions remain
+              unchanged. Authorization is from the repository owner (human-governor). No predecessor
+              personal sign-off is claimed. Official loom register was not run. Covering globs were
+              replaced with residual directory globs that do not cover the released paths, instead
+              of enumerating every existing file. Remaining ranges stay with this task; future files
+              under those residual directory globs continue to belong to this task.
       - id: path-release-rule-adaptation-p2-r2-20261112-pi-sdk
         taskId: pi-sdk-family-migration-v3:cursor
         ide: cursor
@@ -7534,14 +7530,12 @@ tasks:
               - src/agent-runtime/command/rule-adaptation/**
               - src/agent-runtime/context/rule-adaptation/**
               - src/agent-runtime/model/rule-adaptation/**
-            note: Limited exclusive source-path release. Predecessor owner and
-              existing sessions remain unchanged. Authorization is from the
-              repository owner (human-governor). No predecessor personal
-              sign-off is claimed. Official loom register was not run. Covering
-              globs were replaced with residual directory globs that do not
-              cover the released paths, instead of enumerating every existing
-              file. Remaining ranges stay with this task; future files under
-              those residual directory globs continue to belong to this task.
+            note: Limited exclusive source-path release. Predecessor owner and existing sessions remain
+              unchanged. Authorization is from the repository owner (human-governor). No predecessor
+              personal sign-off is claimed. Official loom register was not run. Covering globs were
+              replaced with residual directory globs that do not cover the released paths, instead
+              of enumerating every existing file. Remaining ranges stay with this task; future files
+              under those residual directory globs continue to belong to this task.
       - id: path-release-rule-adaptation-p3-r3-20261112-pi-sdk
         taskId: pi-sdk-family-migration-v3:cursor
         ide: cursor
@@ -7559,14 +7553,12 @@ tasks:
               - src/agent-runtime/contracts/task.ts
               - src/agent-runtime/state/repository/task-board-file.ts
               - src/agent-runtime/state/mutations/runtime-rule-adaptation.ts
-            note: Limited exclusive source-path release. Predecessor owner and
-              existing sessions remain unchanged. Authorization is from the
-              repository owner (human-governor). No predecessor personal
-              sign-off is claimed. Official loom register was not run. Covering
-              globs were replaced with residual directory globs that do not
-              cover the released paths, instead of enumerating every existing
-              file. Remaining ranges stay with this task; future files under
-              those residual directory globs continue to belong to this task.
+            note: Limited exclusive source-path release. Predecessor owner and existing sessions remain
+              unchanged. Authorization is from the repository owner (human-governor). No predecessor
+              personal sign-off is claimed. Official loom register was not run. Covering globs were
+              replaced with residual directory globs that do not cover the released paths, instead
+              of enumerating every existing file. Remaining ranges stay with this task; future files
+              under those residual directory globs continue to belong to this task.
     ownerHistory: []
     since: 2026-08-29
     metadata:
@@ -7588,14 +7580,12 @@ tasks:
           paths:
             - src/agent-runtime/contracts/rule-adaptation.ts
             - src/agent-runtime/policy/rule-adaptation/**
-          note: Limited exclusive source-path release. Predecessor owner and
-            existing sessions remain unchanged. Authorization is from the
-            repository owner (human-governor). No predecessor personal sign-off
-            is claimed. Official loom register was not run. Covering globs were
-            replaced with residual directory globs that do not cover the
-            released paths, instead of enumerating every existing file.
-            Remaining ranges stay with this task; future files under those
-            residual directory globs continue to belong to this task.
+          note: Limited exclusive source-path release. Predecessor owner and existing sessions remain
+            unchanged. Authorization is from the repository owner (human-governor). No predecessor
+            personal sign-off is claimed. Official loom register was not run. Covering globs were
+            replaced with residual directory globs that do not cover the released paths, instead of
+            enumerating every existing file. Remaining ranges stay with this task; future files
+            under those residual directory globs continue to belong to this task.
         - toTask: runtime-rule-adaptation
           toOwner: grok-dynamic-rules
           fromOwner: cursor
@@ -7607,14 +7597,12 @@ tasks:
             - src/agent-runtime/command/rule-adaptation/**
             - src/agent-runtime/context/rule-adaptation/**
             - src/agent-runtime/model/rule-adaptation/**
-          note: Limited exclusive source-path release. Predecessor owner and
-            existing sessions remain unchanged. Authorization is from the
-            repository owner (human-governor). No predecessor personal sign-off
-            is claimed. Official loom register was not run. Covering globs were
-            replaced with residual directory globs that do not cover the
-            released paths, instead of enumerating every existing file.
-            Remaining ranges stay with this task; future files under those
-            residual directory globs continue to belong to this task.
+          note: Limited exclusive source-path release. Predecessor owner and existing sessions remain
+            unchanged. Authorization is from the repository owner (human-governor). No predecessor
+            personal sign-off is claimed. Official loom register was not run. Covering globs were
+            replaced with residual directory globs that do not cover the released paths, instead of
+            enumerating every existing file. Remaining ranges stay with this task; future files
+            under those residual directory globs continue to belong to this task.
         - toTask: runtime-rule-adaptation
           toOwner: grok-dynamic-rules
           fromOwner: cursor
@@ -7625,14 +7613,12 @@ tasks:
             - src/agent-runtime/contracts/task.ts
             - src/agent-runtime/state/repository/task-board-file.ts
             - src/agent-runtime/state/mutations/runtime-rule-adaptation.ts
-          note: Limited exclusive source-path release. Predecessor owner and
-            existing sessions remain unchanged. Authorization is from the
-            repository owner (human-governor). No predecessor personal sign-off
-            is claimed. Official loom register was not run. Covering globs were
-            replaced with residual directory globs that do not cover the
-            released paths, instead of enumerating every existing file.
-            Remaining ranges stay with this task; future files under those
-            residual directory globs continue to belong to this task.
+          note: Limited exclusive source-path release. Predecessor owner and existing sessions remain
+            unchanged. Authorization is from the repository owner (human-governor). No predecessor
+            personal sign-off is claimed. Official loom register was not run. Covering globs were
+            replaced with residual directory globs that do not cover the released paths, instead of
+            enumerating every existing file. Remaining ranges stay with this task; future files
+            under those residual directory globs continue to belong to this task.
         - toTask: runtime-rule-adaptation
           toOwner: grok-dynamic-rules
           fromOwner: cursor
@@ -7647,14 +7633,12 @@ tasks:
             - src/agents/pi-embedded-runner/extensions.ts
             - src/agents/pi-embedded-runner/compact.ts
             - src/agents/model-fallback.ts
-          note: Limited exclusive source-path release. Predecessor owner and
-            existing sessions remain unchanged. Authorization is from the
-            repository owner (human-governor). No predecessor personal sign-off
-            is claimed. Official loom register was not run. Covering globs were
-            replaced with residual directory globs that do not cover the
-            released paths, instead of enumerating every existing file.
-            Remaining ranges stay with this task; future files under those
-            residual directory globs continue to belong to this task.
+          note: Limited exclusive source-path release. Predecessor owner and existing sessions remain
+            unchanged. Authorization is from the repository owner (human-governor). No predecessor
+            personal sign-off is claimed. Official loom register was not run. Covering globs were
+            replaced with residual directory globs that do not cover the released paths, instead of
+            enumerating every existing file. Remaining ranges stay with this task; future files
+            under those residual directory globs continue to belong to this task.
   - id: cursor-s01-r6-replay-v2
     owner: cursor
     intent:
@@ -8915,14 +8899,12 @@ tasks:
           paths:
             - src/agents/pi-embedded-runner/extensions.ts
             - src/agents/pi-embedded-runner/compact.ts
-          note: Limited exclusive source-path release. Predecessor owner and
-            existing sessions remain unchanged. Authorization is from the
-            repository owner (human-governor). No predecessor personal sign-off
-            is claimed. Official loom register was not run. Covering globs were
-            replaced with residual directory globs that do not cover the
-            released paths, instead of enumerating every existing file.
-            Remaining ranges stay with this task; future files under those
-            residual directory globs continue to belong to this task.
+          note: Limited exclusive source-path release. Predecessor owner and existing sessions remain
+            unchanged. Authorization is from the repository owner (human-governor). No predecessor
+            personal sign-off is claimed. Official loom register was not run. Covering globs were
+            replaced with residual directory globs that do not cover the released paths, instead of
+            enumerating every existing file. Remaining ranges stay with this task; future files
+            under those residual directory globs continue to belong to this task.
   - id: hook-session-delivery-closure
     owner: cursor-grok
     intent: []
@@ -10034,10 +10016,10 @@ tasks:
           at: 2026-11-12T14:40:00.000Z
           paths:
             - src/agents/pi-embedded-runner/compact.ts
-          note: Limited exclusive source-path release for P4 r2 official consumer-chain and
-            selection-block landing paths. Predecessor owner and sessions remain unchanged.
-            Authorization is from the repository owner in t21u (human-governor). No predecessor
-            personal sign-off is claimed. Official loom register was not run.
+          note: Limited exclusive source-path release for P4 r2 official consumer-chain and selection-block
+            landing paths. Predecessor owner and sessions remain unchanged. Authorization is from
+            the repository owner in t21u (human-governor). No predecessor personal sign-off is
+            claimed. Official loom register was not run.
   - id: cn-office-capability-approval-mvp
     owner: cursor-grok
     intent: []
@@ -11674,10 +11656,10 @@ tasks:
           at: 2026-11-12T14:40:00.000Z
           paths:
             - src/agents/model-fallback.ts
-          note: Limited exclusive source-path release for P4 r2 official consumer-chain and
-            selection-block landing paths. Predecessor owner and sessions remain unchanged.
-            Authorization is from the repository owner in t21u (human-governor). No predecessor
-            personal sign-off is claimed. Official loom register was not run.
+          note: Limited exclusive source-path release for P4 r2 official consumer-chain and selection-block
+            landing paths. Predecessor owner and sessions remain unchanged. Authorization is from
+            the repository owner in t21u (human-governor). No predecessor personal sign-off is
+            claimed. Official loom register was not run.
   - id: p1-fix-20261101:全栈验收
     owner: grok-bot
     intent: []
@@ -13554,14 +13536,12 @@ tasks:
               - src/agent-runtime/command/rule-adaptation/**
               - src/agent-runtime/context/rule-adaptation/**
               - src/agent-runtime/model/rule-adaptation/**
-            note: Limited exclusive source-path release. Predecessor owner and
-              existing sessions remain unchanged. Authorization is from the
-              repository owner (human-governor). No predecessor personal
-              sign-off is claimed. Official loom register was not run. Covering
-              globs were replaced with residual directory globs that do not
-              cover the released paths, instead of enumerating every existing
-              file. Remaining ranges stay with this task; future files under
-              those residual directory globs continue to belong to this task.
+            note: Limited exclusive source-path release. Predecessor owner and existing sessions remain
+              unchanged. Authorization is from the repository owner (human-governor). No predecessor
+              personal sign-off is claimed. Official loom register was not run. Covering globs were
+              replaced with residual directory globs that do not cover the released paths, instead
+              of enumerating every existing file. Remaining ranges stay with this task; future files
+              under those residual directory globs continue to belong to this task.
     ownerHistory:
       - fromOwner: codex-runtime-manager
         toOwner: grok-bot
@@ -13583,14 +13563,12 @@ tasks:
           paths:
             - src/agent-runtime/contracts/rule-adaptation.ts
             - src/agent-runtime/policy/rule-adaptation/**
-          note: Limited exclusive source-path release. Predecessor owner and
-            existing sessions remain unchanged. Authorization is from the
-            repository owner (human-governor). No predecessor personal sign-off
-            is claimed. Official loom register was not run. Covering globs were
-            replaced with residual directory globs that do not cover the
-            released paths, instead of enumerating every existing file.
-            Remaining ranges stay with this task; future files under those
-            residual directory globs continue to belong to this task.
+          note: Limited exclusive source-path release. Predecessor owner and existing sessions remain
+            unchanged. Authorization is from the repository owner (human-governor). No predecessor
+            personal sign-off is claimed. Official loom register was not run. Covering globs were
+            replaced with residual directory globs that do not cover the released paths, instead of
+            enumerating every existing file. Remaining ranges stay with this task; future files
+            under those residual directory globs continue to belong to this task.
         - toTask: runtime-rule-adaptation
           toOwner: grok-dynamic-rules
           fromOwner: 双规发布
@@ -13602,14 +13580,12 @@ tasks:
             - src/agent-runtime/command/rule-adaptation/**
             - src/agent-runtime/context/rule-adaptation/**
             - src/agent-runtime/model/rule-adaptation/**
-          note: Limited exclusive source-path release. Predecessor owner and
-            existing sessions remain unchanged. Authorization is from the
-            repository owner (human-governor). No predecessor personal sign-off
-            is claimed. Official loom register was not run. Covering globs were
-            replaced with residual directory globs that do not cover the
-            released paths, instead of enumerating every existing file.
-            Remaining ranges stay with this task; future files under those
-            residual directory globs continue to belong to this task.
+          note: Limited exclusive source-path release. Predecessor owner and existing sessions remain
+            unchanged. Authorization is from the repository owner (human-governor). No predecessor
+            personal sign-off is claimed. Official loom register was not run. Covering globs were
+            replaced with residual directory globs that do not cover the released paths, instead of
+            enumerating every existing file. Remaining ranges stay with this task; future files
+            under those residual directory globs continue to belong to this task.
         - toTask: runtime-rule-adaptation
           toOwner: grok-dynamic-rules
           fromOwner: 双规发布
@@ -13620,14 +13596,12 @@ tasks:
             - src/agent-runtime/contracts/task.ts
             - src/agent-runtime/state/repository/task-board-file.ts
             - src/agent-runtime/state/mutations/runtime-rule-adaptation.ts
-          note: Limited exclusive source-path release. Predecessor owner and
-            existing sessions remain unchanged. Authorization is from the
-            repository owner (human-governor). No predecessor personal sign-off
-            is claimed. Official loom register was not run. Covering globs were
-            replaced with residual directory globs that do not cover the
-            released paths, instead of enumerating every existing file.
-            Remaining ranges stay with this task; future files under those
-            residual directory globs continue to belong to this task.
+          note: Limited exclusive source-path release. Predecessor owner and existing sessions remain
+            unchanged. Authorization is from the repository owner (human-governor). No predecessor
+            personal sign-off is claimed. Official loom register was not run. Covering globs were
+            replaced with residual directory globs that do not cover the released paths, instead of
+            enumerating every existing file. Remaining ranges stay with this task; future files
+            under those residual directory globs continue to belong to this task.
         - toTask: runtime-rule-adaptation
           toOwner: grok-dynamic-rules
           fromOwner: 双规发布
@@ -13641,14 +13615,12 @@ tasks:
             - src/agent-runtime/execution/runner/embedded-run-attempt.ts
             - src/agents/pi-embedded-runner/compact.ts
             - src/agents/pi-embedded-runner/extensions.ts
-          note: Limited exclusive source-path release. Predecessor owner and
-            existing sessions remain unchanged. Authorization is from the
-            repository owner (human-governor). No predecessor personal sign-off
-            is claimed. Official loom register was not run. Covering globs were
-            replaced with residual directory globs that do not cover the
-            released paths, instead of enumerating every existing file.
-            Remaining ranges stay with this task; future files under those
-            residual directory globs continue to belong to this task.
+          note: Limited exclusive source-path release. Predecessor owner and existing sessions remain
+            unchanged. Authorization is from the repository owner (human-governor). No predecessor
+            personal sign-off is claimed. Official loom register was not run. Covering globs were
+            replaced with residual directory globs that do not cover the released paths, instead of
+            enumerating every existing file. Remaining ranges stay with this task; future files
+            under those residual directory globs continue to belong to this task.
   - id: agent-runtime-observability:codex-observe-owner
     owner: codex-observe-owner
     intent:
@@ -13954,10 +13926,10 @@ tasks:
             - src/agents/model-fallback.ts
             - src/agent-runtime/execution/runner/embedded-run-attempt.ts
             - src/agent-runtime/execution/runner/embedded-run-auth.ts
-          note: Limited exclusive source-path release for P4 r2 official consumer-chain and
-            selection-block landing paths. Predecessor owner and sessions remain unchanged.
-            Authorization is from the repository owner in t21u (human-governor). No predecessor
-            personal sign-off is claimed. Official loom register was not run.
+          note: Limited exclusive source-path release for P4 r2 official consumer-chain and selection-block
+            landing paths. Predecessor owner and sessions remain unchanged. Authorization is from
+            the repository owner in t21u (human-governor). No predecessor personal sign-off is
+            claimed. Official loom register was not run.
   - id: pr249-technical-closeout
     owner: codex-runtime-manager
     intent: []
@@ -14081,8 +14053,11 @@ tasks:
       - P1 typed contracts and pure validator path ownership
       - Exclusive limited ownership of the rule-adaptation contract and policy source paths
       - P2 shadow layering relocation and actual completion limit enforcement
-      - Limited exclusive ownership of three official P3 activation landing paths without claiming remaining state or contracts
-      - Limited exclusive ownership of official P4 personal-context-cap consumer-chain and selection-block landing paths without claiming remaining agent, execution, or compact-command scope
+      - Limited exclusive ownership of three official P3 activation landing paths without claiming
+        remaining state or contracts
+      - Limited exclusive ownership of official P4 personal-context-cap consumer-chain and
+        selection-block landing paths without claiming remaining agent, execution, or
+        compact-command scope
     paths:
       - .kiro/specs/runtime-rule-adaptation/**
       - src/agent-runtime/contracts/rule-adaptation.ts
@@ -14125,10 +14100,10 @@ tasks:
           paths:
             - src/agent-runtime/contracts/rule-adaptation.ts
             - src/agent-runtime/policy/rule-adaptation/**
-          note: Limited exclusive source-path receipt. Predecessor owner and sessions remain unchanged.
-            After the broad wildcard was expanded into the existing directories and files, current
-            file coverage can be preserved, but future new paths will no longer automatically belong
-            to the original task. Subsequent new components must be re-registered; the expanded
+          note: Limited exclusive source-path receipt. Predecessor owner and sessions remain unchanged. After
+            the broad wildcard was expanded into the existing directories and files, current file
+            coverage can be preserved, but future new paths will no longer automatically belong to
+            the original task. Subsequent new components must be re-registered; the expanded
             per-item declarations must not continue to be claimed as fully equivalent to the
             original src/**.
         - fromTask: agent-runtime-convergence
@@ -14141,10 +14116,10 @@ tasks:
           paths:
             - src/agent-runtime/contracts/rule-adaptation.ts
             - src/agent-runtime/policy/rule-adaptation/**
-          note: Limited exclusive source-path receipt. Predecessor owner and sessions remain unchanged.
-            After the broad wildcards were expanded into the existing directories and files, current
-            file coverage can be preserved, but future new paths will no longer automatically belong
-            to the original task. Subsequent new components must be re-registered; the expanded
+          note: Limited exclusive source-path receipt. Predecessor owner and sessions remain unchanged. After
+            the broad wildcards were expanded into the existing directories and files, current file
+            coverage can be preserved, but future new paths will no longer automatically belong to
+            the original task. Subsequent new components must be re-registered; the expanded
             per-item declarations must not continue to be claimed as fully equivalent to the
             original src/agent-runtime/policy/** and src/agent-runtime/contracts/**.
         - fromTask: pi-sdk-family-migration-v3:cursor
@@ -14160,11 +14135,12 @@ tasks:
             - src/agent-runtime/context/rule-adaptation/**
             - src/agent-runtime/model/rule-adaptation/**
           note: Limited exclusive source-path receipt for the P2 shadow layering paths. Predecessor owner and
-            sessions remain unchanged. After the broad wildcards were expanded into the existing directories and
-            files, current file coverage can be preserved, but future new paths will no longer automatically
-            belong to the original task. Subsequent new components must be re-registered; the expanded per-item
-            declarations must not continue to be claimed as fully equivalent to the original
-            src/agent-runtime/command/**, src/agent-runtime/context/**, and src/agent-runtime/model/**.
+            sessions remain unchanged. After the broad wildcards were expanded into the existing
+            directories and files, current file coverage can be preserved, but future new paths will
+            no longer automatically belong to the original task. Subsequent new components must be
+            re-registered; the expanded per-item declarations must not continue to be claimed as
+            fully equivalent to the original src/agent-runtime/command/**,
+            src/agent-runtime/context/**, and src/agent-runtime/model/**.
         - fromTask: agent-runtime-convergence
           fromOwner: 双规发布
           toTask: runtime-rule-adaptation
@@ -14178,11 +14154,12 @@ tasks:
             - src/agent-runtime/context/rule-adaptation/**
             - src/agent-runtime/model/rule-adaptation/**
           note: Limited exclusive source-path receipt for the P2 shadow layering paths. Predecessor owner and
-            sessions remain unchanged. After the broad wildcards were expanded into the existing directories and
-            files, current file coverage can be preserved, but future new paths will no longer automatically
-            belong to the original task. Subsequent new components must be re-registered; the expanded per-item
-            declarations must not continue to be claimed as fully equivalent to the original
-            src/agent-runtime/command/**, src/agent-runtime/context/**, and src/agent-runtime/model/**.
+            sessions remain unchanged. After the broad wildcards were expanded into the existing
+            directories and files, current file coverage can be preserved, but future new paths will
+            no longer automatically belong to the original task. Subsequent new components must be
+            re-registered; the expanded per-item declarations must not continue to be claimed as
+            fully equivalent to the original src/agent-runtime/command/**,
+            src/agent-runtime/context/**, and src/agent-runtime/model/**.
         - fromTask: agent-runtime-convergence
           fromOwner: 双规发布
           toTask: runtime-rule-adaptation
@@ -14192,9 +14169,9 @@ tasks:
           at: 2026-11-12T11:18:00.000Z
           paths:
             - src/agent-runtime/contracts/rule-adaptation-activation.ts
-          note: Limited exclusive source-path receipt for the P3 activation contract file only.
-            Coordinated surgical edits to contracts/task.ts and state/repository/task-board-file.ts
-            are not claimed as exclusive ownership. Official loom register was not run.
+          note: Limited exclusive source-path receipt for the P3 activation contract file only. Coordinated
+            surgical edits to contracts/task.ts and state/repository/task-board-file.ts are not
+            claimed as exclusive ownership. Official loom register was not run.
         - fromTask: pi-sdk-family-migration-v3:cursor
           fromOwner: cursor
           toTask: runtime-rule-adaptation
@@ -14207,11 +14184,12 @@ tasks:
             - src/agent-runtime/state/repository/task-board-file.ts
             - src/agent-runtime/state/mutations/runtime-rule-adaptation.ts
           note: Limited exclusive source-path receipt for the three personal-scenario P3 activation landing
-            paths. Predecessor owner and sessions remain unchanged. After the broad wildcard was expanded into
-            the existing directories and files, current file coverage can be preserved, but future new paths
-            will no longer automatically belong to the original task. Subsequent new components must be
-            re-registered; the expanded per-item declarations must not continue to be claimed as fully
-            equivalent to the original src/agent-runtime/state/**.
+            paths. Predecessor owner and sessions remain unchanged. After the broad wildcard was
+            expanded into the existing directories and files, current file coverage can be
+            preserved, but future new paths will no longer automatically belong to the original
+            task. Subsequent new components must be re-registered; the expanded per-item
+            declarations must not continue to be claimed as fully equivalent to the original
+            src/agent-runtime/state/**.
         - fromTask: agent-runtime-convergence
           fromOwner: 双规发布
           toTask: runtime-rule-adaptation
@@ -14224,11 +14202,12 @@ tasks:
             - src/agent-runtime/state/repository/task-board-file.ts
             - src/agent-runtime/state/mutations/runtime-rule-adaptation.ts
           note: Limited exclusive source-path receipt for the three personal-scenario P3 activation landing
-            paths. Predecessor owner and sessions remain unchanged. After the broad wildcard was expanded into
-            the existing directories and files, current file coverage can be preserved, but future new paths
-            will no longer automatically belong to the original task. Subsequent new components must be
-            re-registered; the expanded per-item declarations must not continue to be claimed as fully
-            equivalent to the original src/agent-runtime/state/**.
+            paths. Predecessor owner and sessions remain unchanged. After the broad wildcard was
+            expanded into the existing directories and files, current file coverage can be
+            preserved, but future new paths will no longer automatically belong to the original
+            task. Subsequent new components must be re-registered; the expanded per-item
+            declarations must not continue to be claimed as fully equivalent to the original
+            src/agent-runtime/state/**.
         - fromTask: daibai-super-steward:kiro-daibai
           fromOwner: kiro-daibai
           toTask: runtime-rule-adaptation
@@ -14238,10 +14217,10 @@ tasks:
           at: 2026-11-12T14:40:00.000Z
           paths:
             - src/agents/pi-embedded-runner/compact.ts
-          note: Limited exclusive source-path receipt for P4 r2 official consumer-chain and
-            selection-block landing paths. Predecessor owner and sessions remain unchanged.
-            Authorization is from the repository owner in t21u (human-governor). No predecessor
-            personal sign-off is claimed. Official loom register was not run.
+          note: Limited exclusive source-path receipt for P4 r2 official consumer-chain and selection-block
+            landing paths. Predecessor owner and sessions remain unchanged. Authorization is from
+            the repository owner in t21u (human-governor). No predecessor personal sign-off is
+            claimed. Official loom register was not run.
         - fromTask: production-agent-runtime-safety:codex-runtime-safety
           fromOwner: codex-runtime-safety
           toTask: runtime-rule-adaptation
@@ -14253,16 +14232,15 @@ tasks:
             - src/agents/pi-embedded-runner/extensions.ts
             - src/agents/pi-embedded-runner/compact.ts
             - src/agents/model-fallback.ts
-          note: Limited exclusive source-path receipt for P4 r2 official consumer-chain and
-            selection-block landing paths. Predecessor owner and sessions remain unchanged.
-            Authorization is from the repository owner in t21u (human-governor). No predecessor
-            personal sign-off is claimed. Official loom register was not run. The covering
-            pattern(s) src/agents/** were expanded into the existing files, excluding only the
-            released paths. After the broad wildcard was expanded into the existing directories and
-            files, current file coverage can be preserved, but future new paths will no longer
-            automatically belong to the original task. Subsequent new components must be
-            re-registered; the expanded per-item declarations must not continue to be claimed as
-            fully equivalent to the original glob.
+          note: Limited exclusive source-path receipt for P4 r2 official consumer-chain and selection-block
+            landing paths. Predecessor owner and sessions remain unchanged. Authorization is from
+            the repository owner in t21u (human-governor). No predecessor personal sign-off is
+            claimed. Official loom register was not run. The covering pattern(s) src/agents/** were
+            expanded into the existing files, excluding only the released paths. After the broad
+            wildcard was expanded into the existing directories and files, current file coverage can
+            be preserved, but future new paths will no longer automatically belong to the original
+            task. Subsequent new components must be re-registered; the expanded per-item
+            declarations must not continue to be claimed as fully equivalent to the original glob.
         - fromTask: pi-sdk-family-migration-v3:cursor
           fromOwner: cursor
           toTask: runtime-rule-adaptation
@@ -14278,12 +14256,12 @@ tasks:
             - src/agents/pi-embedded-runner/extensions.ts
             - src/agents/pi-embedded-runner/compact.ts
             - src/agents/model-fallback.ts
-          note: Limited exclusive source-path receipt for P4 r2 official consumer-chain and
-            selection-block landing paths. Predecessor owner and sessions remain unchanged.
-            Authorization is from the repository owner in t21u (human-governor). No predecessor
-            personal sign-off is claimed. Official loom register was not run. The covering
-            pattern(s) src/agent-runtime/execution/**, src/agents/** were expanded into the existing
-            files, excluding only the released paths. After the broad wildcard was expanded into the
+          note: Limited exclusive source-path receipt for P4 r2 official consumer-chain and selection-block
+            landing paths. Predecessor owner and sessions remain unchanged. Authorization is from
+            the repository owner in t21u (human-governor). No predecessor personal sign-off is
+            claimed. Official loom register was not run. The covering pattern(s)
+            src/agent-runtime/execution/**, src/agents/** were expanded into the existing files,
+            excluding only the released paths. After the broad wildcard was expanded into the
             existing directories and files, current file coverage can be preserved, but future new
             paths will no longer automatically belong to the original task. Subsequent new
             components must be re-registered; the expanded per-item declarations must not continue
@@ -14298,16 +14276,16 @@ tasks:
           paths:
             - src/agents/pi-embedded-runner/extensions.ts
             - src/agents/pi-embedded-runner/compact.ts
-          note: Limited exclusive source-path receipt for P4 r2 official consumer-chain and
-            selection-block landing paths. Predecessor owner and sessions remain unchanged.
-            Authorization is from the repository owner in t21u (human-governor). No predecessor
-            personal sign-off is claimed. Official loom register was not run. The covering
-            pattern(s) src/agents/pi-embedded-runner/** were expanded into the existing files,
-            excluding only the released paths. After the broad wildcard was expanded into the
-            existing directories and files, current file coverage can be preserved, but future new
-            paths will no longer automatically belong to the original task. Subsequent new
-            components must be re-registered; the expanded per-item declarations must not continue
-            to be claimed as fully equivalent to the original glob.
+          note: Limited exclusive source-path receipt for P4 r2 official consumer-chain and selection-block
+            landing paths. Predecessor owner and sessions remain unchanged. Authorization is from
+            the repository owner in t21u (human-governor). No predecessor personal sign-off is
+            claimed. Official loom register was not run. The covering pattern(s)
+            src/agents/pi-embedded-runner/** were expanded into the existing files, excluding only
+            the released paths. After the broad wildcard was expanded into the existing directories
+            and files, current file coverage can be preserved, but future new paths will no longer
+            automatically belong to the original task. Subsequent new components must be
+            re-registered; the expanded per-item declarations must not continue to be claimed as
+            fully equivalent to the original glob.
         - fromTask: account-sandbox-skills-mount
           fromOwner: grok-bot
           toTask: runtime-rule-adaptation
@@ -14317,10 +14295,10 @@ tasks:
           at: 2026-11-12T14:40:00.000Z
           paths:
             - src/agents/pi-embedded-runner/compact.ts
-          note: Limited exclusive source-path receipt for P4 r2 official consumer-chain and
-            selection-block landing paths. Predecessor owner and sessions remain unchanged.
-            Authorization is from the repository owner in t21u (human-governor). No predecessor
-            personal sign-off is claimed. Official loom register was not run.
+          note: Limited exclusive source-path receipt for P4 r2 official consumer-chain and selection-block
+            landing paths. Predecessor owner and sessions remain unchanged. Authorization is from
+            the repository owner in t21u (human-governor). No predecessor personal sign-off is
+            claimed. Official loom register was not run.
         - fromTask: smart-model-routing-runtime-admission:智能模型路由
           fromOwner: 智能模型路由
           toTask: runtime-rule-adaptation
@@ -14330,10 +14308,10 @@ tasks:
           at: 2026-11-12T14:40:00.000Z
           paths:
             - src/agents/model-fallback.ts
-          note: Limited exclusive source-path receipt for P4 r2 official consumer-chain and
-            selection-block landing paths. Predecessor owner and sessions remain unchanged.
-            Authorization is from the repository owner in t21u (human-governor). No predecessor
-            personal sign-off is claimed. Official loom register was not run.
+          note: Limited exclusive source-path receipt for P4 r2 official consumer-chain and selection-block
+            landing paths. Predecessor owner and sessions remain unchanged. Authorization is from
+            the repository owner in t21u (human-governor). No predecessor personal sign-off is
+            claimed. Official loom register was not run.
         - fromTask: agent-runtime-convergence
           fromOwner: 双规发布
           toTask: runtime-rule-adaptation
@@ -14348,16 +14326,16 @@ tasks:
             - src/agent-runtime/execution/runner/embedded-run-attempt.ts
             - src/agents/pi-embedded-runner/compact.ts
             - src/agents/pi-embedded-runner/extensions.ts
-          note: Limited exclusive source-path receipt for P4 r2 official consumer-chain and
-            selection-block landing paths. Predecessor owner and sessions remain unchanged.
-            Authorization is from the repository owner in t21u (human-governor). No predecessor
-            personal sign-off is claimed. Official loom register was not run. The covering
-            pattern(s) src/agent-runtime/execution/** were expanded into the existing files,
-            excluding only the released paths. After the broad wildcard was expanded into the
-            existing directories and files, current file coverage can be preserved, but future new
-            paths will no longer automatically belong to the original task. Subsequent new
-            components must be re-registered; the expanded per-item declarations must not continue
-            to be claimed as fully equivalent to the original glob.
+          note: Limited exclusive source-path receipt for P4 r2 official consumer-chain and selection-block
+            landing paths. Predecessor owner and sessions remain unchanged. Authorization is from
+            the repository owner in t21u (human-governor). No predecessor personal sign-off is
+            claimed. Official loom register was not run. The covering pattern(s)
+            src/agent-runtime/execution/** were expanded into the existing files, excluding only the
+            released paths. After the broad wildcard was expanded into the existing directories and
+            files, current file coverage can be preserved, but future new paths will no longer
+            automatically belong to the original task. Subsequent new components must be
+            re-registered; the expanded per-item declarations must not continue to be claimed as
+            fully equivalent to the original glob.
         - fromTask: agent-runtime-observability:codex-observe-owner
           fromOwner: codex-observe-owner
           toTask: runtime-rule-adaptation
@@ -14369,10 +14347,10 @@ tasks:
             - src/agents/model-fallback.ts
             - src/agent-runtime/execution/runner/embedded-run-attempt.ts
             - src/agent-runtime/execution/runner/embedded-run-auth.ts
-          note: Limited exclusive source-path receipt for P4 r2 official consumer-chain and
-            selection-block landing paths. Predecessor owner and sessions remain unchanged.
-            Authorization is from the repository owner in t21u (human-governor). No predecessor
-            personal sign-off is claimed. Official loom register was not run.
+          note: Limited exclusive source-path receipt for P4 r2 official consumer-chain and selection-block
+            landing paths. Predecessor owner and sessions remain unchanged. Authorization is from
+            the repository owner in t21u (human-governor). No predecessor personal sign-off is
+            claimed. Official loom register was not run.
       limitedLandings:
         - at: 2026-11-12T11:45:54.000Z
           kind: coordinated-surgical-extension
@@ -14397,12 +14375,12 @@ tasks:
                 - src/agent-runtime/contracts/task.ts
                 - src/agent-runtime/state/repository/task-board-file.ts
                 - src/agent-runtime/state/**
-          note: Limited landing registration only, not exclusive ownership. These official files
-            are not added to this task's exclusive paths. Evidence is registry metadata plus this
-            record; no human or agent owner sign-off is claimed. Official diffs versus clean HEAD
-            are the additive optional runtimeRuleAdaptationByTaskId field, its preserve and clone
-            helpers, and a dedicated state mutation entry that wraps the existing board lock and
-            writeEpoch semantics. Other tasks' WIP was not overwritten.
+          note: Limited landing registration only, not exclusive ownership. These official files are not added
+            to this task's exclusive paths. Evidence is registry metadata plus this record; no human
+            or agent owner sign-off is claimed. Official diffs versus clean HEAD are the additive
+            optional runtimeRuleAdaptationByTaskId field, its preserve and clone helpers, and a
+            dedicated state mutation entry that wraps the existing board lock and writeEpoch
+            semantics. Other tasks' WIP was not overwritten.
         - at: 2026-11-12T12:40:00.000Z
           kind: exclusive-limited-takeover
           exclusive: true
@@ -14414,10 +14392,11 @@ tasks:
             - src/agent-runtime/state/repository/task-board-file.ts
             - src/agent-runtime/state/mutations/runtime-rule-adaptation.ts
           note: The r2 limitedLandings record remains as a historical self-registration that was not
-            exclusive. Exclusive limited takeover of these three paths is now completed via pathReleases and
-            pathReceipts. Authorization is from the repository owner in t15u following the established
-            path-release pattern used in P1 and P2. fromOwner remains the registered owners. No separate
-            personal sign-off from cursor or 双规发布 is claimed. Official loom register was not run.
+            exclusive. Exclusive limited takeover of these three paths is now completed via
+            pathReleases and pathReceipts. Authorization is from the repository owner in t15u
+            following the established path-release pattern used in P1 and P2. fromOwner remains the
+            registered owners. No separate personal sign-off from cursor or 双规发布 is claimed.
+            Official loom register was not run.
         - at: 2026-11-12T14:18:00.000Z
           kind: coordinated-surgical-extension
           exclusive: false
@@ -14462,18 +14441,16 @@ tasks:
               state: active
               coveringPatterns:
                 - src/agents/pi-embedded-runner/compact.ts
-          note: P4 r1 limited test wiring only, not exclusive ownership and not a path
-            takeover. These official files are not added to this task's exclusive paths.
-            Authorization is from the repository owner in t20u (human-governor). No
-            predecessor personal sign-off is claimed. Official loom register was not
-            run. Hunks are limited to an optional host-injected context-cap port on
-            prepareEmbeddedModel (default / omitted keeps original behavior), and an
-            optional inheritedContextWindowTokens hook on extensions and
-            compactEmbeddedPiSessionDirect so same-run consumers cannot re-parse and
-            enlarge. The manual /compact command path (compactEmbeddedPiSession) is
-            not modified. Production default embedded run still omits the port;
-            production whitelist stays empty; mainChainWired stays false.
-
+          note: P4 r1 limited test wiring only, not exclusive ownership and not a path takeover. These
+            official files are not added to this task's exclusive paths. Authorization is from the
+            repository owner in t20u (human-governor). No predecessor personal sign-off is claimed.
+            Official loom register was not run. Hunks are limited to an optional host-injected
+            context-cap port on prepareEmbeddedModel (default / omitted keeps original behavior),
+            and an optional inheritedContextWindowTokens hook on extensions and
+            compactEmbeddedPiSessionDirect so same-run consumers cannot re-parse and enlarge. The
+            manual /compact command path (compactEmbeddedPiSession) is not modified. Production
+            default embedded run still omits the port; production whitelist stays empty;
+            mainChainWired stays false.
         - at: 2026-11-12T14:40:00.000Z
           kind: exclusive-limited-takeover
           exclusive: true
@@ -14554,12 +14531,12 @@ tasks:
               coveringPatterns:
                 - ui/src/ui/app-render.ts
                 - ui/src/ui/views/chat.ts
-          note: Limited landing registration only, not exclusive ownership. Owner t63u 2026-11-14
-            authorized a minimal employee-advice entry, trusted server binding, and result display.
-            These exact files are not added to this task's exclusive paths. Predecessor owners,
-            covering globs, session history, and CONFLICT records remain declared and are not
-            shrunk. command/index.ts, interaction-turn.ts, and reply-turn.ts are not taken over.
-            Official loom register was not run. No predecessor personal sign-off is claimed.
+          note: Limited landing registration only, not exclusive ownership. Owner t63u 2026-11-14 authorized a
+            minimal employee-advice entry, trusted server binding, and result display. These exact
+            files are not added to this task's exclusive paths. Predecessor owners, covering globs,
+            session history, and CONFLICT records remain declared and are not shrunk.
+            command/index.ts, interaction-turn.ts, and reply-turn.ts are not taken over. Official
+            loom register was not run. No predecessor personal sign-off is claimed.
         - at: 2026-11-14T06:25:00.000Z
           kind: coordinated-surgical-extension
           exclusive: false
@@ -14576,20 +14553,20 @@ tasks:
               state: active
               coveringPatterns:
                 - src/gateway/server-methods/**
-          note: Limited landing registration only, not exclusive ownership. Owner t65u 2026-11-14
-            closed the employee-advice path landing authorization gap for the production fact
-            resolver and cancel-registry files. These exact files are not added to this task's
-            exclusive paths. Predecessor owners, covering globs, session history, and CONFLICT
-            records remain declared and are not shrunk. Official loom register was not run.
-            Registration does not replace authorization; this records the Owner instruction.
+          note: Limited landing registration only, not exclusive ownership. Owner t65u 2026-11-14 closed the
+            employee-advice path landing authorization gap for the production fact resolver and
+            cancel-registry files. These exact files are not added to this task's exclusive paths.
+            Predecessor owners, covering globs, session history, and CONFLICT records remain
+            declared and are not shrunk. Official loom register was not run. Registration does not
+            replace authorization; this records the Owner instruction.
   - id: exec-chain-fidelity-ab-min
     owner: grok-dynamic-rules
     intent:
-      - "Limited landing of the locked A/B prompt-fidelity fixes and required regression only.
-        Exact files only. Complete-message selection, explicit history-omission mark, and
-        full goal seed without 2000-character clipping. Independent acceptance: codex-runtime-manager.
-        No merge or deploy until authorized. Does not include #281 over-block logic, all-history
-        re-injection, global restrict, or C compaction files."
+      - "Limited landing of the locked A/B prompt-fidelity fixes and required regression only. Exact
+        files only. Complete-message selection, explicit history-omission mark, and full goal seed
+        without 2000-character clipping. Independent acceptance: codex-runtime-manager. No merge or
+        deploy until authorized. Does not include #281 over-block logic, all-history re-injection,
+        global restrict, or C compaction files."
     paths:
       - src/agent-runtime/context/interaction-history.ts
       - src/agent-runtime/context/interaction-history.test.ts
@@ -14612,12 +14589,10 @@ tasks:
   - id: rule-adaptation-shadow-host-min
     owner: codex-runtime-manager
     intent:
-      - "Limited landing of the minimal advice-only shadow host hook in
-        runGovernedInteraction and required regression only. Exact file only.
-        Independent acceptance: codex-runtime-manager. Default off, explicit
-        trigger, advice only, no auto-activation, no production config writes.
-        No merge or deploy until authorized. Does not include A/B fidelity files
-        or #281 content."
+      - "Limited landing of the minimal advice-only shadow host hook in runGovernedInteraction and
+        required regression only. Exact file only. Independent acceptance: codex-runtime-manager.
+        Default off, explicit trigger, advice only, no auto-activation, no production config writes.
+        No merge or deploy until authorized. Does not include A/B fidelity files or #281 content."
     paths:
       - src/config/types.collaboration.ts
       - src/config/zod-schema.ts
@@ -14699,9 +14674,8 @@ tasks:
   - id: gate-debt-delivery-c1-c2-c3-20261116:auditbot-batch1
     owner: auditbot-batch1
     intent:
-      - Inherited delivery-guard debt C1-C3 review. Fix stale seq 151 test;
-        classify missing objects; propose RELEASE_RECORD correction. No ledger
-        write and no production deploy.
+      - Inherited delivery-guard debt C1-C3 review. Fix stale seq 151 test; classify missing
+        objects; propose RELEASE_RECORD correction. No ledger write and no production deploy.
     paths:
       - .kiro/specs/gate-debt-delivery-c1-c2-c3-20261116/**
       - scripts/delivery/classify-ledger-objects.ts
@@ -14773,6 +14747,30 @@ tasks:
         agent: codex-workspace-review
         status: active
         lastSignalAt: 2026-11-18T08:58:46.111Z
+  - id: unify-official-workspace-pathways-20261118:codex-workspace-review
+    owner: codex-workspace-review
+    intent: []
+    paths:
+      - src/gateway/data-governance/workspace-locator-canonicalization.ts
+      - src/gateway/data-governance/workspace-locator-canonicalization.test.ts
+      - src/gateway/knowledge/sources/knowledge-index-source.ts
+      - src/gateway/knowledge/relationship-graph-limits.test.ts
+      - ui/src/ui/views/enterprise-asset-library-usage/robot-capability-table.ts
+      - ui/src/ui/views/enterprise-capability-usage-management/robot-capability-table.ts
+      - src/agent-runtime/command/rule-adaptation/library-feedback.ts
+      - src/agent-runtime/command/rule-adaptation/library-feedback.test.ts
+      - src/agent-runtime/wiring/dynamic-rule-constraints.test.ts
+      - src/diagnosis/handling-loop.test.ts
+      - src/batch1-capability-enablement/isolated-loops.test.ts
+      - src/task-outcome/closed-loop-isolation-contract.test.ts
+    state: active
+    sessions:
+      - id: codex-317-20261118
+        taskId: unify-official-workspace-pathways-20261118:codex-workspace-review
+        ide: codex
+        agent: codex-workspace-review
+        status: active
+        lastSignalAt: 2026-11-18T03:38:00.670Z
         metadata: {}
     ownerHistory: []
     since: 2026-11-18
@@ -14824,9 +14822,43 @@ landingStreams:
       - src/conversation-task/session-task-board.seed-audit.test.ts
       - ui/src/ui/app-render.boundary.node.test.ts
       - src/agent-runtime/command/interaction-terminal.s1.test.ts
-    canLandWith: []
+    canLandWith:
+      - unify-official-workspace-pathways-20261118
+      - MRR
+      - ODIAG
     metadata:
       owner: codex-workspace-review
+  - id: unify-official-workspace-pathways-20261118
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - src/cli/program/register.data.test.ts
+      - src/cli/program/register.data.ts
+      - src/commands/canonicalize-workspace-catalog.ts
+      - src/gateway/chat-interaction-failure.test.ts
+      - src/gateway/chat-interaction-failure.ts
+      - src/gateway/data-governance/phase1b-classified-persist.test.ts
+      - src/gateway/data-governance/workspace-catalog-projection.ts
+      - src/gateway/data-governance/workspace-locator-canonicalization.test.ts
+      - src/gateway/data-governance/workspace-locator-canonicalization.ts
+      - src/gateway/knowledge/deliverables/chat-deliverable-publish.ts
+      - src/gateway/server-methods/chat.ts
+      - src/gateway/server-methods/steward-workspace-file.managed.test.ts
+      - src/gateway/server-methods/steward-workspace-file.ts
+      - src/gateway/workspace-resolver/builders.ts
+      - src/gateway/workspace-resolver/execution-workspace.test.ts
+      - src/gateway/workspace-resolver/execution-workspace.ts
+      - src/gateway/workspace-resolver/steward-write.ts
+      - src/batch1-capability-enablement/isolated-loops.test.ts
+      - src/task-outcome/closed-loop-isolation-contract.test.ts
+    canLandWith:
+      - interaction-reliability-20261118
+      - MRR
+      - ODIAG
+    metadata:
+      owner: 1plus3-publish
+      note: Unify steward execution, publish, and preview onto the official workspace resource id and
+        locator; retire short :steward aliases.
   - id: dependabot-docker-group-minor-patch-20261117
     landingPolicy: serial
     paths:
@@ -14897,7 +14929,8 @@ landingStreams:
     metadata:
       task: rule-adaptation-shadow-host-min
       owner: codex-runtime-manager
-      intent: Human-authorized limited takeover for existing normal-task shadow host wiring; no automatic activation.
+      intent: Human-authorized limited takeover for existing normal-task shadow host wiring; no automatic
+        activation.
   - id: runtime-rule-adaptation
     landingPolicy: serial
     paths:
@@ -14923,9 +14956,9 @@ landingStreams:
     metadata:
       task: runtime-rule-adaptation
       owner: grok-dynamic-rules
-      intent: Limited exclusive landing of accepted P1–P4 personal runtime-rule-adaptation
-        paths. Does not include .loom/registry.yaml. Does not enable production, open
-        the whitelist, or authorize deploy.
+      intent: Limited exclusive landing of accepted P1–P4 personal runtime-rule-adaptation paths. Does not
+        include .loom/registry.yaml. Does not enable production, open the whitelist, or authorize
+        deploy.
   - id: t166-gateway-exec-artifact-auth
     landingPolicy: serial
     paths:
@@ -27461,6 +27494,9 @@ landingStreams:
       - superseded-residue-cleanup:cursor-sandra
       - enterprise-login-session-land:cursor-cloud
       - closed-loop-ui-wiring-20261101
+      - interaction-reliability-20261118
+      - unify-official-workspace-pathways-20261118
+      - ODIAG
     metadata:
       legacyTitle: Main Recovery Routing (dangling refs)
       legacyDisposition: MERGE
@@ -29751,6 +29787,9 @@ landingStreams:
       - F
       - executor-observation-acceptance-fixed-integration-20261109
       - prod-adapt-1plus3
+      - interaction-reliability-20261118
+      - unify-official-workspace-pathways-20261118
+      - MRR
     metadata:
       legacyTitle: OpenBot Diagnosis Platform
       legacyDisposition: MERGE
@@ -30797,19 +30836,24 @@ sharedPaths:
     reviewAfter: 2026-11-30
   - glob: scripts/check-architecture-manifest.ts
     landerTask: runtime-rule-adaptation
-    reason: "Owner t55u 2026-11-14 dependency-boundary close-out. Exact-file sharedPath only; predecessor owners, paths, and session history remain declared. Does not take over scripts/** or change that directory lander."
+    reason: Owner t55u 2026-11-14 dependency-boundary close-out. Exact-file sharedPath only; predecessor
+      owners, paths, and session history remain declared. Does not take over scripts/** or change
+      that directory lander.
     reviewAfter: 2026-11-30
   - glob: scripts/architecture/manifest.json
     landerTask: runtime-rule-adaptation
-    reason: "Owner t55u 2026-11-14 dependency-boundary close-out. Exact-file sharedPath only; predecessor owners, paths, session history, and the later exact sharedPaths on exec-chain-fidelity-ab-min and agent-runtime-convergence remain declared. Does not take over scripts/architecture/** or change that directory lander."
+    reason: Owner t55u 2026-11-14 dependency-boundary close-out. Exact-file sharedPath only; predecessor
+      owners, paths, session history, and the later exact sharedPaths on exec-chain-fidelity-ab-min
+      and agent-runtime-convergence remain declared. Does not take over scripts/architecture/** or
+      change that directory lander.
     reviewAfter: 2026-11-30
   - glob: scripts/architecture/manifest.json
     landerTask: exec-chain-fidelity-ab-min
-    reason: "Owner t54u 于 2026-11-14 同意仅对 src/agent-runtime/context/interaction-history.test.ts
-      的 runtime-model-public-entry 增加例外，不扩目录、不豁免生产代码。Exact-file sharedPath
-      only; predecessor owners, paths, session history, and the later exact sharedPath on
-      agent-runtime-convergence remain declared. Does not take over scripts/architecture/**
-      or change that directory lander. Independent acceptance: codex-runtime-manager."
+    reason: "Owner t54u 于 2026-11-14 同意仅对 src/agent-runtime/context/interaction-history.test.ts 的
+      runtime-model-public-entry 增加例外，不扩目录、不豁免生产代码。Exact-file sharedPath only; predecessor owners,
+      paths, session history, and the later exact sharedPath on agent-runtime-convergence remain
+      declared. Does not take over scripts/architecture/** or change that directory lander.
+      Independent acceptance: codex-runtime-manager."
     reviewAfter: 2026-11-30
   - glob: scripts/architecture/manifest.json
     landerTask: agent-runtime-convergence
@@ -32389,15 +32433,15 @@ sharedPaths:
     landerTask: exec-chain-fidelity-ab-min
     reason: "Human-authorized exact-file landing for the locked A/B prompt-fidelity fix and required
       regression only. Predecessor owners, paths, and session history remain unchanged. Does not
-      take over src/** or src/agent-runtime/context/**. Authorized by human-governor on
-      2026-11-13. Independent acceptance: codex-runtime-manager. No #281 over-block content."
+      take over src/** or src/agent-runtime/context/**. Authorized by human-governor on 2026-11-13.
+      Independent acceptance: codex-runtime-manager. No #281 over-block content."
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/context/interaction-history.test.ts
     landerTask: exec-chain-fidelity-ab-min
     reason: "Human-authorized exact-file landing for the locked A/B prompt-fidelity fix and required
       regression only. Predecessor owners, paths, and session history remain unchanged. Does not
-      take over src/** or src/agent-runtime/context/**. Authorized by human-governor on
-      2026-11-13. Independent acceptance: codex-runtime-manager. No #281 over-block content."
+      take over src/** or src/agent-runtime/context/**. Authorized by human-governor on 2026-11-13.
+      Independent acceptance: codex-runtime-manager. No #281 over-block content."
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/wiring/interaction-turn.ts
     landerTask: agent-runtime-convergence
@@ -33354,16 +33398,16 @@ sharedPaths:
     reason: "Human-authorized exact-file landing for the minimal advice-only shadow host hook in
       runGovernedInteraction and required regression only. Predecessor owners, paths, and session
       history remain unchanged. Does not take over src/** or src/agent-runtime/command/**.
-      Authorized by human-governor on 2026-11-13. Independent acceptance: codex-runtime-manager.
-      No auto-activation or production config writes."
+      Authorized by human-governor on 2026-11-13. Independent acceptance: codex-runtime-manager. No
+      auto-activation or production config writes."
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/command/governed-interaction.test.ts
     landerTask: rule-adaptation-shadow-host-min
-    reason: "Human-authorized exact-file landing for the minimal advice-only shadow host hook
-      regression only. Predecessor owners, paths, and session history remain unchanged. Does not
-      take over src/** or src/agent-runtime/command/**. Authorized by human-governor on
-      2026-11-13. Independent acceptance: codex-runtime-manager. No auto-activation or production
-      config writes."
+    reason: "Human-authorized exact-file landing for the minimal advice-only shadow host hook regression
+      only. Predecessor owners, paths, and session history remain unchanged. Does not take over
+      src/** or src/agent-runtime/command/**. Authorized by human-governor on 2026-11-13.
+      Independent acceptance: codex-runtime-manager. No auto-activation or production config
+      writes."
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/execution/runner/execution-lifecycle.ts
     landerTask: agent-runtime-convergence
@@ -33757,8 +33801,8 @@ sharedPaths:
     landerTask: exec-chain-fidelity-ab-min
     reason: "Human-authorized exact-file landing for the locked A/B prompt-fidelity fix and required
       regression only. Predecessor owners, paths, and session history remain unchanged. Does not
-      take over src/** or src/agents/**. Authorized by human-governor on 2026-11-13.
-      Independent acceptance: codex-runtime-manager. No #281 over-block content."
+      take over src/** or src/agents/**. Authorized by human-governor on 2026-11-13. Independent
+      acceptance: codex-runtime-manager. No #281 over-block content."
   - glob: src/agents/pi-extensions/compaction-safeguard.ts
     landerTask: exec-chain-overblock-min
     reason: "Human-authorized exact-file landing for the accepted compaction cancel-on-summary-failure
@@ -33773,127 +33817,127 @@ sharedPaths:
       2026-11-13. Independent acceptance: codex-runtime-manager. No A/B or #281 content."
   - glob: src/gateway/server-methods/runtime-rule-adaptation-advice.ts
     landerTask: runtime-rule-adaptation
-    reason: "Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor
-      owners, paths, session history, and covering globs (including GWSV src/gateway/server-methods/**
-      and EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register
-      was not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts."
+    reason: Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor owners,
+      paths, session history, and covering globs (including GWSV src/gateway/server-methods/** and
+      EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register was
+      not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts.
     reviewAfter: 2026-11-30
   - glob: src/gateway/server-methods/runtime-rule-adaptation-advice.test.ts
     landerTask: runtime-rule-adaptation
-    reason: "Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor
-      owners, paths, session history, and covering globs (including GWSV src/gateway/server-methods/**
-      and EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register
-      was not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts."
+    reason: Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor owners,
+      paths, session history, and covering globs (including GWSV src/gateway/server-methods/** and
+      EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register was
+      not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts.
     reviewAfter: 2026-11-30
   - glob: src/gateway/server-methods.ts
     landerTask: runtime-rule-adaptation
-    reason: "Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor
-      owners, paths, session history, and covering globs (including GWSV src/gateway/server-methods/**
-      and EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register
-      was not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts."
+    reason: Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor owners,
+      paths, session history, and covering globs (including GWSV src/gateway/server-methods/** and
+      EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register was
+      not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts.
     reviewAfter: 2026-11-30
   - glob: src/gateway/server-methods-list.ts
     landerTask: runtime-rule-adaptation
-    reason: "Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor
-      owners, paths, session history, and covering globs (including GWSV src/gateway/server-methods/**
-      and EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register
-      was not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts."
+    reason: Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor owners,
+      paths, session history, and covering globs (including GWSV src/gateway/server-methods/** and
+      EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register was
+      not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts.
     reviewAfter: 2026-11-30
   - glob: src/gateway/method-scopes.ts
     landerTask: runtime-rule-adaptation
-    reason: "Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor
-      owners, paths, session history, and covering globs (including GWSV src/gateway/server-methods/**
-      and EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register
-      was not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts."
+    reason: Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor owners,
+      paths, session history, and covering globs (including GWSV src/gateway/server-methods/** and
+      EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register was
+      not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts.
     reviewAfter: 2026-11-30
   - glob: ui/src/ui/chat/rule-adaptation-advice-panel.ts
     landerTask: runtime-rule-adaptation
-    reason: "Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor
-      owners, paths, session history, and covering globs (including GWSV src/gateway/server-methods/**
-      and EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register
-      was not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts."
+    reason: Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor owners,
+      paths, session history, and covering globs (including GWSV src/gateway/server-methods/** and
+      EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register was
+      not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts.
     reviewAfter: 2026-11-30
   - glob: ui/src/ui/chat/rule-adaptation-advice-panel.node.test.ts
     landerTask: runtime-rule-adaptation
-    reason: "Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor
-      owners, paths, session history, and covering globs (including GWSV src/gateway/server-methods/**
-      and EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register
-      was not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts."
+    reason: Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor owners,
+      paths, session history, and covering globs (including GWSV src/gateway/server-methods/** and
+      EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register was
+      not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts.
     reviewAfter: 2026-11-30
   - glob: ui/src/ui/controllers/rule-adaptation-advice.ts
     landerTask: runtime-rule-adaptation
-    reason: "Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor
-      owners, paths, session history, and covering globs (including GWSV src/gateway/server-methods/**
-      and EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register
-      was not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts."
+    reason: Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor owners,
+      paths, session history, and covering globs (including GWSV src/gateway/server-methods/** and
+      EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register was
+      not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts.
     reviewAfter: 2026-11-30
   - glob: ui/src/ui/controllers/rule-adaptation-advice.node.test.ts
     landerTask: runtime-rule-adaptation
-    reason: "Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor
-      owners, paths, session history, and covering globs (including GWSV src/gateway/server-methods/**
-      and EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register
-      was not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts."
+    reason: Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor owners,
+      paths, session history, and covering globs (including GWSV src/gateway/server-methods/** and
+      EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register was
+      not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts.
     reviewAfter: 2026-11-30
   - glob: ui/src/styles/chat/rule-adaptation-advice.css
     landerTask: runtime-rule-adaptation
-    reason: "Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor
-      owners, paths, session history, and covering globs (including GWSV src/gateway/server-methods/**
-      and EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register
-      was not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts."
+    reason: Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor owners,
+      paths, session history, and covering globs (including GWSV src/gateway/server-methods/** and
+      EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register was
+      not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts.
     reviewAfter: 2026-11-30
   - glob: ui/src/styles/chat.css
     landerTask: runtime-rule-adaptation
-    reason: "Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor
-      owners, paths, session history, and covering globs (including GWSV src/gateway/server-methods/**
-      and EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register
-      was not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts."
+    reason: Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor owners,
+      paths, session history, and covering globs (including GWSV src/gateway/server-methods/** and
+      EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register was
+      not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts.
     reviewAfter: 2026-11-30
   - glob: ui/src/ui/views/chat.ts
     landerTask: runtime-rule-adaptation
-    reason: "Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor
-      owners, paths, session history, and covering globs (including GWSV src/gateway/server-methods/**
-      and EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register
-      was not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts."
+    reason: Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor owners,
+      paths, session history, and covering globs (including GWSV src/gateway/server-methods/** and
+      EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register was
+      not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts.
     reviewAfter: 2026-11-30
   - glob: ui/src/ui/app-render.ts
     landerTask: runtime-rule-adaptation
-    reason: "Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor
-      owners, paths, session history, and covering globs (including GWSV src/gateway/server-methods/**
-      and EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register
-      was not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts."
+    reason: Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor owners,
+      paths, session history, and covering globs (including GWSV src/gateway/server-methods/** and
+      EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register was
+      not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts.
     reviewAfter: 2026-11-30
   - glob: ui/src/i18n/locales/zh-CN.ts
     landerTask: runtime-rule-adaptation
-    reason: "Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor
-      owners, paths, session history, and covering globs (including GWSV src/gateway/server-methods/**
-      and EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register
-      was not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts."
+    reason: Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor owners,
+      paths, session history, and covering globs (including GWSV src/gateway/server-methods/** and
+      EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register was
+      not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts.
     reviewAfter: 2026-11-30
   - glob: ui/src/i18n/locales/en.ts
     landerTask: runtime-rule-adaptation
-    reason: "Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor
-      owners, paths, session history, and covering globs (including GWSV src/gateway/server-methods/**
-      and EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register
-      was not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts."
+    reason: Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor owners,
+      paths, session history, and covering globs (including GWSV src/gateway/server-methods/** and
+      EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register was
+      not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts.
     reviewAfter: 2026-11-30
   - glob: src/gateway/server-methods/runtime-rule-adaptation-advice-facts.ts
     landerTask: runtime-rule-adaptation
-    reason: "Owner t65u 2026-11-14 closed the employee-advice path landing authorization gap.
-      Exact-file sharedPath only; predecessor owners, paths, session history, and covering globs
-      (including GWSV src/gateway/server-methods/**) remain declared. exclusive:false; no exclusive
-      takeover; official loom register was not run. Registration does not replace authorization."
+    reason: Owner t65u 2026-11-14 closed the employee-advice path landing authorization gap. Exact-file
+      sharedPath only; predecessor owners, paths, session history, and covering globs (including
+      GWSV src/gateway/server-methods/**) remain declared. exclusive:false; no exclusive takeover;
+      official loom register was not run. Registration does not replace authorization.
     reviewAfter: 2026-11-30
   - glob: src/gateway/server-methods/runtime-rule-adaptation-advice-facts.test.ts
     landerTask: runtime-rule-adaptation
-    reason: "Owner t65u 2026-11-14 closed the employee-advice path landing authorization gap.
-      Exact-file sharedPath only; predecessor owners, paths, session history, and covering globs
-      (including GWSV src/gateway/server-methods/**) remain declared. exclusive:false; no exclusive
-      takeover; official loom register was not run. Registration does not replace authorization."
+    reason: Owner t65u 2026-11-14 closed the employee-advice path landing authorization gap. Exact-file
+      sharedPath only; predecessor owners, paths, session history, and covering globs (including
+      GWSV src/gateway/server-methods/**) remain declared. exclusive:false; no exclusive takeover;
+      official loom register was not run. Registration does not replace authorization.
     reviewAfter: 2026-11-30
   - glob: src/gateway/server-methods/runtime-rule-adaptation-advice.live.test.ts
     landerTask: runtime-rule-adaptation
-    reason: "Owner t65u 2026-11-14 closed the employee-advice path landing authorization gap.
-      Exact-file sharedPath only; predecessor owners, paths, session history, and covering globs
-      (including GWSV src/gateway/server-methods/**) remain declared. exclusive:false; no exclusive
-      takeover; official loom register was not run. Registration does not replace authorization."
+    reason: Owner t65u 2026-11-14 closed the employee-advice path landing authorization gap. Exact-file
+      sharedPath only; predecessor owners, paths, session history, and covering globs (including
+      GWSV src/gateway/server-methods/**) remain declared. exclusive:false; no exclusive takeover;
+      official loom register was not run. Registration does not replace authorization.
     reviewAfter: 2026-11-30

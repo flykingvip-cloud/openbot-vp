@@ -15,7 +15,13 @@ import {
   type WorkspaceCutoverOperation,
   type WorkspaceCutoverStore,
 } from "../workspace-cutover/index.js";
-import { buildEmployeeStewardCutoverCatalogEntries, buildWorkspaceResourceId } from "./builders.js";
+import {
+  STEWARD_BUILTIN_AGENT_ASSET_ID,
+  buildEmployeeStewardCutoverCatalogEntries,
+  buildWorkspaceResourceId,
+} from "./builders.js";
+
+export { STEWARD_BUILTIN_AGENT_ASSET_ID, buildBuiltinStewardWorkspaceResourceId } from "./builders.js";
 import {
   InMemoryWorkspaceResourceCatalog,
   withCatalogEntries,
@@ -24,8 +30,6 @@ import {
 import { resolveWorkspaceActorTenantId } from "./group-read.js";
 import { openWorkspaceResourceAccess, resolveWorkspaceResource } from "./resolve.js"; import { resolveWorkspaceLocator, resolveWorkspaceTargetBinding } from "./strict-locator.js";
 import type { WorkspaceResolveActor } from "./types.js";
-
-export const STEWARD_BUILTIN_AGENT_ASSET_ID = "steward:builtin" as const;
 
 export function resolveEmployeeStewardSourceWorkspaceDir(
   platformUserId: string,

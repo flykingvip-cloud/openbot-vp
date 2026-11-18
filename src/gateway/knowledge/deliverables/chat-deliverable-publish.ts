@@ -11,6 +11,7 @@ import type { AgentRegistryStore } from "../../agent-registry/types.js";
 import { loadValidatedCatalogRecordSync } from "../../data-governance/catalog-store.js";
 import { resolveDataGovernanceCatalogPath } from "../../data-governance/paths.js";
 import { resolveSecurityProfile } from "../../security-profile.js";
+import { buildBuiltinStewardWorkspaceResourceId } from "../../workspace-resolver/builders.js";
 import { selectExecutionWorkspace } from "../../workspace-resolver/execution-workspace.js";
 import {
   markDeliverableDeclarationUnwritten,
@@ -616,7 +617,10 @@ export function prepareChatDeliverablePublish(
       const rid = groupId
         ? `ws:${tenantId}:group:${groupId}`
         : identity.kind === "builtin-universal"
-          ? `ws:${tenantId}:user:${params.userId}:steward`
+          ? buildBuiltinStewardWorkspaceResourceId({
+              tenantId,
+              userId: params.userId,
+            })
           : identity.kind === "resolved" && owner
             ? owner.ownerType === "seat"
               ? `ws:${tenantId}:seat:${owner.ownerId}:asset:${identity.ref.agentAssetId}`

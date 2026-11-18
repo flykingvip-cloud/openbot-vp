@@ -42,7 +42,7 @@ void describe("persistClassifiedAuthorityRows", () => {
           agentAssetId: "asset-1",
         },
         {
-          resourceId: "ws:tenant-1:user:user-1:steward",
+          resourceId: "ws:tenant-1:user:user-1:asset:steward:builtin",
           classification: "classified",
           workspaceKind: "employee_private",
           tenantId: "tenant-1",
@@ -60,7 +60,7 @@ void describe("persistClassifiedAuthorityRows", () => {
 
     assert.deepEqual(result.persisted.toSorted(), [
       "ws:tenant-1:user:user-1:asset:asset-1",
-      "ws:tenant-1:user:user-1:steward",
+      "ws:tenant-1:user:user-1:asset:steward:builtin",
     ]);
     assert.deepEqual(result.compareAndPutConfirmed, result.persisted);
     assert.deepEqual(
@@ -72,8 +72,8 @@ void describe("persistClassifiedAuthorityRows", () => {
     assert.equal(got?.envelope.governanceVersion, 2);
     assert.equal(got?.envelope.resourceType, "workspace");
     assert.equal(
-      (await store.get("ws:tenant-1:user:user-1:steward"))?.envelope.resourceId,
-      "ws:tenant-1:user:user-1:steward",
+      (await store.get("ws:tenant-1:user:user-1:asset:steward:builtin"))?.envelope.resourceId,
+      "ws:tenant-1:user:user-1:asset:steward:builtin",
     );
     assert.equal(await store.get("ws:tenant-1:unknown:conflict"), null);
     assert.deepEqual(assertClassifiedCatalogWriteAllowed("conflict"), {

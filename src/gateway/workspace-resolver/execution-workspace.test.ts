@@ -4,6 +4,10 @@ import path from "node:path";
 import { afterEach, expect, it } from "vitest";
 import { createEmptyAgentRegistryStore } from "../agent-registry/types.js";
 import type { CatalogRecord } from "../data-governance/types.js";
+import {
+  STEWARD_BUILTIN_AGENT_ASSET_ID,
+  buildBuiltinStewardWorkspaceResourceId,
+} from "./builders.js";
 import { selectExecutionWorkspace } from "./execution-workspace.js";
 
 const roots: string[] = [];
@@ -188,3 +192,147 @@ it.each(["archived", "deletion_pending", "purged", "quarantined", "recovery_requ
     );
   },
 );
+
+function stewardRecord(params: {
+  resourceId: string;
+  locator: string;
+  userId: string;
+  tenantId?: string;
+}): CatalogRecord {
+  const tenantId = params.tenantId ?? "tenant";
+  return {
+    envelope: {
+      resourceId: params.resourceId,
+      resourceType: "workspace",
+      schemaVersion: 1,
+      tenantId,
+      owner: { kind: "user", userId: params.userId },
+      scope: { kind: "tenant", tenantId },
+      lifecycleState: "active",
+      classification: "internal",
+      governanceVersion: 1,
+      canonicalBindingId: "binding",
+      createdAt: "now",
+      updatedAt: "now",
+    },
+    bindings: [
+      {
+        bindingId: "binding",
+        resourceId: params.resourceId,
+        role: "canonical",
+        state: "active",
+        locator: params.locator,
+        storageKind: "filesystem",
+        contentVersion: "1",
+      },
+    ],
+  };
+}
+
+it("builtin steward uses the official asset:steward:builtin catalog id", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "canonical-steward-"));
+  roots.push(root);
+  const userId = "user-elle";
+  const resourceId = buildBuiltinStewardWorkspaceResourceId({ tenantId: "tenant", userId });
+  expect(resourceId).toBe(`ws:tenant:user:${userId}:asset:${STEWARD_BUILTIN_AGENT_ASSET_ID}`);
+  const written = selectExecutionWorkspace({
+    tenantId: "tenant",
+    userId,
+    agentId: "main",
+    registry: createEmptyAgentRegistryStore(),
+    records: [stewardRecord({ resourceId, locator: root, userId })],
+    operation: "write",
+  });
+  expect(written.resourceId).toBe(resourceId);
+  expect(written.rootPath).toBe(fs.realpathSync(root));
+});
+
+it("does not accept a short :steward alias for builtin steward", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "canonical-steward-short-"));
+  roots.push(root);
+  const userId = "user-elle";
+  expect(() =>
+    selectExecutionWorkspace({
+      tenantId: "tenant",
+      userId,
+      agentId: "main",
+      registry: createEmptyAgentRegistryStore(),
+      records: [
+        stewardRecord({
+          resourceId: `ws:tenant:user:${userId}:steward`,
+          locator: root,
+          userId,
+        }),
+      ],
+      operation: "write",
+    }),
+  ).toThrow("workspace_binding_required:resource_missing_or_ambiguous");
+});
+
+it("resolves a historical /root/.openbot locator onto STATE_DIR and never onto operators", () => {
+  const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "canonical-state-"));
+  roots.push(stateDir);
+  const userId = "user-elle";
+  const official = path.join(
+    stateDir,
+    "tenants/001/users",
+    userId,
+    "OpenBot/agents/main/workspace",
+  );
+  fs.mkdirSync(official, { recursive: true });
+  fs.mkdirSync(path.join(stateDir, "operators", userId, "OpenBot/agents/main/workspace"), {
+    recursive: true,
+  });
+  const resourceId = buildBuiltinStewardWorkspaceResourceId({ tenantId: "001", userId });
+  const written = selectExecutionWorkspace({
+    tenantId: "001",
+    userId,
+    agentId: "main",
+    registry: createEmptyAgentRegistryStore(),
+    records: [
+      stewardRecord({
+        resourceId,
+        locator: `/root/.openbot/tenants/001/users/${userId}/OpenBot/agents/main/workspace`,
+        userId,
+        tenantId: "001",
+      }),
+    ],
+    operation: "write",
+    stateDir,
+    tenantsRoot: path.join(stateDir, "tenants"),
+  });
+  expect(written.rootPath).toBe(fs.realpathSync(official));
+  expect(written.rootPath).not.toContain(`${path.sep}operators${path.sep}`);
+});
+
+it("fail-closes write when the official workspace directory is not writable", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "canonical-steward-ro-"));
+  roots.push(root);
+  fs.chmodSync(root, 0o555);
+  const userId = "user-elle";
+  const resourceId = buildBuiltinStewardWorkspaceResourceId({ tenantId: "tenant", userId });
+  try {
+    expect(() =>
+      selectExecutionWorkspace({
+        tenantId: "tenant",
+        userId,
+        agentId: "main",
+        registry: createEmptyAgentRegistryStore(),
+        records: [stewardRecord({ resourceId, locator: root, userId })],
+        operation: "write",
+      }),
+    ).toThrow("workspace_binding_required:directory_not_writable");
+    expect(
+      selectExecutionWorkspace({
+        tenantId: "tenant",
+        userId,
+        agentId: "main",
+        registry: createEmptyAgentRegistryStore(),
+        records: [stewardRecord({ resourceId, locator: root, userId })],
+        operation: "read",
+      }).rootPath,
+    ).toBe(fs.realpathSync(root));
+  } finally {
+    fs.chmodSync(root, 0o755);
+  }
+});

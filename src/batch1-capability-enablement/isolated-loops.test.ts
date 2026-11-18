@@ -14,7 +14,7 @@ import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import { fileKeyForTenant } from "../conversation-task/canonical.js";
 import {
   completeConversationTaskLedgerOnReply,
@@ -61,8 +61,15 @@ import { applySpendAndAssess, buildTaskBudgetState } from "../task-outcome/budge
 import { readBoundSha } from "./bound-sha.js";
 import { PRICE_WATCH_ORIGINAL_MARKDOWN, runOfficialKnowledgeReuse } from "./knowledge-reuse.js";
 
+const configuredEvidenceDir = process.env.OPENBOT_BATCH1_EVIDENCE_DIR?.trim();
 const EVIDENCE_DIR =
-  process.env.OPENBOT_BATCH1_EVIDENCE_DIR ?? "/workspace/openbot-vp-audit/batch1-evidence";
+  configuredEvidenceDir || fs.mkdtempSync(path.join(os.tmpdir(), "openbot-batch1-evidence-"));
+
+afterAll(() => {
+  if (!configuredEvidenceDir) {
+    fs.rmSync(EVIDENCE_DIR, { recursive: true, force: true });
+  }
+});
 
 const tmpDirs: string[] = [];
 const previousLedgerFlag = process.env[PROGRESS_LEDGER_ENABLED_ENV];

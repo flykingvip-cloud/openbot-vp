@@ -11,7 +11,10 @@ import { setPrimaryOwner } from "../agent-registry/ownership.js";
 import { createAgentAsset, findAgentAssetBySlug } from "../agent-registry/registry.js";
 import { loadAgentRegistryStore, saveAgentRegistryStore } from "../agent-registry/store.js";
 import { AgentRegistryError } from "../agent-registry/types.js";
-import { buildWorkspaceResourceId } from "../workspace-resolver/builders.js";
+import {
+  STEWARD_BUILTIN_AGENT_ASSET_ID,
+  buildWorkspaceResourceId,
+} from "../workspace-resolver/builders.js";
 import {
   InMemoryWorkspaceResourceCatalog,
   type WorkspaceResourceCatalog,
@@ -37,8 +40,6 @@ export type ExistingGovernedWorkspaceIdentity = {
 
 const USER_OWNED_ASSET_ID = /^ws:([^:]+):user:([^:]+):asset:(.+)$/;
 const SEAT_OWNED_ASSET_ID = /^ws:([^:]+):seat:([^:]+):asset:(.+)$/;
-/** Same token as steward-write.STEWARD_BUILTIN_AGENT_ASSET_ID — keep inlined to avoid chat importing cutover. */
-const STEWARD_BUILTIN_AGENT_ASSET_ID = "steward:builtin" as const;
 
 function stewardTargetWorkspaceDir(params: {
   tenantId: string;
