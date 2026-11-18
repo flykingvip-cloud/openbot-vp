@@ -14753,6 +14753,12 @@ tasks:
       - src/agent-runtime/command/rule-adaptation/library-feedback.ts
       - src/agent-runtime/command/rule-adaptation/library-feedback.test.ts
       - src/agent-runtime/wiring/dynamic-rule-constraints.test.ts
+      - src/auto-reply/reply/get-reply-inline-actions.ts
+      - src/cli/run-main.exit.test.ts
+      - src/cli/run-main.profile-env.test.ts
+      - src/agent-runtime/execution/runner/command-budget.test.ts
+      - src/gateway/collaboration-dispatch/round-store-io.ts
+      - test/test-env.ts
     state: active
     sessions:
       - id: codex-interaction-20261118
@@ -14760,7 +14766,7 @@ tasks:
         ide: codex
         agent: codex-workspace-review
         status: active
-        lastSignalAt: 2026-11-18T06:53:47.468Z
+        lastSignalAt: 2026-11-18T08:25:35.672Z
         metadata: {}
     ownerHistory: []
     since: 2026-11-18
@@ -14800,6 +14806,12 @@ landingStreams:
       - src/agent-runtime/command/rule-adaptation/library-feedback.ts
       - src/agent-runtime/command/rule-adaptation/library-feedback.test.ts
       - src/agent-runtime/wiring/dynamic-rule-constraints.test.ts
+      - src/auto-reply/reply/get-reply-inline-actions.ts
+      - src/cli/run-main.exit.test.ts
+      - src/cli/run-main.profile-env.test.ts
+      - src/agent-runtime/execution/runner/command-budget.test.ts
+      - src/gateway/collaboration-dispatch/round-store-io.ts
+      - test/test-env.ts
     canLandWith: []
     metadata:
       owner: codex-workspace-review
