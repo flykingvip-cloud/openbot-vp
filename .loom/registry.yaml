@@ -14732,6 +14732,8 @@ tasks:
       - src/gateway/chat-request-recovery.ts
       - src/gateway/chat-request-recovery.test.ts
       - src/gateway/server-methods/chat.ts
+      - src/gateway/collaboration-learning/group-interaction-understanding.ts
+      - src/gateway/collaboration-learning/group-interaction-understanding.test.ts
     state: active
     sessions:
       - id: codex-interaction-20261118
@@ -14739,7 +14741,7 @@ tasks:
         ide: codex
         agent: codex-workspace-review
         status: active
-        lastSignalAt: 2026-11-18T05:04:39.991Z
+        lastSignalAt: 2026-11-18T05:29:05.226Z
         metadata: {}
     ownerHistory: []
     since: 2026-11-18
@@ -14758,6 +14760,8 @@ landingStreams:
       - src/gateway/chat-request-recovery.ts
       - src/gateway/chat-request-recovery.test.ts
       - src/gateway/server-methods/chat.ts
+      - src/gateway/collaboration-learning/group-interaction-understanding.ts
+      - src/gateway/collaboration-learning/group-interaction-understanding.test.ts
     canLandWith: []
     metadata:
       owner: codex-workspace-review
