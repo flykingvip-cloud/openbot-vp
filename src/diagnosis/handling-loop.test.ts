@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { PRODUCTION_EXECUTION_MODE_ENV } from "../agents/sandbox/production-execution-mode.js";
 import { DIAGNOSIS_JOBS_DIR } from "./diagnosis-job-model.js";
 import { diagnosisJobTenantHash16, writeDiagnosisScheduleBinding } from "./diagnosis-job-store.js";
@@ -37,6 +37,7 @@ import { DIAGNOSIS_REMEDIATION_EXECUTION_ENABLED } from "./production-cutover.js
 const tmpDirs: string[] = [];
 
 afterEach(() => {
+  vi.restoreAllMocks();
   for (const dir of tmpDirs.splice(0)) {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -601,8 +602,10 @@ describe("diagnosis handling loop · diagnosis_job_paused", () => {
 
   it("refuses to open execute from the isolation env var or a production registration path", async () => {
     const isolatedDir = tmp();
-    const notTmp = fs.mkdtempSync(path.join("/workspace", "openbot-handling-not-iso-"));
-    tmpDirs.push(notTmp);
+    const notTmp = tmp();
+    // Two real temp directories exercise both sides of the boundary without
+    // requiring a writable directory outside the host temp tree.
+    vi.spyOn(os, "tmpdir").mockReturnValue(isolatedDir);
     expect(
       isDiagnosisHandlingExecuteOpen({
         isolation: false,
