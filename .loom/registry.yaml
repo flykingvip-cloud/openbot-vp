@@ -14729,6 +14729,9 @@ tasks:
       - src/gateway/chat-interaction-failure.test.ts
       - src/agent-runtime/command/governed-interaction.ts
       - src/agent-runtime/command/governed-interaction.test.ts
+      - src/gateway/chat-request-recovery.ts
+      - src/gateway/chat-request-recovery.test.ts
+      - src/gateway/server-methods/chat.ts
     state: active
     sessions:
       - id: codex-interaction-20261118
@@ -14736,7 +14739,7 @@ tasks:
         ide: codex
         agent: codex-workspace-review
         status: active
-        lastSignalAt: 2026-11-18T04:53:29.152Z
+        lastSignalAt: 2026-11-18T05:04:39.991Z
         metadata: {}
     ownerHistory: []
     since: 2026-11-18
@@ -14752,6 +14755,9 @@ landingStreams:
       - src/gateway/chat-interaction-failure.test.ts
       - src/agent-runtime/command/governed-interaction.ts
       - src/agent-runtime/command/governed-interaction.test.ts
+      - src/gateway/chat-request-recovery.ts
+      - src/gateway/chat-request-recovery.test.ts
+      - src/gateway/server-methods/chat.ts
     canLandWith: []
     metadata:
       owner: codex-workspace-review

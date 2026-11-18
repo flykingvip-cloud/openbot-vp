@@ -179,6 +179,11 @@ import {
   writeChatTurnTerminal,
   readChatTurnTerminal,
 } from "../chat-interaction-failure.js";
+import {
+  recordAcceptedChatRequest,
+  completeAcceptedChatRequest,
+  recoverInterruptedChatRequests,
+} from "../chat-request-recovery.js";
 import { stripEnvelopeFromMessage, stripEnvelopeFromMessages } from "../chat-sanitize.js";
 import {
   noteChatRunTenant,
@@ -3369,6 +3374,7 @@ function broadcastChatFinal(params: {
     ...(params.taskUpdate ? { taskUpdate: params.taskUpdate } : {}),
   };
   const send = () => {
+    completeAcceptedChatRequest(params.runId, params.sessionKey);
     params.context.broadcastChat(params.sessionKey, payload, {
       runId: params.runId,
       tenantId: resolveChatRunTenantId(params.runId),
@@ -4604,6 +4610,25 @@ export const chatHandlers: GatewayRequestHandlers = {
       return;
     }
     if (sessionId && storePath) {
+      await recoverInterruptedChatRequests({
+        sessionKey,
+        append: async (message, idempotencyKey) => {
+          const governance = await resolveChatTranscriptGovernance({ client: historyClient, cfg });
+          return appendAssistantTranscriptMessage({
+            message,
+            idempotencyKey,
+            sessionId,
+            storePath,
+            sessionFile: entry?.sessionFile,
+            agentId: historyAgentId,
+            createIfMissing: false,
+            tenantId: governance.tenantId,
+            ownerUserId: governance.ownerUserId,
+            groupId: governance.groupId,
+            failClosed: governance.failClosed,
+          });
+        },
+      });
       for (const receipt of listChatTurnTerminals(sessionKey)) {
         if (receipt.persistedToTranscript) {
           continue;
@@ -6997,6 +7022,17 @@ export const chatHandlers: GatewayRequestHandlers = {
         userMessageId: `local-${clientRunId}`,
         userMessageText: bodyTrimmed,
       });
+      try {
+        recordAcceptedChatRequest(clientRunId, resolvedSessionKey);
+      } catch {
+        context.chatAbortControllers.delete(clientRunId);
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.UNAVAILABLE, "请求记录暂不可用，请稍后重试。"),
+        );
+        return;
+      }
       const ackPayload = {
         runId: clientRunId,
         status: "started" as const,
@@ -7623,6 +7659,7 @@ export const chatHandlers: GatewayRequestHandlers = {
               }).catch(() => undefined);
             }
           }
+          completeAcceptedChatRequest(clientRunId, resolvedSessionKey);
           setGatewayDedupeEntry({
             dedupe: context.dedupe,
             key: `chat:${clientRunId}`,
@@ -7682,6 +7719,9 @@ export const chatHandlers: GatewayRequestHandlers = {
           context.logGateway.warn(
             `webchat interaction dispatch failed: class=${errorClass} run=${shortChatRunId(clientRunId)} persisted=${terminal.persisted} phase=${phase} usageRecorded=${usageRecorded}`,
           );
+          if (terminal.persisted) {
+            completeAcceptedChatRequest(clientRunId, resolvedSessionKey);
+          }
           broadcastChatError({
             context,
             runId: clientRunId,
