@@ -603,7 +603,8 @@ it("persists a missing-text interaction decision as a durable pre-admission noti
     append,
   });
   expect(result.persisted).toBe(true);
-  expect(result.text).toBe(INTERACTION_TIMEOUT_TEXT);
+  expect(result.text).toContain("模型未返回有效的交互决定");
+  expect(result.text).not.toBe(INTERACTION_TIMEOUT_TEXT);
   expect(result.text).not.toMatch(/SyntaxError|stack|\\{/);
   expect(append).toHaveBeenCalledTimes(1);
 });

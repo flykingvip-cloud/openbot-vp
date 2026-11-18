@@ -80,6 +80,8 @@ export function isInteractionBudgetExhausted(
 
 export const INTERACTION_TIMEOUT_TEXT =
   "本轮交互在时限内没有得到有效输出，没有启动或修改任务。本轮请求已结束，不会自动补做。";
+export const INTERACTION_EMPTY_OUTPUT_TEXT =
+  "本轮模型未返回有效的交互决定，没有启动或修改任务。请重新提出请求。";
 export const INTERACTION_MODEL_FAILURE_TEXT =
   "本轮交互未能完成（模型或服务失败），没有启动或修改任务。本轮请求已结束，不会自动补做。";
 export const INTERACTION_QUEUE_TIMEOUT_TEXT =
@@ -118,45 +120,54 @@ export function isInteractionUserAbort(error: unknown): boolean {
  * is not cancelled; callers keep cleanup / usage responsibility.
  */
 
-function deadlineAfter<T = never>(remainingMs: number): Promise<T> {
-  return new Promise((_, reject) => {
-    setTimeout(() => {
-      // Yield one macrotask so a cooperative waiter due on the same tick
-      // (for example a queue wait equal to this deadline) can settle first.
-      setImmediate(() => reject(interactionTimeoutError()));
-    }, remainingMs);
-  });
-}
-
 export async function raceVisibleInteraction<T>(
   work: Promise<T>,
   opts: { signal?: AbortSignal; remainingMs?: number },
 ): Promise<T> {
   const remaining = opts.remainingMs;
-  if (opts.signal?.aborted) {
-    throw visibleDeadlineError(opts.signal);
+  const signal = opts.signal;
+  if (signal?.aborted) {
+    throw visibleDeadlineError(signal);
   }
   if (remaining !== undefined && remaining <= 0) {
     throw interactionTimeoutError();
   }
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let immediate: ReturnType<typeof setImmediate> | undefined;
+  let onAbort: (() => void) | undefined;
   const racers: Promise<T>[] = [work];
-  if (opts.signal) {
-    racers.push(whenAborted(opts.signal));
-  }
-  if (remaining !== undefined) {
-    racers.push(deadlineAfter(remaining));
-  }
-  return await Promise.race(racers);
-}
-
-function whenAborted<T = never>(signal: AbortSignal): Promise<T> {
-  return new Promise((_, reject) => {
-    if (signal.aborted) {
-      reject(visibleDeadlineError(signal));
-      return;
+  try {
+    if (signal) {
+      racers.push(
+        new Promise<T>((_, reject) => {
+          onAbort = () => reject(visibleDeadlineError(signal));
+          signal.addEventListener("abort", onAbort, { once: true });
+        }),
+      );
     }
-    signal.addEventListener("abort", () => reject(visibleDeadlineError(signal)), { once: true });
-  });
+    if (remaining !== undefined) {
+      racers.push(
+        new Promise<T>((_, reject) => {
+          timer = setTimeout(() => {
+            // Let a cooperative queue waiter due on the same tick settle first.
+            immediate = setImmediate(() => reject(interactionTimeoutError()));
+          }, remaining);
+        }),
+      );
+    }
+    return await Promise.race(racers);
+  } finally {
+    // A completed race must not retain timers or caller abort listeners.
+    if (timer !== undefined) {
+      clearTimeout(timer);
+    }
+    if (immediate !== undefined) {
+      clearImmediate(immediate);
+    }
+    if (signal && onAbort) {
+      signal.removeEventListener("abort", onAbort);
+    }
+  }
 }
 
 function visibleDeadlineError(signal: AbortSignal): Error {
@@ -206,7 +217,10 @@ export function formatInteractionFailureReply(error: unknown): string {
     const message = error instanceof Error ? error.message.trim() : "";
     return message || INTERACTION_QUEUE_TIMEOUT_TEXT;
   }
-  if (kind === "timeout" || kind === "empty") {
+  if (kind === "empty") {
+    return INTERACTION_EMPTY_OUTPUT_TEXT;
+  }
+  if (kind === "timeout") {
     return INTERACTION_TIMEOUT_TEXT;
   }
   return INTERACTION_MODEL_FAILURE_TEXT;

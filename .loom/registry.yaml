@@ -14719,7 +14719,38 @@ tasks:
     ownerHistory: []
     since: 2026-11-16
     metadata: {}
+  - id: interaction-reliability-20261118:codex-workspace-review
+    owner: codex-workspace-review
+    intent: []
+    paths:
+      - src/agent-runtime/model/interaction-resource-wait.ts
+      - src/agent-runtime/model/interaction-resource-wait.test.ts
+      - src/gateway/chat-interaction-failure.ts
+      - src/gateway/chat-interaction-failure.test.ts
+    state: active
+    sessions:
+      - id: codex-interaction-20261118
+        taskId: interaction-reliability-20261118:codex-workspace-review
+        ide: codex
+        agent: codex-workspace-review
+        status: active
+        lastSignalAt: 2026-11-18T04:17:30.028Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-18
+    metadata: {}
 landingStreams:
+  - id: interaction-reliability-20261118
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - src/agent-runtime/model/interaction-resource-wait.ts
+      - src/agent-runtime/model/interaction-resource-wait.test.ts
+      - src/gateway/chat-interaction-failure.ts
+      - src/gateway/chat-interaction-failure.test.ts
+    canLandWith: []
+    metadata:
+      owner: codex-workspace-review
   - id: dependabot-docker-group-minor-patch-20261117
     landingPolicy: serial
     paths:
