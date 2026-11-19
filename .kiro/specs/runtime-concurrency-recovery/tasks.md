@@ -25,3 +25,12 @@
 - Added real SIGKILL holder recovery test: passes; committed board focusRevision and writeEpoch survive takeover. This verifies lock-holder death only, not external tool exactly-once semantics — codex-runtime
 - Scoped lint passes on all 3 TS files. Full tsgo reports errors outside changed files; full check previously stopped at 124 existing formatting failures — codex-runtime
 - Ownership transfer refines predecessor broad gateway globs to retain all existing other paths; resulting registry expansion is attribution-only — codex-runtime
+
+## Batch 2
+
+- [x] Verified existing board adapter and clean predecessor checkpoint before taking over the shared file for the user-requested next batch; designated this task as lander, preserved historical sessions — codex-runtime
+- [x] Reproduced corrupt-state overwrite: new regression failed before fix because mutation silently reset malformed persisted JSON — codex-runtime
+- [x] Make mutation, CAS, and publication epoch reads strict: missing files still bootstrap; corrupt/unreadable existing state fails closed — codex-runtime
+- [x] Clean temporary staging files after failed atomic publication; verify old snapshot, epoch and lock cleanup — codex-runtime
+- [x] 31/31 scoped tests pass, including real child SIGKILL recovery and 7 cross-process cases; scoped lint passes — codex-runtime
+- Remaining: deterministic stale-lock contention barriers, real SIGKILL during publication, external tool result reconciliation. Injection of rename failure does not prove power-loss durability or exactly-once execution — codex-runtime

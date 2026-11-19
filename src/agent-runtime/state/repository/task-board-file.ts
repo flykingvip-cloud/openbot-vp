@@ -103,7 +103,7 @@ export function readSessionTaskBoardUnlocked(
  * value so concurrent callers cannot invent a non-monotonic generation from a stale board.
  */
 export function writeSessionTaskBoardUnlocked(sessionFile: string, board: SessionTaskBoard): void {
-  const disk = readSessionTaskBoardUnlocked(sessionFile);
+  const disk = readSessionTaskBoardUnlocked(sessionFile, true);
   const diskEpoch = typeof disk.writeEpoch === "number" ? disk.writeEpoch : 0;
   const normalized: SessionTaskBoard = {
     ...board,
@@ -114,8 +114,13 @@ export function writeSessionTaskBoardUnlocked(sessionFile: string, board: Sessio
   };
   const target = sessionTaskBoardPath(sessionFile);
   const tmp = `${target}.${process.pid}.${randomUUID()}.tmp`;
-  fs.writeFileSync(tmp, `${JSON.stringify(normalized)}\n`, "utf8");
-  fs.renameSync(tmp, target);
+  try {
+    fs.writeFileSync(tmp, `${JSON.stringify(normalized)}\n`, "utf8");
+    fs.renameSync(tmp, target);
+  } finally {
+    // Failed publication must leave the previous snapshot intact without orphaning staging files.
+    fs.rmSync(tmp, { force: true });
+  }
 }
 
 export function readSessionTaskBoard(sessionFile?: string): SessionTaskBoard {
@@ -149,7 +154,7 @@ export function mutateSessionTaskBoard<T>(
   mutate: (live: SessionTaskBoard) => { board: SessionTaskBoard; value: T },
 ): T {
   return withSessionTaskBoardLock(sessionFile, () => {
-    const live = readSessionTaskBoardUnlocked(sessionFile);
+    const live = readSessionTaskBoardUnlocked(sessionFile, true);
     const { board, value } = mutate(live);
     writeSessionTaskBoardUnlocked(sessionFile, board);
     return value;
@@ -176,7 +181,7 @@ export function seedSessionTaskBoard(sessionFile: string, board: SessionTaskBoar
  */
 export function writeSessionTaskBoard(sessionFile: string, board: SessionTaskBoard): void {
   withSessionTaskBoardLock(sessionFile, () => {
-    const disk = readSessionTaskBoardUnlocked(sessionFile);
+    const disk = readSessionTaskBoardUnlocked(sessionFile, true);
     const diskEpoch = typeof disk.writeEpoch === "number" ? disk.writeEpoch : 0;
     const claimed = board.writeEpoch;
     if (diskEpoch > 0 && claimed !== diskEpoch) {

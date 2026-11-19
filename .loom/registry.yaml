@@ -14790,6 +14790,7 @@ landingStreams:
   - id: cron-fire-budget-reviewed-integration
     landingPolicy: serial
     paths:
+      - src/agent-runtime/state/repository/task-board-file.ts
       - .loom/registry.yaml
       - package.json
       - pnpm-lock.yaml
@@ -30569,8 +30570,8 @@ sharedPaths:
     reason: Authorized execution identity mutation migration; retain prior history.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/state/repository/task-board-file.ts
-    landerTask: agent-runtime-convergence
-    reason: Authorized unique board repository migration; preserve storage and locking semantics.
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: Verified takeover for user-authorized runtime batch 2; preserve predecessor sessions.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/context/sources/task-resume.ts
     landerTask: agent-runtime-convergence
