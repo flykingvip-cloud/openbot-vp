@@ -1,4 +1,9 @@
 import type { OpenBotConfig } from "../config/config.js";
+import {
+  DIAGNOSIS_SKILL_MARKER,
+  DIAGNOSIS_SKILL_GOAL,
+  DIAGNOSIS_SKILL_ACCEPTANCE,
+} from "../cron/diagnosis-skill-contract.js";
 import { parsePersonalTaskMetaFromDescription } from "../cron/personal-task-meta.js";
 import { resolveCronStorePath } from "../cron/store.js";
 import { resolveCronLedgerTaskId } from "../cron/wake-identity.js";
@@ -78,6 +83,16 @@ export function parseLongHorizonCronMeta(job: LongHorizonCronJob): LongHorizonCr
     if (goal) {
       return { goal, acceptanceRules: parsed.acceptanceRules };
     }
+  }
+  // Legacy confirmed prescriptions predate explicit goal/acceptance metadata.
+  if (
+    job.name?.startsWith("diagnosis-evolution:") &&
+    parsed.visibleDescription === DIAGNOSIS_SKILL_MARKER &&
+    collectCronUserTexts(job).some((text) =>
+      text.startsWith("用空闲时间练习已安装但本窗未观察到使用的技能。"),
+    )
+  ) {
+    return { goal: DIAGNOSIS_SKILL_GOAL, acceptanceRules: [...DIAGNOSIS_SKILL_ACCEPTANCE] };
   }
   return qualifyOrdinaryCronTexts(collectCronUserTexts(job), parsed.goal.trim());
 }

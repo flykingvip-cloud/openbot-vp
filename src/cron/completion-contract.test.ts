@@ -7,6 +7,21 @@ import {
 import { formatCronResultSurfaceMessage } from "./cron-result-template.js";
 
 describe("cron completion contract", () => {
+  it.each(["summary", "outputText"] as const)(
+    "does not mark protocol failure in %s as successful",
+    (field) => {
+      const result = classifyCronCompletion({
+        status: "ok",
+        [field]: "本步工具调用未能执行，请重试。",
+      });
+      expect(result).toMatchObject({
+        completion: "failed",
+        status: "error",
+        error: "model_tool_protocol_failure",
+      });
+    },
+  );
+
   it("does not green-check the market-assistant empty cron", () => {
     const classified = classifyCronCompletion({
       status: "ok",

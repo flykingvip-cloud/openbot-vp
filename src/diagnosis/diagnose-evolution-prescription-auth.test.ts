@@ -4,9 +4,11 @@
  * Omitting enabled follows the production constant; enabled:false still refuses.
  */
 import { describe, expect, it } from "vitest";
+import { parseLongHorizonCronMeta } from "../progress-ledger/cron-binding.js";
 import { evolutionPrescriptionContentHash } from "./diagnose-evolution-content-hash.js";
 import {
   SCHEDULE_DIAGNOSIS_PRESCRIPTION_ACTION,
+  evolutionJobCreate,
   confirmDiagnoseEvolutionPrescription,
   type EvolutionCronPort,
   type EvolutionPrescription,
@@ -52,6 +54,18 @@ function basePrescription(over: Partial<EvolutionPrescription> = {}): EvolutionP
   row.prescriptionContentHash = evolutionPrescriptionContentHash(row);
   return row;
 }
+
+it("creates skill practice jobs with a scheduler-readable contract and original boundaries", () => {
+  const wakeText =
+    "用空闲时间练习已安装但本窗未观察到使用的技能。只记录技能名与结果，不安装新技能。";
+  const job = evolutionJobCreate(basePrescription({ purpose: "learn_capability", wakeText }));
+  const contract = parseLongHorizonCronMeta({ ...job, id: "generated-job" });
+  expect(contract?.goal).toContain("练习");
+  expect(contract?.acceptanceRules).toHaveLength(2);
+  expect(contract?.acceptanceRules.join(" ")).toContain("不新增授权");
+  expect(job.payload).toMatchObject({ message: wakeText, lightContext: true });
+  expect(job.delivery).toEqual({ mode: "none" });
+});
 
 function store(initial: EvolutionPrescription) {
   const rows = new Map<string, EvolutionPrescription>([[initial.prescriptionId, { ...initial }]]);
