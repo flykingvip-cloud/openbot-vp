@@ -78,3 +78,5 @@
 - [x] Relevant tests: 26 passed across 6 files; scoped lint passed.
 - [ ] Unified ExecutionContext/StepEvent/WaitCondition/TurnOutcome has not yet been wired end-to-end.
 - [ ] External provider query/reconciliation, cancellation-vs-completion transaction, metrics, and Postgres lease/fencing backend remain incomplete.
+
+- [x] Added typed ExecutionContext, StepEvent, WaitCondition and StandardExecutionResult contracts with evidence/wake-condition test. End-to-end adapters are still pending — codex-runtime
