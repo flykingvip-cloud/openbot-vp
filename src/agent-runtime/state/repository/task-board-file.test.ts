@@ -93,3 +93,107 @@ it("keeps the committed snapshot when atomic publication fails", () => {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+it("retains the last committed snapshot when killed immediately before publication", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "board-killed-publish-"));
+  const sessionFile = path.join(dir, "session.jsonl");
+  seedSessionTaskBoard(sessionFile, { parked: [], focusRevision: 7 });
+  const child = spawn(
+    process.execPath,
+    [
+      "--import",
+      "tsx",
+      "--input-type=module",
+      "-e",
+      `
+    import fs from 'node:fs';
+    import { mutateSessionTaskBoard } from './src/agent-runtime/state/repository/task-board-file.ts';
+    // Hold precisely after the production temp write, before atomic rename.
+    fs.renameSync = () => {
+      fs.writeSync(1, 'before-rename');
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0);
+    };
+    mutateSessionTaskBoard(process.env.SESSION_FILE, board => ({
+      board: { ...board, focusRevision: 99 }, value: undefined,
+    }));
+  `,
+    ],
+    { env: { ...process.env, SESSION_FILE: sessionFile }, stdio: ["ignore", "pipe", "pipe"] },
+  );
+  const closed = once(child, "close");
+  try {
+    const ready = once(child.stdout, "data").then(([data]) => String(data));
+    expect(await Promise.race([ready, closed.then(() => "exited before publication")])).toBe(
+      "before-rename",
+    );
+    expect(fs.readdirSync(dir).some((name) => name.endsWith(".tmp"))).toBe(true);
+    child.kill("SIGKILL");
+    await closed;
+    expect(readSessionTaskBoard(sessionFile)).toMatchObject({ focusRevision: 7, writeEpoch: 1 });
+    mutateSessionTaskBoard(sessionFile, (board) => ({
+      board: { ...board, focusRevision: 8 },
+      value: undefined,
+    }));
+    expect(readSessionTaskBoard(sessionFile)).toMatchObject({ focusRevision: 8, writeEpoch: 2 });
+    expect(fs.existsSync(`${sessionTaskBoardPath(sessionFile)}.lock`)).toBe(false);
+  } finally {
+    child.kill("SIGKILL");
+    await closed;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}, 20_000);
+
+it("serializes writers released from the same IPC barrier without lost updates", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "board-barrier-"));
+  const sessionFile = path.join(dir, "session.jsonl");
+  seedSessionTaskBoard(sessionFile, { parked: [], focusRevision: 0 });
+  const workers = Array.from({ length: 4 }, () => {
+    const child = spawn(
+      process.execPath,
+      [
+        "--import",
+        "tsx",
+        "--input-type=module",
+        "-e",
+        `
+      import { mutateSessionTaskBoard } from './src/agent-runtime/state/repository/task-board-file.ts';
+      process.once('message', () => {
+        for (let i = 0; i < 20; i++) {
+          mutateSessionTaskBoard(process.env.SESSION_FILE, board => ({
+            board: { ...board, focusRevision: board.focusRevision + 1 }, value: undefined,
+          }));
+        }
+        process.disconnect();
+      });
+      process.send('ready');
+    `,
+      ],
+      {
+        env: { ...process.env, SESSION_FILE: sessionFile },
+        stdio: ["ignore", "pipe", "pipe", "ipc"],
+      },
+    );
+    const closed = once(child, "close");
+    const ready = Promise.race([
+      once(child, "message").then(([message]) => message),
+      closed.then(() => "early exit"),
+    ]);
+    return { child, closed, ready };
+  });
+  try {
+    expect(await Promise.all(workers.map((w) => w.ready))).toEqual(Array(4).fill("ready"));
+    for (const worker of workers) {
+      worker.child.send("start");
+    }
+    const exits = await Promise.all(workers.map((w) => w.closed));
+    expect(exits.map(([code]) => code)).toEqual([0, 0, 0, 0]);
+    expect(readSessionTaskBoard(sessionFile)).toMatchObject({ focusRevision: 80, writeEpoch: 81 });
+    expect(fs.existsSync(`${sessionTaskBoardPath(sessionFile)}.lock`)).toBe(false);
+  } finally {
+    for (const worker of workers) {
+      worker.child.kill("SIGKILL");
+    }
+    await Promise.all(workers.map((w) => w.closed));
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}, 20_000);

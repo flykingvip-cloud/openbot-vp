@@ -34,3 +34,10 @@
 - [x] Clean temporary staging files after failed atomic publication; verify old snapshot, epoch and lock cleanup — codex-runtime
 - [x] 31/31 scoped tests pass, including real child SIGKILL recovery and 7 cross-process cases; scoped lint passes — codex-runtime
 - Remaining: deterministic stale-lock contention barriers, real SIGKILL during publication, external tool result reconciliation. Injection of rename failure does not prove power-loss durability or exactly-once execution — codex-runtime
+
+## Batch 3
+
+- [x] Four real Node workers wait at an IPC readiness barrier before 80 combined read-modify-write operations; assert exact focusRevision 80 and writeEpoch 81 — codex-runtime
+- [x] Real SIGKILL after production temporary snapshot write and immediately before rename: committed snapshot remains unchanged, next writer recovers dead-owner lock and advances exactly once — codex-runtime
+- Test-only fs override in isolated child establishes crash point; production publication code is unchanged. Process death leaves its temporary staging file; no unsafe global cleanup added — codex-runtime
+- These tests do not close the stale-lock multiple-reaper race, power-loss durability, or external tool reconciliation. Historical intermittent constraint loss remains unproven fixed — codex-runtime
