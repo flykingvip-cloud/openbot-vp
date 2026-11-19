@@ -7,6 +7,7 @@
  * treat them as a transport failure (no backoff, no failure page). They are
  * still not status ok.
  */
+import { PROTOCOL_FAILURE_USER_TEXT } from "../agents/model-output-boundary.js";
 import type { CronCompletionKind, CronRunStatus } from "./types.js";
 
 export const CRON_COMPLETION_KINDS = ["ok", "failed", "empty", "needs_attention"] as const;
@@ -108,6 +109,18 @@ export function classifyCronCompletion(input: CronCompletionInput): CronCompleti
   }
   if (input.status === "skipped") {
     return { completion: "ok", status: "skipped", userReason: "" };
+  }
+
+  // A protocol-gate diagnostic is execution failure, not a successful summary.
+  if (
+    [input.summary, input.outputText].some((text) => text?.trim() === PROTOCOL_FAILURE_USER_TEXT)
+  ) {
+    return {
+      completion: "failed",
+      status: "error",
+      error: "model_tool_protocol_failure",
+      userReason: PROTOCOL_FAILURE_USER_TEXT,
+    };
   }
 
   const summary = realSummary(input.summary) ?? realSummary(input.outputText);

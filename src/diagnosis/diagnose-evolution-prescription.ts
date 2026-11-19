@@ -6,6 +6,10 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import {
+  DIAGNOSIS_SKILL_GOAL,
+  DIAGNOSIS_SKILL_ACCEPTANCE,
+} from "../cron/diagnosis-skill-contract.js";
 import type { CronJobCreate } from "../cron/types.js";
 import type { AuthorizationGrant } from "./delegation.js";
 import {
@@ -290,7 +294,11 @@ export function evolutionJobCreate(prescription: EvolutionPrescription): CronJob
   return {
     agentId: prescription.targetAgentId,
     name: diagnosisEvolutionJobName(prescription.prescriptionId),
-    description: `diagnosis-evolution-purpose:${prescription.purpose}`,
+    description:
+      `diagnosis-evolution-purpose:${prescription.purpose}` +
+      (prescription.purpose === "learn_capability"
+        ? `\n<!--openbot-task-meta:${encodeURIComponent(JSON.stringify({ goal: DIAGNOSIS_SKILL_GOAL, acceptanceRules: DIAGNOSIS_SKILL_ACCEPTANCE }))}-->`
+        : ""),
     enabled: true,
     schedule: { kind: "cron", expr: prescription.scheduleExpr },
     sessionTarget: "isolated",
