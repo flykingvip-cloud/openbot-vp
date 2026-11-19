@@ -41,3 +41,12 @@
 - [x] Real SIGKILL after production temporary snapshot write and immediately before rename: committed snapshot remains unchanged, next writer recovers dead-owner lock and advances exactly once — codex-runtime
 - Test-only fs override in isolated child establishes crash point; production publication code is unchanged. Process death leaves its temporary staging file; no unsafe global cleanup added — codex-runtime
 - These tests do not close the stale-lock multiple-reaper race, power-loss durability, or external tool reconciliation. Historical intermittent constraint loss remains unproven fixed — codex-runtime
+
+## Batch 4 — confirmed stale-reaper defect, repair pending
+
+- [x] Refreshed origin/main and verified ancestry — codex-runtime
+- [x] Existing lock liveness tests pass 4/4, but do not cover successful stale inspection followed by replacement before unlink — codex-runtime
+- [x] Node diagnostic injects a peer replacement at the stale unlink boundary; replacementInjected=true and acquiredOverLivePeer=true. Confirms a deterministic check/unlink race in synchronous recovery — codex-runtime
+- Diagnostic uses an isolated temporary directory and fs override, not concurrent OS scheduling; validates the interleaving vulnerability, not real-world incidence. Run: node --import tsx .kiro/specs/runtime-concurrency-recovery/stale-reaper-probe.ts — codex-runtime
+- [ ] Design mutually exclusive stale reclamation/acquisition, with recovery of a crashed reclaimer. Rechecking inode or token immediately before unlink alone cannot close the remaining TOCTOU window. Async path shares the pattern but needs its own regression — codex-runtime
+- No production lock changes shipped; previous SIGKILL recovery remains single-reclaimer evidence only. Batch is diagnostic, not a completed concurrency fix — codex-runtime
