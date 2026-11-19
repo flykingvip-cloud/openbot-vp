@@ -76,8 +76,12 @@ it("keeps the committed snapshot when atomic publication fails", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "board-publish-failure-"));
   const sessionFile = path.join(dir, "session.jsonl");
   seedSessionTaskBoard(sessionFile, { parked: [], focusRevision: 7 });
-  const rename = vi.spyOn(fs, "renameSync").mockImplementationOnce(() => {
-    throw new Error("injected publication failure");
+  const originalRename = fs.renameSync;
+  const rename = vi.spyOn(fs, "renameSync").mockImplementation((...args) => {
+    if (String(args[1]) === sessionTaskBoardPath(sessionFile)) {
+      throw new Error("injected publication failure");
+    }
+    return originalRename(...args);
   });
   try {
     expect(() =>
@@ -87,7 +91,9 @@ it("keeps the committed snapshot when atomic publication fails", () => {
       })),
     ).toThrow("injected publication failure");
     expect(readSessionTaskBoard(sessionFile)).toMatchObject({ focusRevision: 7, writeEpoch: 1 });
-    expect(fs.readdirSync(dir)).toEqual(["session.jsonl.task-board.json"]);
+    expect(fs.readdirSync(dir).filter((name) => !name.endsWith(".arbitration"))).toEqual([
+      "session.jsonl.task-board.json",
+    ]);
   } finally {
     rename.mockRestore();
     fs.rmSync(dir, { recursive: true, force: true });
@@ -109,9 +115,13 @@ it("retains the last committed snapshot when killed immediately before publicati
     import fs from 'node:fs';
     import { mutateSessionTaskBoard } from './src/agent-runtime/state/repository/task-board-file.ts';
     // Hold precisely after the production temp write, before atomic rename.
-    fs.renameSync = () => {
-      fs.writeSync(1, 'before-rename');
-      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0);
+    const rename = fs.renameSync;
+    fs.renameSync = (from, to) => {
+      if (String(to) === process.env.SESSION_FILE + '.task-board.json') {
+        fs.writeSync(1, 'before-rename');
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0);
+      }
+      return rename(from, to);
     };
     mutateSessionTaskBoard(process.env.SESSION_FILE, board => ({
       board: { ...board, focusRevision: 99 }, value: undefined,

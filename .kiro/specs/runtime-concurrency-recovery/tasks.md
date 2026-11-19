@@ -50,3 +50,23 @@
 - Diagnostic uses an isolated temporary directory and fs override, not concurrent OS scheduling; validates the interleaving vulnerability, not real-world incidence. Run: node --import tsx .kiro/specs/runtime-concurrency-recovery/stale-reaper-probe.ts — codex-runtime
 - [ ] Design mutually exclusive stale reclamation/acquisition, with recovery of a crashed reclaimer. Rechecking inode or token immediately before unlink alone cannot close the remaining TOCTOU window. Async path shares the pattern but needs its own regression — codex-runtime
 - No production lock changes shipped; previous SIGKILL recovery remains single-reclaimer evidence only. Batch is diagnostic, not a completed concurrency fix — codex-runtime
+
+## Batch 5 — repair investigation WIP
+
+- [x] Independently reproduced async stale unlink race: mode=async, replacementInjected=true, acquiredOverLivePeer=true. Sync and async both affected — codex-runtime
+- Reviewed task-orchestration/lease-file-lock.ts before reuse: its companion path limits stale claim targeting, but final public inode-check/unlink is still separate and tomb recovery must be proven. Not adopted as a proven fix — codex-runtime
+- Required protocol properties: acquisition and reclaim serialized by the same mechanism; no shared-name unlink after an unprotected check; crashed reclaimers recover without timeout-based revocation of live owners; sync and async share the protocol; legacy participants require an explicit migration boundary — codex-runtime
+- Candidate implementation direction: OS-owned advisory lock with process-death release, or a formally reviewed unique-ticket arbitration protocol over local filesystem. No new native dependency selected yet. Network/shared-host semantics remain outside the single-host guarantee — codex-runtime
+- [ ] Production repair remains unfinished. Do not interpret diagnostic probe success as a passing safety regression. Next implementation must invert probe expectation and add real multi-process paused-reclaimer and killed-reclaimer tests — codex-runtime
+
+## Shared acquisition/reclamation protocol implementation
+
+- [x] User explicitly requested protocol implementation; reviewed predecessor file-lock implementation and liveness tests, registered session runtime-lock-protocol-20261119, transferred only these paths while preserving predecessor sessions — codex-runtime
+- [x] Added unique-ticket local-filesystem bakery arbitration: publish choosing ticket atomically, choose monotonic number with filename tie-break, refuse earlier or choosing live participants; dead owners are cleaned only via their never-reused ticket names — codex-runtime
+- [x] Sync/async acquisition and stale reclaim execute one synchronous, arbitrated filesystem section. Release participates in arbitration and verifies descriptor inode before deleting public name — codex-runtime
+- [x] Actual Node child pauses with SIGSTOP while owning reclaimer arbitration; both acquisition APIs refuse entry. SIGCONT completes normally; SIGKILL recovers both before and after old public-lock deletion — codex-runtime
+- [x] Direct stale-unlink replacement regression blocks cooperating acquirer; updated standalone probe asserts this for sync and async. Earlier historical probe output describes old implementation only — codex-runtime
+- [x] 41 tests passed across 5 relevant files; added after-unlink crash case then arbitration suite passed 5/5, bringing relevant cases to 42. Scoped lint on six TS files passes. tsgo reports 8 existing errors, none in modified files — codex-runtime
+- pnpm check stops at existing formatting failures in 124 files. Isolated build command was rejected because automatic approval review could not complete; command was not executed. Build verification remains outstanding — codex-runtime
+- Deployment boundary: local filesystem and all participating workers upgraded together. Mixed old/new writers, cross-host shared storage, power-loss durability and global exactly-once tools are not claimed. Arbitration directory remains intentionally; kill during staging may leave a unique .pending file that is never treated as an active ticket. PID reuse can delay recovery conservatively — codex-runtime
+- Release arbitration timeout fails closed and reports an error; live paused owners are never revoked by elapsed time. This can delay work until the paused process resumes/exits — codex-runtime

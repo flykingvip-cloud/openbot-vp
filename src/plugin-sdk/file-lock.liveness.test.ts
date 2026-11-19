@@ -1,5 +1,4 @@
 import fs from "node:fs";
-import fsPromises from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, expect, it, vi } from "vitest";
@@ -33,9 +32,16 @@ const options = { retries: { retries: 0, factor: 1, minTimeout: 1, maxTimeout: 1
 it("async stale inspection cannot delete a replacement lock after ENOENT", async () => {
   const { file, payload } = fixture();
   fs.writeFileSync(`${file}.lock`, "");
-  vi.spyOn(fsPromises, "stat").mockImplementationOnce(async () => {
-    await fsPromises.writeFile(`${file}.lock`, payload);
-    throw Object.assign(new Error("previous lock disappeared"), { code: "ENOENT" });
+  const stat = fs.statSync;
+  vi.spyOn(fs, "statSync").mockImplementation((...args: Parameters<typeof fs.statSync>) => {
+    if (
+      String(args[0]) ===
+      path.join(fs.realpathSync(path.dirname(file)), `${path.basename(file)}.lock`)
+    ) {
+      fs.writeFileSync(`${file}.lock`, payload);
+      throw Object.assign(new Error("previous lock disappeared"), { code: "ENOENT" });
+    }
+    return stat(...args);
   });
   await expect(acquireFileLock(file, options)).rejects.toThrow(/timeout/);
   expect(fs.readFileSync(`${file}.lock`, "utf8")).toBe(payload);
