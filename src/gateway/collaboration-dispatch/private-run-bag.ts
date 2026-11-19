@@ -15,7 +15,7 @@
  * Gated by collaboration.privateRunBag (default false).
  */
 
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { ParticipationOverlay } from "@openbot/collaboration-runtime";
@@ -117,6 +117,8 @@ export function durableToolSideEffectKey(fingerprint: DurableToolSideEffectFinge
   ].join("|");
 }
 
+const activeSideEffectClaims = new Set<string>();
+
 function durableToolSideEffectFile(ledgerDir: string, key: string): string {
   const digest = createHash("sha256").update(key).digest("hex");
   return path.join(ledgerDir, `${digest}.json`);
@@ -158,25 +160,59 @@ export async function scheduleDurableToolSideEffect<T>(params: {
     stepId: params.fingerprint.stepId.trim(),
     toolName: params.fingerprint.toolName.trim(),
     claimedAtMs: nowMs,
+    ownerPid: process.pid,
+    ownerToken: randomUUID(),
   })}\n`;
+  const alreadyActive = activeSideEffectClaims.has(file);
+  if (alreadyActive) {
+    return { skipped: true, key };
+  }
+  activeSideEffectClaims.add(file);
   try {
     await fs.writeFile(file, body, { flag: "wx" });
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "EEXIST") {
+      activeSideEffectClaims.delete(file);
       const operation = await readToolOperation<T>(`${file}.result`);
       if (operation?.state === "started") {
         throw new ToolOperationOutcomeUnknownError(key);
       }
+      if (!operation) {
+        let owner: { ownerPid?: number };
+        try {
+          owner = JSON.parse(await fs.readFile(file, "utf8"));
+        } catch {
+          throw new ToolOperationOutcomeUnknownError(key);
+        }
+        let live = false;
+        if (Number.isInteger(owner.ownerPid) && owner.ownerPid! > 0) {
+          try {
+            process.kill(owner.ownerPid!, 0);
+            live = true;
+          } catch (error) {
+            live = (error as NodeJS.ErrnoException).code === "EPERM";
+          }
+        }
+        if (!live) {
+          throw new ToolOperationOutcomeUnknownError(key);
+        }
+      }
       return { skipped: true, key };
     }
+    activeSideEffectClaims.delete(file);
     throw error;
   }
-  const value = await executeClaimedToolOperation({
-    file: `${file}.result`,
-    operationId: key,
-    run: params.run,
-    nowMs,
-  });
+  let value: T;
+  try {
+    value = await executeClaimedToolOperation({
+      file: `${file}.result`,
+      operationId: key,
+      run: params.run,
+      nowMs,
+    });
+  } finally {
+    activeSideEffectClaims.delete(file);
+  }
   if (params.bag) {
     recordPrivateRunBagToolSideEffect(params.bag, {
       toolName: params.fingerprint.toolName.trim(),

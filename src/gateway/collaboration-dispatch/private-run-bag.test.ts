@@ -209,3 +209,45 @@ describe("private-run-bag", () => {
     expect(fires).toEqual(["first"]);
   });
 });
+
+it("requires reconciliation for an orphaned claim without a result journal", async () => {
+  const ledgerDir = await fs.mkdtemp(path.join(os.tmpdir(), "orphan-side-effect-"));
+  tempDirs.push(ledgerDir);
+  const fingerprint = {
+    taskId: "orphan-task",
+    boardItemId: "item",
+    stepId: "step",
+    toolName: "message",
+  };
+  await expect(
+    scheduleDurableToolSideEffect({
+      ledgerDir,
+      fingerprint,
+      run: async () => {
+        throw new Error("interrupted");
+      },
+    }),
+  ).rejects.toThrow("interrupted");
+  for (const name of await fs.readdir(ledgerDir)) {
+    const file = path.join(ledgerDir, name);
+    if (name.endsWith(".result")) {
+      await fs.unlink(file);
+    } else if (name.endsWith(".json")) {
+      const claim = JSON.parse(await fs.readFile(file, "utf8"));
+      expect(claim.ownerToken).toBeTruthy();
+      claim.ownerPid = 2147483647;
+      await fs.writeFile(file, JSON.stringify(claim));
+    }
+  }
+  let retried = false;
+  await expect(
+    scheduleDurableToolSideEffect({
+      ledgerDir,
+      fingerprint,
+      run: async () => {
+        retried = true;
+      },
+    }),
+  ).rejects.toMatchObject({ name: "ToolOperationOutcomeUnknownError" });
+  expect(retried).toBe(false);
+});

@@ -108,3 +108,9 @@
 - Due scan/backoff/confirmed removal regression added: 23 related tests pass. Query exceptions become unknown with persisted retry backoff instead of permitting writes — codex-runtime
 - Attribution gate fails: 1 unattributed path and 3 conflicting historical ownership paths. Do not commit until registry is repaired without overwriting predecessor records — codex-runtime
 - Full requested scope remains open: provider query consumers, gateway scheduling integration, cancellation/completion arbitration transaction, Postgres repository and fencing takeover tests. Current changes are a partial recovery layer only — codex-runtime
+
+## Claim ownership checkpoint
+
+- Claims persist ownerPid and unique ownerToken. Same-process active claims dedupe without mistaking the pre-journal window for an orphan. Failed/no-result dead-owner claims require reconciliation and never re-fire — codex-runtime
+- Existing delivery/private-bag 17 tests pass; new orphan regression passes (private bag 9/9); scoped lint passes. PID recycling conservatively delays detection; token is identity metadata, not fencing — codex-runtime
+- Provider consumers, gateway recovery scheduling, cancellation transaction and Postgres fencing remain open — codex-runtime
