@@ -70,3 +70,11 @@
 - pnpm check stops at existing formatting failures in 124 files. Isolated build command was rejected because automatic approval review could not complete; command was not executed. Build verification remains outstanding — codex-runtime
 - Deployment boundary: local filesystem and all participating workers upgraded together. Mixed old/new writers, cross-host shared storage, power-loss durability and global exactly-once tools are not claimed. Arbitration directory remains intentionally; kill during staging may leave a unique .pending file that is never treated as an active ticket. PID reuse can delay recovery conservatively — codex-runtime
 - Release arbitration timeout fails closed and reports an error; live paused owners are never revoked by elapsed time. This can delay work until the paused process resumes/exits — codex-runtime
+
+## Next full-pack checkpoint
+
+- [x] Durable external-operation journal added before side-effect execution; succeeded results replay without re-running; started records fail closed as outcome-unknown — codex-runtime
+- [x] Delivery side-effect path now uses operation journal; usage Outbox recovery tests cover persisted receipt, interrupted processing, and duplicate completion — codex-runtime
+- [x] Relevant tests: 26 passed across 6 files; scoped lint passed.
+- [ ] Unified ExecutionContext/StepEvent/WaitCondition/TurnOutcome has not yet been wired end-to-end.
+- [ ] External provider query/reconciliation, cancellation-vs-completion transaction, metrics, and Postgres lease/fencing backend remain incomplete.

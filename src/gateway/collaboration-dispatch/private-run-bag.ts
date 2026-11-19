@@ -19,6 +19,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { ParticipationOverlay } from "@openbot/collaboration-runtime";
+import { executeClaimedToolOperation } from "../../agent-runtime/state/repository/tool-operation.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import { assertCollaborationRuntimeWritable } from "./runtime-namespace.js";
 
@@ -162,7 +163,12 @@ export async function scheduleDurableToolSideEffect<T>(params: {
     }
     throw error;
   }
-  const value = await params.run();
+  const value = await executeClaimedToolOperation({
+    file: `${file}.result`,
+    operationId: key,
+    run: params.run,
+    nowMs,
+  });
   if (params.bag) {
     recordPrivateRunBagToolSideEffect(params.bag, {
       toolName: params.fingerprint.toolName.trim(),
