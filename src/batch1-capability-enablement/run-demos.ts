@@ -43,6 +43,7 @@ import { buildDeliverableCiteUri } from "../gateway/knowledge/ke/cite.js";
 import { PROGRESS_LEDGER_ENABLED_ENV } from "../progress-ledger/feature.js";
 import { readBoundSha } from "./bound-sha.js";
 import { runControlledFaultDiagnosis } from "./controlled-fault-diagnosis.js";
+import { BATCH1_EVIDENCE_ROOT } from "./evidence-root.js";
 import {
   PRICE_WATCH_DELIVERABLE_ID,
   PRICE_WATCH_ORIGINAL_MARKDOWN,
@@ -50,7 +51,7 @@ import {
 } from "./knowledge-reuse.js";
 
 export const DEMO_EVIDENCE_ROOT = path.join(
-  process.env.OPENBOT_BATCH1_EVIDENCE_DIR ?? "/workspace/openbot-vp-audit/batch1-evidence",
+  process.env.OPENBOT_BATCH1_EVIDENCE_DIR ?? BATCH1_EVIDENCE_ROOT,
   "demos",
 );
 

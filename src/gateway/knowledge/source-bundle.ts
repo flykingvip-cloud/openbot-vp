@@ -1,9 +1,7 @@
 import fs from "node:fs";
 import { loadConfig } from "../../config/config.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
-import { listDataSources } from "../enterprise-data/data-source-store.js";
-import { ensureEnterpriseDataCatalogSeeded } from "../enterprise-data/seeds.js";
-import { loadEnterpriseDataStore, saveEnterpriseDataStore } from "../enterprise-data/store.js";
+import { readKnowledgeEnterpriseStore } from "../enterprise-data/streaming-store-read.js";
 import type { GatewayClient } from "../server-methods/types.js";
 import { resolveControlPlaneStorePathForClient } from "../tenant-context.js";
 import { TENANT_ENTERPRISE_DATA_FILE } from "../tenant-store-paths.js";
@@ -18,8 +16,8 @@ import {
   sumChunkReferenceCountsByKnowledgeBase,
 } from "./governance/chunk-governance-store.js";
 import { loadDocumentGovernanceOverlayAsync } from "./governance/runtime/object-writeback.js";
-import { resolveKnowledgeIndexDbPath } from "./kb-index.js";
 import { acquireKnowledgeIndexRead } from "./kb-index-read-pool.js";
+import { resolveKnowledgeIndexDbPath } from "./kb-index.js";
 import { listKnowledgeBases } from "./knowledge-base-store.js";
 import { buildDefaultKnowledgeObjects, buildDefaultKnowledgeSourceSummary } from "./mock-graph.js";
 import { buildIntelligentRelationshipGraph } from "./runtime/relationship-runtime.js";
@@ -81,25 +79,7 @@ async function loadEnterpriseStoreBundle(
     client,
     TENANT_ENTERPRISE_DATA_FILE,
   );
-  let store = await loadEnterpriseDataStore(storePath);
-  if (context.tenantId) {
-    const sourceCountBefore = listDataSources({
-      store,
-      tenantId: context.tenantId,
-    }).length;
-    ensureEnterpriseDataCatalogSeeded({
-      store,
-      tenantId: context.tenantId,
-      nowIso: new Date().toISOString(),
-    });
-    const sourceCountAfter = listDataSources({
-      store,
-      tenantId: context.tenantId,
-    }).length;
-    if (sourceCountAfter !== sourceCountBefore) {
-      await saveEnterpriseDataStore(store, storePath);
-    }
-  }
+  const store = await readKnowledgeEnterpriseStore({ storePath, tenantId: context.tenantId });
   // Fail-closed personal projection: only assets owned by the caller enter the graph.
   const personalObjects = loadPersonalKnowledgeObjects({ ownerUserId: context.userId });
   // Consumption reads FeedItems that supply already wrote. It does not materialize.

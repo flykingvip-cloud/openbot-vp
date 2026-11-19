@@ -8,6 +8,7 @@ import {
   INTERACTION_TIMEOUT_TEXT,
   classifyInteractionFailure,
 } from "../agent-runtime/model/index.js";
+import { formatInteractionFailureReply } from "../agent-runtime/model/interaction-resource-wait.js";
 import { SESSION_TASK_BOARD_LOCK_OPTIONS, withFileLock } from "../infra/file-lock.js";
 import { createAsyncLock } from "../infra/json-files.js";
 import { resolveConfigDir } from "../utils.js";
@@ -307,7 +308,10 @@ export function formatChatTurnTerminalText(error: unknown): {
       return { text: REJECTED_INTERACTION_TURN_TEXT, businessExecution: "none" };
     }
     const kind = classifyInteractionFailure(error);
-    if (kind === "timeout" || kind === "empty") {
+    if (kind === "empty") {
+      return { text: formatInteractionFailureReply(error), businessExecution: "none" };
+    }
+    if (kind === "timeout") {
       return { text: INTERACTION_TIMEOUT_TEXT, businessExecution: "none" };
     }
     if (kind === "model") {
@@ -318,6 +322,9 @@ export function formatChatTurnTerminalText(error: unknown): {
       return { text: message || INTERACTION_TIMEOUT_TEXT, businessExecution: "none" };
     }
     return { text: REJECTED_INTERACTION_TURN_TEXT, businessExecution: "none" };
+  }
+  if (error instanceof Error && error.message.startsWith("workspace_binding_required:")) {
+    return { text: error.message, businessExecution: "none" };
   }
   return { text: CHAT_TURN_ERROR_UNCONFIRMED_TEXT, businessExecution: "unknown" };
 }

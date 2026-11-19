@@ -112,3 +112,35 @@ it("marks incomplete budgeted history as restricted and still answers an ordinar
   expect(historyChars).toBeLessThan(sourceChars);
   expect(request.input.message).toBe("2加2等于几");
 });
+
+it("charges group preparation against the shared interaction budget before model admission", async () => {
+  vi.useFakeTimers();
+  calls.understand.mockClear();
+  calls.bootstrap.mockImplementationOnce(
+    () => new Promise((resolve) => setTimeout(() => resolve({ contextFiles: [] }), 500)),
+  );
+  try {
+    const pending = understandGroupInteraction({
+      config: {},
+      runId: "budget",
+      groupId: "g",
+      agentId: "bot",
+      sessionKey: "s",
+      workspaceDir: "/tmp/group",
+      provider: "p",
+      model: "m",
+      timeoutMs: 100,
+      identity: {},
+      message: "hello",
+      history: [],
+      groupContext: {},
+    });
+    const rejected = expect(pending).rejects.toThrow("timeout");
+    await vi.advanceTimersByTimeAsync(101);
+    await rejected;
+    expect(calls.understand).not.toHaveBeenCalled();
+  } finally {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  }
+});

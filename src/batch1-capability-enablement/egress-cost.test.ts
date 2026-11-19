@@ -27,7 +27,8 @@ import type { TrustedScope } from "../task-outcome/types.js";
 import { readBoundSha } from "./bound-sha.js";
 
 const EVIDENCE_DIR = path.join(
-  process.env.OPENBOT_BATCH1_EVIDENCE_DIR ?? "/workspace/openbot-vp-audit/batch1-evidence",
+  process.env.OPENBOT_BATCH1_EVIDENCE_DIR ??
+    path.join(os.tmpdir(), "openbot-batch1-egress-evidence"),
   "egress-cost",
 );
 
@@ -48,7 +49,8 @@ function writeEvidence(): void {
 `;
   fs.writeFileSync(path.join(EVIDENCE_DIR, "egress-cost.json"), body, "utf8");
   const proofDir = path.join(
-    process.env.OPENBOT_BATCH1_EVIDENCE_DIR ?? "/workspace/openbot-vp-audit/batch1-evidence",
+    process.env.OPENBOT_BATCH1_EVIDENCE_DIR ??
+      path.join(os.tmpdir(), "openbot-batch1-egress-evidence"),
     "isolation-proof",
   );
   fs.mkdirSync(proofDir, { recursive: true });

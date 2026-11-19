@@ -200,85 +200,86 @@ async function authorizeStewardWorkspaceFile(params: {
         return { ok: false };
       }
     }
-    let trustedLocator: string | null = null;
-    try {
-      trustedLocator = await resolveTrustedAgentLocator({
-        client: params.client,
-        agentId,
-        cfg,
-      });
-    } catch {
-      // Dual occupancy (user + seat rows for one asset) fail-closes Item 7
-      // as first_canonical_selection_forbidden. Session ACL already bound
-      // this read to the agent; preview uses the session write root next.
-      trustedLocator = null;
-    }
-    const tenantCtx = await resolveTenantContext(params.client).catch(() => null);
-    const tenantId = context.tenantId?.trim() || tenantCtx?.tenantId?.trim() || "";
-    const runtimeWorkspaces: string[] = [];
-    let occupiedSeatId: string | null = null;
-    try {
-      const actor = await resolveEmployeeWorkbenchActor(params.client);
-      occupiedSeatId = actor?.currentSeatId?.trim() || null;
-    } catch {
-      occupiedSeatId = null;
-    }
-    let catalog = null;
-    if (tenantId && context.userId) {
+    if (boundWorkspace) {
+      locator = boundWorkspace.rootPath;
+    } else {
+      let trustedLocator: string | null = null;
       try {
-        const identity = await loadExistingGovernedWorkspaceIdentity({
-          tenantId,
-          userId: context.userId,
+        trustedLocator = await resolveTrustedAgentLocator({
+          client: params.client,
           agentId,
-          occupiedSeatId,
-          stateDir,
+          cfg,
         });
-        catalog = identity.catalog ?? null;
       } catch {
-        catalog = null;
+        // Dual occupancy (user + seat rows for one asset) fail-closes Item 7
+        // as first_canonical_selection_forbidden. Session ACL already bound
+        // this read to the agent; preview uses the session write root next.
+        trustedLocator = null;
       }
-    }
-    const ownership = await loadCanonicalWriteOwnership({
-      cfg,
-      agentId,
-      tenantId,
-      chattingUserId: context.userId,
-      occupiedSeatId,
-      stateDir,
-      catalog,
-    });
-    const canonicalRaw = resolveCanonicalRobotWriteRoot({
-      agentId,
-      tenantId,
-      chattingUserId: context.userId,
-      sessionKey,
-      stateDir,
-      ownership,
-    });
-    const canonical = canonicalRaw
-      ? alignFormalRootForManagedAddressing(canonicalRaw, { config: cfg })
-      : null;
-    if (canonical) {
-      runtimeWorkspaces.push(canonical);
-    } else if (ownership.kind !== "seat_owned") {
-      // Personal / unknown: prior per-login-user root.
-      // Seat-owned without sticky/host fails closed (not synced) instead of
-      // forking preview onto the chatting user's empty tree.
-      const robotOwn = resolveRobotWriteRoot({
+      const tenantCtx = await resolveTenantContext(params.client).catch(() => null);
+      const tenantId = context.tenantId?.trim() || tenantCtx?.tenantId?.trim() || "";
+      const runtimeWorkspaces: string[] = [];
+      let occupiedSeatId: string | null = null;
+      try {
+        const actor = await resolveEmployeeWorkbenchActor(params.client);
+        occupiedSeatId = actor?.currentSeatId?.trim() || null;
+      } catch {
+        occupiedSeatId = null;
+      }
+      let catalog = null;
+      if (tenantId && context.userId) {
+        try {
+          const identity = await loadExistingGovernedWorkspaceIdentity({
+            tenantId,
+            userId: context.userId,
+            agentId,
+            occupiedSeatId,
+            stateDir,
+          });
+          catalog = identity.catalog ?? null;
+        } catch {
+          catalog = null;
+        }
+      }
+      const ownership = await loadCanonicalWriteOwnership({
+        cfg,
         agentId,
         tenantId,
-        userId: context.userId,
+        chattingUserId: context.userId,
+        occupiedSeatId,
+        stateDir,
+        catalog,
+      });
+      const canonicalRaw = resolveCanonicalRobotWriteRoot({
+        agentId,
+        tenantId,
+        chattingUserId: context.userId,
         sessionKey,
         stateDir,
+        ownership,
       });
-      if (robotOwn) {
-        runtimeWorkspaces.push(alignFormalRootForManagedAddressing(robotOwn, { config: cfg }));
+      const canonical = canonicalRaw
+        ? alignFormalRootForManagedAddressing(canonicalRaw, { config: cfg })
+        : null;
+      if (canonical) {
+        runtimeWorkspaces.push(canonical);
+      } else if (ownership.kind !== "seat_owned") {
+        // Personal / unknown: prior per-login-user root.
+        // Seat-owned without sticky/host fails closed (not synced) instead of
+        // forking preview onto the chatting user's empty tree.
+        const robotOwn = resolveRobotWriteRoot({
+          agentId,
+          tenantId,
+          userId: context.userId,
+          sessionKey,
+          stateDir,
+        });
+        if (robotOwn) {
+          runtimeWorkspaces.push(alignFormalRootForManagedAddressing(robotOwn, { config: cfg }));
+        }
       }
-    }
-    try {
-      locator =
-        boundWorkspace?.rootPath ??
-        resolvePreviewFilesystemLocator({
+      try {
+        locator = resolvePreviewFilesystemLocator({
           trustedLocator,
           runtimeWorkspaces,
           configuredWorkspace: null,
@@ -286,10 +287,17 @@ async function authorizeStewardWorkspaceFile(params: {
           agentId,
           stateDir,
         });
-    } catch {
-      params.respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, PREVIEW_FILE_NOT_SYNCED));
-      return { ok: false };
+      } catch {
+        params.respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.UNAVAILABLE, PREVIEW_FILE_NOT_SYNCED),
+        );
+        return { ok: false };
+      }
     }
+  } else if (boundWorkspace) {
+    locator = boundWorkspace.rootPath;
   } else {
     stewardException = true;
     const tenantCtx = await resolveTenantContext(params.client).catch(() => null);
@@ -304,9 +312,6 @@ async function authorizeStewardWorkspaceFile(params: {
       return { ok: false };
     }
     locator = alignFormalRootForManagedAddressing(robotOwn, { config: cfg });
-  }
-  if (boundWorkspace) {
-    locator = boundWorkspace.rootPath;
   }
   if (params.operation === "write") {
     const decision = resolveWorkspaceWriteLocator({

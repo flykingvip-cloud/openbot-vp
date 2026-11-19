@@ -1,3 +1,4 @@
+import fs from "node:fs";
 /**
  * Scheduled connector sync. Gateway maintenance calls the tick.
  * Eligible sources are connected (or in error) and have a registered sync driver.
@@ -5,8 +6,6 @@
  * rematerialized. Overlap-safe, with the same failure backoff shape as
  * scheduled projection materialization.
  */
-
-import fs from "node:fs";
 import path from "node:path";
 import { CONFIG_DIR } from "../../utils.js";
 import {
@@ -18,6 +17,7 @@ import {
   sourceEligibleForAutoSync,
   syncConnectedSourceAndSupply,
 } from "./connector-sync-lifecycle.js";
+import { indexedEnterpriseStorePath } from "./indexed-store.js";
 import { computeFailureBackoffMs } from "./scheduled-projection-materializer.js";
 import { loadEnterpriseDataStore, saveEnterpriseDataStore } from "./store.js";
 import type { EnterpriseDataStore } from "./types.js";
@@ -285,11 +285,14 @@ export async function tickScheduledConnectorSync(params?: {
         tenantId,
         TENANT_ENTERPRISE_DATA_FILE,
       );
-      const resolvedStorePath = fs.existsSync(primaryStorePath)
-        ? primaryStorePath
-        : fs.existsSync(fallbackStorePath)
-          ? fallbackStorePath
-          : null;
+      const resolvedStorePath =
+        fs.existsSync(primaryStorePath) ||
+        fs.existsSync(indexedEnterpriseStorePath(primaryStorePath))
+          ? primaryStorePath
+          : fs.existsSync(fallbackStorePath) ||
+              fs.existsSync(indexedEnterpriseStorePath(fallbackStorePath))
+            ? fallbackStorePath
+            : null;
       if (!resolvedStorePath) {
         continue;
       }

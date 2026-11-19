@@ -1,7 +1,11 @@
 import path from "node:path";
-import { readJsonFile, writeJsonAtomic } from "../../infra/json-files.js";
 import { CONFIG_DIR, resolveUserPath } from "../../utils.js";
 import { canonicalizeTenantId } from "../tenant-canonicalization.js";
+import {
+  loadIndexedEnterpriseStore,
+  saveIndexedEnterpriseStore,
+  isIndexedEnterpriseStore,
+} from "./indexed-store.js";
 import {
   ENTERPRISE_DATA_STORE_VERSION,
   DataConnectorCredential,
@@ -155,8 +159,7 @@ export async function loadEnterpriseDataStore(storePath?: string): Promise<Enter
   const resolvedPath = resolveUserPath(
     storePath?.trim() || resolveDefaultEnterpriseDataStorePath(),
   );
-  const parsed = await readJsonFile<Partial<EnterpriseDataStore>>(resolvedPath);
-  return normalizeEnterpriseDataStore(parsed);
+  return loadIndexedEnterpriseStore(resolvedPath, normalizeEnterpriseDataStore(null));
 }
 
 export async function saveEnterpriseDataStore(
@@ -166,9 +169,11 @@ export async function saveEnterpriseDataStore(
   const resolvedPath = resolveUserPath(
     storePath?.trim() || resolveDefaultEnterpriseDataStorePath(),
   );
-  const normalized = normalizeEnterpriseDataStore({
-    ...store,
-    version: ENTERPRISE_DATA_STORE_VERSION,
-  });
-  await writeJsonAtomic(resolvedPath, normalized);
+  const normalized = isIndexedEnterpriseStore(store)
+    ? store
+    : normalizeEnterpriseDataStore({
+        ...store,
+        version: ENTERPRISE_DATA_STORE_VERSION,
+      });
+  await saveIndexedEnterpriseStore(resolvedPath, normalized, normalizeEnterpriseDataStore(null));
 }

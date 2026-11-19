@@ -16,7 +16,8 @@ vi.mock("../infra/dotenv.js", () => ({
   loadDotEnv: dotenvState.loadDotEnv,
 }));
 
-vi.mock("../infra/env.js", () => ({
+vi.mock("../infra/env.js", async (original) => ({
+  ...(await original<typeof import("../infra/env.js")>()),
   normalizeEnv: vi.fn(),
 }));
 

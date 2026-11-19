@@ -48,6 +48,15 @@ async function withAuthorizedInteraction<T>(
   const work: Promise<Visible> = (async () => {
     abortSignal.throwIfAborted();
     const gate = await ports.session.authorize(ports.authorization);
+    // An explicitly managed caller must never consume a legacy skipped gate.
+    // Do not resolve credentials or choose an alternative model after this denial.
+    if (gate.skipped && ports.authorization.enterpriseId?.trim()) {
+      return {
+        kind: "respond" as const,
+        text: "企业模型准入未完成，本轮未启动执行。请联系管理员检查模型授权。",
+        clarification: false,
+      };
+    }
     if (!gate.acquired && !gate.skipped) {
       // A cooperative queue wait may settle slightly after the signal
       // due to poll interval; keep that factual gate result.

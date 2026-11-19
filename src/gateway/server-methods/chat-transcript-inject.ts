@@ -273,6 +273,7 @@ export function appendInjectedAssistantMessageToTranscript(params: {
   transcriptPath: string;
   message: string;
   label?: string;
+  senderLabel?: string;
   idempotencyKey?: string;
   abortMeta?: GatewayInjectedAbortMeta;
   cronResult?: GatewayInjectedCronResultMeta;
@@ -289,6 +290,7 @@ export function appendInjectedAssistantMessageToTranscript(params: {
     transcriptPath: params.transcriptPath,
     role: "assistant",
     message: params.message,
+    senderLabel: params.senderLabel,
     ...(params.label ? { label: params.label } : {}),
     ...(params.idempotencyKey ? { idempotencyKey: params.idempotencyKey } : {}),
     ...(params.abortMeta ? { abortMeta: params.abortMeta } : {}),

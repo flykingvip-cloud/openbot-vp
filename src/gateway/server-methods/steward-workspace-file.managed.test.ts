@@ -184,7 +184,7 @@ beforeEach(async () => {
   fs.rmSync(tmpRoot, { recursive: true, force: true });
   fs.mkdirSync(stewardWorkspace(), { recursive: true });
   await seedCanonicalWorkspace({
-    resourceId: `ws:001:user:${state.userId}:steward`,
+    resourceId: `ws:001:user:${state.userId}:asset:steward:builtin`,
     locator: stewardWorkspace(),
     agentAssetId: "steward:builtin",
   });
