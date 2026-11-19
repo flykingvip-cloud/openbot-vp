@@ -1,3 +1,4 @@
+import type { WaitCondition } from "./execution-protocol.js";
 /** Durable logical operation identity survives retries; attempt identity is separate. */
 export type OperationIdentity = {
   tenantId: string;
@@ -20,4 +21,5 @@ export type PersistedOperation<T = unknown> = {
   startedAtMs: number;
   completedAtMs?: number;
   result?: T;
+  wait?: { condition: WaitCondition; nextQueryAtMs: number; attempts: number };
 };

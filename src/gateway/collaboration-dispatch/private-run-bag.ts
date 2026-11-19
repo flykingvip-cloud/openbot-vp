@@ -19,7 +19,11 @@ import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { ParticipationOverlay } from "@openbot/collaboration-runtime";
-import { executeClaimedToolOperation } from "../../agent-runtime/state/repository/tool-operation.js";
+import {
+  executeClaimedToolOperation,
+  readToolOperation,
+  ToolOperationOutcomeUnknownError,
+} from "../../agent-runtime/state/repository/tool-operation.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import { assertCollaborationRuntimeWritable } from "./runtime-namespace.js";
 
@@ -159,6 +163,10 @@ export async function scheduleDurableToolSideEffect<T>(params: {
     await fs.writeFile(file, body, { flag: "wx" });
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "EEXIST") {
+      const operation = await readToolOperation<T>(`${file}.result`);
+      if (operation?.state === "started") {
+        throw new ToolOperationOutcomeUnknownError(key);
+      }
       return { skipped: true, key };
     }
     throw error;

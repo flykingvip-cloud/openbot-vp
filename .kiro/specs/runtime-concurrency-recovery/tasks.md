@@ -80,3 +80,31 @@
 - [ ] External provider query/reconciliation, cancellation-vs-completion transaction, metrics, and Postgres lease/fencing backend remain incomplete.
 
 - [x] Added typed ExecutionContext, StepEvent, WaitCondition and StandardExecutionResult contracts with evidence/wake-condition test. End-to-end adapters are still pending — codex-runtime
+
+## Rebase and wait-contract integration checkpoint
+
+- [x] Replayed all seven Runtime commits onto refreshed origin/main; preserved latest registry on conflicts; narrow durable storage port retained — codex-runtime
+- [x] Installed newly required stream-json dependency from frozen lockfile; reran exact relevant regression set: 8 files / 45 tests pass — codex-runtime
+- [x] Unknown operation now carries standard external_operation WaitCondition. Repeated delivery claims with a started journal surface reconciliation requirement instead of silently skipping, and never re-fire — codex-runtime
+- [ ] Model adapter still projects unknown operation as tool error. Unified waiting scheduler and reconciliation consumer are not integrated.
+- WIP: registry session restoration needs minimal-diff normalization and ownership audit before committing this checkpoint; edits remain uncommitted — codex-runtime
+
+## Waiting tool adapter and reconciliation WIP
+
+- [x] Pi tool adapter now returns waiting + retryAllowed=false + canonical WaitCondition for unknown external outcomes — codex-runtime
+- [x] Added query-only reconciliation: unknown keeps started state; confirmed provider evidence persists result and supports replay without invoking a writer — codex-runtime
+- [x] 22 tests across operation journal/private bag/actual delivery adapter pass; scoped lint passes — codex-runtime
+- [ ] Provider-specific query consumers, durable wait scheduling, Postgres, cancellation transaction and observation sinks remain unfinished.
+- WIP remains uncommitted pending minimal registry normalization and path takeover audit. No deployment performed — codex-runtime
+
+## Durable reconciliation waiting WIP
+
+- Added persisted wait condition, query due time, attempt count and bounded backoff to external operation records. Query-unknown persists next due time; confirmed evidence clears wait. Added due scan for result journals — codex-runtime
+- Existing 22 operation/delivery tests pass and scoped lint passes; new due-scan/backoff tests and production scheduler consumer are still required — codex-runtime
+- Requested provider-specific consumers, cancel arbitration and Postgres backend remain unimplemented. No claims of completion or database validation. Worktree remains WIP, uncommitted — codex-runtime
+
+## Closure audit — incomplete
+
+- Due scan/backoff/confirmed removal regression added: 23 related tests pass. Query exceptions become unknown with persisted retry backoff instead of permitting writes — codex-runtime
+- Attribution gate fails: 1 unattributed path and 3 conflicting historical ownership paths. Do not commit until registry is repaired without overwriting predecessor records — codex-runtime
+- Full requested scope remains open: provider query consumers, gateway scheduling integration, cancellation/completion arbitration transaction, Postgres repository and fencing takeover tests. Current changes are a partial recovery layer only — codex-runtime

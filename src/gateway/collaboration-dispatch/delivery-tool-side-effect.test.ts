@@ -209,7 +209,11 @@ describe("delivery tool side effect loop", () => {
     const skipped = await execute(message, "m2");
     expect(calls).toBe(1);
     expect(failed.details).toMatchObject({ status: "error", error: "send failed" });
-    expect(skipped.details).toMatchObject({ status: "skipped" });
+    expect(skipped.details).toMatchObject({
+      status: "waiting",
+      retryAllowed: false,
+      waitCondition: { reason: "external_operation" },
+    });
   });
 
   it("indexes the private run bag once and never double-fires the same fingerprint", async () => {

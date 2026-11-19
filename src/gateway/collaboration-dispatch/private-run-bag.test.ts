@@ -193,15 +193,19 @@ describe("private-run-bag", () => {
     ).rejects.toThrow(/result unknown/);
     expect(fires).toEqual(["first"]);
 
-    const retry = await scheduleDurableToolSideEffect({
-      ledgerDir,
-      fingerprint,
-      run: async () => {
-        fires.push("blind-retry");
-        return "should-not-run";
-      },
+    await expect(
+      scheduleDurableToolSideEffect({
+        ledgerDir,
+        fingerprint,
+        run: async () => {
+          fires.push("blind-retry");
+          return "should-not-run";
+        },
+      }),
+    ).rejects.toMatchObject({
+      name: "ToolOperationOutcomeUnknownError",
+      waitCondition: { reason: "external_operation" },
     });
-    expect(retry.skipped).toBe(true);
     expect(fires).toEqual(["first"]);
   });
 });

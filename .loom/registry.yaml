@@ -14786,7 +14786,47 @@ tasks:
     ownerHistory: []
     since: 2026-11-18
     metadata: {}
+  - id: runtime-concurrency-recovery:codex-runtime
+    owner: codex-runtime
+    intent: []
+    paths:
+      - src/agent-runtime/state/repository/tool-operation.ts
+      - src/agent-runtime/state/repository/tool-operation.test.ts
+      - src/gateway/collaboration-dispatch/private-run-bag.ts
+      - .kiro/specs/runtime-concurrency-recovery/**
+      - .kiro/specs/runtime-concurrency-recovery/tasks.md
+      - src/agent-runtime/contracts/operation.ts
+      - src/agents/pi-tool-definition-adapter.ts
+      - src/gateway/collaboration-dispatch/delivery-tool-side-effect.test.ts
+      - src/gateway/collaboration-dispatch/private-run-bag.test.ts
+    state: active
+    sessions:
+      - id: runtime-rebase-recovery-20261119
+        taskId: runtime-concurrency-recovery:codex-runtime
+        ide: codex
+        agent: codex-runtime
+        status: active
+        lastSignalAt: 2026-11-19T15:10:30.777Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-19
+    metadata: {}
 landingStreams:
+  - id: runtime-recovery-integration
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - .kiro/specs/runtime-concurrency-recovery/tasks.md
+      - src/agent-runtime/contracts/operation.ts
+      - src/agent-runtime/state/repository/tool-operation.test.ts
+      - src/agent-runtime/state/repository/tool-operation.ts
+      - src/agents/pi-tool-definition-adapter.ts
+      - src/gateway/collaboration-dispatch/delivery-tool-side-effect.test.ts
+      - src/gateway/collaboration-dispatch/private-run-bag.test.ts
+      - src/gateway/collaboration-dispatch/private-run-bag.ts
+    canLandWith: []
+    metadata:
+      owner: codex-runtime
   - id: cron-fire-budget-reviewed-integration
     landingPolicy: serial
     paths:
@@ -32622,7 +32662,7 @@ sharedPaths:
     reason: Human-authorized exact-file final runtime closure; retain other declarations and history.
     reviewAfter: 2026-11-30
   - glob: src/agents/pi-tool-definition-adapter.ts
-    landerTask: agent-runtime-convergence
+    landerTask: runtime-concurrency-recovery:codex-runtime
     reason: Human-authorized exact-file final runtime closure; retain other declarations and history.
     reviewAfter: 2026-11-30
   - glob: src/agents/pi-tools.before-tool-call.ts
@@ -34048,3 +34088,24 @@ sharedPaths:
       GWSV src/gateway/server-methods/**) remain declared. exclusive:false; no exclusive takeover;
       official loom register was not run. Registration does not replace authorization.
     reviewAfter: 2026-11-30
+  - glob: .kiro/specs/runtime-concurrency-recovery/tasks.md
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized isolated runtime recovery integration; preserve predecessor history.
+  - glob: src/agent-runtime/contracts/operation.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized isolated runtime recovery integration; preserve predecessor history.
+  - glob: src/agent-runtime/state/repository/tool-operation.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized isolated runtime recovery integration; preserve predecessor history.
+  - glob: src/agent-runtime/state/repository/tool-operation.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized isolated runtime recovery integration; preserve predecessor history.
+  - glob: src/gateway/collaboration-dispatch/delivery-tool-side-effect.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized isolated runtime recovery integration; preserve predecessor history.
+  - glob: src/gateway/collaboration-dispatch/private-run-bag.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized isolated runtime recovery integration; preserve predecessor history.
+  - glob: src/gateway/collaboration-dispatch/private-run-bag.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized isolated runtime recovery integration; preserve predecessor history.
