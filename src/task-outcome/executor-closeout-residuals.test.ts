@@ -38,7 +38,7 @@ describe("executor closeout cost evidence", () => {
     const unknown = classifyTipBudgetCostFromUsage({
       usage: { input: 100, output: 50 },
       provider: "openai",
-      model: "gpt-test",
+      model: "gpt-4o",
     });
     expect(unknown).toEqual({ evidence: "unknown" });
 
@@ -286,7 +286,7 @@ describe("executor closeout CLI entry blocks the next model call", () => {
 
   it("agentCommand does not invoke the embedded runner once the tip iteration budget is spent", async () => {
     vi.resetModules();
-    vi.doMock("../agents/pi-embedded.js", () => ({
+    vi.doMock("../agent-runtime/execution/runner/embedded-run.js", () => ({
       runEmbeddedPiAgent: vi.fn(async () => ({
         payloads: [{ text: "ok" }],
         meta: {
@@ -294,7 +294,7 @@ describe("executor closeout CLI entry blocks the next model call", () => {
           agentMeta: {
             sessionId: "s",
             provider: "openai",
-            model: "gpt-test",
+            model: "gpt-4o",
             usage: { input: 1, output: 1 },
           },
         },
@@ -306,7 +306,7 @@ describe("executor closeout CLI entry blocks the next model call", () => {
       tryAcquireEnterpriseAgentRun: vi.fn(async () => ({ acquired: false, skipped: true })),
       releaseEnterpriseAgentRun: vi.fn(async () => {}),
     }));
-    const embedded = await import("../agents/pi-embedded.js");
+    const embedded = await import("../agent-runtime/execution/runner/embedded-run.js");
     const { agentCommand } = await import("../commands/agent.js");
     const configModule = await import("../config/config.js");
     const { withTempHome } = await import("../../test/helpers/temp-home.js");
@@ -319,8 +319,8 @@ describe("executor closeout CLI entry blocks the next model call", () => {
         const cfg = {
           agents: {
             defaults: {
-              model: { primary: "openai/gpt-test" },
-              models: { "openai/gpt-test": {} },
+              model: { primary: "openai/gpt-4o" },
+              models: { "openai/gpt-4o": {} },
               workspace: path.join(home, "workspace"),
             },
             list: [{ id: "main", default: true, agentDir }],

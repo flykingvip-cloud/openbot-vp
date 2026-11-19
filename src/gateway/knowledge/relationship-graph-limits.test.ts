@@ -31,8 +31,8 @@ function makeGraph(nodeCount: number, edgeCount: number, includeHubs = true): Re
   }
   const edges = [];
   for (let index = 0; index < edgeCount; index += 1) {
-    const source = nodes[index % nodes.length]!;
-    const target = nodes[(index + 1) % nodes.length]!;
+    const source = nodes[index % nodes.length];
+    const target = nodes[(index + 1) % nodes.length];
     if (source.id === target.id) {
       continue;
     }

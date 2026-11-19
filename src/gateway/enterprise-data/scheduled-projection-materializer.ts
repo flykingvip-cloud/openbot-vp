@@ -1,9 +1,8 @@
+import fs from "node:fs";
 /**
  * Scheduled enterprise knowledge projection materialization.
  * Invoked from gateway maintenance ticks; bounded, overlap-safe, with failure backoff.
  */
-
-import fs from "node:fs";
 import path from "node:path";
 import { CONFIG_DIR } from "../../utils.js";
 import {
@@ -13,6 +12,7 @@ import {
 } from "../tenant-store-paths.js";
 import { getProcessControlledSarProvider } from "./controlled-sar-provider.js";
 import { listEnterpriseKnowledgeProjectionBindings } from "./enterprise-knowledge-projection-binding-store.js";
+import { indexedEnterpriseStorePath } from "./indexed-store.js";
 import { isImplementedMaterializationMode } from "./knowledge-publication.js";
 import { runProjectionMaterialization } from "./projection-materializer.js";
 import { findEnterpriseKnowledgeProjectionSpec } from "./projection-spec-store.js";
@@ -351,11 +351,14 @@ export async function tickScheduledProjectionMaterialization(params?: {
         tenantId,
         TENANT_ENTERPRISE_DATA_FILE,
       );
-      const resolvedStorePath = fs.existsSync(primaryStorePath)
-        ? primaryStorePath
-        : fs.existsSync(fallbackStorePath)
-          ? fallbackStorePath
-          : null;
+      const resolvedStorePath =
+        fs.existsSync(primaryStorePath) ||
+        fs.existsSync(indexedEnterpriseStorePath(primaryStorePath))
+          ? primaryStorePath
+          : fs.existsSync(fallbackStorePath) ||
+              fs.existsSync(indexedEnterpriseStorePath(fallbackStorePath))
+            ? fallbackStorePath
+            : null;
       if (!resolvedStorePath) {
         continue;
       }

@@ -83,7 +83,7 @@ function boundBudget() {
     config: {},
     agentId: "bot",
     runId: "run",
-    startedAtMs: 1,
+    startedAtMs: Date.now(),
     taskId: "task",
     scope: {
       kind: "personal",
@@ -141,7 +141,7 @@ it("preserves parent identity and advances sequence even after a failed charge",
     config: {},
     agentId: "child",
     runId: "run",
-    startedAtMs: 1,
+    startedAtMs: Date.now(),
     taskId: "task",
     scope: {
       kind: "personal",
@@ -160,7 +160,7 @@ it("preserves parent identity and advances sequence even after a failed charge",
       taskId: "task",
       parentTaskId: "parent",
       parentAgentId: "owner",
-      startedAtMs: 1,
+      startedAtMs: Date.now(),
     }),
   );
   vi.mocked(chargeModelCallAgainstTip).mockImplementationOnce(() => {
@@ -217,7 +217,7 @@ it("does not open a second command when the committed charge then throws", async
     config: {},
     agentId: "bot",
     runId: "run",
-    startedAtMs: 1,
+    startedAtMs: Date.now(),
     entrypoint: "cli",
     readContext: () => ({
       taskId: "task",
@@ -346,7 +346,7 @@ it("does not label a conflict receipt as committed", async () => {
     config: {},
     agentId: "bot",
     runId: "run",
-    startedAtMs: 1,
+    startedAtMs: Date.now(),
     entrypoint: "cli",
     readContext: () => ({
       taskId: "task",
@@ -375,7 +375,7 @@ it("does not invent a task or charge when no outcome binding exists", () => {
     config: {},
     agentId: "child",
     runId: "run",
-    startedAtMs: 1,
+    startedAtMs: Date.now(),
   });
   budget.assertAllowed();
   expect(budget.charge({ provider: "p", model: "m" })).toBeUndefined();

@@ -119,3 +119,53 @@ it("does not treat a timeout abort as a user cancel", () => {
   ).toBe(false);
   expect(isInteractionUserAbort(new Error("timeout"))).toBe(false);
 });
+
+it("releases deadline timers and abort listeners after successful output", async () => {
+  vi.useFakeTimers();
+  const controller = new AbortController();
+  const remove = vi.spyOn(controller.signal, "removeEventListener");
+  const { raceVisibleInteraction } = await import("./interaction-resource-wait.js");
+  await expect(
+    raceVisibleInteraction(Promise.resolve("answer"), {
+      signal: controller.signal,
+      remainingMs: 15_000,
+    }),
+  ).resolves.toBe("answer");
+  expect(vi.getTimerCount()).toBe(0);
+  expect(remove).toHaveBeenCalledWith("abort", expect.any(Function));
+});
+
+it("does not describe empty model output as a timeout", () => {
+  expect(
+    formatInteractionFailureReply(new Error("本轮未取得有效的交互决定，没有启动或修改任务。")),
+  ).toContain("模型未返回有效的交互决定");
+});
+
+it("releases deadline timers and abort listeners after model failure", async () => {
+  vi.useFakeTimers();
+  const controller = new AbortController();
+  const remove = vi.spyOn(controller.signal, "removeEventListener");
+  const { raceVisibleInteraction } = await import("./interaction-resource-wait.js");
+  await expect(
+    raceVisibleInteraction(Promise.reject(new Error("provider failed")), {
+      signal: controller.signal,
+      remainingMs: 15_000,
+    }),
+  ).rejects.toThrow("provider failed");
+  expect(vi.getTimerCount()).toBe(0);
+  expect(remove).toHaveBeenCalledWith("abort", expect.any(Function));
+});
+
+it("removes the pending deadline after an explicit user cancellation", async () => {
+  vi.useFakeTimers();
+  const controller = new AbortController();
+  const { raceVisibleInteraction } = await import("./interaction-resource-wait.js");
+  const pending = raceVisibleInteraction(new Promise<never>(() => {}), {
+    signal: controller.signal,
+    remainingMs: 15_000,
+  });
+  const rejected = expect(pending).rejects.toThrow("cancelled");
+  controller.abort(new DOMException("cancelled", "AbortError"));
+  await rejected;
+  expect(vi.getTimerCount()).toBe(0);
+});

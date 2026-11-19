@@ -954,20 +954,6 @@ export function renderArtifactSidebarHeaderActions(props: ArtifactSidebarProps) 
         : nothing
     }
     ${
-      props.onSaveDeliverable
-        ? html`
-      <button class="btn btn--sm artifact-preview-action artifact-preview-action--icon" type="button"
-        aria-label=${t("chat.deliverableSaveAs")}
-        ?disabled=${Boolean(saveState?.busy) || Boolean(saveState?.pendingDecision)}
-        @pointerenter=${revealArtifactActionTip}
-        @pointerleave=${hideArtifactActionTip}
-        @click=${() => void props.onSaveDeliverable?.("save_as")}>
-        ${icons.copy}
-        <span class="artifact-preview-action__label">${t("chat.deliverableSaveAs")}</span>
-      </button>`
-        : nothing
-    }
-    ${
       hasInlineTextPreview || artifact.editUrl
         ? html`
             <button

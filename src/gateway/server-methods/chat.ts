@@ -179,6 +179,11 @@ import {
   writeChatTurnTerminal,
   readChatTurnTerminal,
 } from "../chat-interaction-failure.js";
+import {
+  recordAcceptedChatRequest,
+  completeAcceptedChatRequest,
+  recoverInterruptedChatRequests,
+} from "../chat-request-recovery.js";
 import { stripEnvelopeFromMessage, stripEnvelopeFromMessages } from "../chat-sanitize.js";
 import {
   noteChatRunTenant,
@@ -2858,6 +2863,7 @@ function transcriptHasIdempotencyKey(transcriptPath: string, idempotencyKey: str
 async function appendAssistantTranscriptMessage(params: {
   message: string;
   label?: string;
+  senderLabel?: string;
   sessionId: string;
   storePath: string | undefined;
   sessionFile?: string;
@@ -2965,6 +2971,7 @@ async function appendAssistantTranscriptMessage(params: {
     transcriptPath,
     message: params.message,
     label: params.label,
+    senderLabel: params.senderLabel,
     idempotencyKey: params.idempotencyKey,
     abortMeta: params.abortMeta,
     cronResult: params.cronResult,
@@ -3369,6 +3376,7 @@ function broadcastChatFinal(params: {
     ...(params.taskUpdate ? { taskUpdate: params.taskUpdate } : {}),
   };
   const send = () => {
+    completeAcceptedChatRequest(params.runId, params.sessionKey);
     params.context.broadcastChat(params.sessionKey, payload, {
       runId: params.runId,
       tenantId: resolveChatRunTenantId(params.runId),
@@ -4604,6 +4612,48 @@ export const chatHandlers: GatewayRequestHandlers = {
       return;
     }
     if (sessionId && storePath) {
+      let recoveryMessages: unknown[] | undefined;
+      await recoverInterruptedChatRequests({
+        sessionKey,
+        hasDurableReply: (runId) => {
+          recoveryMessages ??= readSessionMessages(sessionId, storePath, entry?.sessionFile);
+          return recoveryMessages.some((raw) => {
+            if (!raw || typeof raw !== "object") {
+              return false;
+            }
+            const row = raw as { message?: unknown; role?: unknown; idempotencyKey?: unknown };
+            const message = (
+              row.message && typeof row.message === "object" ? row.message : row
+            ) as { role?: unknown; idempotencyKey?: unknown };
+            return (
+              message.role === "assistant" &&
+              typeof message.idempotencyKey === "string" &&
+              [
+                `${runId}:assistant`,
+                `${runId}:interaction-rejected`,
+                `${runId}:interaction-rejected:assistant`,
+                `${runId}:restart-interrupted`,
+              ].includes(message.idempotencyKey)
+            );
+          });
+        },
+        append: async (message, idempotencyKey) => {
+          const governance = await resolveChatTranscriptGovernance({ client: historyClient, cfg });
+          return appendAssistantTranscriptMessage({
+            message,
+            idempotencyKey,
+            sessionId,
+            storePath,
+            sessionFile: entry?.sessionFile,
+            agentId: historyAgentId,
+            createIfMissing: false,
+            tenantId: governance.tenantId,
+            ownerUserId: governance.ownerUserId,
+            groupId: governance.groupId,
+            failClosed: governance.failClosed,
+          });
+        },
+      });
       for (const receipt of listChatTurnTerminals(sessionKey)) {
         if (receipt.persistedToTranscript) {
           continue;
@@ -6035,6 +6085,7 @@ export const chatHandlers: GatewayRequestHandlers = {
                 sessionFile: groupSession.entry.sessionFile,
                 createIfMissing: true,
                 idempotencyKey: `${clientRunId}:group-interaction`,
+                senderLabel: interpreter.name,
               });
               if (!persisted.ok) {
                 throw new Error("协作回复暂未保存，本轮没有启动任务。");
@@ -6997,6 +7048,17 @@ export const chatHandlers: GatewayRequestHandlers = {
         userMessageId: `local-${clientRunId}`,
         userMessageText: bodyTrimmed,
       });
+      try {
+        recordAcceptedChatRequest(clientRunId, resolvedSessionKey);
+      } catch {
+        context.chatAbortControllers.delete(clientRunId);
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.UNAVAILABLE, "请求记录暂不可用，请稍后重试。"),
+        );
+        return;
+      }
       const ackPayload = {
         runId: clientRunId,
         status: "started" as const,
@@ -7623,6 +7685,7 @@ export const chatHandlers: GatewayRequestHandlers = {
               }).catch(() => undefined);
             }
           }
+          completeAcceptedChatRequest(clientRunId, resolvedSessionKey);
           setGatewayDedupeEntry({
             dedupe: context.dedupe,
             key: `chat:${clientRunId}`,
@@ -7679,9 +7742,13 @@ export const chatHandlers: GatewayRequestHandlers = {
             err &&
             typeof err === "object" &&
             (err as { usageRecorded?: unknown }).usageRecorded === true;
+          const errorMessage = err instanceof Error ? err.message : String(err);
           context.logGateway.warn(
-            `webchat interaction dispatch failed: class=${errorClass} run=${shortChatRunId(clientRunId)} persisted=${terminal.persisted} phase=${phase} usageRecorded=${usageRecorded}`,
+            `webchat interaction dispatch failed: class=${errorClass} run=${shortChatRunId(clientRunId)} persisted=${terminal.persisted} phase=${phase} usageRecorded=${usageRecorded} message=${errorMessage}`,
           );
+          if (terminal.persisted) {
+            completeAcceptedChatRequest(clientRunId, resolvedSessionKey);
+          }
           broadcastChatError({
             context,
             runId: clientRunId,

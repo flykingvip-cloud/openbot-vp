@@ -1,11 +1,15 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
-import { DEMO_EVIDENCE_ROOT, runAllDemos } from "./run-demos.js";
+import { afterAll, describe, expect, it } from "vitest";
+import { runAllDemos } from "./run-demos.js";
+
+const DEMO_EVIDENCE_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), "batch1-demo-evidence-"));
+afterAll(() => fs.rmSync(DEMO_EVIDENCE_ROOT, { recursive: true, force: true }));
 
 describe("batch1 business demos", () => {
   it("runs task, knowledge, and diagnosis demos and persists evidence", async () => {
-    const index = await runAllDemos();
+    const index = await runAllDemos(DEMO_EVIDENCE_ROOT);
     expect(index.task).toEqual(expect.objectContaining({ result: "pass" }));
     expect(index.knowledge).toEqual(expect.objectContaining({ result: "pass" }));
     expect(index.diagnosis).toEqual(expect.objectContaining({ result: "pass" }));

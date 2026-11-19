@@ -538,8 +538,10 @@ export function applyJobResult(
     }
   }
 
-  // askOutcome W1: keep currentFireId across same-fire error retries; clear otherwise.
+  // Only one-shot backoff retries belong to the same fire. Recurring jobs
+  // schedule a new occurrence, which must receive a fresh duration budget.
   const retainedBecauseErrorRetry =
+    job.schedule.kind === "at" &&
     result.status === "error" &&
     !completionHold &&
     job.enabled &&

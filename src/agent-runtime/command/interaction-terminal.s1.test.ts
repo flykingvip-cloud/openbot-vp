@@ -27,6 +27,7 @@ import {
   createInteractionResourceBudget,
   formatInteractionFailureReply,
 } from "../model/index.js";
+import { INTERACTION_EMPTY_OUTPUT_TEXT } from "../model/interaction-resource-wait.js";
 import { runAuthorizedInteraction } from "./index.js";
 import { formatRestrictedInteractionNotice } from "./index.js";
 import { routeInteraction } from "./index.js";
@@ -129,7 +130,7 @@ it("S1-A / I-C1: B query does not wait for A's hanging tool beyond the interacti
   }
 });
 
-it("S1-B / I-T1: empty-output timeout still yields a terminal that attests no business execution", async () => {
+it("S1-B / I-T1: empty output still yields a terminal that attests no business execution", async () => {
   const dispose = vi.fn(async () => undefined);
   const storeDir = await fs.mkdtemp(path.join(os.tmpdir(), "s1-b-terminal-"));
   try {
@@ -150,27 +151,27 @@ it("S1-B / I-T1: empty-output timeout still yields a terminal that attests no bu
     });
     expect(result).toEqual({
       kind: "respond",
-      text: INTERACTION_TIMEOUT_TEXT,
+      text: INTERACTION_EMPTY_OUTPUT_TEXT,
       clarification: false,
     });
-    expect(INTERACTION_TIMEOUT_TEXT).toContain("没有启动或修改任务");
+    expect(INTERACTION_EMPTY_OUTPUT_TEXT).toContain("没有启动或修改任务");
     const persisted = await persistRejectedInteractionTurn({
-      error: Object.assign(new Error("timeout"), {
+      error: Object.assign(new Error("本轮未取得有效的交互决定，没有启动或修改任务。"), {
         interactionPhase: "interpretation",
-        reason: "timeout",
+        reason: "empty",
       }),
       runId: "run-s1b",
       sessionKey: "sess-s1b",
       storeDir,
       append: async () => ({ ok: true }),
     });
-    expect(persisted).toEqual({ persisted: true, text: INTERACTION_TIMEOUT_TEXT });
+    expect(persisted).toEqual({ persisted: true, text: INTERACTION_EMPTY_OUTPUT_TEXT });
     expect(readChatTurnTerminal("run-s1b", storeDir, "sess-s1b")).toMatchObject({
       runId: "run-s1b",
       persistedToTranscript: true,
       businessExecution: "none",
       recordTemporarilyUnavailable: false,
-      text: INTERACTION_TIMEOUT_TEXT,
+      text: INTERACTION_EMPTY_OUTPUT_TEXT,
     });
     expect(dispose).toHaveBeenCalledOnce();
   } finally {

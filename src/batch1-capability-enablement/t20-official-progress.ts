@@ -29,20 +29,12 @@ import {
   resolveProgressLedgerGate,
 } from "../progress-ledger/feature.js";
 import { readBoundSha } from "./bound-sha.js";
+import { BATCH1_EVIDENCE_ROOT } from "./evidence-root.js";
 import { runKnowledgeDemo } from "./run-demos.js";
 
-export const T20_EVIDENCE_ROOT = path.join(
-  "/workspace/openbot-vp-audit/batch1-evidence",
-  "t20-official-progress",
-);
-export const T20_ROLLBACK_EVIDENCE_ROOT = path.join(
-  "/workspace/openbot-vp-audit/batch1-evidence",
-  "t20-rollback",
-);
-export const T20_KNOWLEDGE_EVIDENCE_ROOT = path.join(
-  "/workspace/openbot-vp-audit/batch1-evidence",
-  "t20-knowledge",
-);
+export const T20_EVIDENCE_ROOT = path.join(BATCH1_EVIDENCE_ROOT, "t20-official-progress");
+export const T20_ROLLBACK_EVIDENCE_ROOT = path.join(BATCH1_EVIDENCE_ROOT, "t20-rollback");
+export const T20_KNOWLEDGE_EVIDENCE_ROOT = path.join(BATCH1_EVIDENCE_ROOT, "t20-knowledge");
 
 const PILOT_TENANT = "tenant-a";
 const FOREIGN_TENANT = "tenant-b";
@@ -67,8 +59,11 @@ function artifactIdentity(): Record<string, unknown> {
     imageDigestUnfilledReason:
       "Auditor box has no docker/podman/nerdctl/buildah/ctr client. A process listens on 0.0.0.0:2375 but no local container runtime process was identified in this namespace, and talking to that unknown listener was not treated as a safe isolated build. Digest is unfilled, not invented.",
     pythonListenerRollbackRetracted: true,
-    pythonListenerHistoricalIndex:
-      "/workspace/openbot-vp-audit/batch1-evidence/release-prep/rollback-drill.json",
+    pythonListenerHistoricalIndex: path.join(
+      BATCH1_EVIDENCE_ROOT,
+      "release-prep",
+      "rollback-drill.json",
+    ),
     zone: "Asia/Shanghai",
     recordedAt: new Date().toISOString(),
   };

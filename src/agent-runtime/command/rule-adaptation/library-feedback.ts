@@ -145,11 +145,15 @@ function parseEntry(value: unknown): RuleLibraryEntry | undefined {
   if (typeof item.sourceVersion !== "string" || item.sourceVersion.length === 0) {
     return undefined;
   }
-  if (!Number.isSafeInteger(item.revision) || item.revision < 1) {
+  if (
+    typeof item.revision !== "number" ||
+    !Number.isSafeInteger(item.revision) ||
+    item.revision < 1
+  ) {
     return undefined;
   }
   if (item.disposition === "use_parameter") {
-    if (!Number.isSafeInteger(item.parameter)) {
+    if (typeof item.parameter !== "number" || !Number.isSafeInteger(item.parameter)) {
       return undefined;
     }
     return {

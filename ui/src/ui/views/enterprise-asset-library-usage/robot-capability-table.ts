@@ -6,7 +6,7 @@
  * 落实需求：Requirements 4.4, 4.5, 8.5, 11.4, 11.6, 11.7
  */
 
-import { html, nothing, type TemplateResult } from "lit-html";
+import { html, nothing, type TemplateResult } from "lit";
 import type { RobotCapabilityUsageView } from "../../capability/runtime-projection/types.ts";
 import type { RobotCapabilityViewSorting } from "../../controllers/enterprise-asset-library-usage/robot-capability-view.ts";
 import { formatExecutions, formatSuccessRate } from "./shared/format.ts";

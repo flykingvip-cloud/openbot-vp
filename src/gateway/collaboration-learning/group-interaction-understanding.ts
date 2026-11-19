@@ -1,6 +1,11 @@
 import { projectInteractionHistoryWithStatus } from "../../agent-runtime/context/index.js";
 import type { InteractionAvailability } from "../../agent-runtime/contracts/interaction-availability.js";
 import type { InteractionModelInput } from "../../agent-runtime/contracts/interaction.js";
+import {
+  createInteractionResourceBudget,
+  raceVisibleInteraction,
+  interactionTimeoutError,
+} from "../../agent-runtime/model/interaction-resource-wait.js";
 /** Group host adapter: read authorized context, then use the shared governed interpretation. */
 import { resolveAgentDir } from "../../agents/agent-scope.js";
 import { resolveBootstrapContextForRun } from "../../agents/bootstrap-files.js";
@@ -31,12 +36,16 @@ const DEFAULT_HISTORY_CHARS = 24000;
 
 export async function understandGroupInteraction(input: GroupUnderstandingInput) {
   input.signal?.throwIfAborted();
-  const bootstrap = await resolveBootstrapContextForRun({
-    workspaceDir: input.workspaceDir,
-    config: input.config,
-    sessionKey: input.sessionKey,
-    agentId: input.agentId,
-  });
+  const deadline = createInteractionResourceBudget({ capMs: input.timeoutMs });
+  const bootstrap = await raceVisibleInteraction(
+    resolveBootstrapContextForRun({
+      workspaceDir: input.workspaceDir,
+      config: input.config,
+      sessionKey: input.sessionKey,
+      agentId: input.agentId,
+    }),
+    { signal: input.signal, remainingMs: deadline.remainingMs() },
+  );
   const skills = buildWorkspaceSkillSnapshot(input.workspaceDir, { config: input.config });
   const budget = resolveContextBudget(input.config, input.agentId);
   const historyBudgetChars = budget.enabled ? budget.maxChars : DEFAULT_HISTORY_CHARS;
@@ -49,6 +58,10 @@ export async function understandGroupInteraction(input: GroupUnderstandingInput)
     ? undefined
     : { mode: "restricted", reasons: ["context_source_unavailable"] };
   const runtime = await import("../../agent-runtime/wiring/interaction-turn.runtime.js");
+  const remainingMs = deadline.remainingMs();
+  if (remainingMs <= 0) {
+    throw interactionTimeoutError();
+  }
   return runtime.runGatewayUnderstanding({
     config: input.config,
     runId: input.runId,
@@ -59,7 +72,7 @@ export async function understandGroupInteraction(input: GroupUnderstandingInput)
     identity: input.identity,
     provider: input.provider,
     model: input.model,
-    timeoutMs: input.timeoutMs,
+    timeoutMs: remainingMs,
     input: {
       message: input.message,
       images: input.images,

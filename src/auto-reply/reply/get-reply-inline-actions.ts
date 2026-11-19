@@ -34,7 +34,7 @@ import type { createModelSelectionState } from "./model-selection.js";
 import { extractInlineSimpleCommand } from "./reply-inline.js";
 import type { TypingController } from "./typing.js";
 
-const builtinSlashCommands = (() => {
+function builtinSlashCommands() {
   return listReservedChatSlashCommandNames([
     "think",
     "verbose",
@@ -45,7 +45,7 @@ const builtinSlashCommands = (() => {
     "status",
     "queue",
   ]);
-})();
+}
 
 function resolveSlashCommandName(commandBodyNormalized: string): string | null {
   const trimmed = commandBodyNormalized.trim();
@@ -167,7 +167,7 @@ export async function handleInlineActions(params: {
     allowTextCommands &&
     slashCommandName !== null &&
     // `/skill …` needs the full skill command list.
-    (slashCommandName === "skill" || !builtinSlashCommands.has(slashCommandName));
+    (slashCommandName === "skill" || !builtinSlashCommands().has(slashCommandName));
   const skillCommands =
     shouldLoadSkillCommands && params.skillCommands
       ? params.skillCommands

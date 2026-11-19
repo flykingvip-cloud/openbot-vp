@@ -66,6 +66,7 @@ export function installTestEnv(): { cleanup: () => void; tempHome: string } {
 
   const restore: RestoreEntry[] = [
     { key: "OPENCLAW_TEST_FAST", value: process.env.OPENCLAW_TEST_FAST },
+    { key: "COREPACK_HOME", value: process.env.COREPACK_HOME },
     { key: "HOME", value: process.env.HOME },
     { key: "USERPROFILE", value: process.env.USERPROFILE },
     { key: "XDG_CONFIG_HOME", value: process.env.XDG_CONFIG_HOME },
@@ -96,6 +97,13 @@ export function installTestEnv(): { cleanup: () => void; tempHome: string } {
 
   process.env.OPENCLAW_REAL_HOME ??=
     restore.find((entry) => entry.key === "HOME")?.value ?? tempHome;
+  // Toolchain cache stays outside isolated application HOME.
+  process.env.COREPACK_HOME ??= path.join(
+    process.env.HOME ?? os.homedir(),
+    ".cache",
+    "node",
+    "corepack",
+  );
   process.env.HOME = tempHome;
   process.env.USERPROFILE = tempHome;
   process.env.OPENCLAW_TEST_HOME = tempHome;

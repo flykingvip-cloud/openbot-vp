@@ -33,11 +33,11 @@ import {
   testState,
 } from "../gateway/test-helpers.js";
 import { readBoundSha } from "./bound-sha.js";
+import { BATCH1_EVIDENCE_ROOT } from "./evidence-root.js";
 
 installGatewayTestHooks({ scope: "suite" });
 
-const EVIDENCE_ROOT =
-  process.env.OPENBOT_BATCH1_EVIDENCE_DIR ?? "/workspace/openbot-vp-audit/batch1-evidence";
+const EVIDENCE_ROOT = process.env.OPENBOT_BATCH1_EVIDENCE_DIR ?? BATCH1_EVIDENCE_ROOT;
 const EVIDENCE_DIR = path.join(EVIDENCE_ROOT, "gateway");
 const ISOLATION_PROOF_DIR = path.join(EVIDENCE_ROOT, "isolation-proof");
 const TEST_TOKEN = "test-gateway-token-1234567890";

@@ -7,9 +7,14 @@ import { loadAgentRegistryStore } from "../agent-registry/store.js";
 import type { AgentRegistryStore } from "../agent-registry/types.js";
 import { getSharedDataGovernanceCatalog } from "../data-governance/runtime-catalog.js";
 import type { CatalogRecord } from "../data-governance/types.js";
+import {
+  canonicalizeWorkspaceLocator,
+  resolveOfficialWorkspaceRoots,
+} from "../data-governance/workspace-locator-canonicalization.js";
 import { resolveKnowledgeSourceContext } from "../knowledge/context.js";
 import { resolveSecurityProfile } from "../security-profile.js";
 import type { GatewayClient } from "../server-methods/types.js";
+import { buildBuiltinStewardWorkspaceResourceId } from "./builders.js";
 import { isFilesystemWorkspaceLocator } from "./write-roots.js";
 
 export type ExecutionWorkspaceOwner =
@@ -40,6 +45,8 @@ export function selectExecutionWorkspace(params: {
   registry: AgentRegistryStore;
   records: readonly CatalogRecord[];
   operation: "read" | "write";
+  stateDir?: string;
+  tenantsRoot?: string;
 }): ExecutionWorkspaceBinding {
   const deny = (reason: string): never => {
     throw new Error(`workspace_binding_required:${reason}`);
@@ -67,7 +74,10 @@ export function selectExecutionWorkspace(params: {
             legacyAgentId: params.agentId,
           });
     if (resolved.kind === "builtin-universal") {
-      resourceId = `ws:${params.tenantId}:user:${params.userId}:steward`;
+      resourceId = buildBuiltinStewardWorkspaceResourceId({
+        tenantId: params.tenantId,
+        userId: params.userId,
+      });
       expectedOwner = (r) =>
         r.envelope.owner.kind === "user" && r.envelope.owner.userId === params.userId;
     } else if (resolved.kind === "resolved") {
@@ -123,15 +133,27 @@ export function selectExecutionWorkspace(params: {
   ) {
     return deny("binding_unplaced");
   }
-  // Read and write use the exact registered directory. Never scan siblings,
-  // align tenants to operators, mint a root, or fall back to a user's directory.
+  // Official locator only: current STATE_DIR / TENANTS_ROOT, or the same tree
+  // under a retired historical prefix. Never scan siblings, align tenants to
+  // operators, mint a root, or fall back to a chatting-user directory.
+  const roots = {
+    stateDir: params.stateDir ?? resolveOfficialWorkspaceRoots().stateDir,
+    tenantsRoot: params.tenantsRoot ?? resolveOfficialWorkspaceRoots().tenantsRoot,
+  };
+  const officialLocator = canonicalizeWorkspaceLocator(binding.locator, roots).locator;
   let real: string;
   try {
-    real = fs.realpathSync(binding.locator);
+    real = fs.realpathSync(officialLocator);
     if (!fs.statSync(real).isDirectory()) {
       return deny("not_directory");
     }
-  } catch {
+    if (params.operation === "write" && !isWritableDirectory(real)) {
+      return deny("directory_not_writable");
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("workspace_binding_required:")) {
+      throw error;
+    }
     return deny("directory_missing");
   }
   return {
@@ -164,6 +186,7 @@ export async function resolveExecutionWorkspace(params: {
   if (!identity.tenantId || !identity.userId) {
     throw new Error("workspace_binding_required:trusted_identity_missing");
   }
+  const roots = resolveOfficialWorkspaceRoots();
   return selectExecutionWorkspace({
     tenantId: identity.tenantId,
     userId: identity.userId,
@@ -172,5 +195,16 @@ export async function resolveExecutionWorkspace(params: {
     operation: params.operation,
     registry: await loadAgentRegistryStore(),
     records: await getSharedDataGovernanceCatalog().list("workspace"),
+    stateDir: roots.stateDir,
+    tenantsRoot: roots.tenantsRoot,
   });
+}
+
+function isWritableDirectory(dir: string): boolean {
+  try {
+    fs.accessSync(dir, fs.constants.W_OK);
+    return true;
+  } catch {
+    return false;
+  }
 }

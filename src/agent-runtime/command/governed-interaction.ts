@@ -99,6 +99,8 @@ function bindGovernedUnderstanding(
       session,
       authorization: {
         agentId: params.agentId,
+        // Commercial scope must use the same trusted identity as the model gate.
+        enterpriseId: params.identity.executionIdentity?.enterpriseId,
         queueMaxWaitMs: resourceBudget.remainingQueueWaitMs(),
         ...(params.identity.executionIdentity?.collaborationGroupId
           ? { groupId: params.identity.executionIdentity.collaborationGroupId }

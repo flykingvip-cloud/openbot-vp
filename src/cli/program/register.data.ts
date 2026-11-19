@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { canonicalizeWorkspaceCatalogCommand } from "../../commands/canonicalize-workspace-catalog.js";
 import {
   executeForgetPlan,
   parseForgetScope,
@@ -129,4 +130,26 @@ export function registerDataCli(program: Command) {
         }
       },
     );
+
+  data
+    .command("canonicalize-workspace-catalog")
+    .description(
+      "Rewrite historical workspace locators to STATE_DIR/TENANTS_ROOT and retire short steward ids (dry-run by default)",
+    )
+    .option(
+      "--yes",
+      "Apply the planned catalog updates (creates a catalog.json backup first)",
+      false,
+    )
+    .option(
+      "--fix-permissions",
+      "Also restore owner-write on official workspace directories",
+      false,
+    )
+    .action(async (opts: { yes?: boolean; fixPermissions?: boolean }) => {
+      await canonicalizeWorkspaceCatalogCommand({
+        yes: opts.yes === true,
+        fixPermissions: opts.fixPermissions === true,
+      });
+    });
 }

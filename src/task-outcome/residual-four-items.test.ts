@@ -42,9 +42,14 @@ describe("residual 1: W1 entry inventory (real call sites)", () => {
 
   it("commands/agent opens a subagent tip and gates the model call", () => {
     const src = fs.readFileSync(path.join(root, "src/commands/agent.ts"), "utf8");
-    expect(src).toMatch(/ensureSubagentTurnTaskOutcome/);
-    expect(src).toMatch(/assertRunnerTurnBudgetAllowsModelCall/);
-    expect(src).toMatch(/chargeModelCallAgainstTip/);
+    expect(src).toContain("openCommandOutcomeEntry");
+    const entry = fs.readFileSync(
+      path.join(root, "src/agent-runtime/command/command-outcome-entry.ts"),
+      "utf8",
+    );
+    expect(entry).toContain("ensureSubagentTurnTaskOutcome");
+    expect(src).toContain("createCommandBudget");
+    expect(src).toContain("settleCommandBudgetForCloseout");
     expect(src).toMatch(/entrypoint: "subagent"|"subagent"/);
     expect(src).not.toMatch(/skip nested subagent lane/);
   });

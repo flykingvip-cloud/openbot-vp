@@ -34,6 +34,7 @@ import {
 } from "../gateway/test-helpers.js";
 import { loadOrCreateDeviceIdentity } from "../infra/device-identity.js";
 import { readBoundSha } from "./bound-sha.js";
+import { BATCH1_EVIDENCE_ROOT } from "./evidence-root.js";
 import {
   observationFromCallGatewayError,
   observationFromCallGatewayPayload,
@@ -54,8 +55,8 @@ installGatewayTestHooks({ scope: "suite" });
 const RUN_ID = `t22-diagnosis-rpc-${Date.now()}`;
 const EVIDENCE_DIR =
   process.env.OPENBOT_T22_DIAGNOSIS_EVIDENCE_DIR ??
-  "/workspace/openbot-vp-audit/batch1-evidence/t22-diagnosis";
-const T20_RPC_JSONL = "/workspace/openbot-vp-audit/batch1-evidence/t20-rpc/rpc.jsonl";
+  path.join(BATCH1_EVIDENCE_ROOT, "t22-diagnosis");
+const T20_RPC_JSONL = path.join(BATCH1_EVIDENCE_ROOT, "t20-rpc", "rpc.jsonl");
 const TEST_TOKEN = "test-gateway-token-1234567890";
 const OTHER_SESSION_KEY = "agent:other:t20";
 const INHERITED_ENV_KEYS = [

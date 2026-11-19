@@ -1,5 +1,7 @@
 import fs from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { BATCH1_EVIDENCE_ROOT } from "./evidence-root.js";
 import {
   T20_DIAGNOSIS_RPC_SPECS,
   deriveCaseHonesty,
@@ -8,7 +10,7 @@ import {
   withCombinedConcurrency,
 } from "./rpc-summary.js";
 
-const T20_RPC_JSONL = "/workspace/openbot-vp-audit/batch1-evidence/t20-rpc/rpc.jsonl";
+const T20_RPC_JSONL = path.join(BATCH1_EVIDENCE_ROOT, "t20-rpc", "rpc.jsonl");
 
 describe("rpc summary honesty", () => {
   it("does not mark pass when an original under-test call failed", () => {
@@ -106,27 +108,30 @@ describe("rpc summary honesty", () => {
     expect(honesty.persistence.observed).toBe(true);
   });
 
-  it("re-evaluates the t20 rpc.jsonl and refuses to relabel failed writes as pass", () => {
-    expect(fs.existsSync(T20_RPC_JSONL)).toBe(true);
-    const records = withCombinedConcurrency(
-      recordsFromJsonl(fs.readFileSync(T20_RPC_JSONL, "utf8")),
-    );
-    const specs = T20_DIAGNOSIS_RPC_SPECS.map((spec) =>
-      spec.caseName === "timeout-fallback" ||
-      spec.caseName === "concurrency" ||
-      spec.caseName === "concurrency-a" ||
-      spec.caseName === "concurrency-b"
-        ? { ...spec, officialOutcome: "accepted" }
-        : spec,
-    );
-    const cases = deriveSummaryCases(records, specs);
-    expect(cases["timeout-fallback"]?.result).toBe("fail");
-    expect(cases["concurrency"]?.result).toBe("fail");
-    expect(cases["concurrency-a"]?.result).toBe("fail");
-    expect(cases["concurrency-b"]?.result).toBe("fail");
-    // auth-deny: expected send failure, no write requirement
-    expect(cases["auth-deny"]?.result).toBe("pass");
-    expect(cases["boundary-deny"]?.result).toBe("pass");
-    expect(cases["duplicate-delivery"]?.result).toBe("pass");
-  });
+  it.skipIf(!fs.existsSync(T20_RPC_JSONL))(
+    "re-evaluates the t20 rpc.jsonl and refuses to relabel failed writes as pass",
+    () => {
+      expect(fs.existsSync(T20_RPC_JSONL)).toBe(true);
+      const records = withCombinedConcurrency(
+        recordsFromJsonl(fs.readFileSync(T20_RPC_JSONL, "utf8")),
+      );
+      const specs = T20_DIAGNOSIS_RPC_SPECS.map((spec) =>
+        spec.caseName === "timeout-fallback" ||
+        spec.caseName === "concurrency" ||
+        spec.caseName === "concurrency-a" ||
+        spec.caseName === "concurrency-b"
+          ? { ...spec, officialOutcome: "accepted" }
+          : spec,
+      );
+      const cases = deriveSummaryCases(records, specs);
+      expect(cases["timeout-fallback"]?.result).toBe("fail");
+      expect(cases["concurrency"]?.result).toBe("fail");
+      expect(cases["concurrency-a"]?.result).toBe("fail");
+      expect(cases["concurrency-b"]?.result).toBe("fail");
+      // auth-deny: expected send failure, no write requirement
+      expect(cases["auth-deny"]?.result).toBe("pass");
+      expect(cases["boundary-deny"]?.result).toBe("pass");
+      expect(cases["duplicate-delivery"]?.result).toBe("pass");
+    },
+  );
 });

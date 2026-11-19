@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 const source = readFileSync(
   resolve(
     dirname(fileURLToPath(import.meta.url)),
-    "../agent-runtime/execution/runner/admitted-candidate.ts",
+    "../agent-runtime/execution/runner/admitted-candidate-embedded.ts",
   ),
   "utf8",
 );
