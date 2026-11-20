@@ -35,7 +35,8 @@ vi.mock("./platform-auth.js", async (importOriginal) => {
   };
 });
 
-const { resolveTenantContextForSessionStore } = await import("./tenant-context.js");
+const { resolveTenantContext, resolveTenantContextForSessionStore } =
+  await import("./tenant-context.js");
 const { ensureGatewayClientEnterpriseTenant } =
   await import("./webchat-client-platform-identity.js");
 const { findMembershipByUserId, findUniqueMembershipByUserId } =
@@ -51,6 +52,38 @@ function storeInOrder(
 ): PlatformAuthStore {
   const memberships: PlatformAuthStore["memberships"] = {};
   for (const membership of [first, second]) {
+    memberships[membership.id] = {
+      id: membership.id,
+      userId: "user-multi",
+      enterpriseId: membership.enterpriseId,
+      membershipRole: "member",
+      createdAt: NOW,
+      updatedAt: NOW,
+    };
+  }
+  return {
+    users: {
+      "user-multi": {
+        id: "user-multi",
+        email: "multi@example.com",
+        normalizedEmail: "multi@example.com",
+        status: "active",
+      },
+    },
+    enterprises: {
+      "ent-a": { id: "ent-a", name: "A", status: "paid" },
+      "ent-b": { id: "ent-b", name: "B", status: "paid" },
+    },
+    memberships,
+    sessions: {},
+  } as unknown as PlatformAuthStore;
+}
+
+function storeWithMemberships(
+  membershipsList: Array<{ id: string; enterpriseId: string }>,
+): PlatformAuthStore {
+  const memberships: PlatformAuthStore["memberships"] = {};
+  for (const membership of membershipsList) {
     memberships[membership.id] = {
       id: membership.id,
       userId: "user-multi",
@@ -142,5 +175,67 @@ describe("WP-B slice1 membership ambiguity on resolveTenantContextForSessionStor
     const ctx = await resolveTenantContextForSessionStore(client);
     expect(ctx?.tenantId).toBe("ent-b");
     expect(ctx?.userId).toBe("user-multi");
+  });
+
+  it("still resolves a unique enterprise membership when the session has no binding", async () => {
+    currentStore = storeWithMemberships([MEM_A]);
+    expect(findUniqueMembershipByUserId(currentStore, "user-multi")?.enterpriseId).toBe("ent-a");
+    const ctx = await resolveTenantContextForSessionStore(unboundClient());
+    expect(ctx?.tenantId).toBe("ent-a");
+    expect(ctx?.userId).toBe("user-multi");
+  });
+
+  it("does not fall through to unique or first-match when the exact session membership pair is invalid", async () => {
+    currentStore = storeInOrder(MEM_A, MEM_B);
+    const client = {
+      ...unboundClient(),
+      sessionMembershipId: "mem-a",
+      sessionEnterpriseId: "ent-b",
+    } as GatewayClient;
+    // The legacy helper still first-matches; an invalid exact pair must not use it.
+    expect(findMembershipByUserId(currentStore, "user-multi")?.enterpriseId).toBe("ent-a");
+    const ctx = await resolveTenantContextForSessionStore(client);
+    expect(ctx).toBeNull();
+  });
+
+  it("treats a half-bound session as unbound and uses the unique-membership path", async () => {
+    currentStore = storeInOrder(MEM_A, MEM_B);
+    const membershipOnly = {
+      ...unboundClient(),
+      sessionMembershipId: "mem-b",
+    } as GatewayClient;
+    const enterpriseOnly = {
+      ...unboundClient(),
+      sessionEnterpriseId: "ent-b",
+    } as GatewayClient;
+    expect(findMembershipByUserId(currentStore, "user-multi")?.enterpriseId).toBe("ent-a");
+    expect(await resolveTenantContextForSessionStore(membershipOnly)).toBeNull();
+    expect(await resolveTenantContextForSessionStore(enterpriseOnly)).toBeNull();
+
+    currentStore = storeWithMemberships([MEM_A]);
+    const uniqueHalfBound = {
+      ...unboundClient(),
+      sessionEnterpriseId: "ent-b",
+    } as GatewayClient;
+    const uniqueCtx = await resolveTenantContextForSessionStore(uniqueHalfBound);
+    expect(uniqueCtx?.tenantId).toBe("ent-a");
+  });
+
+  it("does not treat sessionTenantId as authority when membership is unresolved", async () => {
+    currentStore = storeInOrder(MEM_A, MEM_B);
+    const client = {
+      ...unboundClient(),
+      sessionTenantId: "ent-b",
+    } as GatewayClient;
+    expect(await resolveTenantContextForSessionStore(client)).toBeNull();
+
+    const enterpriseClient = {
+      ...client,
+      sessionDomain: "enterprise",
+    } as GatewayClient;
+    await expect(resolveTenantContext(enterpriseClient)).rejects.toMatchObject({
+      name: "TenantContextError",
+      code: "unresolved_tenant",
+    });
   });
 });
