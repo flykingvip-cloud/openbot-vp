@@ -216,7 +216,7 @@ dependencies {
     testImplementation("io.kotest:kotest-runner-junit5-jvm:6.2.7")
     testImplementation("io.kotest:kotest-assertions-core-jvm:6.2.7")
     testImplementation("com.squareup.okhttp3:mockwebserver:5.5.1")
-    testImplementation("org.robolectric:robolectric:4.18")
+    testImplementation("org.robolectric:robolectric:4.18.1")
     testRuntimeOnly("org.junit.vintage:junit-vintage-engine:6.1.3")
 }
 
