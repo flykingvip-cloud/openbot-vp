@@ -14790,6 +14790,7 @@ tasks:
     owner: codex-runtime
     intent: []
     paths:
+      - src/agent-runtime/state/postgres/**
       - src/agent-runtime/state/repository/tool-operation.ts
       - src/agent-runtime/state/repository/tool-operation.test.ts
       - src/gateway/collaboration-dispatch/private-run-bag.ts
@@ -14799,6 +14800,18 @@ tasks:
       - src/agents/pi-tool-definition-adapter.ts
       - src/gateway/collaboration-dispatch/delivery-tool-side-effect.test.ts
       - src/gateway/collaboration-dispatch/private-run-bag.test.ts
+      - src/agent-runtime/state/postgres/execution.integration.test.ts
+      - src/agent-runtime/state/postgres/execution.sql
+      - src/agent-runtime/state/postgres/execution.ts
+      - src/agent-runtime/state/postgres/lease-lifecycle.test.ts
+      - src/agent-runtime/state/postgres/lease-lifecycle.ts
+      - src/agent-runtime/wiring/postgres-turn-lease.test.ts
+      - src/agent-runtime/wiring/postgres-turn-lease.ts
+      - src/agent-runtime/wiring/runtime-lease-registry.test.ts
+      - src/agent-runtime/wiring/runtime-lease-registry.ts
+      - src/agent-runtime/wiring/reply-turn.ts
+      - src/gateway/server-close.ts
+      - src/gateway/server.impl.ts
     state: active
     sessions:
       - id: runtime-rebase-recovery-20261119
@@ -14808,10 +14821,37 @@ tasks:
         status: active
         lastSignalAt: 2026-11-19T15:10:30.777Z
         metadata: {}
+      - id: runtime-production-binding-20261120
+        taskId: runtime-concurrency-recovery:codex-runtime
+        ide: codex
+        agent: codex-runtime
+        status: active
+        lastSignalAt: 2026-11-20T00:14:57.293Z
+        metadata: {}
     ownerHistory: []
     since: 2026-11-19
     metadata: {}
 landingStreams:
+  - id: runtime-postgres-binding
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - src/agent-runtime/state/postgres/execution.integration.test.ts
+      - src/agent-runtime/state/postgres/execution.sql
+      - src/agent-runtime/state/postgres/execution.ts
+      - src/agent-runtime/state/postgres/lease-lifecycle.test.ts
+      - src/agent-runtime/state/postgres/lease-lifecycle.ts
+      - src/agent-runtime/wiring/postgres-turn-lease.test.ts
+      - src/agent-runtime/wiring/postgres-turn-lease.ts
+      - src/agent-runtime/wiring/runtime-lease-registry.test.ts
+      - src/agent-runtime/wiring/runtime-lease-registry.ts
+      - .kiro/specs/runtime-concurrency-recovery/tasks.md
+      - src/agent-runtime/wiring/reply-turn.ts
+      - src/gateway/server-close.ts
+      - src/gateway/server.impl.ts
+    canLandWith: []
+    metadata:
+      owner: codex-runtime
   - id: runtime-recovery-integration
     landingPolicy: serial
     paths:
@@ -31068,7 +31108,7 @@ sharedPaths:
       history retained. Sole lander is codex-runtime-manager for this convergence checkpoint.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/wiring/reply-turn.ts
-    landerTask: agent-runtime-convergence
+    landerTask: runtime-concurrency-recovery:codex-runtime
     reason: Human-authorized scoped landing transfer on 2026-11-05; prior task declarations and session
       history retained. Sole lander is codex-runtime-manager for this convergence checkpoint.
     reviewAfter: 2026-11-30
@@ -33311,7 +33351,7 @@ sharedPaths:
       history preserved.
     reviewAfter: 2026-11-30
   - glob: src/gateway/server.impl.ts
-    landerTask: agent-runtime-convergence
+    landerTask: runtime-concurrency-recovery:codex-runtime
     reason: User-authorized Package2 async-wait recovery boot wiring next to consumer-boot; preserve
       prior P4 heartbeat lifecycle ownership and sessions.
     reviewAfter: 2026-12-31
@@ -34109,3 +34149,33 @@ sharedPaths:
   - glob: src/gateway/collaboration-dispatch/private-run-bag.ts
     landerTask: runtime-concurrency-recovery:codex-runtime
     reason: User-authorized isolated runtime recovery integration; preserve predecessor history.
+  - glob: src/agent-runtime/state/postgres/execution.integration.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized isolated runtime production binding; predecessor history retained.
+  - glob: src/agent-runtime/state/postgres/execution.sql
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized isolated runtime production binding; predecessor history retained.
+  - glob: src/agent-runtime/state/postgres/execution.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized isolated runtime production binding; predecessor history retained.
+  - glob: src/agent-runtime/state/postgres/lease-lifecycle.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized isolated runtime production binding; predecessor history retained.
+  - glob: src/agent-runtime/state/postgres/lease-lifecycle.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized isolated runtime production binding; predecessor history retained.
+  - glob: src/agent-runtime/wiring/postgres-turn-lease.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized isolated runtime production binding; predecessor history retained.
+  - glob: src/agent-runtime/wiring/postgres-turn-lease.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized isolated runtime production binding; predecessor history retained.
+  - glob: src/agent-runtime/wiring/runtime-lease-registry.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized isolated runtime production binding; predecessor history retained.
+  - glob: src/agent-runtime/wiring/runtime-lease-registry.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized isolated runtime production binding; predecessor history retained.
+  - glob: src/gateway/server-close.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized isolated runtime production binding; predecessor history retained.

@@ -114,3 +114,62 @@
 - Claims persist ownerPid and unique ownerToken. Same-process active claims dedupe without mistaking the pre-journal window for an orphan. Failed/no-result dead-owner claims require reconciliation and never re-fire — codex-runtime
 - Existing delivery/private-bag 17 tests pass; new orphan regression passes (private bag 9/9); scoped lint passes. PID recycling conservatively delays detection; token is identity metadata, not fencing — codex-runtime
 - Provider consumers, gateway recovery scheduling, cancellation transaction and Postgres fencing remain open — codex-runtime
+
+## Postgres execution prototype — WIP, not integrated
+
+- Added tenant-scoped execution/outbox schema and SQL repository claim + terminal arbitration. Database clock, fence/version/owner checks and atomic terminal event insertion are specified — codex-runtime
+- Scoped lint passes; no database integration tests yet. No renewal, cancellation request ingress, repository factory, gateway wiring or migration deployment; not a completed Postgres backend — codex-runtime
+- Query consumers and production waiting scheduler remain unfinished. New source and registry are uncommitted WIP — codex-runtime
+
+## Production integration audit WIP
+
+- runAdmittedTurn success is model execution, not business acceptance/delivery. Production completion hook must attach to verified acceptance after delivery, never to the model-loop return — codex-runtime
+- Added database requestCancellation transition: tenant scoped, terminal compare-and-set, fence invalidation, atomic cancellation Outbox. This method is not yet connected to trusted interaction cancellation ingress — codex-runtime
+- Production connection factory, lifetime/renewal worker, verified completion hook and shutdown lifecycle remain missing. No production backend enabled or deployed — codex-runtime
+
+## Cancellation ingress repository verification
+
+- Real isolated PostgreSQL regression extended and passed: cross-tenant cancellation rejected; duplicate cancellation produces no extra event; cancelled owner cannot renew or finish; one cancellation event persisted — codex-runtime
+- Temporary database stopped after validation. Scoped lint and diff whitespace checks pass. Test is a single integration scenario with multiple assertions, not multiple independently isolated cases — codex-runtime
+- Production trusted ingress, abort propagation, accepted delivery completion and gateway lifecycle remain unconnected. Repository code is WIP and not deployed — codex-runtime
+
+## Lease lifecycle helper WIP
+
+- Located trusted executionIdentity on queued runs, opts.abortSignal, and deferred commitGrowthOutcome acceptance/delivery boundary. Gateway server-close owns connection shutdown lifecycle — codex-runtime
+- Added acquireExecutionLease helper: requires tenant/execution identity, claims before use, propagates parent abort, serializes renew calls, aborts on renewal rejection/error, exposes explicit dispose — codex-runtime
+- Helper only: no gateway pool/factory or actual run/acceptance/cancel binding yet. No lifecycle regression test yet. Scoped lint passes; must not enable in production before integration and tests — codex-runtime
+
+## Lifecycle regression checkpoint
+
+- 4 lifecycle tests pass: trusted identity rejection, parent cancellation propagation, renewal rejection/error aborts and disposal stops timers. Invalid lease parameters/pre-aborted callers rejected before claim — codex-runtime
+- Actual reply-turn/gateway lifecycle binding remains unfinished. Repository helpers are not a production-enabled backend; no config activation or completion hooks added — codex-runtime
+
+## Opt-in reply execution lease binding WIP
+
+- replyTurnRuntime.execution now calls runWithPostgresTurnLease; unset OPENBOT_RUNTIME_DATABASE_URL retains existing behavior, configured mode requires trusted enterprise identity and stable task executionAttempt, creates ready row and acquires lease before model invocation — codex-runtime
+- Leased AbortSignal flows through opts; lost lease rejects return; finally disposes renewal and closes per-turn pool. No automatic schema creation — codex-runtime
+- Binding has no dedicated mock/real-db runner test yet; final acceptance/delivery and gateway-level pool/shutdown still not connected. Database row remains running until lease expiry; repeated logical execution requires explicit terminal policy. Do not enable in production yet — codex-runtime
+- Scoped lint passed; full type diagnostics saved in /tmp/runtime-binding-tsgo.log. Source remains uncommitted WIP pending ownership and integration tests — codex-runtime
+
+## Turn binding regression WIP
+
+- Added injectable per-turn pool test seam; 3 turn binding tests pass (disabled pass-through, trusted identity/parent cancel/cleanup, DB failure prevents model execution). Combined lifecycle tests 7/7 pass; scoped lint passes — codex-runtime
+- Lease currently ends at model return; verified acceptance/delivery occurs later and has no lease fence. This is a known integration gap, not production-complete. Gateway lifecycle, final acceptance and cancellation ingress remain unfinished — codex-runtime
+
+## Deferred acceptance binding WIP
+
+- Success result transfers lease ownership to commitGrowthOutcome wrapper. Completed requires passed acceptance, delivered transport, deliveryId and no processPlaceholder; DB terminal commit fences before legacy outcome callback — codex-runtime
+- New test confirms pool remains open after model return and closes after verified terminal callback. Turn wrapper suite 4/4 passes; existing lifecycle 4/4 passed before this addition — codex-runtime
+- Known gap: absent deferred callback leaves renewal alive; gateway registry/shutdown cleanup missing. DB completion and legacy growth write are not one transaction. Not production-ready; uncommitted WIP — codex-runtime
+
+## Gateway registry binding WIP
+
+- Added gateway-scoped lease registry; per-turn resources register cleanup, shutdown stops admission and drains cleanup, startup recovery reopens admission. Lease disposal aborts delayed acceptance — codex-runtime
+- Turn/lifecycle tests 8 passed; registry shutdown/reopen test 1 passed. Real server-close integration and failure paths still untested — codex-runtime
+- Known remaining: cleanup failure currently can interrupt broader gateway close; concurrent renewal disposal ordering; trusted cancel request wiring; no complete production end-to-end validation. No deployment — codex-runtime
+
+## Submit validation 2026-11-20
+
+- 9 unit/integration-seam tests and 1 isolated real PostgreSQL scenario pass. Scoped lint on 11 TS files passes; full tsgo errors are outside modified paths; full check remains blocked by existing repository issues — codex-runtime
+- Shutdown cleanup errors no longer skip other gateway shutdown work. dispose returns pending renewal promise; per-turn cleanup awaits it before closing pool — codex-runtime
+- Submission is opt-in WIP integration, not production readiness certification: provider query consumers, trusted cancel ingress, DB+legacy outcome reconciliation, real gateway shutdown fault tests and no-callback runtime timeout remain open — codex-runtime

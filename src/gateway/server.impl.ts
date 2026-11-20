@@ -6,6 +6,7 @@ import {
   ensureAsyncWaitRecoveryFollowupConsumer,
   setAsyncWaitRecoveryContinueEnqueue,
 } from "../agent-runtime/state/index.js";
+import { startRuntimeLeaseAdmission } from "../agent-runtime/wiring/runtime-lease-registry.js";
 import { resolveAgentWorkspaceDir, resolveDefaultAgentId } from "../agents/agent-scope.js";
 import { maybeProvisionBuiltinStewardAtStartup } from "../agents/builtin-steward/provision.js";
 import { getActiveEmbeddedRunCount } from "../agents/pi-embedded-runner/runs.js";
@@ -821,6 +822,7 @@ export async function startGatewayServer(
         ensureAsyncWaitRecoveryFollowupConsumer({ cfg, sessionKey });
       });
       setAsyncWaitRecoveryContinueEnqueue(createAsyncWaitRecoveryContinueEnqueue(cfgAtStart));
+      startRuntimeLeaseAdmission();
       recoverAsyncWaitJobsAtGatewayBoot({
         cfg: cfgAtStart,
         startRecheck: true,
