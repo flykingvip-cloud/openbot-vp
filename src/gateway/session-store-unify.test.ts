@@ -20,6 +20,8 @@ vi.mock("./platform-auth.js", () => ({
   findUserByEmail: () => ({ id: "u1", email: "a@acme.com" }),
   findUserById: () => ({ id: "u1", email: "a@acme.com" }),
   findMembershipByUserId: () => ({ enterpriseId: "acme" }),
+  findUniqueMembershipByUserId: () => ({ enterpriseId: "acme" }),
+  findMembershipByIdForUser: () => undefined,
 }));
 
 import type { GatewayClient } from "./server-methods/types.js";

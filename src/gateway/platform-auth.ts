@@ -22,6 +22,8 @@ export {
   findUserByEmail,
   findUserById,
   findMembershipByUserId,
+  findMembershipByIdForUser,
+  findUniqueMembershipByUserId,
   buildPlatformOrganizationSnapshot,
   buildPlatformEmployeeAccess,
 } from "./platform-auth/memberships.js";
