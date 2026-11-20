@@ -29,7 +29,10 @@ import { isSubagentSessionKey } from "../routing/session-key.js";
 import { resolveGatewayMessageChannel } from "../utils/message-channel.js";
 import { resolveAgentConfig } from "./agent-scope.js";
 import { createApplyPatchTool } from "./apply-patch.js";
-import { wrapToolWithAuthoritativeWriteRecheck } from "./authoritative-write-recheck.js";
+import {
+  isBoundTenantAuthorityStillGranted,
+  wrapToolWithAuthoritativeWriteRecheck,
+} from "./authoritative-write-recheck.js";
 import {
   createExecTool,
   createProcessTool,
@@ -259,10 +262,11 @@ function createChatSendWriteAuthorityRecheck(options?: {
       options?.executionIdentity?.membershipId ?? options?.gatewayClientSessionMembershipId,
   } as GatewayClient;
   return {
-    isAuthorityStillGranted: async () => {
-      const { tenantId } = await resolveAuthoritativeMembership(client);
-      return canonicalizeTenantId(tenantId) === boundEnterpriseId;
-    },
+    isAuthorityStillGranted: () =>
+      isBoundTenantAuthorityStillGranted({
+        boundEnterpriseId,
+        resolveAuthority: () => resolveAuthoritativeMembership(client),
+      }),
   };
 }
 
