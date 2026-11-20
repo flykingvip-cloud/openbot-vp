@@ -33,6 +33,8 @@ vi.mock("./platform-auth.js", () => ({
   findUserByEmail: () => undefined,
   findUserById: () => undefined,
   findMembershipByUserId: () => undefined,
+  findUniqueMembershipByUserId: () => undefined,
+  findMembershipByIdForUser: () => undefined,
 }));
 
 import { withOperatorStateScope } from "../config/operator-state-scope.js";

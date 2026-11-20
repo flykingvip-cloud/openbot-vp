@@ -26,6 +26,8 @@ vi.mock("./platform-auth.js", () => ({
   loadPlatformAuthStore: loadPlatformAuthStoreMock,
   findUserByEmail: findUserByEmailMock,
   findMembershipByUserId: findMembershipByUserIdMock,
+  findUniqueMembershipByUserId: findMembershipByUserIdMock,
+  findMembershipByIdForUser: vi.fn(),
 }));
 vi.mock("./workspace-resolver/tool-cwd.js", () => ({
   resolveAuthorizedAgentToolWorkspaceCwd: resolveAuthorizedAgentToolWorkspaceCwdMock,

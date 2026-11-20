@@ -22,7 +22,8 @@ import { normalizeAgentId } from "../routing/session-key.js";
 import { resolveUserPath } from "../utils.js";
 import { healOperatorSessionEntryFromSharedStore } from "./operator-shared-session-heal.js";
 import {
-  findMembershipByUserId,
+  findMembershipByIdForUser,
+  findUniqueMembershipByUserId,
   findUserByEmail,
   findUserById,
   loadPlatformAuthStore,
@@ -88,8 +89,10 @@ export class TenantContextError extends Error {
 /**
  * Membership-only authoritative `{ tenantId, userId }` for a session.
  *
- * Resolves STRICTLY from the platform-auth store: `client.user` (email) → user → membership →
- * `enterpriseId`. It NEVER consults `client.sessionTenantId` and does NOT use the workbench-actor /
+ * Resolves STRICTLY from the platform-auth store: `client.user` (email) or `platformUserId` →
+ * user → an exact session membership pair, or a unique membership → `enterpriseId`.
+ * It never first-matches among several enterprises (object iteration order is not a
+ * selection policy). It NEVER consults `client.sessionTenantId` as authority and does NOT use the workbench-actor /
  * local-operator fallbacks layered on by `resolveTrustedAttribution` (expert review 高危2). Returns
  * `null` fields when not resolvable; callers fail closed.
  *
@@ -121,7 +124,21 @@ async function resolveMembershipAuthority(
     if (!user) {
       return { tenantId: null, userId: null };
     }
-    const membership = findMembershipByUserId(store, user.id);
+    const membershipId = client?.sessionMembershipId?.trim() || "";
+    const sessionEnterpriseId = client?.sessionEnterpriseId?.trim() || "";
+    let membership;
+    if (membershipId && sessionEnterpriseId) {
+      const exact = findMembershipByIdForUser(store, membershipId, user.id);
+      if (
+        exact &&
+        canonicalizeTenantId(exact.enterpriseId) === canonicalizeTenantId(sessionEnterpriseId)
+      ) {
+        membership = exact;
+      }
+    } else {
+      // No exact pair: never first-match across enterprises.
+      membership = findUniqueMembershipByUserId(store, user.id);
+    }
     const tenantId = membership ? canonicalizeTenantId(membership.enterpriseId) : null;
     return { tenantId, userId: user.id.trim() || null };
   } catch {

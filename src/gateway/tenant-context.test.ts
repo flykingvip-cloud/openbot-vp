@@ -14,6 +14,7 @@ const {
   findUserByEmailMock,
   findUserByIdMock,
   findMembershipByUserIdMock,
+  findMembershipByIdForUserMock,
 } = vi.hoisted(() => ({
   loadConfigMock: vi.fn(),
   resolvePlatformAuthConfigMock: vi.fn(),
@@ -21,6 +22,7 @@ const {
   findUserByEmailMock: vi.fn(),
   findUserByIdMock: vi.fn(),
   findMembershipByUserIdMock: vi.fn(),
+  findMembershipByIdForUserMock: vi.fn(),
 }));
 vi.mock("../config/config.js", () => ({ loadConfig: loadConfigMock }));
 vi.mock("./platform-auth.js", () => ({
@@ -29,6 +31,8 @@ vi.mock("./platform-auth.js", () => ({
   findUserByEmail: findUserByEmailMock,
   findUserById: findUserByIdMock,
   findMembershipByUserId: findMembershipByUserIdMock,
+  findMembershipByIdForUser: findMembershipByIdForUserMock,
+  findUniqueMembershipByUserId: findMembershipByUserIdMock,
 }));
 
 import { resolveStorePath } from "../config/sessions.js";
@@ -69,6 +73,7 @@ function withMembership(opts: { userId?: string | null; enterpriseId?: string | 
   findMembershipByUserIdMock.mockReturnValue(
     opts.enterpriseId ? { enterpriseId: opts.enterpriseId } : undefined,
   );
+  findMembershipByIdForUserMock.mockReturnValue(undefined);
 }
 
 beforeEach(() => {
@@ -83,6 +88,7 @@ beforeEach(() => {
   findUserByEmailMock.mockReset();
   findUserByIdMock.mockReset();
   findMembershipByUserIdMock.mockReset();
+  findMembershipByIdForUserMock.mockReset();
 });
 
 afterEach(() => {

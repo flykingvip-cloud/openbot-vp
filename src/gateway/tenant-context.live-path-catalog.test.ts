@@ -26,6 +26,8 @@ vi.mock("./platform-auth.js", () => ({
   loadPlatformAuthStore: loadPlatformAuthStoreMock,
   findUserByEmail: findUserByEmailMock,
   findMembershipByUserId: findMembershipByUserIdMock,
+  findUniqueMembershipByUserId: findMembershipByUserIdMock,
+  findMembershipByIdForUser: vi.fn(),
 }));
 vi.mock("../utils.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../utils.js")>();
