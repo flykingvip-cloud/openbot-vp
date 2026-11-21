@@ -181,3 +181,40 @@ describe("routing explanation round-trips through platform projection (P3 收口
     expect(exp.matchedRules).toContain("best_quality");
   });
 });
+
+it("strict AOR projection propagates invalid target instead of silently acknowledging", async () => {
+  const { recordAorRunFeedbackStrict } = await import("./aor-feedback.js");
+  expect(() =>
+    recordAorRunFeedbackStrict({ banditStatePath: "", provider: "", model: "", taskTypeId: "" }),
+  ).toThrow("requires canonical");
+});
+
+it("atomically deduplicates replayed AOR learning events", async () => {
+  const { recordAorFeedbackEvent } = await import("./aor-feedback.js");
+  const input = {
+    banditStatePath: path.join(tempDir, "event-bandit.json"),
+    provider: "provider",
+    model: "model",
+    taskTypeId: "research",
+    eventId: "event",
+  };
+  expect(recordAorFeedbackEvent(input)).toBe("applied");
+  expect(recordAorFeedbackEvent(input)).toBe("duplicate");
+  expect(Object.values(readBanditPersistedState(input.banditStatePath)!.arms)[0].trials).toBe(1);
+  expect(() => recordAorFeedbackEvent({ ...input, score: 0 })).toThrow("conflict");
+});
+
+it("legacy feedback preserves event receipts rather than erasing deduplication", async () => {
+  const { recordAorFeedbackEvent } = await import("./aor-feedback.js");
+  const input = {
+    banditStatePath: path.join(tempDir, "mixed-bandit.json"),
+    provider: "p",
+    model: "m",
+    taskTypeId: "research",
+    eventId: "event",
+  };
+  recordAorFeedbackEvent(input);
+  recordAorRunFeedback(input);
+  expect(recordAorFeedbackEvent(input)).toBe("duplicate");
+  expect(Object.values(readBanditPersistedState(input.banditStatePath)!.arms)[0].trials).toBe(2);
+});

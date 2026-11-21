@@ -123,6 +123,8 @@ export async function runEmbeddedRunAttemptIteration(args: {
     sessionFile: params.sessionFile,
     skipUserTranscriptPersist: params.skipUserTranscriptPersist,
     collaborationRoundInvoked: params.collaborationRoundInvoked,
+    logicalExecutionId: params.logicalExecutionId,
+    logicalTaskId: params.logicalTaskId,
     deliveryToolSideEffect: params.deliveryToolSideEffect,
     privateRunBag: params.privateRunBag,
     workspaceDir: resolvedWorkspace,

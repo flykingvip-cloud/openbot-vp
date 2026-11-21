@@ -1,5 +1,6 @@
 import type { Server as HttpServer } from "node:http";
 import type { WebSocketServer } from "ws";
+import { stopRuntimeLeases } from "../agent-runtime/wiring/runtime-lease-registry.js";
 import { stopDeliveryContextSweep } from "../agents/execution-preflight/completion-hold.js";
 import type { CanvasHostHandler, CanvasHostServer } from "../canvas-host/server.js";
 import { type ChannelId, listChannelPlugins } from "../channels/plugins/index.js";
@@ -34,6 +35,9 @@ export function createGatewayCloseHandler(params: {
   httpServers?: HttpServer[];
 }) {
   return async (opts?: { reason?: string; restartExpectedMs?: number | null }) => {
+    await stopRuntimeLeases().catch((error: unknown) => {
+      console.error("Runtime lease shutdown cleanup failed", error);
+    });
     const reasonRaw = typeof opts?.reason === "string" ? opts.reason.trim() : "";
     const reason = reasonRaw || "gateway stopping";
     const restartExpectedMs =

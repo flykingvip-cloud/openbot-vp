@@ -209,7 +209,11 @@ describe("delivery tool side effect loop", () => {
     const skipped = await execute(message, "m2");
     expect(calls).toBe(1);
     expect(failed.details).toMatchObject({ status: "error", error: "send failed" });
-    expect(skipped.details).toMatchObject({ status: "skipped" });
+    expect(skipped.details).toMatchObject({
+      status: "waiting",
+      retryAllowed: false,
+      waitCondition: { reason: "external_operation" },
+    });
   });
 
   it("indexes the private run bag once and never double-fires the same fingerprint", async () => {
@@ -472,4 +476,41 @@ describe("delivery fingerprint reaches the tool loop from prompt assembly", () =
       key: `${TASK_ID}|${itemId}|step-send|message`,
     });
   });
+});
+
+it("carries canonical admitted operation identity through the actual SDK tool chain", async () => {
+  const ledgerDir = await fs.mkdtemp(path.join(os.tmpdir(), "canonical-operation-chain-"));
+  tempDirs.push(ledgerDir);
+  const operationIdentity = {
+    tenantId: "tenant",
+    taskId: "task",
+    executionId: "chat:execution",
+    stepId: "step",
+    operationId: "send",
+  };
+  let writes = 0;
+  const schedule = {
+    ledgerDir,
+    taskId: "task",
+    boardItemId: "item",
+    stepId: "step",
+    operationIdentity,
+  };
+  const tools = splitSdkTools({
+    sandboxEnabled: false,
+    deliveryToolSideEffect: schedule,
+    tools: [
+      tool("message", () => {
+        writes += 1;
+        return { content: [{ type: "text", text: "sent" }], details: { status: "ok" } };
+      }),
+    ],
+  }).customTools;
+  await execute(tools[0], "first-attempt-call");
+  await execute(tools[0], "retry-different-call");
+  expect(writes).toBe(1);
+  const claims = (await fs.readdir(ledgerDir)).filter((name) => name.endsWith(".json"));
+  expect(claims).toHaveLength(1);
+  const claim = JSON.parse(await fs.readFile(path.join(ledgerDir, claims[0]), "utf8"));
+  expect(claim.key).toMatch(/^operation:v1:[a-f0-9]{64}$/);
 });

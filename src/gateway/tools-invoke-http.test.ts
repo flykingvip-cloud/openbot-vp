@@ -1,6 +1,8 @@
-import { readFileSync } from "node:fs";
+import { mkdtempSync, rmSync, readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
+import os from "node:os";
+import path from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   readExecutionTraces,
@@ -23,6 +25,8 @@ const { appendGovernanceShadowDecisionMock, gatewayAuthResult } = vi.hoisted(() 
 }));
 
 let cfg: Record<string, unknown> = {};
+let operationExecutions = 0;
+let operationPause: (() => Promise<void>) | undefined;
 let lastCreateOpenClawToolsContext: Record<string, unknown> | undefined;
 
 // Perf: keep this suite pure unit. Mock heavyweight config/session modules.
@@ -103,7 +107,11 @@ vi.mock("../agents/openclaw-tools.js", () => {
     {
       name: "agents_list",
       parameters: { type: "object", properties: { action: { type: "string" } } },
-      execute: async () => ({ ok: true, result: [] }),
+      execute: async () => {
+        operationExecutions++;
+        await operationPause?.();
+        return { ok: true, result: [] };
+      },
     },
     {
       name: "sessions_spawn",
@@ -867,3 +875,306 @@ describe("POST /tools/invoke", () => {
     expect(source).not.toContain("ORCHESTRATION_LIVE_INVOKE");
   });
 });
+
+it("HTTP operation replay is durable, payload conflicts do not execute, and tenant mismatch is denied", async () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "http-operation-admission-"));
+  const previous = process.env.OPENBOT_STATE_DIR;
+  process.env.OPENBOT_STATE_DIR = root;
+  try {
+    allowAgentsListForMain();
+    gatewayAuthResult.current = {
+      ok: true,
+      trustedProxy: { domain: "enterprise", enterpriseId: "tenant-1" },
+    };
+    const operationIdentity = {
+      tenantId: "tenant-1",
+      taskId: "task",
+      executionId: "execution",
+      stepId: "step",
+      operationId: "list",
+    };
+    const invoke = (identity = operationIdentity, args = {}) =>
+      postToolsInvoke({
+        port: sharedPort,
+        headers: gatewayAuthHeaders(),
+        body: { tool: "agents_list", args, operationIdentity: identity },
+      });
+    const before = operationExecutions;
+    expect((await invoke()).status).toBe(200);
+    expect((await invoke()).status).toBe(200);
+    expect(operationExecutions).toBe(before + 1);
+    expect((await invoke(operationIdentity, { changed: true })).status).not.toBe(200);
+    expect(operationExecutions).toBe(before + 1);
+    expect((await invoke({ ...operationIdentity, tenantId: "other" })).status).toBe(403);
+    expect(operationExecutions).toBe(before + 1);
+  } finally {
+    if (previous === undefined) {
+      delete process.env.OPENBOT_STATE_DIR;
+    } else {
+      process.env.OPENBOT_STATE_DIR = previous;
+    }
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+it("database runtime rejects an identity-bearing operation without lease grant before execution", async () => {
+  const previous = process.env.OPENBOT_RUNTIME_DATABASE_URL;
+  process.env.OPENBOT_RUNTIME_DATABASE_URL = "postgresql://test-required-grant";
+  try {
+    allowAgentsListForMain();
+    gatewayAuthResult.current = {
+      ok: true,
+      trustedProxy: { domain: "enterprise", enterpriseId: "tenant-1" },
+    };
+    const before = operationExecutions;
+    const res = await postToolsInvoke({
+      port: sharedPort,
+      headers: gatewayAuthHeaders(),
+      body: {
+        tool: "agents_list",
+        args: {},
+        operationIdentity: {
+          tenantId: "tenant-1",
+          taskId: "task",
+          executionId: "execution",
+          stepId: "step",
+          operationId: "write",
+        },
+      },
+    });
+    expect(res.status).toBe(403);
+    expect((await res.json()).error.type).toBe("execution_grant_required");
+    expect(operationExecutions).toBe(before);
+  } finally {
+    if (previous === undefined) {
+      delete process.env.OPENBOT_RUNTIME_DATABASE_URL;
+    } else {
+      process.env.OPENBOT_RUNTIME_DATABASE_URL = previous;
+    }
+  }
+});
+
+it.skipIf(!process.env.OPENBOT_RUNTIME_TEST_DATABASE_URL)(
+  "HTTP validates a real DB grant and rejects changed request and cancelled lease",
+  async () => {
+    const { createRequire } = await import("node:module");
+    const { randomUUID } = await import("node:crypto");
+    const { issueToolExecutionGrant } =
+      await import("../agent-runtime/state/postgres/tool-execution-grant.js");
+    const { PostgresExecutionRepository } =
+      await import("../agent-runtime/state/postgres/execution.js");
+    const { toolExecutionRequestDigest } =
+      await import("../agent-runtime/wiring/http-execution-grant.js");
+    const { Client } = createRequire(import.meta.url)("pg");
+    const base = process.env.OPENBOT_RUNTIME_TEST_DATABASE_URL!;
+    const db = new Client({ connectionString: base });
+    await db.connect();
+    const schema = `http_grant_${randomUUID().replaceAll("-", "")}`;
+    const root = mkdtempSync(path.join(os.tmpdir(), "http-real-grant-"));
+    const previousUrl = process.env.OPENBOT_RUNTIME_DATABASE_URL,
+      previousRoot = process.env.OPENBOT_STATE_DIR;
+    let created = false;
+    try {
+      await db.query(`CREATE SCHEMA ${schema}`);
+      created = true;
+      await db.query(`SET search_path TO ${schema}`);
+      await db.query(readFileSync("src/agent-runtime/state/postgres/execution.sql", "utf8"));
+      await db.query(
+        "INSERT INTO runtime_executions(tenant_id,execution_id,state,payload) VALUES ('tenant-1','execution','ready','{\"taskId\":\"task\"}')",
+      );
+      const repo = new PostgresExecutionRepository(db);
+      const lease = await repo.claim("tenant-1", "execution", "owner", 30000);
+      const identity = {
+        tenantId: "tenant-1",
+        taskId: "task",
+        executionId: "execution",
+        stepId: "step",
+        operationId: "list",
+      };
+      const token = await issueToolExecutionGrant(db, {
+        identity,
+        toolName: "agents_list",
+        sessionKey: "agent:main:main",
+        requestDigest: toolExecutionRequestDigest("agents_list", "agent:main:main", undefined, {}),
+        owner: "owner",
+        fence: String(lease.fence),
+      });
+      const url = new URL(base);
+      url.searchParams.set("options", `-csearch_path=${schema}`);
+      process.env.OPENBOT_RUNTIME_DATABASE_URL = url.href;
+      process.env.OPENBOT_STATE_DIR = root;
+      allowAgentsListForMain();
+      gatewayAuthResult.current = {
+        ok: true,
+        trustedProxy: { domain: "enterprise", enterpriseId: "tenant-1" },
+      };
+      const call = (args = {}) =>
+        postToolsInvoke({
+          port: sharedPort,
+          headers: { ...gatewayAuthHeaders(), "x-openbot-execution-grant": token },
+          body: {
+            tool: "agents_list",
+            sessionKey: "agent:main:main",
+            args,
+            operationIdentity: identity,
+          },
+        });
+      const { persistAuthorizedFabricRequest } =
+        await import("../agent-runtime/wiring/fabric-rpc-admission.js");
+      const { createFabricRequestAdmission } =
+        await import("../agent-runtime/wiring/fabric-request-admission.js");
+      const { createGatewayFabricService } = await import("../fabric/wiring.js");
+      const { createLoopbackToolInvoker } = await import("../fabric/loopback-invoker.js");
+      const { AdapterRegistry } = await import("../fabric/adapter-registry.js");
+      await db.query(
+        "INSERT INTO runtime_executions(tenant_id,execution_id,state,payload) VALUES ('tenant-1','parent-authority','running',$1::jsonb)",
+        [
+          JSON.stringify({
+            taskId: "fabric-task",
+            userId: "fabric-user",
+            sessionKey: "agent:main:main",
+            ingress: "chat",
+          }),
+        ],
+      );
+      const fabricRequest = {
+        id: "fabric-op",
+        source: { type: "cursor", tenantId: "tenant-1", userId: "fabric-user" },
+        tool: { name: "agents_list" },
+        input: { args: [] },
+        context: {},
+        trace: {
+          sessionId: "agent:main:main",
+          taskId: "fabric-task",
+          correlationId: "fabric-logical",
+        },
+      };
+      await persistAuthorizedFabricRequest(fabricRequest);
+      const registry = new AdapterRegistry([
+        {
+          id: "test.agents",
+          match: { toolNames: ["agents_list"] },
+          execute: { command: "agents_list" },
+          capabilities: { fs: false, network: false, streaming: false },
+        },
+      ]);
+      const admit = createFabricRequestAdmission({
+        build: (_request, issuer) =>
+          createGatewayFabricService({
+            registry,
+            processRunner: false,
+            toolInvoker: createLoopbackToolInvoker({
+              baseUrl: `http://127.0.0.1:${sharedPort}`,
+              token: TEST_GATEWAY_TOKEN,
+              issueExecutionGrant: issuer,
+            }),
+          }),
+      });
+      // HTTP operator has no tenant; validated execution grant must restore it before tool construction.
+      gatewayAuthResult.current = { ok: true };
+      const fabricHost = await admit(fabricRequest);
+      try {
+        const executed = await fabricHost.service.execute(fabricRequest);
+        expect(executed.result.status).toBe("success");
+        expect(lastCreateOpenClawToolsContext?.executionIdentity).toMatchObject({
+          enterpriseId: "tenant-1",
+          platformUserId: "fabric-user",
+        });
+      } finally {
+        await fabricHost.dispose();
+      }
+      gatewayAuthResult.current = {
+        ok: true,
+        trustedProxy: { domain: "enterprise", enterpriseId: "tenant-1" },
+      };
+      const before = operationExecutions;
+      let release!: () => void;
+      operationPause = () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        });
+      const firstCall = call();
+      await vi.waitFor(() => expect(operationExecutions).toBe(before + 1));
+      try {
+        expect((await call()).status).toBe(409);
+      } finally {
+        release();
+        operationPause = undefined;
+      }
+      expect((await firstCall).status).toBe(200);
+      expect((await call()).status).toBe(200);
+      expect(operationExecutions).toBe(before + 1);
+      expect(
+        (
+          await db.query(
+            "SELECT count(*)::int AS n FROM runtime_tool_results WHERE execution_id='execution'",
+          )
+        ).rows[0].n,
+      ).toBe(1);
+      expect((await call({ changed: true })).status).not.toBe(200);
+      expect(operationExecutions).toBe(before + 1);
+      const pendingIdentity = { ...identity, operationId: "write-before-takeover" };
+      const pendingToken = await issueToolExecutionGrant(db, {
+        identity: pendingIdentity,
+        toolName: "agents_list",
+        sessionKey: "agent:main:main",
+        requestDigest: toolExecutionRequestDigest("agents_list", "agent:main:main", undefined, {}),
+        owner: "owner",
+        fence: String(lease.fence),
+      });
+      const pendingCall = (grant: string) =>
+        postToolsInvoke({
+          port: sharedPort,
+          headers: { ...gatewayAuthHeaders(), "x-openbot-execution-grant": grant },
+          body: {
+            tool: "agents_list",
+            sessionKey: "agent:main:main",
+            args: {},
+            operationIdentity: pendingIdentity,
+          },
+        });
+      operationPause = () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        });
+      const oldWorker = pendingCall(pendingToken);
+      await vi.waitFor(() => expect(operationExecutions).toBe(before + 2));
+      await db.query(
+        "UPDATE runtime_executions SET lease_expires_at=clock_timestamp()-interval '1 second' WHERE execution_id='execution'",
+      );
+      const replacement = await repo.claim("tenant-1", "execution", "new-owner", 30000);
+      release();
+      operationPause = undefined;
+      expect((await oldWorker).status).toBe(409);
+      const newToken = await issueToolExecutionGrant(db, {
+        identity: pendingIdentity,
+        toolName: "agents_list",
+        sessionKey: "agent:main:main",
+        requestDigest: toolExecutionRequestDigest("agents_list", "agent:main:main", undefined, {}),
+        owner: "new-owner",
+        fence: String(replacement.fence),
+      });
+      expect((await pendingCall(newToken)).status).toBe(409);
+      expect(operationExecutions).toBe(before + 2);
+      await repo.requestCancellation("tenant-1", "execution", "cancel");
+      expect((await call()).status).not.toBe(200);
+      expect(operationExecutions).toBe(before + 2);
+    } finally {
+      if (previousUrl === undefined) {
+        delete process.env.OPENBOT_RUNTIME_DATABASE_URL;
+      } else {
+        process.env.OPENBOT_RUNTIME_DATABASE_URL = previousUrl;
+      }
+      if (previousRoot === undefined) {
+        delete process.env.OPENBOT_STATE_DIR;
+      } else {
+        process.env.OPENBOT_STATE_DIR = previousRoot;
+      }
+      if (created) {
+        await db.query(`DROP SCHEMA ${schema} CASCADE`);
+      }
+      await db.end();
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);

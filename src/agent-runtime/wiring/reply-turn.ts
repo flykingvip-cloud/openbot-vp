@@ -30,6 +30,7 @@ import { confirmPendingTurnDelivery } from "./delivery-confirm.js";
 import { resolveDynamicExecutionConstraints } from "./dynamic-rule-constraints.js";
 import { interruptInteractionTask, steerInteractionTask } from "./interaction-effects.js";
 import type { GatewayInteractionParams } from "./interaction-turn.js";
+import { runWithPostgresTurnLease } from "./postgres-turn-lease.js";
 import { evaluateBoundTaskAcceptance } from "./task-acceptance.js";
 
 /** Compose the original reply-turn dependencies. The reply host owns transport and cleanup. */
@@ -84,7 +85,7 @@ export const replyTurnRuntime = {
             }),
         };
       }
-      return runAdmittedTurn(request, host);
+      return runWithPostgresTurnLease(request, (leased) => runAdmittedTurn(leased, host));
     },
   },
   delivery: {

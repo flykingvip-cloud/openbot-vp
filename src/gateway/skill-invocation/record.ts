@@ -6,9 +6,11 @@ import { bindSkillInvocationRecord } from "../evolution-control/task-outcome-bin
 import { skillExecutionSkillName } from "../skill-execution-binding/paths.js";
 import { parseSkillIdentityToolName } from "../skill-execution-binding/skill-tool-wrappers.js";
 import {
+  SkillRelationScopeError,
+  SkillAssetStoreError,
   getSkillRuntimeDefinitionForBinding,
   listRobotSkillAssets,
-  recordRobotSkillInvocationStats,
+  commitRobotSkillInvocation,
   recordSkillHealthSample,
 } from "../skill-lifecycle-store.js";
 import { recordAttributionOutcome } from "./attribution-stats.js";
@@ -200,18 +202,25 @@ export function recordSkillInvocationCompleted(
     return event;
   }
 
-  // Append event first (recoverable audit trail).
-  appendSkillInvocationEvent(event, configDir);
-
+  // Canonical audit fact/counter/receipt commit precedes the external JSONL projection.
   try {
-    recordRobotSkillInvocationStats({
+    commitRobotSkillInvocation({
       agentId: event.agentId,
       skillId: event.skillId,
       atMs: event.completedAt,
+      invocationId: event.invocationId,
+      audit: event,
+      ...(event.tenantId && event.userId
+        ? { scope: { tenantId: event.tenantId, userId: event.userId } }
+        : {}),
     });
-  } catch {
-    // relation may not exist
+  } catch (error) {
+    // A missing old relation may be tolerated; authority failure must not be marked seen.
+    if (error instanceof SkillRelationScopeError || !(error instanceof SkillAssetStoreError)) {
+      throw error;
+    }
   }
+  appendSkillInvocationEvent(event, configDir);
 
   try {
     recordSkillHealthSample({

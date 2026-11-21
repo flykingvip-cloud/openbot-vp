@@ -641,3 +641,281 @@ describe("skill share attribution", () => {
     expect(listRobotSkillAssets("robot-alpha").map((entry) => entry.id)).toContain(saved.skillId);
   });
 });
+
+it("scoped skill reads isolate ownership and reject unowned legacy installs", async () => {
+  cleanStore();
+  const { listTenantRobotSkillAssets } = await import("./skill-lifecycle-store.js");
+  const saved = saveExampleSkill();
+  installSkillToRobotAsset({
+    agentId: "scoped-agent",
+    skillId: saved.skillId,
+    tenantId: "tenant-a",
+    ownerUserId: "user-a",
+  });
+  expect(
+    listTenantRobotSkillAssets({ tenantId: "tenant-a", userId: "user-a", agentId: "scoped-agent" }),
+  ).toHaveLength(1);
+  expect(
+    listTenantRobotSkillAssets({ tenantId: "tenant-b", userId: "user-a", agentId: "scoped-agent" }),
+  ).toEqual([]);
+  expect(
+    listTenantRobotSkillAssets({ tenantId: "tenant-a", userId: "user-b", agentId: "scoped-agent" }),
+  ).toEqual([]);
+  expect(() =>
+    installSkillToRobotAsset({
+      agentId: "scoped-agent",
+      skillId: saved.skillId,
+      tenantId: "tenant-b",
+      ownerUserId: "user-b",
+    }),
+  ).toThrow("ownership conflict");
+  installSkillToRobotAsset({ agentId: "legacy-agent", skillId: saved.skillId });
+  expect(() =>
+    listTenantRobotSkillAssets({ tenantId: "tenant-a", userId: "user-a", agentId: "legacy-agent" }),
+  ).toThrow("migration");
+});
+
+it("exact relation authorization rejects other tenant/user and legacy relations", async () => {
+  cleanStore();
+  const { assertRobotSkillRelationScope } = await import("./skill-lifecycle-store.js");
+  const saved = saveExampleSkill();
+  installSkillToRobotAsset({
+    agentId: "guarded",
+    skillId: saved.skillId,
+    tenantId: "tenant",
+    ownerUserId: "user",
+  });
+  const scope = { tenantId: "tenant", userId: "user", agentId: "guarded", skillId: saved.skillId };
+  expect(() => assertRobotSkillRelationScope(scope)).not.toThrow();
+  expect(() => assertRobotSkillRelationScope({ ...scope, tenantId: "other" })).toThrow("not owned");
+  expect(() => assertRobotSkillRelationScope({ ...scope, userId: "other" })).toThrow("not owned");
+});
+
+it("scoped mutations reject omitted or different ownership inside the locked write", () => {
+  cleanStore();
+  const saved = saveExampleSkill();
+  installSkillToRobotAsset({
+    agentId: "scope-write",
+    skillId: saved.skillId,
+    tenantId: "tenant",
+    ownerUserId: "user",
+  });
+  const base = { agentId: "scope-write", skillId: saved.skillId, enabled: false };
+  expect(() => toggleRobotSkillAsset(base)).toThrow("matching");
+  expect(() =>
+    removeRobotSkillAsset({ ...base, scope: { tenantId: "other", userId: "user" } }),
+  ).toThrow("matching");
+  expect(
+    toggleRobotSkillAsset({ ...base, scope: { tenantId: "tenant", userId: "user" } }).enabled,
+  ).toBe(false);
+});
+
+it("commits invocation audit, count and dedupe receipt in one snapshot", async () => {
+  cleanStore();
+  const { commitRobotSkillInvocation } = await import("./skill-lifecycle-store.js");
+  const saved = saveExampleSkill();
+  installSkillToRobotAsset({ agentId: "atomic-invoke", skillId: saved.skillId });
+  const input = {
+    agentId: "atomic-invoke",
+    skillId: saved.skillId,
+    invocationId: "invocation",
+    atMs: 10,
+    audit: { id: "invocation", outcome: "success" },
+  };
+  expect(commitRobotSkillInvocation(input)).toBe("applied");
+  expect(commitRobotSkillInvocation(input)).toBe("duplicate");
+  expect(listRobotSkillAssets("atomic-invoke")[0].usageCount).toBe(1);
+  expect(() =>
+    commitRobotSkillInvocation({ ...input, audit: { id: "invocation", outcome: "failure" } }),
+  ).toThrow("conflict");
+});
+
+it("recovers committed tenant audit projection without repeating skill counters", async () => {
+  cleanStore();
+  const { commitRobotSkillInvocation } = await import("./skill-lifecycle-store.js");
+  const { reconcileCommittedInvocationAudits } =
+    await import("./skill-invocation/reconcile-audit.js");
+  const { readSkillInvocationEvents } = await import("./skill-invocation/event-store.js");
+  const saved = saveExampleSkill();
+  installSkillToRobotAsset({
+    agentId: "audit-recovery",
+    skillId: saved.skillId,
+    tenantId: "tenant",
+    ownerUserId: "user",
+  });
+  const audit = {
+    type: "skill_invocation_completed",
+    invocationId: "recovered",
+    agentId: "audit-recovery",
+    skillId: saved.skillId,
+    tenantId: "tenant",
+    userId: "user",
+    completedAt: 10,
+    outcome: "success",
+  };
+  commitRobotSkillInvocation({
+    agentId: "audit-recovery",
+    skillId: saved.skillId,
+    invocationId: "recovered",
+    atMs: 10,
+    audit,
+    scope: { tenantId: "tenant", userId: "user" },
+  });
+  const configDir = path.join(tmpDir, "audit-recovery-projection");
+  reconcileCommittedInvocationAudits({ tenantId: "tenant", userId: "user", configDir });
+  reconcileCommittedInvocationAudits({ tenantId: "tenant", userId: "user", configDir });
+  expect(readSkillInvocationEvents({ configDir })).toHaveLength(1);
+  expect(listRobotSkillAssets("audit-recovery")[0].usageCount).toBe(1);
+  expect(reconcileCommittedInvocationAudits({ tenantId: "other", userId: "user", configDir })).toBe(
+    0,
+  );
+});
+
+it("audit recovery pages past first records and wraps for late earlier identities", async () => {
+  cleanStore();
+  const { commitRobotSkillInvocation } = await import("./skill-lifecycle-store.js");
+  const { reconcileCommittedInvocationAudits } =
+    await import("./skill-invocation/reconcile-audit.js");
+  const { readSkillInvocationEvents } = await import("./skill-invocation/event-store.js");
+  const saved = saveExampleSkill();
+  installSkillToRobotAsset({
+    agentId: "paged",
+    skillId: saved.skillId,
+    tenantId: "tenant",
+    ownerUserId: "user",
+  });
+  const commit = (id: string) =>
+    commitRobotSkillInvocation({
+      agentId: "paged",
+      skillId: saved.skillId,
+      invocationId: id,
+      atMs: 10,
+      scope: { tenantId: "tenant", userId: "user" },
+      audit: {
+        type: "skill_invocation_completed",
+        invocationId: id,
+        agentId: "paged",
+        skillId: saved.skillId,
+        tenantId: "tenant",
+        userId: "user",
+        completedAt: 10,
+      },
+    });
+  commit("b");
+  commit("c");
+  const configDir = path.join(tmpDir, "paged-audit");
+  const input = { tenantId: "tenant", userId: "user", configDir, limit: 1 };
+  expect(reconcileCommittedInvocationAudits(input)).toBe(1);
+  expect(reconcileCommittedInvocationAudits(input)).toBe(1);
+  commit("a");
+  expect(reconcileCommittedInvocationAudits(input)).toBe(0);
+  expect(reconcileCommittedInvocationAudits(input)).toBe(1);
+  expect(readSkillInvocationEvents({ configDir })).toHaveLength(3);
+  expect(listRobotSkillAssets("paged")[0].usageCount).toBe(3);
+});
+
+it("does not advance audit recovery cursor when JSONL append fails", async () => {
+  cleanStore();
+  const { commitRobotSkillInvocation } = await import("./skill-lifecycle-store.js");
+  const { reconcileCommittedInvocationAudits } =
+    await import("./skill-invocation/reconcile-audit.js");
+  const { readSkillInvocationEvents } = await import("./skill-invocation/event-store.js");
+  const saved = saveExampleSkill();
+  installSkillToRobotAsset({
+    agentId: "failed-audit",
+    skillId: saved.skillId,
+    tenantId: "tenant",
+    ownerUserId: "user",
+  });
+  commitRobotSkillInvocation({
+    agentId: "failed-audit",
+    skillId: saved.skillId,
+    invocationId: "event",
+    atMs: 10,
+    scope: { tenantId: "tenant", userId: "user" },
+    audit: {
+      type: "skill_invocation_completed",
+      invocationId: "event",
+      agentId: "failed-audit",
+      skillId: saved.skillId,
+      tenantId: "tenant",
+      userId: "user",
+      completedAt: 10,
+    },
+  });
+  const configDir = path.join(tmpDir, "audit-failure");
+  const original = fs.appendFileSync;
+  const spy = vi.spyOn(fs, "appendFileSync").mockImplementation((...args) => {
+    if (String(args[0]).endsWith("events.jsonl")) {
+      throw new Error("injected disk failure");
+    }
+    return original(...args);
+  });
+  try {
+    expect(() =>
+      reconcileCommittedInvocationAudits({ tenantId: "tenant", userId: "user", configDir }),
+    ).toThrow("disk failure");
+  } finally {
+    spy.mockRestore();
+  }
+  expect(
+    reconcileCommittedInvocationAudits({ tenantId: "tenant", userId: "user", configDir }),
+  ).toBe(1);
+  expect(readSkillInvocationEvents({ configDir })).toHaveLength(1);
+  expect(listRobotSkillAssets("failed-audit")[0].usageCount).toBe(1);
+});
+
+it("audit recovery respects agent allowlist and uses independent grant cursors", async () => {
+  cleanStore();
+  const { commitRobotSkillInvocation } = await import("./skill-lifecycle-store.js");
+  const { reconcileCommittedInvocationAudits } =
+    await import("./skill-invocation/reconcile-audit.js");
+  const { readSkillInvocationEvents } = await import("./skill-invocation/event-store.js");
+  const saved = saveExampleSkill();
+  for (const agentId of ["allowed", "denied"]) {
+    installSkillToRobotAsset({
+      agentId,
+      skillId: saved.skillId,
+      tenantId: "tenant",
+      ownerUserId: "user",
+    });
+    commitRobotSkillInvocation({
+      agentId,
+      skillId: saved.skillId,
+      invocationId: agentId,
+      atMs: 10,
+      scope: { tenantId: "tenant", userId: "user" },
+      audit: {
+        type: "skill_invocation_completed",
+        invocationId: agentId,
+        agentId,
+        skillId: saved.skillId,
+        tenantId: "tenant",
+        userId: "user",
+        completedAt: 10,
+      },
+    });
+  }
+  const configDir = path.join(tmpDir, "allowlist-audit");
+  reconcileCommittedInvocationAudits({
+    tenantId: "tenant",
+    userId: "user",
+    agentIds: ["allowed"],
+    configDir,
+  });
+  expect(readSkillInvocationEvents({ configDir }).map((e) => e.agentId)).toEqual(["allowed"]);
+  reconcileCommittedInvocationAudits({
+    tenantId: "tenant",
+    userId: "user",
+    agentIds: [],
+    configDir,
+  });
+  expect(readSkillInvocationEvents({ configDir })).toHaveLength(1);
+  reconcileCommittedInvocationAudits({
+    tenantId: "tenant",
+    userId: "user",
+    agentIds: ["denied"],
+    configDir,
+  });
+  expect(readSkillInvocationEvents({ configDir })).toHaveLength(2);
+});

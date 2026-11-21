@@ -1,3 +1,4 @@
+import path from "node:path";
 /**
  * Durable commercial usage outbox — receipt before delivery.
  *
@@ -5,8 +6,7 @@
  * treating the commercial usage as accepted. A drain consumer calls the
  * idempotent recordCreditUsage stage machine.
  */
-
-import path from "node:path";
+import { withFileLock, SESSION_TASK_BOARD_LOCK_OPTIONS } from "../../infra/file-lock.js";
 import { createAsyncLock, readJsonFile, writeJsonAtomic } from "../../infra/json-files.js";
 import { CONFIG_DIR, resolveUserPath } from "../../utils.js";
 import type { RecordCreditUsageInput } from "./record-credit-usage.js";
@@ -41,7 +41,11 @@ export function resolveDefaultUsageOutboxStorePath(): string {
   return path.join(CONFIG_DIR, "openbot-usage-outbox.json");
 }
 
-const withLock = createAsyncLock();
+const serialize = createAsyncLock();
+function withLock<T>(storePath: string | undefined, work: () => Promise<T>): Promise<T> {
+  const file = resolveUserPath(storePath?.trim() || resolveDefaultUsageOutboxStorePath());
+  return serialize(() => withFileLock(file, SESSION_TASK_BOARD_LOCK_OPTIONS, work));
+}
 
 async function loadStore(storePath?: string): Promise<Store> {
   const resolved = resolveUserPath(storePath?.trim() || resolveDefaultUsageOutboxStorePath());
@@ -70,7 +74,7 @@ export async function enqueueUsageOutbox(
     throw new Error("taskId is required for usage outbox");
   }
   const id = taskId;
-  return withLock(async () => {
+  return withLock(storePath, async () => {
     const store = await loadStore(storePath);
     const existing = store.byId[id];
     if (
@@ -132,7 +136,7 @@ export async function markUsageOutboxProcessing(
   id: string,
   storePath?: string,
 ): Promise<UsageOutboxRecord | null> {
-  return withLock(async () => {
+  return withLock(storePath, async () => {
     const store = await loadStore(storePath);
     const existing = store.byId[id];
     if (!existing || existing.status === "done") {
@@ -152,7 +156,7 @@ export async function markUsageOutboxProcessing(
 }
 
 export async function markUsageOutboxDone(id: string, storePath?: string): Promise<void> {
-  await withLock(async () => {
+  await withLock(storePath, async () => {
     const store = await loadStore(storePath);
     const existing = store.byId[id];
     if (!existing) {
@@ -175,7 +179,7 @@ export async function markUsageOutboxFailed(input: {
   storePath?: string;
   backoffMs?: number;
 }): Promise<void> {
-  await withLock(async () => {
+  await withLock(input.storePath, async () => {
     const store = await loadStore(input.storePath);
     const existing = store.byId[input.id];
     if (!existing || existing.status === "done") {

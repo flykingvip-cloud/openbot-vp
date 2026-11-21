@@ -45,11 +45,13 @@ export function createGatewayEvolutionControlPlane(options?: {
   inspector?: EvolutionAuthorizationInspector;
   observationProvider?: ExperimentObservationProvider;
   skillInvocationConfigDir?: string;
+  /** Trusted host membership/service grant, never proposal-supplied. */
+  skillScope?: { tenantId: string; userId: string };
 }): EvolutionControlPlane {
   const cfg = options?.cfg ?? loadConfig();
   const persistDir = resolveEvolutionControlRoot(options?.persistDir);
   const adapterDir = resolveEvolutionAdapterDir(persistDir);
-  const skillPort = createDefaultSkillLifecyclePort();
+  const skillPort = createDefaultSkillLifecyclePort(options?.skillScope);
   const workingDnaAdapter = createWorkingDnaAdapter(cfg, { persistDir: adapterDir });
   const capsuleStore = createWorkspaceCapsuleStore(cfg);
   const capsuleAdapter = createCapsuleAdapter(capsuleStore, {

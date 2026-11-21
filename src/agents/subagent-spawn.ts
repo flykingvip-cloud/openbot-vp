@@ -1,8 +1,11 @@
 import crypto from "node:crypto";
 import { promises as fs } from "node:fs";
+import path from "node:path";
+import type { OperationIdentity } from "../agent-runtime/contracts/operation.js";
 import { formatThinkingLevels, normalizeThinkLevel } from "../auto-reply/thinking.js";
 import { DEFAULT_SUBAGENT_MAX_SPAWN_DEPTH } from "../config/agent-limits.js";
 import { loadConfig } from "../config/config.js";
+import { resolveStateDir } from "../config/paths.js";
 import { callGateway } from "../gateway/call.js";
 import type { ExecutionIdentityContext } from "../gateway/execution-identity-context.js";
 import {
@@ -48,6 +51,7 @@ import {
 } from "./subagent-attachments.js";
 import { resolveSubagentCapabilities } from "./subagent-capabilities.js";
 import { getSubagentDepthFromSessionStore } from "./subagent-depth.js";
+import { dispatchChildOnce } from "./subagent-dispatch-journal.js";
 import { countActiveRunsForSession, registerSubagentRun } from "./subagent-registry.js";
 import { readStringParam } from "./tools/common.js";
 import {
@@ -87,6 +91,8 @@ export type SpawnSubagentParams = {
 };
 
 export type SpawnSubagentContext = {
+  /** Trusted persisted operation, never supplied in model tool args. */
+  operationIdentity?: OperationIdentity;
   agentSessionKey?: string;
   agentChannel?: string;
   agentAccountId?: string;
@@ -281,7 +287,7 @@ async function ensureThreadBindingForSubagentSpawn(params: {
   }
 }
 
-export async function spawnSubagentDirect(
+async function spawnSubagentUnregistered(
   params: SpawnSubagentParams,
   ctx: SpawnSubagentContext,
 ): Promise<SpawnSubagentResult> {
@@ -909,4 +915,26 @@ export async function spawnSubagentDirect(
     ...(childCapabilitySurface ? { capabilityExecutionSurface: childCapabilitySurface } : {}),
     ...(childCapabilityPlanSummary ? { childCapabilityPlan: childCapabilityPlanSummary } : {}),
   };
+}
+
+export async function spawnSubagentDirect(
+  params: SpawnSubagentParams,
+  ctx: SpawnSubagentContext,
+): Promise<SpawnSubagentResult> {
+  if (!ctx.operationIdentity) {
+    return spawnSubagentUnregistered(params, ctx);
+  }
+  const tenant =
+    ctx.executionIdentity?.enterpriseId ??
+    ctx.executionIdentity?.collaborationOwnerEntitlement?.tenantId;
+  if (!tenant || tenant !== ctx.operationIdentity.tenantId || !ctx.agentSessionKey) {
+    throw new Error("Child dispatch requires trusted tenant and requester identity");
+  }
+  return dispatchChildOnce({
+    root: path.join(resolveStateDir(), "runtime-child-dispatch"),
+    identity: ctx.operationIdentity,
+    requesterSessionKey: ctx.agentSessionKey,
+    request: params,
+    dispatch: () => spawnSubagentUnregistered(params, ctx),
+  });
 }

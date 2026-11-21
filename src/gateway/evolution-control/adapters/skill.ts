@@ -13,6 +13,7 @@ import {
   getPersonalSkillAssetDetail,
   installSkillToRobotAsset,
   listRobotSkillAssets,
+  listTenantRobotSkillAssets,
   publishSkillReview,
   restoreRobotSkillInstallation,
   restoreSkillLifecycleState,
@@ -500,7 +501,10 @@ function toRecord(skillId: string): SkillRecord {
   };
 }
 
-export function createDefaultSkillLifecyclePort(): SkillLifecyclePort {
+export function createDefaultSkillLifecyclePort(scope?: {
+  tenantId: string;
+  userId: string;
+}): SkillLifecyclePort {
   return {
     get(skillId) {
       try {
@@ -510,7 +514,9 @@ export function createDefaultSkillLifecyclePort(): SkillLifecyclePort {
       }
     },
     installation(agentId, skillId) {
-      const entry = listRobotSkillAssets(agentId).find((row) => row.id === skillId);
+      const entry = (
+        scope ? listTenantRobotSkillAssets({ ...scope, agentId }) : listRobotSkillAssets(agentId)
+      ).find((row) => row.id === skillId);
       return entry
         ? {
             installed: true,
@@ -524,11 +530,15 @@ export function createDefaultSkillLifecyclePort(): SkillLifecyclePort {
       return toRecord(skillId);
     },
     install(agentId, skillId) {
-      installSkillToRobotAsset({ agentId, skillId });
+      installSkillToRobotAsset({
+        agentId,
+        skillId,
+        ...(scope ? { tenantId: scope.tenantId, ownerUserId: scope.userId } : {}),
+      });
       return toRecord(skillId);
     },
     promote(agentId, skillId) {
-      upgradeRobotSkillAsset({ agentId, skillId });
+      upgradeRobotSkillAsset({ agentId, skillId, scope });
       return toRecord(skillId);
     },
     restoreLifecycle(skillId, lifecycle) {
@@ -539,6 +549,7 @@ export function createDefaultSkillLifecyclePort(): SkillLifecyclePort {
         agentId,
         skillId,
         installed: previous.installed,
+        scope,
         ...(previous.installedVersion ? { installedVersion: previous.installedVersion } : {}),
         ...(typeof previous.enabled === "boolean" ? { enabled: previous.enabled } : {}),
       });

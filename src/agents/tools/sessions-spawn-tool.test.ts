@@ -340,3 +340,29 @@ describe("sessions_spawn tool", () => {
     expect(chain?.aggregation).not.toEqual({ source: "child_session" });
   });
 });
+
+it("forwards only host-resolved operation identity into child dispatch", async () => {
+  const identity = {
+    tenantId: "tenant",
+    taskId: "task",
+    executionId: "execution",
+    stepId: "step",
+    operationId: "child",
+  };
+  const resolver = vi.fn(async () => identity);
+  hoisted.spawnSubagentDirectMock.mockResolvedValue({
+    status: "accepted",
+    childSessionKey: "child",
+    runId: "run",
+  });
+  const tool = createSessionsSpawnTool({
+    agentSessionKey: "agent:main:main",
+    resolveSpawnOperationIdentity: resolver,
+  });
+  await tool.execute("provider-call", { task: "research" });
+  expect(resolver).toHaveBeenCalledWith("provider-call");
+  expect(hoisted.spawnSubagentDirectMock).toHaveBeenLastCalledWith(
+    expect.anything(),
+    expect.objectContaining({ operationIdentity: identity }),
+  );
+});

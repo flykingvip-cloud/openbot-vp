@@ -6,6 +6,10 @@ import {
   ensureAsyncWaitRecoveryFollowupConsumer,
   setAsyncWaitRecoveryContinueEnqueue,
 } from "../agent-runtime/state/index.js";
+import { createFabricRequestAdmission } from "../agent-runtime/wiring/fabric-request-admission.js";
+import { startPostgresGrowthService } from "../agent-runtime/wiring/postgres-growth-service.js";
+import { startPostgresStatisticsConsumer } from "../agent-runtime/wiring/postgres-statistics-consumer.js";
+import { startRuntimeLeaseAdmission } from "../agent-runtime/wiring/runtime-lease-registry.js";
 import { resolveAgentWorkspaceDir, resolveDefaultAgentId } from "../agents/agent-scope.js";
 import { maybeProvisionBuiltinStewardAtStartup } from "../agents/builtin-steward/provision.js";
 import { getActiveEmbeddedRunCount } from "../agents/pi-embedded-runner/runs.js";
@@ -33,10 +37,13 @@ import { shutdownShadowHook } from "../conversation-task/gateway-shadow-hook.js"
 import { initShadowHookFromServerConfig } from "../conversation-task/runtime-bootstrap.js";
 import { resolveConversationFlags } from "../conversations/flags.js";
 import { ensureConversationRetentionCronJob } from "../conversations/retention-cron.js";
+import { AdapterRegistry, BUILTIN_ADAPTERS } from "../fabric/adapter-registry.js";
+import { GENERIC_ADAPTERS } from "../fabric/adapters/shell-git.js";
 import { createFabricAuditStore } from "../fabric/audit-store.js";
 import { formatFabricAuditLine } from "../fabric/audit.js";
 import { isFabricEnabled } from "../fabric/feature.js";
 import { createLoopbackToolInvoker } from "../fabric/loopback-invoker.js";
+import { createRequestHostedFabricService } from "../fabric/request-execution-host.js";
 import { createGatewayFabricService } from "../fabric/wiring.js";
 import { clearAgentRunContext, onAgentEvent } from "../infra/agent-events.js";
 import {
@@ -821,6 +828,14 @@ export async function startGatewayServer(
         ensureAsyncWaitRecoveryFollowupConsumer({ cfg, sessionKey });
       });
       setAsyncWaitRecoveryContinueEnqueue(createAsyncWaitRecoveryContinueEnqueue(cfgAtStart));
+      startRuntimeLeaseAdmission();
+      startPostgresStatisticsConsumer((error) =>
+        logRecovery.warn(`Runtime statistics consumer: ${String(error)}`),
+      );
+      await startPostgresGrowthService({
+        cfg: cfgAtStart,
+        onError: (error) => logRecovery.warn(`Runtime growth consumer: ${String(error)}`),
+      });
       recoverAsyncWaitJobsAtGatewayBoot({
         cfg: cfgAtStart,
         startRecheck: true,
@@ -1021,7 +1036,9 @@ export async function startGatewayServer(
     // the repo registry (absent in production installs → null → no signal). The
     // resolver is a pure in-memory matcher (no runtime registry lookup, D4).
     const loomAttribution = loadLoomAttributionSource();
+    const fabricRegistry = new AdapterRegistry([...BUILTIN_ADAPTERS, ...GENERIC_ADAPTERS]);
     const fabricService = createGatewayFabricService({
+      registry: fabricRegistry,
       toolInvoker: createLoopbackToolInvoker({
         baseUrl: `http://127.0.0.1:${port}`,
         token: fabricToken,
@@ -1033,8 +1050,31 @@ export async function startGatewayServer(
         log.info(`[fabric] ${formatFabricAuditLine(rec)}`);
       },
     });
+    const hostedFabricService = process.env.OPENBOT_RUNTIME_DATABASE_URL?.trim()
+      ? createRequestHostedFabricService({
+          control: fabricService,
+          admit: createFabricRequestAdmission({
+            build: (_request, issuer) =>
+              createGatewayFabricService({
+                registry: fabricRegistry,
+                toolInvoker: createLoopbackToolInvoker({
+                  baseUrl: `http://127.0.0.1:${port}`,
+                  token: fabricToken,
+                  issueExecutionGrant: issuer,
+                }),
+                // Native runners would bypass HTTP database operation admission.
+                processRunner: false,
+                ...(loomAttribution ? { attributionFor: loomAttribution.attributionFor } : {}),
+                onRecord: (rec) => {
+                  fabricAuditStore.append(rec);
+                  log.info(`[fabric] ${formatFabricAuditLine(rec)}`);
+                },
+              }),
+          }),
+        })
+      : fabricService;
     setFabricAuditStoreProvider(() => fabricAuditStore);
-    setFabricServiceProvider(() => (isFabricEnabled() ? fabricService : null));
+    setFabricServiceProvider(() => (isFabricEnabled() ? hostedFabricService : null));
     log.info(
       isFabricEnabled()
         ? "[fabric] control plane enabled; /v1/* + fabric.* live"

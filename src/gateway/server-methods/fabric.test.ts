@@ -1,4 +1,8 @@
-import { afterEach, describe, expect, it } from "vitest";
+const membership = vi.hoisted(() =>
+  vi.fn(async () => ({ tenantId: null as string | null, userId: null as string | null })),
+);
+vi.mock("../tenant-context.js", () => ({ resolveAuthoritativeMembership: membership }));
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { AdapterRegistry } from "../../fabric/adapter-registry.js";
 import { createFabricAuditStore } from "../../fabric/audit-store.js";
 import { buildExecutionRecord } from "../../fabric/audit.js";
@@ -57,6 +61,8 @@ const validRequest = {
 };
 
 afterEach(() => {
+  membership.mockReset();
+  membership.mockResolvedValue({ tenantId: null, userId: null });
   setFabricServiceProvider(null);
   setFabricAuditStoreProvider(null);
 });
@@ -229,5 +235,56 @@ describe("fabric handlers — adapter.register", () => {
     const { calls, respond } = captureRespond();
     void fabricHandlers["fabric.adapter.register"](ctxArgs({ adapter: { id: "bad" } }, respond));
     expect(calls[0]?.ok).toBe(false);
+  });
+});
+
+describe("Fabric authoritative tenant admission", () => {
+  it("rejects tenant and user spoofing before executing", async () => {
+    const service = fakeService();
+    const execute = vi.spyOn(service, "execute");
+    setFabricServiceProvider(() => service);
+    membership.mockResolvedValue({ tenantId: "tenant", userId: "user" });
+    for (const source of [
+      { type: "cursor", tenantId: "other" },
+      { type: "cursor", tenantId: "tenant", userId: "other" },
+    ]) {
+      const { calls, respond } = captureRespond();
+      await fabricHandlers["fabric.tool.execute"](
+        ctxArgs({ request: { ...validRequest, source } }, respond),
+      );
+      expect(calls[0].ok).toBe(false);
+    }
+    expect(execute).not.toHaveBeenCalled();
+  });
+  it("binds authoritative user to matching tenant request", async () => {
+    const service = fakeService();
+    const execute = vi.spyOn(service, "execute");
+    setFabricServiceProvider(() => service);
+    membership.mockResolvedValue({ tenantId: "tenant", userId: "user" });
+    const { calls, respond } = captureRespond();
+    await fabricHandlers["fabric.tool.execute"](
+      ctxArgs(
+        { request: { ...validRequest, source: { type: "cursor", tenantId: "tenant" } } },
+        respond,
+      ),
+    );
+    expect(calls[0].ok).toBe(true);
+    expect(execute.mock.calls[0][0].source.userId).toBe("user");
+  });
+  it("stream spoofing registers no event recipient", async () => {
+    setFabricServiceProvider(() => fakeService());
+    membership.mockResolvedValue({ tenantId: "tenant", userId: "user" });
+    const register = vi.fn();
+    const { calls, respond } = captureRespond();
+    await fabricHandlers["fabric.tool.stream"]({
+      ...(ctxArgs(
+        { request: { ...validRequest, source: { type: "cursor", tenantId: "other" } } },
+        respond,
+      ) as object),
+      client: { connId: "connection" },
+      context: { registerToolEventRecipient: register },
+    } as never);
+    expect(calls[0].ok).toBe(false);
+    expect(register).not.toHaveBeenCalled();
   });
 });

@@ -216,6 +216,8 @@ export async function runEmbeddedAttemptPreflight(
       senderIsOwner: params.senderIsOwner,
       sessionKey: s.sandboxSessionKey,
       sessionId: params.sessionId,
+      logicalExecutionId: params.logicalExecutionId,
+      logicalTaskId: params.logicalTaskId,
       runId: params.runId,
       agentDir: s.agentDir,
       workspaceDir: s.effectiveWorkspace,

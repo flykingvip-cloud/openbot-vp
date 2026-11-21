@@ -5,6 +5,8 @@ export type TaskCompletionBinding = {
   /** Accepted constraints captured when this attempt is claimed; never model supplied. */
   constraints?: readonly string[];
   taskId: string;
+  /** Persisted logical execution; distinct from retry/recovery attempt. */
+  logicalExecutionId?: string;
   executionAttempt?: string;
   deliverableVersion?: string;
 };

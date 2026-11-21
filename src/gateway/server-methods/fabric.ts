@@ -1,3 +1,5 @@
+import { persistAuthorizedFabricRequest } from "../../agent-runtime/wiring/fabric-rpc-admission.js";
+import { loadConfig, writeConfigFile } from "../../config/config.js";
 /**
  * fabric.ts — OpenBot Fabric public API handlers (R7).
  *
@@ -20,8 +22,6 @@
  *
  * Design: `.kiro/specs/openbot-fabric/design.md` §3.8.
  */
-
-import { loadConfig, writeConfigFile } from "../../config/config.js";
 import { AdapterRegistry } from "../../fabric/adapter-registry.js";
 import type { FabricAuditStore } from "../../fabric/audit-store.js";
 import type { AuditQuery } from "../../fabric/audit.js";
@@ -30,6 +30,7 @@ import { isFabricEnabled } from "../../fabric/feature.js";
 import { createProbeDecideFor } from "../../fabric/probes.js";
 import { createFabricService, type FabricService } from "../../fabric/service.js";
 import { ErrorCodes, errorShape } from "../protocol/index.js";
+import { resolveAuthoritativeMembership } from "../tenant-context.js";
 import type { GatewayRequestHandlers, RespondFn } from "./types.js";
 
 let serviceProvider: (() => FabricService | null) | null = null;
@@ -114,7 +115,7 @@ export const fabricHandlers: GatewayRequestHandlers = {
     respond(true, { decision, trace: request.trace });
   },
 
-  "fabric.tool.execute": async ({ params, respond }) => {
+  "fabric.tool.execute": async ({ params, respond, client }) => {
     const service = resolveService(respond);
     if (!service) {
       return;
@@ -123,6 +124,25 @@ export const fabricHandlers: GatewayRequestHandlers = {
     if (!request) {
       return;
     }
+    if (request.source.tenantId) {
+      const authority = await resolveAuthoritativeMembership(client);
+      if (
+        authority.tenantId !== request.source.tenantId ||
+        (request.source.userId && authority.userId !== request.source.userId)
+      ) {
+        respond(
+          false,
+          undefined,
+          errorShape(
+            ErrorCodes.INVALID_REQUEST,
+            "Fabric execution tenant identity is not authorized",
+          ),
+        );
+        return;
+      }
+      request.source.userId = authority.userId ?? undefined;
+    }
+    await persistAuthorizedFabricRequest(request);
     const { result } = await service.execute(request);
     respond(true, { result, trace: request.trace });
   },
@@ -161,6 +181,22 @@ export const fabricHandlers: GatewayRequestHandlers = {
     // Reuse the tool-events transport: register this connection as a recipient
     // for the run, then push each ExecutionEvent to it (R12.2). The execution
     // id keys the run so a client can correlate the event stream to its request.
+    if (request.source.tenantId) {
+      const authority = await resolveAuthoritativeMembership(client);
+      if (
+        authority.tenantId !== request.source.tenantId ||
+        (request.source.userId && authority.userId !== request.source.userId)
+      ) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, "Fabric stream tenant identity is not authorized"),
+        );
+        return;
+      }
+      request.source.userId = authority.userId ?? undefined;
+    }
+    await persistAuthorizedFabricRequest(request);
     const executionId = request.id;
     const recipients = new Set([connId]);
     context.registerToolEventRecipient(executionId, connId);

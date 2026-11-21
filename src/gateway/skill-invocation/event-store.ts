@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { withFileLockSync, SESSION_TASK_BOARD_LOCK_OPTIONS } from "../../infra/file-lock.js";
 import { CONFIG_DIR } from "../../utils.js";
 import type {
   RecordSkillInvocationCompletedInput,
@@ -21,7 +22,20 @@ export function appendSkillInvocationEvent(
 ): void {
   const filePath = resolveSkillInvocationEventsPath(configDir);
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.appendFileSync(filePath, `${JSON.stringify(event)}\n`, "utf8");
+  withFileLockSync(filePath, SESSION_TASK_BOARD_LOCK_OPTIONS, () => {
+    if (event.type === "skill_invocation_completed") {
+      const prior = readSkillInvocationEvents({ configDir }).find(
+        (row) => row.type === event.type && row.invocationId === event.invocationId,
+      );
+      if (prior) {
+        if (JSON.stringify(prior) !== JSON.stringify(event)) {
+          throw new Error("Invocation audit projection conflict");
+        }
+        return;
+      }
+    }
+    fs.appendFileSync(filePath, `${JSON.stringify(event)}\n`, "utf8");
+  });
 }
 
 export function readSkillInvocationEvents(params?: {

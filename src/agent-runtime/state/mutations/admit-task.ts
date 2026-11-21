@@ -83,6 +83,7 @@ export function commitAdmittedSessionTask(params: {
         kind: "duplicate",
         binding: {
           taskId: current.taskId,
+          logicalExecutionId: current.logicalExecutionId,
           executionAttempt: current.executionAttempt,
           deliverableVersion: current.deliverableVersion,
         },

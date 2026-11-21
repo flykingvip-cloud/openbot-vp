@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { TaskCompletionBinding } from "../../contracts/task-binding.js";
 import type { SessionTaskBoard } from "../../contracts/task.js";
 import { activeConstraintTexts, isTaskTombstoned, isLiveTaskBinding } from "../../policy/index.js";
@@ -25,6 +26,7 @@ export function captureTaskCompletionBinding(
   return task?.unfinished
     ? {
         taskId: task.taskId,
+        logicalExecutionId: task.logicalExecutionId,
         executionAttempt: task.executionAttempt,
         deliverableVersion: task.deliverableVersion,
         constraints: activeConstraintTexts(task),
@@ -60,19 +62,21 @@ export function startBoundTaskExecution(
     }
     const next = {
       ...binding,
+      logicalExecutionId: current.logicalExecutionId ?? randomUUID(),
       executionAttempt,
       deliverableVersion: executionAttempt,
       constraints: activeConstraintTexts(current),
     };
-    return {
-      board: bindCurrentExecution({
-        board,
-        taskId: next.taskId,
-        executionAttempt: next.executionAttempt,
-        deliverableVersion: next.deliverableVersion,
-      }),
-      value: next,
-    };
+    const bound = bindCurrentExecution({
+      board,
+      taskId: next.taskId,
+      executionAttempt: next.executionAttempt,
+      deliverableVersion: next.deliverableVersion,
+    });
+    if (bound.current) {
+      bound.current.logicalExecutionId = next.logicalExecutionId;
+    }
+    return { board: bound, value: next };
   });
 }
 

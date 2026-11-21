@@ -9,6 +9,7 @@ import {
   isToolWrappedWithBeforeToolCallHook,
   runBeforeToolCallHook,
 } from "../agent-runtime/capabilities/index.js";
+import { ToolOperationOutcomeUnknownError } from "../agent-runtime/state/repository/tool-operation.js";
 import { checkTaskActionBoundary } from "../agent-runtime/state/task-action.js";
 import type { OpenBotConfig } from "../config/config.js";
 import { runDeliveryToolSideEffect } from "../gateway/collaboration-dispatch/delivery-tool-side-effect.js";
@@ -229,6 +230,16 @@ export function toToolDefinitions(
               : "";
           if (name === "AbortError") {
             throw err;
+          }
+          if (err instanceof ToolOperationOutcomeUnknownError) {
+            return jsonResult({
+              status: "waiting",
+              tool: normalizedName,
+              operationId: err.operationId,
+              waitCondition: err.waitCondition,
+              retryAllowed: false,
+              reason: "external_operation_requires_reconciliation",
+            });
           }
           const described = describeToolExecutionError(err);
           if (described.stack && described.stack !== described.message) {

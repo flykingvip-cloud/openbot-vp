@@ -1,3 +1,4 @@
+import type { OperationIdentity } from "../agent-runtime/contracts/operation.js";
 import type { OpenBotConfig } from "../config/config.js";
 import {
   resolveExecutionIdentityFromRunFields,
@@ -144,6 +145,7 @@ export function createOpenClawTools(
     sessionId?: string;
     /** Current agent run identity for subagent inherit-only Objective observation. */
     agentRunId?: string;
+    resolveSpawnOperationIdentity?: (toolCallId: string) => Promise<OperationIdentity | undefined>;
     tenantId?: string;
     /**
      * Workspace directory to pass to spawned subagents for inheritance.
@@ -409,6 +411,7 @@ export function createOpenClawTools(
       requesterAgentIdOverride: options?.requesterAgentIdOverride,
       workspaceDir: spawnWorkspaceDir,
       parentRunId: options?.agentRunId,
+      resolveSpawnOperationIdentity: options?.resolveSpawnOperationIdentity,
       tenantId: options?.tenantId,
       executionIdentity,
     }),
