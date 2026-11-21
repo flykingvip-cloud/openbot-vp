@@ -2,6 +2,7 @@ import { loadConfig } from "../../config/config.js";
 import { syncRobotPendingTaskGapStatuses } from "../agent-growth/pending-task-gap-sync.js";
 import { recordRobotGrowthMilestone } from "../agent-growth/record-robot-milestone.js";
 import { findRegistryEntryBySkillKey, getRegistryEntry } from "../capability-governance-store.js";
+import { listNamedSkillUses } from "../named-skill-usage.js";
 import {
   listMyAccumulationSkillAssets,
   requireOwnedPersonalSkill,
@@ -684,7 +685,13 @@ export const skillLifecycleHandlers: GatewayRequestHandlers = {
     if (!agentId) {
       return;
     }
-    respond(true, { skills: listRobotSkillAssets(agentId) }, undefined);
+    let namedSkillUses: ReturnType<typeof listNamedSkillUses> = [];
+    try {
+      namedSkillUses = listNamedSkillUses(agentId);
+    } catch {
+      namedSkillUses = [];
+    }
+    respond(true, { skills: listRobotSkillAssets(agentId), namedSkillUses }, undefined);
   },
 
   "robot-skills.toggle": ({ params, respond }) => {
