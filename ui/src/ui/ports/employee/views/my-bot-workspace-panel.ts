@@ -13,9 +13,20 @@ import type {
   MyBotProjection,
   MyBotWorkingStyleProjection,
 } from "../semantic/my-bot-read-model.ts";
+import type { MyBotDomainVector } from "../semantic/my-bot-read-model.ts";
 import type { UserOperationalIdentitySnapshot } from "../semantic/view-controller-facade.ts";
+import {
+  buildCapabilityRadar,
+  capabilityDomainLabel,
+  capabilityDomainOrder,
+  type RobotCapabilityAtlas,
+  type RobotCapabilityNode,
+  type RobotCapabilityOrigin,
+} from "./my-bot-capability-atlas.ts";
+import type { RobotDataOpenItem, RobotDataSurface } from "./my-bot-data-surface.ts";
 import { renderPersonalDevicesPanel } from "./personal-devices-page.ts";
-import { normalizeGrowthReport, renderGrowthReportSummary } from "./workbench-growth-report.ts";
+import { normalizeGrowthReport } from "./workbench-growth-report.ts";
+import { robotIdentityAgentScope } from "./workbench-robot-operational-identity-panel.ts";
 import { wbSettingsDetailToolbar } from "./workbench-settings-layout.ts";
 import type {
   WorkbenchMyBotIdentityDraft,
@@ -91,6 +102,11 @@ export type MyBotWorkspacePanelProps = {
   }) => void;
   onAddPersonalIdentity?: () => void;
   onLoadRobotEnterpriseIdentities?: (agentId: string) => void;
+  dataSurface?: RobotDataSurface | null;
+  onEnsureRobotData?: (agentId: string) => void;
+  capabilityAtlas?: RobotCapabilityAtlas | null;
+  onEnsureCapabilityAtlas?: (agentId: string) => void;
+  onOpenRobotDataItem?: (item: RobotDataOpenItem) => void;
   ownedRobotDeleteBusyId?: string | null;
   ownedRobotDeleteError?: string | null;
   ownedRobotDeleteDisposition?: "delete_all" | "keep_artifacts_conversations" | "soft_unbind";
@@ -104,32 +120,6 @@ export type MyBotWorkspacePanelProps = {
 function renderStars(stars: number): string {
   const n = Math.max(1, Math.min(5, Math.round(stars)));
   return `${"★".repeat(n)}${"☆".repeat(5 - n)}`;
-}
-
-function sourceLabel(source: MyBotCapabilityProjection["source"]): string {
-  switch (source) {
-    case "personal":
-      return "个人";
-    case "group":
-      return "小组";
-    case "enterprise":
-      return "企业";
-    default:
-      return "市场";
-  }
-}
-
-function statusLabel(status: MyBotProjection["identity"]["status"]): string {
-  switch (status) {
-    case "online":
-      return "可用";
-    case "degraded":
-      return "异常";
-    case "offline":
-      return "离线";
-    default:
-      return "未知";
-  }
 }
 
 function formatBytes(bytes: number | undefined): string {
@@ -274,34 +264,152 @@ function renderIdentityTab(props: MyBotWorkspacePanelProps) {
   `;
 }
 
+function atlasFor(props: MyBotWorkspacePanelProps): RobotCapabilityAtlas | null {
+  const agentId = props.entry.id;
+  const atlas = props.capabilityAtlas;
+  return atlas?.agentId === agentId ? atlas : null;
+}
+
+function ensureAtlas(props: MyBotWorkspacePanelProps): void {
+  const atlas = atlasFor(props);
+  if (!atlas || (!atlas.loaded && !atlas.loading)) {
+    props.onEnsureCapabilityAtlas?.(props.entry.id);
+  }
+}
+
+function renderCapabilityRow(cap: RobotCapabilityNode) {
+  return html`
+    <li class="wb-bots__list-row">
+      <span class="wb-bots__list-title">${cap.name}</span>
+      <span class="wb-bots__list-meta">
+        ${capabilityOriginLabel(cap.origin)}${cap.callCount > 0 ? ` · ${cap.callCount} 次` : ""}
+      </span>
+    </li>
+  `;
+}
+
+function capabilityOriginLabel(origin: RobotCapabilityOrigin): string {
+  switch (origin) {
+    case "created":
+      return "改造";
+    case "evolved":
+      return "进化";
+    case "used":
+      return "使用";
+    default:
+      return "安装";
+  }
+}
+
+function renderCapabilityRadar(vector: MyBotDomainVector) {
+  const axes = capabilityDomainOrder().filter((domain) => domain !== "general");
+  const cx = 88;
+  const cy = 88;
+  const radius = 58;
+  const levels = [0.25, 0.5, 0.75, 1];
+  const pointAt = (index: number, value: number) => {
+    const angle = -Math.PI / 2 + (index * 2 * Math.PI) / axes.length;
+    const reach = radius * Math.max(0, Math.min(1, value));
+    return { x: cx + Math.cos(angle) * reach, y: cy + Math.sin(angle) * reach };
+  };
+  const polygon = axes
+    .map((domain, index) => {
+      const point = pointAt(index, vector[domain]);
+      return `${point.x.toFixed(1)},${point.y.toFixed(1)}`;
+    })
+    .join(" ");
+  return html`
+    <div class="wb-bots__radar" data-cap-radar>
+      <svg viewBox="0 0 176 176" role="img" aria-label="能力雷达图">
+        ${levels.map((level) => {
+          const ring = axes
+            .map((_, index) => {
+              const point = pointAt(index, level);
+              return `${point.x.toFixed(1)},${point.y.toFixed(1)}`;
+            })
+            .join(" ");
+          return html`<polygon class="wb-bots__radar-grid" points=${ring}></polygon>`;
+        })}
+        ${axes.map((_, index) => {
+          const tip = pointAt(index, 1);
+          return html`<line
+            class="wb-bots__radar-axis"
+            x1=${cx}
+            y1=${cy}
+            x2=${tip.x.toFixed(1)}
+            y2=${tip.y.toFixed(1)}
+          ></line>`;
+        })}
+        <polygon class="wb-bots__radar-area" points=${polygon}></polygon>
+        ${axes.map((domain, index) => {
+          const tip = pointAt(index, 1.22);
+          return html`<text
+            class="wb-bots__radar-label"
+            x=${tip.x.toFixed(1)}
+            y=${tip.y.toFixed(1)}
+            text-anchor="middle"
+            dominant-baseline="middle"
+          >
+            ${capabilityDomainLabel(domain)}
+          </text>`;
+        })}
+      </svg>
+    </div>
+  `;
+}
+
 function renderCapabilitiesTab(props: MyBotWorkspacePanelProps) {
   const bot = props.bot;
-  if (!bot) {
-    return renderEmpty("正在加载能力…");
+  const atlas = atlasFor(props);
+  ensureAtlas(props);
+  if (!atlas?.loaded) {
+    return renderEmpty("正在读取能力与知识…");
   }
+  if (atlas.error && atlas.capabilities.length === 0 && atlas.knowledge.length === 0) {
+    return renderEmpty(atlas.error);
+  }
+  const groups = capabilityDomainOrder()
+    .map((domain) => ({
+      domain,
+      label: capabilityDomainLabel(domain),
+      items: atlas.capabilities.filter((cap) => cap.domain === domain),
+    }))
+    .filter((group) => group.items.length > 0);
+  const personas = bot?.personas ?? [];
+  const radar = buildCapabilityRadar(atlas.capabilities);
   return html`
-    <div class="wb-bots__stack">
+    <div class="wb-bots__stack" data-wb-bots-capability-atlas>
       ${renderSection(
-        "已安装",
-        bot.capabilities.length === 0
-          ? renderEmpty("还没有安装能力。")
-          : html`
-              <ul class="wb-bots__list">
-                ${bot.capabilities.map(
-                  (cap) => html`
-                    <li class="wb-bots__list-row">
-                      <div class="wb-bots__list-main">
-                        <span class="wb-bots__list-title">${cap.name}</span>
-                        <span class="wb-bots__list-meta" aria-label="熟练度 ${cap.stars} 星">
-                          ${renderStars(cap.stars)}
-                        </span>
-                      </div>
-                      <span class="wb-bots__tag">${sourceLabel(cap.source)}</span>
-                    </li>
-                  `,
-                )}
-              </ul>
-            `,
+        "能力地图",
+        html`
+          <div class="wb-bots__cap-map" data-wb-bots-capability-map>
+            ${renderCapabilityRadar(radar)}
+            ${
+              groups.length === 0
+                ? renderEmpty("还没有安装、改造或使用过的能力。")
+                : html`
+                    <ul class="wb-bots__radar-legend">
+                      ${groups.map((group) => {
+                        const evidence = group.items.reduce((sum, cap) => sum + cap.weight, 0);
+                        return html`<li>
+                          <span>${group.label}</span><strong>${Math.round(evidence)}</strong>
+                        </li>`;
+                      })}
+                    </ul>
+                    ${groups.map(
+                      (group) => html`
+                        <div class="wb-bots__cap-domain">
+                          <span class="wb-bots__cap-domain-label">${group.label}</span>
+                          <ul class="wb-bots__list">
+                            ${group.items.map((cap) => renderCapabilityRow(cap))}
+                          </ul>
+                        </div>
+                      `,
+                    )}
+                  `
+            }
+          </div>
+        `,
         html`
           <button
             type="button"
@@ -312,33 +420,60 @@ function renderCapabilitiesTab(props: MyBotWorkspacePanelProps) {
           </button>
         `,
       )}
-
       ${renderSection(
-        "扮演",
-        bot.personas.length === 0
-          ? renderEmpty("暂无扮演身份。")
+        "知识图谱",
+        atlas.knowledge.length === 0
+          ? renderEmpty("还没有这个机器人记住的知识。")
           : html`
-              <ul class="wb-bots__list">
-                ${bot.personas.map(
-                  (persona) => html`
-                    <li class="wb-bots__list-row wb-bots__list-row--stack">
-                      <span class="wb-bots__list-title">${persona.label}</span>
-                      ${
-                        persona.description
-                          ? html`<span class="wb-bots__list-sub">${persona.description}</span>`
-                          : nothing
-                      }
-                    </li>
-                  `,
-                )}
-              </ul>
+              <div class="wb-bots__kg" data-wb-bots-knowledge-graph>
+                <div class="wb-bots__kg-root">${bot?.identity.name || props.entry.name}</div>
+                <ul class="wb-bots__kg-list">
+                  ${atlas.knowledge.map(
+                    (node) => html`
+                      <li class="wb-bots__kg-node">
+                        <span class="wb-bots__list-title">${node.label}</span>
+                        ${
+                          node.documents.length === 0
+                            ? nothing
+                            : html`
+                                <ul class="wb-bots__kg-docs">
+                                  ${node.documents.map((title) => html`<li>${title}</li>`)}
+                                </ul>
+                              `
+                        }
+                      </li>
+                    `,
+                  )}
+                </ul>
+              </div>
             `,
       )}
+      ${
+        personas.length === 0
+          ? nothing
+          : renderSection(
+              "扮演",
+              html`
+                <ul class="wb-bots__list">
+                  ${personas.map(
+                    (persona) => html`
+                      <li class="wb-bots__list-row wb-bots__list-row--stack">
+                        <span class="wb-bots__list-title">${persona.label}</span>
+                        ${
+                          persona.description
+                            ? html`<span class="wb-bots__list-sub">${persona.description}</span>`
+                            : nothing
+                        }
+                      </li>
+                    `,
+                  )}
+                </ul>
+              `,
+            )
+      }
     </div>
   `;
 }
-
-type GrowthZoneId = "capability" | "performance" | "suggestion";
 
 function recommendationCtaLabel(rec: MyBotGrowthRecommendationView | null | undefined): string {
   switch (rec?.kind) {
@@ -356,21 +491,26 @@ function recommendationCtaLabel(rec: MyBotGrowthRecommendationView | null | unde
 }
 
 function recommendationReasonLabel(rec: MyBotGrowthRecommendationView | null | undefined): string {
-  switch (rec?.kind) {
-    case "start_work":
+  const count = rec?.gaps.length ?? 0;
+  switch (rec?.reason) {
+    case "growth.recommend.start_work":
       return t("frontstage.workbench.growth.dossier.reason.startWork");
-    case "confirm_identity":
+    case "growth.recommend.confirm_identity":
       return t("frontstage.workbench.growth.dossier.reason.confirmIdentity");
-    case "install_capabilities":
-      return rec.gaps.length > 0
-        ? t("frontstage.workbench.growth.dossier.reason.installCapabilitiesCount", {
-            count: rec.gaps.length,
-          })
+    case "growth.recommend.install_for_task":
+      return t("frontstage.workbench.growth.dossier.reason.installCapabilitiesCount", { count });
+    case "growth.recommend.install_capabilities":
+      return count > 0
+        ? t("frontstage.workbench.growth.dossier.reason.installCapabilitiesCount", { count })
         : t("frontstage.workbench.growth.dossier.reason.installCapabilities");
-    case "verify_with_task":
+    case "growth.recommend.verify_with_task":
       return t("frontstage.workbench.growth.dossier.reason.verifyWithTask");
-    default:
+    case "growth.recommend.none":
       return t("frontstage.workbench.growth.dossier.reason.none");
+    default:
+      return rec?.reason && !rec.reason.startsWith("growth.")
+        ? rec.reason
+        : t("frontstage.workbench.growth.dossier.reason.none");
   }
 }
 
@@ -394,19 +534,19 @@ function applyGrowthRecommendation(
   }
 }
 
-function renderDimensionBars(growth: MyBotGrowthProjection): TemplateResult {
-  const dims = growth.dimensions ?? {
-    identity: 0,
-    capability: 0,
-    knowledge: 0,
-    habits: 0,
-  };
-  const rows: Array<{ label: string; value: number }> = [
-    { label: t("frontstage.workbench.growth.dimension.identity"), value: dims.identity },
+function renderDimensionBars(growth: MyBotGrowthProjection): TemplateResult | typeof nothing {
+  const dims = growth.dimensions;
+  if (!dims) {
+    return nothing;
+  }
+  const rows = [
     { label: t("frontstage.workbench.growth.dimension.capability"), value: dims.capability },
     { label: t("frontstage.workbench.growth.dimension.knowledge"), value: dims.knowledge },
     { label: t("frontstage.workbench.growth.dossier.experience"), value: dims.habits },
-  ];
+  ].filter((row) => Number.isFinite(row.value));
+  if (rows.every((row) => row.value <= 0)) {
+    return nothing;
+  }
   return html`
     <ul class="wb-bots__dim-list" data-wb-bots-growth-dims>
       ${rows.map(
@@ -475,8 +615,6 @@ function renderWorkingStyleEvidence(workingStyle: MyBotWorkingStyleProjection): 
     <p class="wb-bots__hint" data-wb-bots-working-style-evidence>
       ${t("frontstage.workbench.growth.dossier.workingStyle.evidenceSummary", {
         tasksTotal: evidence.tasksTotal,
-        minLearning: evidence.minSamplesForLearning,
-        minAutonomous: evidence.minSamplesForAutonomous,
         updated: updatedLabel,
       })}
       ${
@@ -490,33 +628,62 @@ function renderWorkingStyleEvidence(workingStyle: MyBotWorkingStyleProjection): 
   `;
 }
 
+const WORKING_STYLE_FIELDS = [
+  "outputFormat",
+  "reportingCadence",
+  "decisionPreference",
+  "riskPreference",
+  "communicationTone",
+] as const satisfies ReadonlyArray<keyof MyBotWorkingStyleProjection["style"]>;
+
+function growthEventLabel(event: { milestoneKey?: string; text: string }): string {
+  const candidates = [event.milestoneKey, event.text].filter((value): value is string =>
+    Boolean(value),
+  );
+  for (const candidate of candidates) {
+    const key = `frontstage.workbench.growth.dossier.milestone.${candidate}`;
+    const translated = t(key);
+    if (translated !== key) {
+      return translated;
+    }
+  }
+  return event.text;
+}
+
+function impactAmount(item: { value: number; unit?: string }): string {
+  const unit =
+    item.unit === "hours"
+      ? t("frontstage.workbench.growth.dossier.report.hoursUnit")
+      : (item.unit ?? "");
+  return `${item.value}${unit}`;
+}
+
 function renderWorkingStyleSection(
   workingStyle: MyBotWorkingStyleProjection | null | undefined,
-): TemplateResult {
+): TemplateResult | typeof nothing {
   if (!workingStyle) {
-    return html`<p class="wb-bots__hint">${t("frontstage.workbench.growth.dossier.workingStyle.pending")}</p>`;
+    return nothing;
+  }
+  const tasksTotal = workingStyle.evidence?.tasksTotal ?? 0;
+  if (!workingStyle.learned && tasksTotal <= 0) {
+    return nothing;
   }
   if (!workingStyle.learned) {
     return html`
       <div class="wb-bots__working-style" data-wb-bots-working-style>
         <h4 class="wb-bots__subheading">${t("frontstage.workbench.growth.dossier.workingStyle.title")}</h4>
         ${renderWorkingStyleEvidence(workingStyle)}
-        <p class="wb-bots__hint">${t("frontstage.workbench.growth.dossier.workingStyle.notLearned")}</p>
       </div>
     `;
   }
   const style = workingStyle.style;
-  const fields: Array<keyof MyBotWorkingStyleProjection["style"]> = [
-    "outputFormat",
-    "reportingCadence",
-    "decisionPreference",
-    "riskPreference",
-    "communicationTone",
-  ];
+  const recorded = workingStyle.recordedKeys;
+  const fields = recorded
+    ? WORKING_STYLE_FIELDS.filter((field) => recorded.includes(field))
+    : [...WORKING_STYLE_FIELDS];
   return html`
     <div class="wb-bots__working-style" data-wb-bots-working-style>
       <h4 class="wb-bots__subheading">${t("frontstage.workbench.growth.dossier.workingStyle.title")}</h4>
-      ${renderWorkingStyleEvidence(workingStyle)}
       ${renderKvRows(
         fields.map((field) => ({
           label: workingStyleFieldLabel(field),
@@ -524,8 +691,21 @@ function renderWorkingStyleSection(
         })),
       )}
       ${renderWorkingStyleEffect(workingStyle.lastChange)}
+      ${renderWorkingStyleEvidence(workingStyle)}
     </div>
   `;
+}
+
+function capabilityPractice(cap: MyBotCapabilityProjection): TemplateResult | typeof nothing {
+  if (typeof cap.successRate === "number" && Number.isFinite(cap.successRate)) {
+    return html`<span class="wb-bots__list-meta" aria-label="${cap.stars}">${renderStars(cap.stars)}</span>`;
+  }
+  if ((cap.callCount ?? 0) > 0) {
+    return html`<span class="wb-bots__list-meta"
+      >${t("frontstage.workbench.growth.dossier.resume.calls", { count: cap.callCount ?? 0 })}</span
+    >`;
+  }
+  return nothing;
 }
 
 function renderGrowthTab(props: MyBotWorkspacePanelProps) {
@@ -533,202 +713,293 @@ function renderGrowthTab(props: MyBotWorkspacePanelProps) {
   if (!bot) {
     return renderEmpty(t("frontstage.workbench.growth.dossier.loading"));
   }
+  ensureAtlas(props);
+  const atlas = atlasFor(props);
   const growth = bot.growth;
-  const completeness = growth.completeness ?? {
-    identity: 0,
-    capability: 0,
-    performance: 0,
-    suggestion: 0,
-  };
-  const zones: Array<{ id: GrowthZoneId; label: string; value: number }> = [
-    {
-      id: "capability",
-      label: t("frontstage.workbench.growth.dossier.zone.capability"),
-      value: completeness.capability,
-    },
-    {
-      id: "performance",
-      label: t("frontstage.workbench.growth.dossier.zone.performance"),
-      value: completeness.performance,
-    },
-    {
-      id: "suggestion",
-      label: t("frontstage.workbench.growth.dossier.zone.suggestion"),
-      value: completeness.suggestion,
-    },
-  ];
   const gaps = growth.capabilityGaps ?? [];
   const unmet = gaps.filter((gap) => gap.status === "missing");
   const report = normalizeGrowthReport(growth.growthReport ?? null);
   const rec = growth.recommendation ?? null;
   const ctaLabel = recommendationCtaLabel(rec);
   const hasActionableRec = Boolean(rec && rec.kind !== "none");
+  const impact = report?.businessImpact ?? [];
+  const insights = report?.topInsights ?? [];
+  const events = growth.recentEvents;
+  const hasMeasuredScore =
+    typeof growth.operationalScore === "number" && Number.isFinite(growth.operationalScore);
+  const hasWork = impact.length > 0 || insights.length > 0 || events.length > 0 || hasMeasuredScore;
+  const skillSource = atlas?.loaded
+    ? atlas.capabilities.map((cap) => ({
+        name: cap.name,
+        stars: 1,
+        source: "personal" as const,
+        relationId: cap.id,
+        callCount: cap.callCount,
+        successRate: null,
+      }))
+    : props.onEnsureCapabilityAtlas
+      ? []
+      : [...bot.capabilities];
+  const skills = skillSource.toSorted(
+    (a, b) =>
+      (b.callCount ?? 0) - (a.callCount ?? 0) ||
+      (b.successRate ?? -1) - (a.successRate ?? -1) ||
+      a.name.localeCompare(b.name, "zh"),
+  );
+  const dimensionBars = renderDimensionBars(growth);
+  const workingStyle = renderWorkingStyleSection(growth.workingStyle);
+  const showLevel = growth.level > 0;
+  const showMaturity = dimensionBars !== nothing || workingStyle !== nothing || showLevel;
+  const workflows = report?.suggestedWorkflows ?? [];
+  const showSkills = skills.length > 0 || unmet.length > 0;
+  const showSuggestion = hasActionableRec || workflows.length > 0;
+  const outputs = atlas?.loaded ? atlas.outputs : [];
 
   return html`
     <div class="wb-bots__stack wb-bots__growth-dossier" data-wb-bots-growth-dossier>
-      <nav
-        class="wb-bots__zone-nav"
-        aria-label=${t("frontstage.workbench.growth.dossier.zoneNavAria")}
-      >
-        ${zones.map(
-          (zone) => html`
-            <a class="wb-bots__zone-chip" href="#wb-bots-zone-${zone.id}">
-              <span>${zone.label}</span>
-              <strong>${zone.value}%</strong>
-            </a>
-          `,
-        )}
-      </nav>
+      ${
+        !hasWork && !showSkills && !showMaturity && !showSuggestion
+          ? html`<p class="wb-bots__hint">${t("frontstage.workbench.growth.dossier.resume.leadEmpty")}</p>`
+          : nothing
+      }
+      ${
+        hasWork
+          ? renderSection(
+              t("frontstage.workbench.growth.dossier.resume.doneTitle"),
+              html`
+                <div id="wb-bots-zone-performance" data-wb-bots-zone="performance">
+                  ${
+                    impact.length === 0 && !hasMeasuredScore
+                      ? nothing
+                      : html`
+                          <div class="wb-bots__growth-metrics">
+                            ${impact.map(
+                              (item) => html`
+                                <div class="wb-bots__growth-metric">
+                                  <span class="wb-bots__growth-metric-label">${item.description}</span>
+                                  <strong class="wb-bots__growth-metric-value"
+                                    >${impactAmount(item)}</strong
+                                  >
+                                </div>
+                              `,
+                            )}
+                            ${
+                              hasMeasuredScore
+                                ? html`
+                                    <div class="wb-bots__growth-metric">
+                                      <span class="wb-bots__growth-metric-label">
+                                        ${t("frontstage.workbench.growth.dossier.field.operationalScore")}
+                                      </span>
+                                      <strong class="wb-bots__growth-metric-value">
+                                        ${Math.round(growth.operationalScore ?? 0)}
+                                      </strong>
+                                    </div>
+                                  `
+                                : nothing
+                            }
+                          </div>
+                        `
+                  }
+                  ${
+                    insights.length === 0
+                      ? nothing
+                      : html`
+                          <ul class="wb-bots__timeline">
+                            ${insights.map((item) => html`<li><span>${item}</span></li>`)}
+                          </ul>
+                        `
+                  }
+                  ${
+                    events.length === 0
+                      ? nothing
+                      : html`
+                          ${
+                            impact.length > 0 || hasMeasuredScore
+                              ? html`<p class="wb-bots__growth-subhead">
+                                  ${t("frontstage.workbench.growth.dossier.resume.history")}
+                                </p>`
+                              : nothing
+                          }
+                          <ul class="wb-bots__timeline">
+                            ${events.map(
+                              (event) => html`
+                                <li>
+                                  <span>${event.taskRef?.title || growthEventLabel(event)}</span>
+                                  ${
+                                    event.at ? html`<time>${event.at.slice(0, 10)}</time>` : nothing
+                                  }
+                                </li>
+                              `,
+                            )}
+                          </ul>
+                        `
+                  }
+                  ${
+                    growth.falseReady
+                      ? html`
+                          <p class="wb-bots__hint wb-bots__hint--warn" data-wb-bots-false-ready>
+                            ${t("frontstage.workbench.growth.dossier.falseReadyHint")}
+                          </p>
+                        `
+                      : nothing
+                  }
+                </div>
+              `,
+            )
+          : nothing
+      }
 
-      ${renderSection(
-        t("frontstage.workbench.growth.dossier.zone.capability"),
-        html`
-          <div id="wb-bots-zone-capability" data-wb-bots-zone="capability">
-            ${renderDimensionBars(growth)}
-            ${renderWorkingStyleSection(growth.workingStyle)}
-            ${renderKvRows([
-              {
-                label: t("frontstage.workbench.growth.dossier.field.installedSkills"),
-                value: String(bot.capabilities.length),
-              },
-              {
-                label: t("frontstage.workbench.growth.dossier.field.capabilityReady"),
-                value: growth.funnel?.hasFirstSkillInstalled
-                  ? t("frontstage.workbench.growth.dossier.status.started")
-                  : t("frontstage.workbench.growth.dossier.status.pendingInstall"),
-              },
-              {
-                label: t("frontstage.workbench.growth.dossier.field.gaps"),
-                value:
-                  unmet.length > 0
-                    ? t("frontstage.workbench.growth.dossier.status.gapsCount", {
-                        count: unmet.length,
-                      })
-                    : t("frontstage.workbench.growth.dossier.status.none"),
-              },
-            ])}
-            ${
-              unmet.length === 0
-                ? html`<p class="wb-bots__hint">
-                    ${t("frontstage.workbench.growth.dossier.noUnmetGaps")}
-                  </p>`
-                : html`
-                    <ul class="wb-bots__list">
-                      ${unmet.map(
-                        (gap) => html`
-                          <li class="wb-bots__list-row">
-                            <span class="wb-bots__list-title">${gap.label || gap.key}</span>
-                            <span class="wb-bots__tag"
-                              >${t("frontstage.workbench.growth.dossier.pendingGapTag")}</span
-                            >
-                          </li>
-                        `,
-                      )}
-                    </ul>
-                  `
-            }
-          </div>
-        `,
-      )}
+      ${
+        outputs.length === 0
+          ? nothing
+          : renderSection(
+              "产出",
+              html`
+                <ul class="wb-bots__list" data-wb-bots-outputs>
+                  ${outputs.map(
+                    (item) => html`
+                      <li class="wb-bots__list-row">
+                        <span class="wb-bots__list-title">${item.title}</span>
+                      </li>
+                    `,
+                  )}
+                </ul>
+              `,
+            )
+      }
 
-      ${renderSection(
-        t("frontstage.workbench.growth.dossier.zone.performance"),
-        html`
-          <div id="wb-bots-zone-performance" data-wb-bots-zone="performance">
-            ${renderKvRows([
-              {
-                label: t("frontstage.workbench.growth.dossier.field.activationScore"),
-                value: `${Math.round(growth.activationScore ?? 0)}`,
-              },
-              {
-                label: t("frontstage.workbench.growth.dossier.field.operationalScore"),
-                value:
-                  growth.operationalScore === null || growth.operationalScore === undefined
-                    ? t("frontstage.workbench.growth.dossier.status.noData")
-                    : String(Math.round(growth.operationalScore)),
-              },
-              {
-                label: t("frontstage.workbench.growth.dossier.field.level"),
-                value: t("frontstage.workbench.growth.dossier.status.levelValue", {
-                  level: growth.level,
-                }),
-              },
-            ])}
-            ${
-              growth.falseReady
-                ? html`
-                    <p class="wb-bots__hint wb-bots__hint--warn" data-wb-bots-false-ready>
-                      ${t("frontstage.workbench.growth.dossier.falseReadyHint")}
-                    </p>
-                  `
-                : nothing
-            }
-            ${
-              report
-                ? renderGrowthReportSummary(report)
-                : html`<p class="wb-bots__hint">
-                    ${t("frontstage.workbench.growth.dossier.reportPending")}
-                  </p>`
-            }
-            ${
-              growth.recentEvents.length === 0
-                ? nothing
-                : html`
-                    <ul class="wb-bots__timeline">
-                      ${growth.recentEvents.map(
-                        (event) => html`
-                          <li>
-                            <span>${event.text}</span>
-                            ${event.at ? html`<time>${event.at.slice(0, 10)}</time>` : nothing}
-                          </li>
-                        `,
-                      )}
-                    </ul>
-                  `
-            }
-          </div>
-        `,
-      )}
+      ${
+        showSkills
+          ? renderSection(
+              skills.length > 0
+                ? t("frontstage.workbench.growth.dossier.resume.skillsTitle")
+                : t("frontstage.workbench.growth.dossier.field.gaps"),
+              html`
+                <div id="wb-bots-zone-capability" data-wb-bots-zone="capability">
+                  ${
+                    skills.length === 0
+                      ? nothing
+                      : html`
+                          <ul class="wb-bots__list">
+                            ${skills.map(
+                              (cap) => html`
+                                <li class="wb-bots__list-row">
+                                  <div class="wb-bots__list-main">
+                                    <span class="wb-bots__list-title">${cap.name}</span>
+                                    ${capabilityPractice(cap)}
+                                  </div>
+                                </li>
+                              `,
+                            )}
+                          </ul>
+                        `
+                  }
+                  ${
+                    unmet.length === 0
+                      ? nothing
+                      : html`
+                          <div class="wb-bots__growth-gaps">
+                          ${
+                            skills.length > 0
+                              ? html`<p class="wb-bots__growth-subhead">
+                                  ${t("frontstage.workbench.growth.dossier.field.gaps")}
+                                </p>`
+                              : nothing
+                          }
+                          <ul class="wb-bots__list">
+                            ${unmet.map(
+                              (gap) => html`
+                                <li class="wb-bots__list-row">
+                                  <span class="wb-bots__list-title">${gap.label || gap.key}</span>
+                                </li>
+                              `,
+                            )}
+                          </ul>
+                          <button
+                            type="button"
+                            class="wb-bots__text-action"
+                            @click=${() => props.onExploreCapabilities()}
+                          >
+                            ${t("frontstage.workbench.growth.recommend.ctaInstallCapabilities")}
+                          </button>
+                          </div>
+                        `
+                  }
+                </div>
+              `,
+            )
+          : nothing
+      }
 
-      ${renderSection(
-        t("frontstage.workbench.growth.dossier.zone.suggestion"),
-        html`
-          <div id="wb-bots-zone-suggestion" data-wb-bots-zone="suggestion">
-            <p class="wb-bots__hint">${recommendationReasonLabel(rec)}</p>
-            ${
-              hasActionableRec
-                ? html`
-                    <button
-                      type="button"
-                      class="btn btn--primary"
-                      data-wb-bots-growth-cta
-                      @click=${() => applyGrowthRecommendation(props, rec)}
-                    >
-                      ${ctaLabel}
-                    </button>
-                  `
-                : html`<p class="wb-bots__hint">
-                    ${t("frontstage.workbench.growth.dossier.keepPace")}
-                  </p>`
-            }
-            ${
-              report?.suggestedWorkflows && report.suggestedWorkflows.length > 0
-                ? html`
-                    <ul class="wb-bots__list">
-                      ${report.suggestedWorkflows.map(
-                        (item) => html`
-                          <li class="wb-bots__list-row wb-bots__list-row--stack">
-                            <span class="wb-bots__list-title">${item}</span>
-                          </li>
-                        `,
-                      )}
-                    </ul>
-                  `
-                : nothing
-            }
-          </div>
-        `,
-      )}
+      ${
+        showMaturity
+          ? renderSection(
+              t("frontstage.workbench.growth.dossier.resume.maturityTitle"),
+              html`
+                ${dimensionBars}
+                ${
+                  showLevel
+                    ? renderKvRows([
+                        {
+                          label: t("frontstage.workbench.growth.dossier.field.level"),
+                          value: t("frontstage.workbench.growth.dossier.status.levelValue", {
+                            level: growth.level,
+                          }),
+                        },
+                      ])
+                    : nothing
+                }
+                ${workingStyle}
+              `,
+            )
+          : nothing
+      }
+
+      ${
+        showSuggestion
+          ? renderSection(
+              t("frontstage.workbench.growth.dossier.zone.suggestion"),
+              html`
+                <div id="wb-bots-zone-suggestion" data-wb-bots-zone="suggestion">
+                  ${
+                    hasActionableRec
+                      ? html`<p class="wb-bots__hint">${recommendationReasonLabel(rec)}</p>`
+                      : nothing
+                  }
+                  ${
+                    hasActionableRec
+                      ? html`
+                          <button
+                            type="button"
+                            class="btn btn--primary"
+                            data-wb-bots-growth-cta
+                            @click=${() => applyGrowthRecommendation(props, rec)}
+                          >
+                            ${ctaLabel}
+                          </button>
+                        `
+                      : nothing
+                  }
+                  ${
+                    workflows.length === 0
+                      ? nothing
+                      : html`
+                          <ul class="wb-bots__list">
+                            ${workflows.map(
+                              (item) => html`
+                                <li class="wb-bots__list-row wb-bots__list-row--stack">
+                                  <span class="wb-bots__list-title">${item}</span>
+                                </li>
+                              `,
+                            )}
+                          </ul>
+                        `
+                  }
+                </div>
+              `,
+            )
+          : nothing
+      }
     </div>
   `;
 }
@@ -736,7 +1007,7 @@ function renderGrowthTab(props: MyBotWorkspacePanelProps) {
 function renderAuthTab(props: MyBotWorkspacePanelProps) {
   const entry = props.entry;
   const agentId = entry.id;
-  const scope = entry.source === "owned" ? "owned" : "shared";
+  const scope = robotIdentityAgentScope(entry);
   const snapshot = props.userOperationalIdentitySnapshot;
   const busy = Boolean(props.userOperationalIdentityBusy);
   const allIdentities = snapshot?.identities ?? [];
@@ -1080,33 +1351,151 @@ function renderCollaborationTab(props: MyBotWorkspacePanelProps) {
   `;
 }
 
-function renderDataTab(props: MyBotWorkspacePanelProps) {
-  const bot = props.bot;
-  if (!bot) {
-    return renderEmpty("正在加载数据…");
-  }
-  const workspacePath = props.entry.workspacePath?.trim() || "尚未配置";
+function renderDataFileList(
+  files: Array<{ name: string; label: string; bytes: number }>,
+  open: (file: { name: string; label: string }) => void,
+) {
   return html`
-    ${renderKvRows([
-      { label: "记忆容量", value: formatBytes(bot.data.memorySize) },
-      { label: "长期记忆", value: String(bot.data.longTermCount ?? 0) },
-      { label: "知识库", value: String(bot.data.kbCount ?? 0) },
-      { label: "工作区", value: workspacePath, mono: true },
-    ])}
-    ${
-      bot.data.recentLearning.length === 0
-        ? nothing
-        : html`
-            <section class="wb-bots__section">
-              <div class="wb-bots__section-head">
-                <h3 class="wb-bots__section-title">近期学习</h3>
-              </div>
-              <ul class="wb-bots__timeline">
-                ${bot.data.recentLearning.map((item) => html`<li><span>${item.text}</span></li>`)}
-              </ul>
-            </section>
-          `
-    }
+    <ul class="wb-bots__list">
+      ${files.map(
+        (file) => html`
+          <li>
+            <button type="button" class="wb-bots__nav-row" @click=${() => open(file)}>
+              <span class="wb-bots__list-title">${file.label}</span>
+              <span class="wb-bots__list-sub">${formatBytes(file.bytes)}</span>
+            </button>
+          </li>
+        `,
+      )}
+    </ul>
+  `;
+}
+
+function renderDataTab(props: MyBotWorkspacePanelProps) {
+  const agentId = props.entry.id;
+  const surface = props.dataSurface?.agentId === agentId ? props.dataSurface : null;
+  if (!surface || (!surface.loaded && !surface.loading)) {
+    props.onEnsureRobotData?.(agentId);
+  }
+  if (!surface || surface.loading) {
+    return renderEmpty("正在读取文件…");
+  }
+  const memoryBytes = surface.memoryFiles.reduce((sum, file) => sum + file.bytes, 0);
+  const memoryCount = surface.memoryFiles.length + surface.atoms.length;
+  const openFile = (file: { name: string; label: string }) =>
+    props.onOpenRobotDataItem?.({ kind: "file", agentId, name: file.name, label: file.label });
+  return html`
+    <div data-wb-bots-data>
+      ${surface.error ? html`<div class="callout callout--danger">${surface.error}</div>` : nothing}
+      <section class="wb-bots__section">
+        <div class="wb-bots__section-head">
+          <h3 class="wb-bots__section-title">
+            记忆
+            ${
+              memoryCount > 0
+                ? html`<span class="wb-bots__list-sub"
+                    >${memoryCount} 项${memoryBytes > 0 ? ` · ${formatBytes(memoryBytes)}` : ""}</span
+                  >`
+                : nothing
+            }
+          </h3>
+        </div>
+        ${
+          memoryCount === 0
+            ? renderEmpty("还没有可打开的记忆文件。")
+            : html`
+                ${surface.memoryFiles.length > 0 ? renderDataFileList(surface.memoryFiles, openFile) : nothing}
+                ${
+                  surface.atoms.length === 0
+                    ? nothing
+                    : html`
+                        <ul class="wb-bots__list">
+                          ${surface.atoms.map(
+                            (atom) => html`
+                              <li>
+                                <button
+                                  type="button"
+                                  class="wb-bots__nav-row"
+                                  @click=${() =>
+                                    props.onOpenRobotDataItem?.({
+                                      kind: "atom",
+                                      agentId,
+                                      id: atom.id,
+                                      text: atom.text,
+                                    })}
+                                >
+                                  <span class="wb-bots__list-title">${atom.text}</span>
+                                </button>
+                              </li>
+                            `,
+                          )}
+                        </ul>
+                      `
+                }
+              `
+        }
+      </section>
+      <section class="wb-bots__section">
+        <div class="wb-bots__section-head">
+          <h3 class="wb-bots__section-title">知识库</h3>
+        </div>
+        ${
+          surface.knowledge.length === 0
+            ? renderEmpty("还没有绑定到这个机器人的知识库文档。")
+            : html`
+                <ul class="wb-bots__list">
+                  ${surface.knowledge.map(
+                    (document) => html`
+                      <li>
+                        <button
+                          type="button"
+                          class="wb-bots__nav-row"
+                          @click=${() =>
+                            props.onOpenRobotDataItem?.({
+                              kind: "knowledge",
+                              agentId,
+                              knowledgeBaseId: document.knowledgeBaseId,
+                              documentId: document.documentId,
+                              title: document.title,
+                            })}
+                        >
+                          <span class="wb-bots__list-main">
+                            <span class="wb-bots__list-title">${document.title}</span>
+                            <span class="wb-bots__list-sub">${document.baseTitle}</span>
+                          </span>
+                          <span class="wb-bots__nav-chevron" aria-hidden="true">›</span>
+                        </button>
+                      </li>
+                    `,
+                  )}
+                </ul>
+              `
+        }
+      </section>
+      <section class="wb-bots__section">
+        <div class="wb-bots__section-head">
+          <h3 class="wb-bots__section-title">工作区</h3>
+        </div>
+        <p class="wb-bots__kv-value mono">${surface.workspace || "工作区路径还没有返回。"}</p>
+        ${
+          surface.workspaceFiles.length === 0
+            ? renderEmpty("工作区里还没有可打开的文件。")
+            : renderDataFileList(surface.workspaceFiles, openFile)
+        }
+      </section>
+      ${
+        surface.open
+          ? html`
+              <section class="wb-bots__section" data-wb-bots-data-open>
+                <div class="wb-bots__section-head">
+                  <h3 class="wb-bots__section-title">${surface.open.title}</h3>
+                </div>
+                <pre class="wb-bots__file-view">${surface.open.text}</pre>
+              </section>
+            `
+          : nothing
+      }
+    </div>
   `;
 }
 
@@ -1123,12 +1512,16 @@ function renderDangerTab(props: MyBotWorkspacePanelProps) {
   const entry = props.entry;
   const busy = props.ownedRobotDeleteBusyId === entry.id;
   const displayName = entry.name?.trim() || entry.id;
+  const groupCount = props.bot?.collaborations.length ?? 0;
 
   return html`
     <section class="wb-bots__danger">
       <div class="wb-bots__danger-head">
         <h3 class="wb-bots__danger-title">删除「${displayName}」</h3>
-        <p class="wb-bots__danger-sub">删除后不可恢复。确认即从你的机器人列表中移除。</p>
+        <p class="wb-bots__danger-sub">
+          删除后不可恢复。确认即从你的机器人列表中移除。
+          ${groupCount > 0 ? `将同时退出 ${groupCount} 个协作小组。` : ""}
+        </p>
       </div>
       ${
         props.ownedRobotDeleteError
@@ -1181,10 +1574,7 @@ export function renderMyBotWorkspacePanel(props: MyBotWorkspacePanelProps) {
   const dirty = canEditIdentity && isIdentityDraftDirty(props.identityDraft, props.bot);
   const tabs = TAB_DEFS.filter((tab) => !tab.ownedOnly || canDelete);
   // Keep status line minimal — ownership already appears on the left anchor row.
-  const statusBits = [
-    props.bot ? statusLabel(props.bot.identity.status) : null,
-    canEditIdentity ? null : "只读",
-  ].filter(Boolean);
+  const statusBits = [canEditIdentity ? null : "只读"].filter(Boolean);
   const displayName =
     (canEditIdentity ? props.identityDraft?.name?.trim() : "") || props.entry.name;
   const titleEmoji = props.entry.emoji ? `${props.entry.emoji} ` : "";
