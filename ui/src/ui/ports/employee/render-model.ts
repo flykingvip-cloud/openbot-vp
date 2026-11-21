@@ -358,6 +358,15 @@ import { resolveCollaborationGroupSnapshot } from "./views/collaboration-group-s
 import { resolveCollaborationSpeakingAgentId } from "./views/collaboration-speaking-agent.ts";
 import type { WorkbenchKnowledgeSurface } from "./views/home-page-contracts.ts";
 import {
+  ensureRobotCapabilityAtlas,
+  peekRobotCapabilityAtlas,
+} from "./views/my-bot-capability-atlas.ts";
+import {
+  ensureRobotDataSurface,
+  openRobotDataItem,
+  peekRobotDataSurface,
+} from "./views/my-bot-data-surface.ts";
+import {
   buildCronExecutionAgents,
   buildCronExecutionGroups,
 } from "./views/personal-cron-execution-targets.ts";
@@ -2068,6 +2077,14 @@ async function chooseSystemWorkspaceDirectory(
   }
 }
 
+function workbenchGroupActionError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (message.includes("CROSS_OPERATOR_STATE_DENIED")) {
+    return "协作小组操作没有完成。请再试一次。";
+  }
+  return message;
+}
+
 async function saveSystemSettingsGroup(
   state: AppPortState,
   entry: WorkbenchSettingsGroupEntry | null,
@@ -2123,7 +2140,7 @@ async function saveSystemSettingsGroup(
       finalDecisionPolicy: {
         mode: draft.finalDecisionMode.trim() || "human_required",
         defaultFinalDeciderRole: draft.finalDecisionRole.trim() || "owner",
-        allowAgentPublishProposal: draft.allowAgentPublishProposal,
+        allowAgentPublishProposal: true,
       },
       openDiscussionWithoutMention: draft.openDiscussionWithoutMention,
       maxVisibleBotRepliesPerRound: Math.max(
@@ -2635,7 +2652,17 @@ function buildWorkbenchSettingsGroupMemberRows(space: {
 }
 
 function scopedAgentsListForEmployeeWorkbench(state: AppPortState) {
-  return filterAgentsListForEmployeeWorkbench(state.agentsList);
+  const access = state.platformAuthState?.employeeAccess;
+  const seatId = access?.currentSeat?.seatId;
+  const seatAgentIds = access?.agentIds;
+  if (!seatId && !seatAgentIds) {
+    return filterAgentsListForEmployeeWorkbench(state.agentsList);
+  }
+  return filterAgentsListForEmployeeWorkbench(state.agentsList, {
+    seatId,
+    employeeUserId: access?.employeeUserId,
+    seatAgentIds,
+  });
 }
 
 // Temporary bridge while the workbench chain is being recovered.
@@ -6072,6 +6099,17 @@ export function buildEmployeeWorkbenchProps(input: {
           bot: state.workbenchMyBotProjection ?? null,
           identityDraft: state.workbenchMyBotIdentityDraft ?? null,
           detailTab: state.workbenchMyBotDetailTab ?? "identity",
+          dataSurface: peekRobotDataSurface(state.workbenchMyBotDetailAgentId),
+          onEnsureDataSurface: (agentId: string) => {
+            void ensureRobotDataSurface(state, agentId, () => requestWorkbenchRender(state));
+          },
+          capabilityAtlas: peekRobotCapabilityAtlas(state.workbenchMyBotDetailAgentId),
+          onEnsureCapabilityAtlas: (agentId: string) => {
+            void ensureRobotCapabilityAtlas(state, agentId, () => requestWorkbenchRender(state));
+          },
+          onOpenDataItem: (item) => {
+            void openRobotDataItem(state, item, () => requestWorkbenchRender(state));
+          },
         }
       : null,
     collaborationGroupProjection: state.workbenchCollaborationGroupProjection ?? null,
@@ -7835,9 +7873,10 @@ export function buildEmployeeWorkbenchProps(input: {
       state.workbenchSystemSettingsGroupNotice = null;
       try {
         await resetEmployeeWorkbenchSpace(state, { groupId });
-        state.workbenchSystemSettingsGroupNotice = "协作小组已重置。";
+        state.workbenchSystemSettingsGroupNotice =
+          "协作小组已重置。聊天记录已清空，小组设置保持不变。";
       } catch (error) {
-        state.workbenchSystemSettingsGroupError = String(error);
+        state.workbenchSystemSettingsGroupError = workbenchGroupActionError(error);
       } finally {
         state.workbenchSystemSettingsGroupSaving = false;
       }
@@ -7871,7 +7910,7 @@ export function buildEmployeeWorkbenchProps(input: {
         state.workbenchSystemSettingsSelectedGroupId = null;
         state.workbenchSystemSettingsGroupDraft = null;
       } catch (error) {
-        state.workbenchSystemSettingsGroupError = String(error);
+        state.workbenchSystemSettingsGroupError = workbenchGroupActionError(error);
       } finally {
         state.workbenchSystemSettingsGroupSaving = false;
       }
