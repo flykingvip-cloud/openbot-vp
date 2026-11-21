@@ -376,9 +376,10 @@ describe("personal devices panel", () => {
       );
     };
     await flush(paintEmpty);
-    expect(container.textContent).toContain("已连接设备");
+    expect(container.textContent).not.toContain("已连接设备");
     expect(viewName(container)).toBe("empty");
-    expect(container.textContent).toContain("还没有设备");
+    expect(container.textContent).not.toContain("还没有设备");
+    expect(container.textContent).toContain("添加一台设备后");
     expect(container.querySelector("[data-testid=personal-devices-add]")?.textContent).toContain(
       "添加设备",
     );

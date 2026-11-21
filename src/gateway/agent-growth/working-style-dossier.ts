@@ -20,6 +20,8 @@ import {
 export type WorkingStyleDossierProjection = {
   learned: boolean;
   style: WorkingStyle;
+  /** Keys actually stored for this robot. Defaults are not recorded preferences. */
+  recordedKeys: Array<keyof WorkingStyle>;
   evidence: WorkingStyleEvidenceGate;
   updatedAtMs: number | null;
   lastChange: {
@@ -70,6 +72,7 @@ export async function buildWorkingStyleDossierProjection(
   return {
     learned: stored !== null,
     style: stored ? { ...DEFAULT_WORKING_STYLE, ...stored } : { ...DEFAULT_WORKING_STYLE },
+    recordedKeys: stored ? (Object.keys(stored) as Array<keyof WorkingStyle>) : [],
     evidence,
     updatedAtMs: lastChange?.changedAtMs ?? null,
     lastChange,

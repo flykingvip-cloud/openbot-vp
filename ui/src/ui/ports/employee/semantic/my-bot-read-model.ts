@@ -37,6 +37,8 @@ export type MyBotCapabilityProjection = {
   name: string;
   /** 1–5 proficiency stars */
   stars: number;
+  /** Present only when skill health has a measured success rate. */
+  successRate?: number | null;
   source: MyBotCapabilitySource;
   relationId: string;
   callCount?: number;
@@ -111,6 +113,8 @@ export type MyBotGrowthCompleteness = {
 
 export type MyBotWorkingStyleProjection = {
   learned: boolean;
+  /** Style keys persisted for this robot. Absent on older payloads. */
+  recordedKeys?: Array<keyof MyBotWorkingStyleProjection["style"]>;
   style: {
     outputFormat: string;
     reportingCadence: string;
@@ -140,6 +144,8 @@ export type MyBotGrowthTaskRef = {
 };
 
 export type MyBotGrowthEventProjection = {
+  /** Growth milestone field name. The label is translated in the UI. */
+  milestoneKey?: string;
   text: string;
   at?: string;
   source?: MyBotGrowthSource;

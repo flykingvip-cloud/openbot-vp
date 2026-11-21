@@ -206,6 +206,11 @@ export type WorkbenchMyBotDetailState = {
   bot: import("../semantic/my-bot-read-model.ts").MyBotProjection | null;
   identityDraft: WorkbenchMyBotIdentityDraft | null;
   detailTab?: WorkbenchMyBotDetailTab;
+  dataSurface?: import("./my-bot-data-surface.ts").RobotDataSurface | null;
+  onEnsureDataSurface?: (agentId: string) => void;
+  capabilityAtlas?: import("./my-bot-capability-atlas.ts").RobotCapabilityAtlas | null;
+  onEnsureCapabilityAtlas?: (agentId: string) => void;
+  onOpenDataItem?: (item: import("./my-bot-data-surface.ts").RobotDataOpenItem) => void;
 };
 
 export type WorkbenchSettingsGroupEntry = {
