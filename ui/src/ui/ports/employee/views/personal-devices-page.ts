@@ -307,6 +307,9 @@ function renderCurrent(selected: PersonalDeviceView | null) {
     return renderBlock(selected.displayName, renderDetail(selected));
   }
   if (name === "empty") {
+    if (panelSurface() === "detail") {
+      return renderEmptyState();
+    }
     return renderBlock(listTitle(), renderEmptyState());
   }
   return renderBlock(listTitle(), renderDeviceList());
@@ -404,7 +407,13 @@ function renderNotice() {
 function renderEmptyState() {
   return html`
     <div class="personal-devices__empty" data-testid="personal-devices-empty">
-      <p class="personal-devices__empty-title">还没有设备</p>
+      ${
+        panelSurface() === "detail"
+          ? nothing
+          : html`
+              <p class="personal-devices__empty-title">还没有设备</p>
+            `
+      }
       <p class="personal-devices__empty-copy">
         添加一台设备后，可以在这里查看授权、平台接受和真机确认。
       </p>
