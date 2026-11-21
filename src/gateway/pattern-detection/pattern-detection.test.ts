@@ -115,11 +115,12 @@ describe("server pattern-detection", () => {
     expect(listPatternCandidates({ agentId: "robot-b" })).toHaveLength(1);
   });
 
-  it("keeps unscoped candidates when the caller filters by their tenant", () => {
+  it("shows one tenant's candidates and hides another tenant", () => {
     const hash = structureHashFromText("market scan outline");
     for (let i = 1; i <= 3; i += 1) {
       ingestPatternSample({
         agentId: "robot-unscoped",
+        tenantId: "001",
         runId: `u-${i}`,
         taskId: `u-t-${i}`,
         inputStructureHash: hash,

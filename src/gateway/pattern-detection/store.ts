@@ -193,23 +193,46 @@ export function applyToolsUsedByRunId(
   return patched;
 }
 
+/** Bind a legacy candidate to the one tenant recorded on its samples. */
+function backfillNullCandidateTenants(store: PatternStore): PatternStore {
+  let changed = false;
+  const candidates = store.candidates.map((candidate) => {
+    if (candidate.tenantId != null) {
+      return candidate;
+    }
+    const tenants = new Set<string>();
+    for (const sampleId of candidate.sampleIds) {
+      const tenantId = store.samples
+        .find((sample) => sample.sampleId === sampleId)
+        ?.tenantId?.trim();
+      if (tenantId) {
+        tenants.add(tenantId);
+      }
+    }
+    if (tenants.size !== 1) {
+      return candidate;
+    }
+    changed = true;
+    return { ...candidate, tenantId: [...tenants][0] ?? null, updatedAt: Date.now() };
+  });
+  if (!changed) {
+    return store;
+  }
+  writeCandidates(candidates);
+  return { ...store, candidates };
+}
+
 export function listPatternCandidates(params?: {
   agentId?: string;
   tenantId?: string | null;
   status?: PatternCandidate["status"];
 }): PatternCandidate[] {
-  const store = readStore();
+  const store = backfillNullCandidateTenants(readStore());
   return store.candidates.filter((candidate) => {
     if (params?.agentId && candidate.agentId !== params.agentId) {
       return false;
     }
-    // Unscoped historical samples (tenantId null) stay visible to a caller who
-    // already passed agent access. A set tenant only hides other tenants.
-    if (
-      params?.tenantId !== undefined &&
-      candidate.tenantId != null &&
-      candidate.tenantId !== params.tenantId
-    ) {
+    if (params?.tenantId !== undefined && candidate.tenantId !== params.tenantId) {
       return false;
     }
     if (params?.status && candidate.status !== params.status) {
@@ -220,7 +243,8 @@ export function listPatternCandidates(params?: {
 }
 
 export function getPatternCandidate(candidateId: string): PatternCandidate | null {
-  return readStore().candidates.find((entry) => entry.candidateId === candidateId) ?? null;
+  const store = backfillNullCandidateTenants(readStore());
+  return store.candidates.find((entry) => entry.candidateId === candidateId) ?? null;
 }
 
 export type ApprovePatternCandidateOptions = {
