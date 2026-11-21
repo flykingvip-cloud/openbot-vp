@@ -1,11 +1,13 @@
 // @vitest-environment node
 /**
  * WP-B slice 3: observe credit reservation status through the chat admitted-turn
- * execution lifecycle (real acquire/release), using only an isolated state dir.
+ * execution lifecycle (real acquire/release). The test creates and removes its
+ * own isolated CONFIG_DIR / state dir, so it can be collected and run by
+ * ordinary Vitest without an external OPENBOT_STATE_DIR.
  */
 import fs from "node:fs";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createExecutionLifecycle } from "../../agent-runtime/execution/runner/execution-lifecycle.js";
 import { bindAdmittedTurnHost } from "../../agent-runtime/wiring/admitted-turn-host.js";
 import { DEFAULT_OVERAGE_POLICY } from "../package-entitlement/normalize-entitlement.js";
@@ -17,16 +19,27 @@ vi.mock("../platform-auth/resolve-tenant-lifecycle-access.js", () => ({
   resolveTenantLifecycleAccess: vi.fn(async () => ({ blocked: false })),
 }));
 
-const stateDir = process.env.OPENBOT_STATE_DIR?.trim() ?? "";
-if (!stateDir || !stateDir.includes("wpb-slice3-state-")) {
-  throw new Error(
-    "Refusing to run chat-reply reservation tests without isolated OPENBOT_STATE_DIR (wpb-slice3-state-*).",
+const { previousStateDir, tmpDir } = vi.hoisted(() => {
+  const previousStateDir = process.env.OPENBOT_STATE_DIR;
+  const tmpRoot = (process.env.TMPDIR || process.env.TMP || process.env.TEMP || "/tmp").replace(
+    /\/$/,
+    "",
   );
-}
+  const tmpDir = `${tmpRoot}/openbot-wpb-slice3-${Date.now()}-${process.pid}`;
+  process.env.OPENBOT_STATE_DIR = tmpDir;
+  return { previousStateDir, tmpDir };
+});
+fs.mkdirSync(tmpDir, { recursive: true });
 
+vi.mock("../../utils.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../utils.js")>();
+  return { ...actual, CONFIG_DIR: tmpDir };
+});
+
+const stateDir = tmpDir;
 const { CONFIG_DIR } = await import("../../utils.js");
 if (path.resolve(CONFIG_DIR) !== path.resolve(stateDir)) {
-  throw new Error(`CONFIG_DIR ${CONFIG_DIR} does not match isolated OPENBOT_STATE_DIR ${stateDir}`);
+  throw new Error(`CONFIG_DIR ${CONFIG_DIR} does not match isolated state dir ${stateDir}`);
 }
 
 const { __resetAgentRunRegistryForTest } = await import("./agent-run-registry.js");
@@ -204,6 +217,15 @@ describe("chat admitted-turn credit reservation status", () => {
     }
   });
 
+  afterAll(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    if (previousStateDir === undefined) {
+      delete process.env.OPENBOT_STATE_DIR;
+    } else {
+      process.env.OPENBOT_STATE_DIR = previousStateDir;
+    }
+  });
+
   it("concurrent prepares do not oversell the last credit", async () => {
     const a = createChatLifecycle("run-a");
     const b = createChatLifecycle("run-b");
@@ -293,7 +315,7 @@ describe("chat admitted-turn credit reservation status", () => {
     expect(await sumHeldReservationsForEnterprise(ENTERPRISE_ID)).toBe(0);
   });
 
-  it("timeout after prepare releases the held reservation", async () => {
+  it("a pre-aborted signal plus explicit dispose after prepare releases the held reservation", async () => {
     const { lifecycle } = createChatLifecycle("run-timeout");
     expect(
       (
