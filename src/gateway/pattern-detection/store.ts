@@ -203,7 +203,13 @@ export function listPatternCandidates(params?: {
     if (params?.agentId && candidate.agentId !== params.agentId) {
       return false;
     }
-    if (params?.tenantId !== undefined && candidate.tenantId !== params.tenantId) {
+    // Unscoped historical samples (tenantId null) stay visible to a caller who
+    // already passed agent access. A set tenant only hides other tenants.
+    if (
+      params?.tenantId !== undefined &&
+      candidate.tenantId != null &&
+      candidate.tenantId !== params.tenantId
+    ) {
       return false;
     }
     if (params?.status && candidate.status !== params.status) {

@@ -115,6 +115,35 @@ describe("server pattern-detection", () => {
     expect(listPatternCandidates({ agentId: "robot-b" })).toHaveLength(1);
   });
 
+  it("keeps unscoped candidates when the caller filters by their tenant", () => {
+    const hash = structureHashFromText("market scan outline");
+    for (let i = 1; i <= 3; i += 1) {
+      ingestPatternSample({
+        agentId: "robot-unscoped",
+        runId: `u-${i}`,
+        taskId: `u-t-${i}`,
+        inputStructureHash: hash,
+        outputStructureHash: hash,
+        success: true,
+      });
+    }
+    expect(listPatternCandidates({ agentId: "robot-unscoped", tenantId: "001" })).toHaveLength(1);
+    for (let i = 1; i <= 3; i += 1) {
+      ingestPatternSample({
+        agentId: "robot-other-tenant",
+        tenantId: "other",
+        runId: `o-${i}`,
+        taskId: `o-t-${i}`,
+        inputStructureHash: hash,
+        outputStructureHash: structureHashFromText(`other ${i}`),
+        success: true,
+      });
+    }
+    expect(listPatternCandidates({ agentId: "robot-other-tenant", tenantId: "001" })).toHaveLength(
+      0,
+    );
+  });
+
   it("publishes an approved candidate into a draft executable skill with lineage", async () => {
     const { approvePatternCandidate, publishPatternCandidateAsDraftSkill } =
       await import("./index.js");

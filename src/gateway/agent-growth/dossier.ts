@@ -28,18 +28,22 @@ export type GrowthDossierProjection = {
   recommendation: NextGrowthAction;
   growthReport: GrowthReportSnapshot | null;
   level: number;
-  recentEvents: Array<{ text: string; at?: string }>;
+  recentEvents: Array<{ milestoneKey?: string; text: string; at?: string }>;
   sources: Array<"personal" | "group" | "skill_upgrade">;
 };
 
 const MILESTONE_LABELS: Record<string, string> = {
   createdAtMs: "创建机器人",
+  sessionOpenedAtMs: "首次打开会话",
   birthPreludeShownAtMs: "完成诞生引导",
   firstCtaClickedAtMs: "完成首个引导动作",
   identityCompletedAtMs: "完善身份信息",
   firstSkillInstalledAtMs: "安装了首个能力",
   firstPermissionGrantedAtMs: "获得首个权限",
   firstKnowledgeUploadedAtMs: "上传了首份知识",
+  rolesAssignedAtMs: "完成角色分配",
+  workflowDefinedAtMs: "确定工作流程",
+  alignmentCompletedAtMs: "完成协作对齐",
   missionReadyAtMs: "达到任务就绪",
   firstMissionSentAtMs: "发出首个任务",
   firstMissionSuccessAtMs: "首个任务成功",
@@ -127,6 +131,7 @@ export function buildGrowthDossierProjection(params: {
     .toSorted((a, b) => b[1] - a[1])
     .slice(0, 5)
     .map(([key, atMs]) => ({
+      milestoneKey: key,
       text: MILESTONE_LABELS[key] ?? key,
       at: new Date(atMs).toISOString(),
     }));
