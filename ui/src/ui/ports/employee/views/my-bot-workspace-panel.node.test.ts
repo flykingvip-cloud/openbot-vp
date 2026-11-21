@@ -103,6 +103,32 @@ describe("renderMyBotWorkspacePanel", () => {
         bot,
         identityDraft: null,
         activeTab: "capabilities",
+        capabilityAtlas: {
+          agentId: baseEntry.id,
+          loading: false,
+          loaded: true,
+          error: null,
+          capabilities: [
+            {
+              id: "cap-quote",
+              name: "报价助手",
+              domain: "research",
+              callCount: 2,
+              origin: "installed",
+              weight: 2,
+            },
+            {
+              id: "pat-browser",
+              name: "微信公众号成稿",
+              domain: "research",
+              callCount: 26,
+              origin: "used",
+              weight: 26,
+            },
+          ],
+          knowledge: [{ id: "kb-sales", label: "销售手册", documents: ["折扣口径"] }],
+          outputs: [{ id: "out-1", title: "季度经营复盘（3页 PPTX）" }],
+        },
         onTabChange: () => undefined,
         onIdentityDraftChange: () => undefined,
         onSaveIdentity: () => undefined,
@@ -113,14 +139,58 @@ describe("renderMyBotWorkspacePanel", () => {
       container,
     );
 
+    expect(container.querySelector("[data-cap-radar]")).toBeTruthy();
+    expect(container.textContent).toContain("能力地图");
+    expect(container.textContent).toContain("知识图谱");
     expect(container.textContent).toContain("报价助手");
+    expect(container.textContent).toContain("微信公众号成稿");
+    expect(container.textContent).toContain("使用");
+    expect(container.textContent).toContain("销售手册");
+    expect(container.textContent).toContain("折扣口径");
+    expect(container.textContent).not.toContain("季度经营复盘");
+    expect(container.textContent).not.toContain("扮演");
     expect(container.textContent).toContain("探索能力");
-    expect(container.textContent).toContain("扮演");
     expect(container.textContent).not.toContain("Lv.");
     Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
       .find((button) => button.textContent?.trim() === "探索能力")
       ?.click();
     expect(onExplore).toHaveBeenCalled();
+  });
+
+  it("shows captured deliverables on the growth tab", () => {
+    const bot = createEmptyMyBotProjection("sales", "销售助手");
+    const container = document.createElement("div");
+    render(
+      html`${renderMyBotWorkspacePanel({
+        entry: baseEntry,
+        loading: false,
+        error: null,
+        saving: false,
+        bot,
+        identityDraft: null,
+        activeTab: "growth",
+        capabilityAtlas: {
+          agentId: "sales",
+          loading: false,
+          loaded: true,
+          error: null,
+          capabilities: [],
+          knowledge: [],
+          outputs: [{ id: "out-1", title: "季度经营复盘（3页 PPTX）" }],
+        },
+        onTabChange: () => undefined,
+        onIdentityDraftChange: () => undefined,
+        onSaveIdentity: () => undefined,
+        onExploreCapabilities: () => undefined,
+        onOpenGroup: () => undefined,
+        onSelectSession: () => undefined,
+      })}`,
+      container,
+    );
+    expect(container.querySelector("[data-wb-bots-outputs]")?.textContent).toContain(
+      "季度经营复盘（3页 PPTX）",
+    );
+    expect(container.textContent).toContain("产出");
   });
 
   it("renders growth dossier capability/performance/suggestion zones with primary recommendation CTA", () => {
@@ -177,10 +247,10 @@ describe("renderMyBotWorkspacePanel", () => {
     expect(container.querySelector("[data-wb-bots-growth-dossier]")).toBeTruthy();
     expect(container.querySelector('[data-wb-bots-zone="identity"]')).toBeNull();
     expect(container.querySelector('[data-wb-bots-zone="capability"]')).toBeTruthy();
-    expect(container.querySelector('[data-wb-bots-zone="performance"]')).toBeTruthy();
+    expect(container.querySelector('[data-wb-bots-zone="performance"]')).toBeNull();
     expect(container.querySelector('[data-wb-bots-zone="suggestion"]')).toBeTruthy();
-    expect(container.textContent).toContain("实战表现");
-    expect(container.textContent).toContain("暂无");
+    expect(container.textContent).not.toContain("实战表现");
+    expect(container.textContent).not.toContain("暂无");
     expect(container.textContent).toContain("CRM");
     expect(container.textContent).toContain("去安装推荐能力");
     container.querySelector<HTMLButtonElement>("[data-wb-bots-growth-cta]")?.click();
@@ -235,7 +305,7 @@ describe("renderMyBotWorkspacePanel", () => {
       container,
     );
     expect(container.querySelector("[data-wb-bots-working-style]")).toBeTruthy();
-    expect(container.textContent).toContain("Working DNA");
+    expect(container.textContent).toContain("工作偏好");
     expect(container.textContent).toContain("表现改善");
   });
 
@@ -311,9 +381,9 @@ describe("renderMyBotWorkspacePanel", () => {
       })}`,
       container,
     );
-    expect(container.textContent).toContain("Operational score");
-    expect(container.textContent).toContain("Not available");
     expect(container.textContent).toContain("Install recommended skills");
+    expect(container.textContent).not.toContain("Operational score");
+    expect(container.textContent).not.toContain("Not available");
     expect(container.textContent).not.toContain("实战表现");
     expect(container.textContent).not.toContain("去安装推荐能力");
   });
@@ -393,5 +463,64 @@ describe("renderMyBotWorkspacePanel", () => {
     const human = container.querySelector<HTMLInputElement>("[data-testid=personal-device-human]");
     expect(human?.disabled).toBe(true);
     expect(human?.getAttribute("data-digital-human-id")).toBe("sales");
+  });
+
+  it("lists openable memory, knowledge, and workspace files on the data tab", () => {
+    const onOpenRobotDataItem = vi.fn();
+    const container = document.createElement("div");
+    render(
+      html`${renderMyBotWorkspacePanel({
+        entry: baseEntry,
+        loading: false,
+        error: null,
+        saving: false,
+        bot: createEmptyMyBotProjection("sales", "销售助手"),
+        identityDraft: null,
+        activeTab: "data",
+        onTabChange: () => undefined,
+        onIdentityDraftChange: () => undefined,
+        onSaveIdentity: () => undefined,
+        onExploreCapabilities: () => undefined,
+        onOpenGroup: () => undefined,
+        onSelectSession: () => undefined,
+        dataSurface: {
+          agentId: "sales",
+          loading: false,
+          loaded: true,
+          error: null,
+          workspace: "/robots/sales/workspace",
+          workspaceFiles: [{ name: "SOUL.md", label: "SOUL.md", bytes: 120 }],
+          memoryFiles: [
+            { name: "memory/task_ledger.json", label: "memory/task_ledger.json", bytes: 80 },
+          ],
+          atoms: [],
+          knowledge: [
+            {
+              knowledgeBaseId: "kb-1",
+              documentId: "doc-1",
+              title: "合同审查手册",
+              baseTitle: "法务知识库",
+            },
+          ],
+          open: null,
+        },
+        onOpenRobotDataItem,
+      })}`,
+      container,
+    );
+    expect(container.textContent).toContain("memory/task_ledger.json");
+    expect(container.textContent).toContain("合同审查手册");
+    expect(container.textContent).toContain("/robots/sales/workspace");
+    expect(container.textContent).toContain("SOUL.md");
+    expect(container.textContent).not.toContain("尚未配置");
+    Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.includes("memory/task_ledger.json"))
+      ?.click();
+    expect(onOpenRobotDataItem).toHaveBeenCalledWith({
+      kind: "file",
+      agentId: "sales",
+      name: "memory/task_ledger.json",
+      label: "memory/task_ledger.json",
+    });
   });
 });
