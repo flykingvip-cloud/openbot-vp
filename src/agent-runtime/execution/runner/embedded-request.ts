@@ -95,6 +95,9 @@ export type RunEmbeddedPiAgentParams = {
    * Confirmed delivery step fingerprint. Side-effecting tools in this run claim
    * the durable ledger before execute. Omitted on ordinary chat turns.
    */
+  /** Scheduler/admission persisted identity; never inferred from model call IDs. */
+  logicalExecutionId?: string;
+  logicalTaskId?: string;
   deliveryToolSideEffect?: DeliveryToolSideEffectSchedule | null;
   /**
    * Ephemeral per-bot private run bag for this turn. Forwarded into the tool loop

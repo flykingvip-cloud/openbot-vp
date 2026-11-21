@@ -1,3 +1,4 @@
+import { withRuntimeDeadline, RUNTIME_SHUTDOWN_MS } from "./deadline.js";
 import type { PostgresExecutionRepository } from "./execution.js";
 
 /** Host owns trusted identity; an execution lease never grants tool authorization. */
@@ -35,12 +36,25 @@ export async function acquireExecutionLease(params: {
   let renewing = false;
   let pendingRenewal: Promise<void> = Promise.resolve();
   let stopped = false;
+  // A renewal promise may never settle during a network blackhole. Local expiry
+  // must still abort tools instead of treating the last successful claim as live.
+  let expiresLocallyAt = Date.now() + leaseMs;
+  const watchdog = setInterval(
+    () => {
+      if (!stopped && Date.now() >= expiresLocallyAt) {
+        controller.abort(new Error("Execution lease renewal deadline exceeded"));
+      }
+    },
+    Math.max(1, Math.floor(leaseMs / 6)),
+  );
+  watchdog.unref();
   const timer = setInterval(
     () => {
       if (renewing || stopped || controller.signal.aborted) {
         return;
       }
       renewing = true;
+      const renewalStartedAt = Date.now();
       pendingRenewal = params.repository
         .renew({
           tenantId: params.tenantId,
@@ -52,6 +66,8 @@ export async function acquireExecutionLease(params: {
         .then((ok) => {
           if (!ok) {
             controller.abort(new Error("Execution lease lost"));
+          } else if (!controller.signal.aborted) {
+            expiresLocallyAt = renewalStartedAt + leaseMs;
           }
         })
         .catch((error) => controller.abort(error))
@@ -70,9 +86,10 @@ export async function acquireExecutionLease(params: {
     dispose() {
       stopped = true;
       clearInterval(timer);
+      clearInterval(watchdog);
       params.parentSignal?.removeEventListener("abort", abort);
       controller.abort(new Error("Execution lease disposed"));
-      return pendingRenewal;
+      return withRuntimeDeadline(pendingRenewal, RUNTIME_SHUTDOWN_MS, "Lease disposal");
     },
   };
 }

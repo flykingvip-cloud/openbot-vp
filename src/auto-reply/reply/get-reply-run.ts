@@ -1676,7 +1676,7 @@ export async function runPreparedReply(
         if (applied.kind === "applied" && applied.abort) {
           const stopTaskId =
             "target" in routed.decision ? routed.decision.target?.taskId : undefined;
-          replyTurnRuntime.interrupt(sessionIdFinal, sessionKey, stopTaskId);
+          await replyTurnRuntime.interrupt(sessionIdFinal, sessionKey, stopTaskId);
           if (routed.decision.kind === "task_control" && routed.decision.action !== "resume") {
             await opts?.onInteractionTaskEffect?.({
               kind: routed.decision.action,

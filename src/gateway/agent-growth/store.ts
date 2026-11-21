@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 /**
  * Agent Growth OS — 持久化（spec: agent-growth-lifecycle, P0A 任务 1.2）。
  *
@@ -9,9 +10,10 @@
  *
  * 本模块仅负责机器人侧落盘 + 低层文件读写，保持无 collaboration 依赖，便于单测。
  */
-
+import fs from "node:fs/promises";
 import path from "node:path";
 import type { OpenBotConfig } from "../../config/config.js";
+import { withFileLock, SESSION_TASK_BOARD_LOCK_OPTIONS } from "../../infra/file-lock.js";
 import { createAsyncLock, readJsonFile, writeJsonAtomic } from "../../infra/json-files.js";
 import { type AgentGrowthPathOpts, resolveGrowthAgentDir } from "./tenant-agent-dir.js";
 import type { GrowthStatus } from "./types.js";
@@ -46,7 +48,19 @@ export async function writeRobotGrowthStatus(
   status: GrowthStatus,
   opts?: AgentGrowthPathOpts,
 ): Promise<void> {
-  await writeJsonAtomic(resolveRobotGrowthStatusPath(cfg, agentId, opts), status);
+  const file = resolveRobotGrowthStatusPath(cfg, agentId, opts);
+  await lock(() =>
+    withFileLock(file, SESSION_TASK_BOARD_LOCK_OPTIONS, async () => {
+      const prior = await readStoredGrowthStrict(file);
+      await writeJsonAtomic(file, {
+        ...status,
+        _growthPersistence: {
+          revision: (prior?._growthPersistence?.revision ?? 0) + 1,
+          receipts: prior?._growthPersistence?.receipts ?? {},
+        },
+      });
+    }),
+  );
 }
 
 /** 在锁内对机器人 GrowthStatus 做读改写（updater 返回 null 表示不写）。 */
@@ -56,13 +70,85 @@ export async function updateRobotGrowthStatus(
   updater: (current: GrowthStatus | null) => GrowthStatus | null,
   opts?: AgentGrowthPathOpts,
 ): Promise<GrowthStatus | null> {
-  return await lock(async () => {
-    const current = await readRobotGrowthStatus(cfg, agentId, opts);
-    const next = updater(current);
-    if (next === null) {
-      return current;
+  const file = resolveRobotGrowthStatusPath(cfg, agentId, opts);
+  return await lock(() =>
+    withFileLock(file, SESSION_TASK_BOARD_LOCK_OPTIONS, async () => {
+      const current = await readStoredGrowthStrict(file);
+      const next = updater(current);
+      if (next === null) {
+        return current;
+      }
+      const stored = current;
+      await writeJsonAtomic(file, {
+        ...next,
+        _growthPersistence: {
+          revision: (stored?._growthPersistence?.revision ?? 0) + 1,
+          receipts: stored?._growthPersistence?.receipts ?? {},
+        },
+      });
+      return next;
+    }),
+  );
+}
+
+type StoredGrowthStatus = GrowthStatus & {
+  _growthPersistence?: { revision: number; receipts: Record<string, string> };
+};
+
+/** Single aggregate event boundary: receipt and GrowthStatus publish atomically. */
+export async function applyRobotGrowthEvent(input: {
+  cfg: OpenBotConfig;
+  agentId: string;
+  eventId: string;
+  payload: unknown;
+  update: (current: GrowthStatus | null) => GrowthStatus;
+  opts?: AgentGrowthPathOpts;
+}): Promise<GrowthStatus> {
+  if (!input.eventId.trim()) {
+    throw new Error("Growth event requires identity");
+  }
+  const digest = createHash("sha256").update(JSON.stringify(input.payload)).digest("hex");
+  const file = resolveRobotGrowthStatusPath(input.cfg, input.agentId, input.opts);
+  return lock(() =>
+    withFileLock(file, SESSION_TASK_BOARD_LOCK_OPTIONS, async () => {
+      const current = await readStoredGrowthStrict(file);
+      const receipts = current?._growthPersistence?.receipts ?? {};
+      if (Object.hasOwn(receipts, input.eventId)) {
+        if (receipts[input.eventId] !== digest) {
+          throw new Error("Growth event payload conflict");
+        }
+        return current!;
+      }
+      const next = input.update(current);
+      const stored: StoredGrowthStatus = {
+        ...next,
+        _growthPersistence: {
+          revision: (current?._growthPersistence?.revision ?? 0) + 1,
+          receipts: { ...receipts, [input.eventId]: digest },
+        },
+      };
+      await writeJsonAtomic(file, stored);
+      return stored;
+    }),
+  );
+}
+
+async function readStoredGrowthStrict(file: string): Promise<StoredGrowthStatus | null> {
+  try {
+    const state = JSON.parse(await fs.readFile(file, "utf8")) as StoredGrowthStatus;
+    if (
+      !state ||
+      !state.dimensions ||
+      !state.milestones ||
+      typeof state.lifecycleState !== "string"
+    ) {
+      throw new Error("Invalid persisted GrowthStatus");
     }
-    await writeRobotGrowthStatus(cfg, agentId, next, opts);
-    return next;
-  });
+    return state;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return null;
+    }
+    throw error;
+  }
 }

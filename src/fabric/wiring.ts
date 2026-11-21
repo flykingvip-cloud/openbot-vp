@@ -33,6 +33,7 @@ import { createProbeDecideFor } from "./probes.js";
 import { createFabricService, type FabricService } from "./service.js";
 
 export interface GatewayFabricDeps {
+  registry?: AdapterRegistry;
   /** Real tool execution backend (e.g. OpenBot /tools/invoke client). */
   toolInvoker: ToolInvoker;
   /** Audit sink (e.g. control-plane-audit). */
@@ -71,7 +72,9 @@ export interface GatewayFabricDeps {
  * Build a production-wired FabricService: real probes + real TOL runner.
  */
 export function createGatewayFabricService(deps: GatewayFabricDeps): FabricService {
-  const registry = new AdapterRegistry(deps.adapters ?? [...BUILTIN_ADAPTERS, ...GENERIC_ADAPTERS]);
+  const registry =
+    deps.registry ??
+    new AdapterRegistry(deps.adapters ?? [...BUILTIN_ADAPTERS, ...GENERIC_ADAPTERS]);
   const toolRunner = createToolInvokerRunner(deps.toolInvoker);
   // When enabled, declarative generic.* adapters naming a real binary (git) run
   // as OS processes; everything else stays on the /tools/invoke surface.

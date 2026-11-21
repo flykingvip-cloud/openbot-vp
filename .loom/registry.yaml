@@ -14812,6 +14812,110 @@ tasks:
       - src/agent-runtime/wiring/reply-turn.ts
       - src/gateway/server-close.ts
       - src/gateway/server.impl.ts
+      - .kiro/specs/runtime-concurrency-recovery/closed-gaps.md
+      - .kiro/specs/runtime-concurrency-recovery/open-gaps.md
+      - scripts/runtime-acceptance/gateway-audit.mjs
+      - src/agent-runtime/contracts/operation.test.ts
+      - src/agent-runtime/execution/preparation/embedded-parameters.test.ts
+      - src/agent-runtime/state/mutations/execution-binding.identity.test.ts
+      - src/agent-runtime/state/postgres/aor-event-handler.test.ts
+      - src/agent-runtime/state/postgres/aor-event-handler.ts
+      - src/agent-runtime/state/postgres/cancellation.integration.test.ts
+      - src/agent-runtime/state/postgres/deadline.ts
+      - src/agent-runtime/state/postgres/event-handlers.test.ts
+      - src/agent-runtime/state/postgres/event-handlers.ts
+      - src/agent-runtime/state/postgres/growth-capture-consumer.test.ts
+      - src/agent-runtime/state/postgres/growth-capture-consumer.ts
+      - src/agent-runtime/state/postgres/growth-event-producer.test.ts
+      - src/agent-runtime/state/postgres/growth-event-producer.ts
+      - src/agent-runtime/state/postgres/growth-service-authority.test.ts
+      - src/agent-runtime/state/postgres/growth-service-authority.ts
+      - src/agent-runtime/state/postgres/operational-metrics.ts
+      - src/agent-runtime/state/postgres/outbox-consumer.test.ts
+      - src/agent-runtime/state/postgres/outbox-consumer.ts
+      - src/agent-runtime/state/postgres/outbox-scheduler.test.ts
+      - src/agent-runtime/state/postgres/outbox-scheduler.ts
+      - src/agent-runtime/state/postgres/outbox.integration.test.ts
+      - src/agent-runtime/state/postgres/outbox.ts
+      - src/agent-runtime/state/postgres/projection-receipts.ts
+      - src/agent-runtime/state/postgres/statistics-projection.ts
+      - src/agent-runtime/state/postgres/tool-execution-grant.ts
+      - src/agent-runtime/wiring/fabric-grant-issuer.test.ts
+      - src/agent-runtime/wiring/fabric-grant-issuer.ts
+      - src/agent-runtime/wiring/fabric-request-admission.ts
+      - src/agent-runtime/wiring/fabric-rpc-admission.ts
+      - src/agent-runtime/wiring/growth-closeout-producer.test.ts
+      - src/agent-runtime/wiring/growth-closeout-producer.ts
+      - src/agent-runtime/wiring/growth-outbox-consumer.test.ts
+      - src/agent-runtime/wiring/growth-outbox-consumer.ts
+      - src/agent-runtime/wiring/growth-pipeline.integration.test.ts
+      - src/agent-runtime/wiring/http-execution-grant.ts
+      - src/agent-runtime/wiring/postgres-growth-service.test.ts
+      - src/agent-runtime/wiring/postgres-growth-service.ts
+      - src/agent-runtime/wiring/postgres-statistics-consumer.test.ts
+      - src/agent-runtime/wiring/postgres-statistics-consumer.ts
+      - src/agent-runtime/wiring/runtime-cancellation.test.ts
+      - src/agent-runtime/wiring/runtime-cancellation.ts
+      - src/agents/spawn-operation-identity.test.ts
+      - src/agents/spawn-operation-identity.ts
+      - src/agents/subagent-dispatch-journal.test.ts
+      - src/agents/subagent-dispatch-journal.ts
+      - src/fabric/loopback-invoker.test.ts
+      - src/fabric/request-execution-host.test.ts
+      - src/fabric/request-execution-host.ts
+      - src/gateway/agent-growth/background-consumer-authority.test.ts
+      - src/gateway/agent-growth/background-consumer-authority.ts
+      - src/gateway/agent-growth/operational-event-consumer.test.ts
+      - src/gateway/agent-growth/operational-event-consumer.ts
+      - src/gateway/agent-growth/operational-event.ts
+      - src/gateway/agent-growth/store.events.test.ts
+      - src/gateway/agent-growth/trusted-operational-consumer.test.ts
+      - src/gateway/agent-growth/trusted-operational-consumer.ts
+      - src/gateway/billing/usage-outbox.cross-process.test.ts
+      - src/gateway/skill-invocation/audit-recovery-scheduler.test.ts
+      - src/gateway/skill-invocation/audit-recovery-scheduler.ts
+      - src/gateway/skill-invocation/reconcile-audit.ts
+      - src/gateway/skill-store.cross-process.test.ts
+      - packages/aor-core/src/tool-invoker.ts
+      - src/agent-runtime/contracts/task-binding.ts
+      - src/agent-runtime/contracts/task.ts
+      - src/agent-runtime/execution/preparation/embedded-parameters.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-preflight.ts
+      - src/agent-runtime/execution/runner/embedded-request.ts
+      - src/agent-runtime/execution/runner/embedded-run-attempt.ts
+      - src/agent-runtime/state/mutations/admit-task.ts
+      - src/agent-runtime/state/mutations/execution-binding.ts
+      - src/agent-runtime/wiring/interaction-effects.ts
+      - src/agents/openclaw-tools.ts
+      - src/agents/pi-tools.ts
+      - src/agents/subagent-spawn.ts
+      - src/agents/tools/sessions-spawn-tool.test.ts
+      - src/agents/tools/sessions-spawn-tool.ts
+      - src/auto-reply/reply/get-reply-run.ts
+      - src/cron/isolated-agent/run.ts
+      - src/fabric/execution.ts
+      - src/fabric/loopback-invoker.ts
+      - src/fabric/wiring.ts
+      - src/gateway/agent-growth/operational-growth.test.ts
+      - src/gateway/agent-growth/operational-growth.ts
+      - src/gateway/agent-growth/store.ts
+      - src/gateway/agent-growth/types.ts
+      - src/gateway/billing/usage-outbox-drain.ts
+      - src/gateway/billing/usage-outbox-store.ts
+      - src/gateway/collaboration-dispatch/delivery-tool-side-effect.ts
+      - src/gateway/evolution-control/adapters/skill.ts
+      - src/gateway/evolution-control/gateway-plane.ts
+      - src/gateway/model-entitlement/aor-feedback.test.ts
+      - src/gateway/model-entitlement/aor-feedback.ts
+      - src/gateway/server-methods/fabric.test.ts
+      - src/gateway/server-methods/fabric.ts
+      - src/gateway/server-methods/skill-lifecycle.ts
+      - src/gateway/skill-invocation/event-store.ts
+      - src/gateway/skill-invocation/record.ts
+      - src/gateway/skill-lifecycle-store.test.ts
+      - src/gateway/skill-lifecycle-store.ts
+      - src/gateway/tools-invoke-http.test.ts
+      - src/gateway/tools-invoke-http.ts
     state: active
     sessions:
       - id: runtime-rebase-recovery-20261119
@@ -14828,10 +14932,142 @@ tasks:
         status: active
         lastSignalAt: 2026-11-20T00:14:57.293Z
         metadata: {}
+      - id: runtime-freeze-20261121
+        taskId: runtime-concurrency-recovery:codex-runtime
+        ide: codex
+        agent: codex-runtime
+        status: active
+        lastSignalAt: 2026-11-21T07:16:53.283Z
+        metadata:
+          reason: User requested freeze current isolated changes for shared baseline review
     ownerHistory: []
     since: 2026-11-19
     metadata: {}
 landingStreams:
+  - id: runtime-freeze-20261121
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - .kiro/specs/runtime-concurrency-recovery/closed-gaps.md
+      - .kiro/specs/runtime-concurrency-recovery/open-gaps.md
+      - scripts/runtime-acceptance/gateway-audit.mjs
+      - src/agent-runtime/contracts/operation.test.ts
+      - src/agent-runtime/execution/preparation/embedded-parameters.test.ts
+      - src/agent-runtime/state/mutations/execution-binding.identity.test.ts
+      - src/agent-runtime/state/postgres/aor-event-handler.test.ts
+      - src/agent-runtime/state/postgres/aor-event-handler.ts
+      - src/agent-runtime/state/postgres/cancellation.integration.test.ts
+      - src/agent-runtime/state/postgres/deadline.ts
+      - src/agent-runtime/state/postgres/event-handlers.test.ts
+      - src/agent-runtime/state/postgres/event-handlers.ts
+      - src/agent-runtime/state/postgres/growth-capture-consumer.test.ts
+      - src/agent-runtime/state/postgres/growth-capture-consumer.ts
+      - src/agent-runtime/state/postgres/growth-event-producer.test.ts
+      - src/agent-runtime/state/postgres/growth-event-producer.ts
+      - src/agent-runtime/state/postgres/growth-service-authority.test.ts
+      - src/agent-runtime/state/postgres/growth-service-authority.ts
+      - src/agent-runtime/state/postgres/operational-metrics.ts
+      - src/agent-runtime/state/postgres/outbox-consumer.test.ts
+      - src/agent-runtime/state/postgres/outbox-consumer.ts
+      - src/agent-runtime/state/postgres/outbox-scheduler.test.ts
+      - src/agent-runtime/state/postgres/outbox-scheduler.ts
+      - src/agent-runtime/state/postgres/outbox.integration.test.ts
+      - src/agent-runtime/state/postgres/outbox.ts
+      - src/agent-runtime/state/postgres/projection-receipts.ts
+      - src/agent-runtime/state/postgres/statistics-projection.ts
+      - src/agent-runtime/state/postgres/tool-execution-grant.ts
+      - src/agent-runtime/wiring/fabric-grant-issuer.test.ts
+      - src/agent-runtime/wiring/fabric-grant-issuer.ts
+      - src/agent-runtime/wiring/fabric-request-admission.ts
+      - src/agent-runtime/wiring/fabric-rpc-admission.ts
+      - src/agent-runtime/wiring/growth-closeout-producer.test.ts
+      - src/agent-runtime/wiring/growth-closeout-producer.ts
+      - src/agent-runtime/wiring/growth-outbox-consumer.test.ts
+      - src/agent-runtime/wiring/growth-outbox-consumer.ts
+      - src/agent-runtime/wiring/growth-pipeline.integration.test.ts
+      - src/agent-runtime/wiring/http-execution-grant.ts
+      - src/agent-runtime/wiring/postgres-growth-service.test.ts
+      - src/agent-runtime/wiring/postgres-growth-service.ts
+      - src/agent-runtime/wiring/postgres-statistics-consumer.test.ts
+      - src/agent-runtime/wiring/postgres-statistics-consumer.ts
+      - src/agent-runtime/wiring/runtime-cancellation.test.ts
+      - src/agent-runtime/wiring/runtime-cancellation.ts
+      - src/agents/spawn-operation-identity.test.ts
+      - src/agents/spawn-operation-identity.ts
+      - src/agents/subagent-dispatch-journal.test.ts
+      - src/agents/subagent-dispatch-journal.ts
+      - src/fabric/loopback-invoker.test.ts
+      - src/fabric/request-execution-host.test.ts
+      - src/fabric/request-execution-host.ts
+      - src/gateway/agent-growth/background-consumer-authority.test.ts
+      - src/gateway/agent-growth/background-consumer-authority.ts
+      - src/gateway/agent-growth/operational-event-consumer.test.ts
+      - src/gateway/agent-growth/operational-event-consumer.ts
+      - src/gateway/agent-growth/operational-event.ts
+      - src/gateway/agent-growth/store.events.test.ts
+      - src/gateway/agent-growth/trusted-operational-consumer.test.ts
+      - src/gateway/agent-growth/trusted-operational-consumer.ts
+      - src/gateway/billing/usage-outbox.cross-process.test.ts
+      - src/gateway/skill-invocation/audit-recovery-scheduler.test.ts
+      - src/gateway/skill-invocation/audit-recovery-scheduler.ts
+      - src/gateway/skill-invocation/reconcile-audit.ts
+      - src/gateway/skill-store.cross-process.test.ts
+      - .kiro/specs/runtime-concurrency-recovery/tasks.md
+      - packages/aor-core/src/tool-invoker.ts
+      - src/agent-runtime/contracts/operation.ts
+      - src/agent-runtime/contracts/task-binding.ts
+      - src/agent-runtime/contracts/task.ts
+      - src/agent-runtime/execution/preparation/embedded-parameters.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-preflight.ts
+      - src/agent-runtime/execution/runner/embedded-request.ts
+      - src/agent-runtime/execution/runner/embedded-run-attempt.ts
+      - src/agent-runtime/state/mutations/admit-task.ts
+      - src/agent-runtime/state/mutations/execution-binding.ts
+      - src/agent-runtime/state/postgres/execution.integration.test.ts
+      - src/agent-runtime/state/postgres/execution.sql
+      - src/agent-runtime/state/postgres/execution.ts
+      - src/agent-runtime/state/postgres/lease-lifecycle.test.ts
+      - src/agent-runtime/state/postgres/lease-lifecycle.ts
+      - src/agent-runtime/wiring/interaction-effects.ts
+      - src/agent-runtime/wiring/postgres-turn-lease.test.ts
+      - src/agent-runtime/wiring/postgres-turn-lease.ts
+      - src/agents/openclaw-tools.ts
+      - src/agents/pi-tools.ts
+      - src/agents/subagent-spawn.ts
+      - src/agents/tools/sessions-spawn-tool.test.ts
+      - src/agents/tools/sessions-spawn-tool.ts
+      - src/auto-reply/reply/get-reply-run.ts
+      - src/cron/isolated-agent/run.ts
+      - src/fabric/execution.ts
+      - src/fabric/loopback-invoker.ts
+      - src/fabric/wiring.ts
+      - src/gateway/agent-growth/operational-growth.test.ts
+      - src/gateway/agent-growth/operational-growth.ts
+      - src/gateway/agent-growth/store.ts
+      - src/gateway/agent-growth/types.ts
+      - src/gateway/billing/usage-outbox-drain.ts
+      - src/gateway/billing/usage-outbox-store.ts
+      - src/gateway/collaboration-dispatch/delivery-tool-side-effect.test.ts
+      - src/gateway/collaboration-dispatch/delivery-tool-side-effect.ts
+      - src/gateway/collaboration-dispatch/private-run-bag.test.ts
+      - src/gateway/collaboration-dispatch/private-run-bag.ts
+      - src/gateway/evolution-control/adapters/skill.ts
+      - src/gateway/evolution-control/gateway-plane.ts
+      - src/gateway/model-entitlement/aor-feedback.test.ts
+      - src/gateway/model-entitlement/aor-feedback.ts
+      - src/gateway/server-methods/fabric.test.ts
+      - src/gateway/server-methods/fabric.ts
+      - src/gateway/server-methods/skill-lifecycle.ts
+      - src/gateway/server.impl.ts
+      - src/gateway/skill-invocation/event-store.ts
+      - src/gateway/skill-invocation/record.ts
+      - src/gateway/skill-lifecycle-store.test.ts
+      - src/gateway/skill-lifecycle-store.ts
+      - src/gateway/tools-invoke-http.test.ts
+      - src/gateway/tools-invoke-http.ts
+    canLandWith: []
+    metadata:
+      owner: codex-runtime
   - id: runtime-postgres-binding
     landingPolicy: serial
     paths:
@@ -30425,7 +30661,7 @@ sharedPaths:
     reason: Human-authorized exact R14 integration takeover; prior declarations and history preserved.
     reviewAfter: 2026-11-30
   - glob: src/cron/isolated-agent/run.ts
-    landerTask: agent-runtime-observability:codex-observe-owner
+    landerTask: runtime-concurrency-recovery:codex-runtime
     reason: Human-authorized exact R14 integration takeover; prior declarations and history preserved.
     reviewAfter: 2026-11-30
   - glob: src/executor-evidence/acceptance-fix-r2.isolation.test.ts
@@ -30588,7 +30824,7 @@ sharedPaths:
     reason: Authorized typed constraint mutation migration; preserve predecessor history.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/state/mutations/admit-task.ts
-    landerTask: agent-runtime-convergence
+    landerTask: runtime-concurrency-recovery:codex-runtime
     reason: Authorized explicit admission transaction migration; preserve predecessor history.
     reviewAfter: 2026-11-30
   - glob: src/conversation-task/focus-policy.ts
@@ -30646,7 +30882,7 @@ sharedPaths:
     reason: Authorized task completion ownership migration; preserve prior behavior and history.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/state/mutations/execution-binding.ts
-    landerTask: agent-runtime-convergence
+    landerTask: runtime-concurrency-recovery:codex-runtime
     reason: Authorized execution identity mutation migration; retain prior history.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/state/repository/task-board-file.ts
@@ -30906,7 +31142,7 @@ sharedPaths:
     reason: Human-authorized explicit execution admission migration; retain prior declarations.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/contracts/task.ts
-    landerTask: agent-runtime-convergence
+    landerTask: runtime-concurrency-recovery:codex-runtime
     reason: Human-authorized explicit execution admission migration; retain prior declarations.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/state/session-task.ts
@@ -31053,7 +31289,7 @@ sharedPaths:
       task history.
     reviewAfter: 2026-11-30
   - glob: src/auto-reply/reply/get-reply-run.ts
-    landerTask: agent-runtime-convergence
+    landerTask: runtime-concurrency-recovery:codex-runtime
     reason: Human-authorized shared-context boundary migration; one convergence lander, retain previous
       task history.
     reviewAfter: 2026-11-30
@@ -31885,7 +32121,7 @@ sharedPaths:
     reason: Human-approved 2026-08-26 takeover for parent-scoped chat selection protocol / typed
       runtime-context selection.
   - glob: src/auto-reply/reply/get-reply-run.ts
-    landerTask: knowledge-consume-precision:cursor-knowledge-consume
+    landerTask: runtime-concurrency-recovery:codex-runtime
     reason: Human-approved 2026-08-26 takeover for parent-scoped chat selection protocol / typed
       runtime-context selection.
   - glob: src/auto-reply/reply/knowledge-universe-context.ts
@@ -31901,7 +32137,7 @@ sharedPaths:
     reason: Human-approved 2026-08-26 takeover for parent-scoped chat selection protocol / typed
       runtime-context selection.
   - glob: src/cron/isolated-agent/run.ts
-    landerTask: agent-runtime-convergence
+    landerTask: runtime-concurrency-recovery:codex-runtime
     reason: User-authorized scoped execution lifecycle migration; verified predecessor state and retain
       knowledge/identity/billing behavior and prior ownership history.
   - glob: ui/src/ui/capability/knowledge-universe/gateway-client.ts
@@ -32289,7 +32525,7 @@ sharedPaths:
     reason: Runner write-failure observability test.
     reviewAfter: 2026-10-11
   - glob: src/gateway/skill-lifecycle-store.test.ts
-    landerTask: openbot-evolution-unification:cursor-evolution
+    landerTask: runtime-concurrency-recovery:codex-runtime
     reason: Skill adapter observation fixtures.
     reviewAfter: 2026-10-07
   - glob: ui/src/ui/capability/ai-workforce-governance/evolution-lineage.node.test.ts
@@ -32353,7 +32589,7 @@ sharedPaths:
     reason: Existing binding lander grok-evolution-closure. RC integration only.
     reviewAfter: 2026-10-07
   - glob: src/gateway/skill-lifecycle-store.ts
-    landerTask: capability-lifecycle-closure:kiro-daibai
+    landerTask: runtime-concurrency-recovery:codex-runtime
     reason: Existing skill lifecycle SoT lander. Evolution adapter is a reader.
     reviewAfter: 2026-10-07
   - glob: src/gateway/server-methods/packs/manifest.ts
@@ -32569,7 +32805,7 @@ sharedPaths:
       enable, deploy, SELECT or EXECUTE authorization.
     reviewAfter: 2026-10-06
   - glob: src/agents/subagent-spawn.ts
-    landerTask: constitutional-runtime-shadow-wiring-implementation:kiro-constitutional-activation
+    landerTask: runtime-concurrency-recovery:codex-runtime
     reason: User-approved 2026-10-01 (option A) exact-file verify-then-take for the PR 246 security
       follow-up. Cross-agent sessions_spawn children run in the target agent workspace (upstream
       parity). No dirty WIP or open PR on this file; recent branches that touched it are merged (PRs
@@ -32714,7 +32950,7 @@ sharedPaths:
     reason: Human-authorized exact-file final runtime closure; retain other declarations and history.
     reviewAfter: 2026-11-30
   - glob: src/agents/pi-tools.ts
-    landerTask: agent-runtime-convergence
+    landerTask: runtime-concurrency-recovery:codex-runtime
     reason: Human-authorized exact-file final runtime closure; retain other declarations and history.
     reviewAfter: 2026-11-30
   - glob: src/auto-reply/reply/followup-runner.ts
@@ -33459,7 +33695,7 @@ sharedPaths:
     reason: Authorized executor semantic routing retirement; preserve predecessor scope and history.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/wiring/interaction-effects.ts
-    landerTask: agent-runtime-convergence
+    landerTask: runtime-concurrency-recovery:codex-runtime
     reason: Authorized separation of cancellation effects from retired semantic routing; preserve history.
     reviewAfter: 2026-11-30
   - glob: src/auto-reply/reply/agent-runner.aside-reply-lane.test.ts
@@ -34179,3 +34415,285 @@ sharedPaths:
   - glob: src/gateway/server-close.ts
     landerTask: runtime-concurrency-recovery:codex-runtime
     reason: User-authorized isolated runtime production binding; predecessor history retained.
+  - glob: .kiro/specs/runtime-concurrency-recovery/closed-gaps.md
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: .kiro/specs/runtime-concurrency-recovery/open-gaps.md
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: scripts/runtime-acceptance/gateway-audit.mjs
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/contracts/operation.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/execution/preparation/embedded-parameters.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/state/mutations/execution-binding.identity.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/state/postgres/aor-event-handler.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/state/postgres/aor-event-handler.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/state/postgres/cancellation.integration.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/state/postgres/deadline.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/state/postgres/event-handlers.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/state/postgres/event-handlers.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/state/postgres/growth-capture-consumer.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/state/postgres/growth-capture-consumer.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/state/postgres/growth-event-producer.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/state/postgres/growth-event-producer.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/state/postgres/growth-service-authority.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/state/postgres/growth-service-authority.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/state/postgres/operational-metrics.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/state/postgres/outbox-consumer.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/state/postgres/outbox-consumer.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/state/postgres/outbox-scheduler.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/state/postgres/outbox-scheduler.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/state/postgres/outbox.integration.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/state/postgres/outbox.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/state/postgres/projection-receipts.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/state/postgres/statistics-projection.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/state/postgres/tool-execution-grant.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/wiring/fabric-grant-issuer.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/wiring/fabric-grant-issuer.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/wiring/fabric-request-admission.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/wiring/fabric-rpc-admission.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/wiring/growth-closeout-producer.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/wiring/growth-closeout-producer.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/wiring/growth-outbox-consumer.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/wiring/growth-outbox-consumer.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/wiring/growth-pipeline.integration.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/wiring/http-execution-grant.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/wiring/postgres-growth-service.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/wiring/postgres-growth-service.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/wiring/postgres-statistics-consumer.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/wiring/postgres-statistics-consumer.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/wiring/runtime-cancellation.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/wiring/runtime-cancellation.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agents/spawn-operation-identity.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agents/spawn-operation-identity.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agents/subagent-dispatch-journal.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agents/subagent-dispatch-journal.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/fabric/loopback-invoker.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/fabric/request-execution-host.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/fabric/request-execution-host.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/gateway/agent-growth/background-consumer-authority.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/gateway/agent-growth/background-consumer-authority.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/gateway/agent-growth/operational-event-consumer.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/gateway/agent-growth/operational-event-consumer.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/gateway/agent-growth/operational-event.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/gateway/agent-growth/store.events.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/gateway/agent-growth/trusted-operational-consumer.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/gateway/agent-growth/trusted-operational-consumer.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/gateway/billing/usage-outbox.cross-process.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/gateway/skill-invocation/audit-recovery-scheduler.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/gateway/skill-invocation/audit-recovery-scheduler.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/gateway/skill-invocation/reconcile-audit.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/gateway/skill-store.cross-process.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: packages/aor-core/src/tool-invoker.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/contracts/task-binding.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/execution/preparation/embedded-parameters.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/execution/runner/embedded-attempt-preflight.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/execution/runner/embedded-request.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agent-runtime/execution/runner/embedded-run-attempt.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agents/openclaw-tools.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agents/tools/sessions-spawn-tool.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/agents/tools/sessions-spawn-tool.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/fabric/execution.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/fabric/loopback-invoker.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/fabric/wiring.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/gateway/agent-growth/operational-growth.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/gateway/agent-growth/operational-growth.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/gateway/agent-growth/store.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/gateway/agent-growth/types.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/gateway/billing/usage-outbox-drain.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/gateway/billing/usage-outbox-store.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/gateway/collaboration-dispatch/delivery-tool-side-effect.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/gateway/evolution-control/adapters/skill.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/gateway/evolution-control/gateway-plane.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/gateway/model-entitlement/aor-feedback.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/gateway/model-entitlement/aor-feedback.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/gateway/server-methods/fabric.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/gateway/server-methods/fabric.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/gateway/server-methods/skill-lifecycle.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/gateway/skill-invocation/event-store.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/gateway/skill-invocation/record.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/gateway/tools-invoke-http.test.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.
+  - glob: src/gateway/tools-invoke-http.ts
+    landerTask: runtime-concurrency-recovery:codex-runtime
+    reason: User-authorized freeze of this isolated task edits; historical declarations retained.

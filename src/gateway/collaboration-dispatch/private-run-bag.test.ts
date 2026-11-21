@@ -6,6 +6,7 @@ import {
   assertNoPrivateRunBagInPublicPayload,
   containsPrivateRunBagMarker,
   createCollaborationPrivateRunBag,
+  durableToolSideEffectKey,
   isCollaborationPrivateRunBagEnabled,
   recordPrivateRunBagToolSideEffect,
   scheduleDurableToolSideEffect,
@@ -250,4 +251,24 @@ it("requires reconciliation for an orphaned claim without a result journal", asy
     }),
   ).rejects.toMatchObject({ name: "ToolOperationOutcomeUnknownError" });
   expect(retried).toBe(false);
+});
+
+it("isolates canonical tool operations and rejects task identity mismatches", () => {
+  const fingerprint = {
+    taskId: "task",
+    boardItemId: "item",
+    stepId: "step",
+    toolName: "message",
+    operationIdentity: {
+      tenantId: "tenant",
+      taskId: "task",
+      executionId: "execution",
+      stepId: "step",
+      operationId: "operation",
+    },
+  };
+  expect(durableToolSideEffectKey(fingerprint)).not.toBe(
+    durableToolSideEffectKey({ ...fingerprint, toolName: "exec" }),
+  );
+  expect(() => durableToolSideEffectKey({ ...fingerprint, taskId: "other" })).toThrow("conflicts");
 });

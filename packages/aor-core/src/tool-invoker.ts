@@ -4,6 +4,14 @@ export interface ToolInvokeRequest {
   args?: Record<string, unknown>;
   action?: string;
   sessionKey?: string;
+  /** Canonical operation identity; receiver must authorize and durably enforce it. */
+  operationIdentity?: {
+    tenantId: string;
+    taskId: string;
+    executionId: string;
+    stepId: string;
+    operationId: string;
+  };
 }
 
 export interface ToolInvokeResult {

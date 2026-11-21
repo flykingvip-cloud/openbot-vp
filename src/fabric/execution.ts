@@ -1,3 +1,4 @@
+import { spawn as nodeSpawn } from "node:child_process";
 /**
  * execution.ts — Execution Plane: bind a gated node to TOL and run it (R5, R21).
  *
@@ -17,9 +18,12 @@
  *
  * Design: `.kiro/specs/openbot-fabric/design.md` §3.5.
  */
-
-import { spawn as nodeSpawn } from "node:child_process";
 import type { ToolInvoker } from "@openbot/aor-core";
+import {
+  operationIdentityFromIngress,
+  executionOperationKey,
+  type OperationIdentity,
+} from "../agent-runtime/contracts/operation.js";
 import type { AdapterRegistry } from "./adapter-registry.js";
 import { toTolControls, type TolControls } from "./constraints.js";
 import type {
@@ -34,6 +38,9 @@ import { constraintsFromDecision } from "./mappers.js";
 
 /** A bound, constraint-carrying invocation handed to the TOL boundary. */
 export interface ToolInvocation {
+  /** Correlation only: not a durable deduplication claim or tenant authorization. */
+  operationIdentity?: OperationIdentity;
+  operationKey?: string;
   request: ToolRequest;
   adapter: ToolAdapter;
   /** Assembled argv (adapter argsTemplate expanded with request args). */
@@ -145,7 +152,26 @@ export function buildExecuteNode(
     const controls = toTolControls(constraints);
     const argv = expandArgs(adapter.execute.argsTemplate, request.input.args ?? []);
     try {
-      const r = await runner.run({ request, adapter, argv, controls });
+      const operationIdentity =
+        request.source.tenantId && request.trace.taskId
+          ? operationIdentityFromIngress({
+              ingress: "fabric",
+              tenantId: request.source.tenantId,
+              taskId: request.trace.taskId,
+              persistedExecutionId: request.trace.correlationId,
+              persistedStepId: node.id,
+              persistedOperationId: request.id,
+            })
+          : undefined;
+      const r = await runner.run({
+        request,
+        adapter,
+        argv,
+        controls,
+        ...(operationIdentity
+          ? { operationIdentity, operationKey: executionOperationKey(operationIdentity) }
+          : {}),
+      });
       return result(node.id, r.ok ? "success" : "failed", start, {
         stdout: r.stdout,
         stderr: r.stderr,
@@ -172,6 +198,7 @@ export function createToolInvokerRunner(invoker: ToolInvoker): ToolRunner {
         tool: request.tool.name,
         args: { argv: invocation.argv },
         sessionKey: request.trace.sessionId,
+        operationIdentity: invocation.operationIdentity,
       });
       if (!res.ok) {
         return { ok: false, stderr: res.error ?? "tool invocation failed" };

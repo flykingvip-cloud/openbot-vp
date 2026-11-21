@@ -3,6 +3,7 @@
  * operational evidence. Identity and knowledge remain driven by explicit product signals.
  */
 
+import { createHash } from "node:crypto";
 import type { OpenBotConfig } from "../../config/config.js";
 import { createInitialGrowthStatus, recomputeGrowthStatus } from "./factory.js";
 import { buildGrowthReportSnapshot, estimateHoursSaved } from "./growth-report.js";
@@ -14,12 +15,12 @@ import {
   readOperationalMetrics,
   type OperationalMetrics,
 } from "./operational-metrics-store.js";
-import { computeOperationalScore } from "./operational-score.js";
+import { computeAdaptivityAdjustment, computeOperationalScore } from "./operational-score.js";
 import { collectCapabilityReadinessSignals } from "./signals.js";
-import { updateRobotGrowthStatus } from "./store.js";
+import { applyRobotGrowthEvent } from "./store.js";
 import { resolveTemplateOrDefault } from "./templates/index.js";
 import type { GrowthStatus } from "./types.js";
-import { runWorkingStyleSelfTuning } from "./working-style-self-tuning.js";
+import { readWorkingStyleEffectStats } from "./working-style-store.js";
 
 /** Twenty observed turns are enough for full confidence in the first growth projection. */
 export const OPERATIONAL_GROWTH_CONFIDENCE_TASKS = 20;
@@ -125,21 +126,37 @@ export async function syncRobotGrowthFromOperationalMetrics(
   metrics?: OperationalMetrics,
 ): Promise<GrowthStatus | null> {
   const observed = metrics ?? (await readOperationalMetrics(cfg, agentId));
-  const signals = deriveOperationalSignals(observed);
-  const { adaptivityAdjustment } = await runWorkingStyleSelfTuning(
-    cfg,
-    agentId,
-    signals ?? undefined,
-    { tasksTotal: observed.tasksTotal },
+  // Projection reads the latest assessed adjustment; adaptive mutations belong to
+  // the existing dedicated recompute lifecycle, not replayable event projection.
+  const adaptivityAdjustment = computeAdaptivityAdjustment(
+    (await readWorkingStyleEffectStats(cfg, agentId)) ?? undefined,
   );
   const installedSkillKeys = collectInstalledSkillKeys(agentId);
-  return await updateRobotGrowthStatus(cfg, agentId, (current) =>
-    projectOperationalGrowth(
-      current ?? createInitialGrowthStatus({ kind: "robot", atMs: Date.now() }),
-      observed,
-      Date.now(),
-      installedSkillKeys,
-      adaptivityAdjustment,
-    ),
-  );
+  const observedAtMs = observed.updatedAtMs;
+  const payload = { observed, installedSkillKeys, adaptivityAdjustment };
+  const eventId = `operational-sync:v1:${createHash("sha256").update(JSON.stringify(payload)).digest("hex")}`;
+  return applyRobotGrowthEvent({
+    cfg,
+    agentId,
+    eventId,
+    payload,
+    update: (current) => {
+      if (
+        current?.operationalObservationAtMs !== undefined &&
+        current.operationalObservationAtMs > observedAtMs
+      ) {
+        return current;
+      }
+      return {
+        ...projectOperationalGrowth(
+          current ?? createInitialGrowthStatus({ kind: "robot", atMs: observedAtMs }),
+          observed,
+          observedAtMs,
+          installedSkillKeys,
+          adaptivityAdjustment,
+        ),
+        operationalObservationAtMs: observedAtMs,
+      };
+    },
+  });
 }

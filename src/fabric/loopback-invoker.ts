@@ -19,6 +19,8 @@ export interface LoopbackToolInvokerOptions {
   token?: string;
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
+  /** Host issues only against its admitted live execution lease. */
+  issueExecutionGrant?: (request: ToolInvokeRequest) => Promise<string>;
 }
 
 interface ToolsInvokeResponseBody {
@@ -41,6 +43,12 @@ export function createLoopbackToolInvoker(opts: LoopbackToolInvokerOptions): Too
         if (opts.token) {
           headers.authorization = `Bearer ${opts.token}`;
         }
+        if (req.operationIdentity) {
+          if (!opts.issueExecutionGrant) {
+            throw new Error("Fabric execution grant issuer is not configured");
+          }
+          headers["x-openbot-execution-grant"] = await opts.issueExecutionGrant(req);
+        }
         const res = await fetchImpl(`${baseUrl}/tools/invoke`, {
           method: "POST",
           headers,
@@ -49,6 +57,7 @@ export function createLoopbackToolInvoker(opts: LoopbackToolInvokerOptions): Too
             args: req.args ?? {},
             action: req.action,
             sessionKey: req.sessionKey,
+            operationIdentity: req.operationIdentity,
           }),
           signal: controller.signal,
         });

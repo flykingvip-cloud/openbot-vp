@@ -13,7 +13,11 @@ function request(signal?: AbortSignal) {
     followupRun: {
       run: {
         executionIdentity: { enterpriseId: "tenant" },
-        taskCompletionBinding: { taskId: "task", executionAttempt: "execution" },
+        taskCompletionBinding: {
+          taskId: "task",
+          executionAttempt: "attempt",
+          logicalExecutionId: "execution",
+        },
       },
     },
     opts: { abortSignal: signal },
@@ -52,7 +56,7 @@ it("claims trusted identity and propagates parent cancellation with connection c
   expect(query.mock.calls[0][1]).toEqual([
     "tenant",
     "execution",
-    JSON.stringify({ taskId: "task" }),
+    JSON.stringify({ taskId: "task", ingress: "chat" }),
   ]);
   expect(end).toHaveBeenCalledTimes(1);
 });
@@ -74,7 +78,7 @@ it("holds ownership until verified delivery acceptance and closes after terminal
     .fn()
     .mockResolvedValueOnce({ rows: [], rowCount: 1 })
     .mockResolvedValueOnce({ rows: [{ fence: "1", version: "1" }], rowCount: 1 })
-    .mockResolvedValueOnce({ rows: [{ event_id: "completion" }], rowCount: 1 });
+    .mockResolvedValueOnce({ rows: [{ event_id: "completion:execution" }], rowCount: 1 });
   const end = vi.fn(async () => {});
   const commit = vi.fn(async () => {});
   const outcome = await runWithPostgresTurnLease(
@@ -96,6 +100,33 @@ it("holds ownership until verified delivery acceptance and closes after terminal
     deliveryId: "receipt",
   });
   expect(query).toHaveBeenCalledTimes(3);
+  expect(commit).toHaveBeenCalledTimes(1);
+  expect(end).toHaveBeenCalledTimes(1);
+});
+
+it("persists pending acceptance as a fenced waiting handoff before releasing ownership", async () => {
+  vi.stubEnv("OPENBOT_RUNTIME_DATABASE_URL", "postgresql://test");
+  const query = vi
+    .fn()
+    .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+    .mockResolvedValueOnce({ rows: [{ fence: "1", version: "1" }], rowCount: 1 })
+    .mockResolvedValueOnce({ rows: [{ event_id: "waiting" }], rowCount: 1 });
+  const end = vi.fn(async () => {});
+  const commit = vi.fn(async () => {});
+  const outcome = await runWithPostgresTurnLease(
+    request(),
+    async () => ({ kind: "success", commitGrowthOutcome: commit }) as unknown as AgentRunLoopResult,
+    () => ({ query, end }),
+  );
+  if (outcome.kind !== "success") {
+    throw new Error("Expected success");
+  }
+  await outcome.commitGrowthOutcome(true, {
+    acceptance: { status: "pending" },
+    delivery: { status: "pending" },
+  });
+  expect(query.mock.calls[2][0]).toContain("state='waiting'");
+  expect(query.mock.calls[2][1]).toContain("acceptance_or_delivery_pending");
   expect(commit).toHaveBeenCalledTimes(1);
   expect(end).toHaveBeenCalledTimes(1);
 });

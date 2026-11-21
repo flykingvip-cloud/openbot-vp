@@ -4,8 +4,14 @@ import type {
   AgentRunLoopResult,
   AgentTurnExecutionParams,
 } from "../execution/runner/turn-contract.js";
+import {
+  withRuntimeDeadline,
+  RUNTIME_PG_OPTIONS,
+  RUNTIME_SHUTDOWN_MS,
+} from "../state/postgres/deadline.js";
 import { PostgresExecutionRepository } from "../state/postgres/execution.js";
 import { acquireExecutionLease } from "../state/postgres/lease-lifecycle.js";
+import { registerRuntimeCancellation } from "./runtime-cancellation.js";
 import { registerRuntimeLease } from "./runtime-lease-registry.js";
 
 type Pool = {
@@ -31,7 +37,7 @@ export async function runWithPostgresTurnLease(
     identity?.enterpriseId?.trim() || identity?.collaborationOwnerEntitlement?.tenantId?.trim();
   const binding = request.followupRun.run.taskCompletionBinding;
   // Never synthesize a durable identity from prompt text or a random per-retry id.
-  const executionId = binding?.executionAttempt?.trim();
+  const executionId = binding?.logicalExecutionId?.trim();
   if (!tenantId || !executionId || !binding?.taskId) {
     throw new Error(
       "Postgres runtime requires trusted tenant and stable admitted execution identity",
@@ -42,23 +48,30 @@ export async function runWithPostgresTurnLease(
   const { Pool } = require("pg") as {
     Pool: new (options: { connectionString: string; max: number }) => Pool;
   };
-  const db = createPool ? createPool(url) : new Pool({ connectionString: url, max: 2 });
+  const db = createPool
+    ? createPool(url)
+    : new Pool({ connectionString: url, ...RUNTIME_PG_OPTIONS });
   let lease: Awaited<ReturnType<typeof acquireExecutionLease>> | undefined;
   const repository = new PostgresExecutionRepository(db);
   const owner = randomUUID();
   let handedOff = false;
   let closed = false;
   let unregister: (() => void) | undefined;
+  let unregisterCancel: (() => void) | undefined;
   const cleanup = async () => {
     if (closed) {
       return;
     }
     closed = true;
-    await lease?.dispose();
+    unregisterCancel?.();
     try {
-      await db.end();
+      await lease?.dispose();
     } finally {
-      unregister?.();
+      try {
+        await withRuntimeDeadline(db.end(), RUNTIME_SHUTDOWN_MS, "Postgres pool shutdown");
+      } finally {
+        unregister?.();
+      }
     }
   };
   try {
@@ -66,7 +79,19 @@ export async function runWithPostgresTurnLease(
     await db.query(
       `INSERT INTO runtime_executions(tenant_id,execution_id,state,payload)
       VALUES ($1,$2,'ready',$3::jsonb) ON CONFLICT (tenant_id,execution_id) DO NOTHING`,
-      [tenantId, executionId, JSON.stringify({ taskId: binding.taskId })],
+      [
+        tenantId,
+        executionId,
+        JSON.stringify({
+          taskId: binding.taskId,
+          agentId: request.followupRun.run.agentId,
+          ...(identity?.platformUserId ? { userId: identity.platformUserId } : {}),
+          ...(request.followupRun.run.sessionKey
+            ? { sessionKey: request.followupRun.run.sessionKey }
+            : {}),
+          ingress: "chat",
+        }),
+      ],
     );
     lease = await acquireExecutionLease({
       repository,
@@ -75,6 +100,22 @@ export async function runWithPostgresTurnLease(
       owner,
       parentSignal: request.opts?.abortSignal,
     });
+    const ownedLease = lease;
+    unregisterCancel = registerRuntimeCancellation(
+      request.followupRun.run.sessionId,
+      binding.taskId,
+      async () => {
+        const cancelled = await repository.requestCancellation(
+          tenantId,
+          executionId,
+          `cancel:${executionId}`,
+        );
+        if (cancelled) {
+          await ownedLease.dispose();
+        }
+        return cancelled;
+      },
+    );
     lease.signal.throwIfAborted();
     const result = await run({ ...request, opts: { ...request.opts, abortSignal: lease.signal } });
     lease.signal.throwIfAborted();
@@ -113,9 +154,26 @@ export async function runWithPostgresTurnLease(
               state: "completed",
               eventId: `completion:${executionId}`,
               evidence: [options.deliveryId],
+              statisticsAgentId: request.followupRun.run.agentId,
+              growthCapture: process.env.OPENBOT_RUNTIME_GROWTH_CONSUMER === "1",
             });
             if (!settled) {
               throw new Error("Execution ownership lost before acceptance commit");
+            }
+          } else {
+            const waiting = await repository.wait({
+              tenantId,
+              executionId,
+              owner,
+              fence: activeLease.fence,
+              version: activeLease.version,
+              eventId: `waiting:${executionId}:${activeLease.fence}`,
+              reason: !success
+                ? "execution_failed_requires_resolution"
+                : "acceptance_or_delivery_pending",
+            });
+            if (!waiting) {
+              throw new Error("Execution ownership lost before recovery handoff");
             }
           }
           await originalCommit(success, options);

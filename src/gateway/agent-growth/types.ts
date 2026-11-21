@@ -162,6 +162,8 @@ export type GrowthPendingTaskContext = {
 
 /** 核心成长状态（机器人持久化于 growth-status.json；小组存于 operating-state）。 */
 export type GrowthStatus = {
+  /** Latest accepted operational snapshot; stale events cannot regress the aggregate. */
+  operationalObservationAtMs?: number;
   lifecycleState: LifecycleState;
   dimensions: GrowthDimension;
   birthAtMs: number;

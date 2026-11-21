@@ -94,5 +94,8 @@ describe("operational growth projection", () => {
     expect(persisted?.dimensions.capability).toBe(97);
     expect(persisted?.dimensions.habits).toBe(97);
     expect(persisted?.operationalScore).toBe(97);
+    const before = await fs.readFile(path.join(agentDir, "growth-status.json"), "utf8");
+    await syncRobotGrowthFromOperationalMetrics(cfg, "historical-bot");
+    expect(await fs.readFile(path.join(agentDir, "growth-status.json"), "utf8")).toBe(before);
   });
 });

@@ -1,4 +1,15 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import path from "node:path";
+import {
+  executionOperationKey,
+  type OperationIdentity,
+} from "../agent-runtime/contracts/operation.js";
+import { ToolOperationOutcomeUnknownError } from "../agent-runtime/state/repository/tool-operation.js";
+import {
+  resolveGrantedHttpIdentity,
+  executeHttpGrantedOperation,
+  verifyHttpExecutionGrant,
+} from "../agent-runtime/wiring/http-execution-grant.js";
 import { buildExecutionPreflight } from "../agents/execution-preflight/resolve.js";
 import { createOpenClawTools } from "../agents/openclaw-tools.js";
 import {
@@ -6,6 +17,7 @@ import {
   resolveGroupToolPolicy,
   resolveSubagentToolPolicy,
 } from "../agents/pi-tools.policy.js";
+import { dispatchChildOnce } from "../agents/subagent-dispatch-journal.js";
 import {
   applyToolPolicyPipeline,
   buildDefaultToolPolicyPipelineSteps,
@@ -17,6 +29,7 @@ import {
 } from "../agents/tool-policy.js";
 import { ToolInputError } from "../agents/tools/common.js";
 import { loadConfig } from "../config/config.js";
+import { resolveStateDir } from "../config/paths.js";
 import { resolveMainSessionKey } from "../config/sessions.js";
 import { isTruthyEnvValue } from "../infra/env.js";
 import { logWarn } from "../logger.js";
@@ -93,6 +106,7 @@ function observeHttpToolsInvokePreflight(params: {
 }
 
 type ToolsInvokeBody = {
+  operationIdentity?: unknown;
   tool?: unknown;
   action?: unknown;
   args?: unknown;
@@ -339,7 +353,48 @@ export async function handleToolsInvokeHttpRequest(
     ? resolveSubagentToolPolicy(cfg)
     : undefined;
 
-  const httpExecutionIdentity = createExecutionIdentityFromGatewayAuth(authResult);
+  let httpExecutionIdentity = createExecutionIdentityFromGatewayAuth(authResult);
+  const serviceGrant = getHeader(req, "x-openbot-execution-grant")?.trim();
+  if (
+    serviceGrant &&
+    !httpExecutionIdentity.enterpriseId &&
+    body.operationIdentity &&
+    typeof body.operationIdentity === "object"
+  ) {
+    const candidate = body.operationIdentity as OperationIdentity;
+    if (
+      [
+        candidate.tenantId,
+        candidate.taskId,
+        candidate.executionId,
+        candidate.stepId,
+        candidate.operationId,
+      ].some((value) => typeof value !== "string" || !value.trim())
+    ) {
+      sendInvalidRequest(res, "Invalid operation identity");
+      return true;
+    }
+    const granted = await resolveGrantedHttpIdentity({
+      token: serviceGrant,
+      identity: candidate,
+      tool: toolName,
+      sessionKey,
+      action,
+      args,
+    });
+    if (
+      !granted ||
+      (httpExecutionIdentity.enterpriseId &&
+        httpExecutionIdentity.enterpriseId !== granted.enterpriseId)
+    ) {
+      sendJson(res, 403, {
+        ok: false,
+        error: { type: "forbidden", message: "Execution grant identity invalid" },
+      });
+      return true;
+    }
+    httpExecutionIdentity = { ...httpExecutionIdentity, ...granted };
+  }
 
   // Build tool list (core + plugin tools).
   const allTools = createOpenClawTools({
@@ -436,10 +491,102 @@ export async function handleToolsInvokeHttpRequest(
       policyToolNames: gatewayFiltered.map((entry) => entry.name),
       catalogToolNames: subagentFiltered.map((entry) => entry.name),
     });
+    let operationIdentity: OperationIdentity | undefined;
+    if (body.operationIdentity !== undefined) {
+      const candidate = body.operationIdentity;
+      const fields = ["tenantId", "taskId", "executionId", "stepId", "operationId"] as const;
+      if (
+        !candidate ||
+        typeof candidate !== "object" ||
+        fields.some((field) => typeof (candidate as Record<string, unknown>)[field] !== "string")
+      ) {
+        sendInvalidRequest(res, "Invalid operation identity");
+        return true;
+      }
+      operationIdentity = candidate as OperationIdentity;
+      executionOperationKey(operationIdentity);
+      if (
+        !httpExecutionIdentity.enterpriseId ||
+        operationIdentity.tenantId !== httpExecutionIdentity.enterpriseId
+      ) {
+        sendJson(res, 403, {
+          ok: false,
+          error: {
+            type: "forbidden",
+            message: "Operation tenant conflicts with authenticated identity",
+          },
+        });
+        return true;
+      }
+    }
+    const grantToken = getHeader(req, "x-openbot-execution-grant")?.trim();
+    if (operationIdentity && process.env.OPENBOT_RUNTIME_DATABASE_URL?.trim() && !grantToken) {
+      sendJson(res, 403, {
+        ok: false,
+        error: {
+          type: "execution_grant_required",
+          message: "Database runtime operations require a live execution grant",
+        },
+      });
+      return true;
+    }
+    const checkGrant = async () => {
+      if (!operationIdentity || !grantToken) {
+        return;
+      }
+      if (
+        !(await verifyHttpExecutionGrant({
+          token: grantToken,
+          identity: operationIdentity,
+          tool: toolName,
+          sessionKey,
+          action,
+          args: toolArgs,
+        }))
+      ) {
+        throw new ToolInputError("Execution grant expired or request ownership changed");
+      }
+    };
+    if (grantToken && !operationIdentity) {
+      sendInvalidRequest(res, "Execution grant requires operation identity");
+      return true;
+    }
+    if (grantToken) {
+      await checkGrant();
+    }
     const invokeId = `http-${Date.now()}`;
     const runTool = async () => {
-      // oxlint-disable-next-line typescript/no-explicit-any
-      return await (tool as any).execute?.(invokeId, toolArgs);
+      const execute = async () => {
+        await checkGrant();
+        return tool.execute(invokeId, toolArgs);
+      };
+      if (grantToken && operationIdentity) {
+        return executeHttpGrantedOperation({
+          token: grantToken,
+          identity: operationIdentity,
+          tool: toolName,
+          sessionKey,
+          action,
+          args: toolArgs,
+          execute,
+        });
+      }
+      if (!operationIdentity) {
+        return execute();
+      }
+      return dispatchChildOnce({
+        root: path.join(resolveStateDir(), "runtime-http-operations"),
+        identity: operationIdentity,
+        requesterSessionKey: sessionKey,
+        request: {
+          tool: toolName,
+          action,
+          args: toolArgs,
+          user: httpExecutionIdentity.platformUserId,
+          membership: httpExecutionIdentity.membershipId,
+        },
+        dispatch: execute,
+      });
     };
 
     // Phase 2 toolkit gate (Policy to Approval to Receipt). Default OFF (NO LIVE):
@@ -472,6 +619,14 @@ export async function handleToolsInvokeHttpRequest(
     const result = await runTool();
     sendJson(res, 200, { ok: true, result });
   } catch (err) {
+    if (err instanceof ToolOperationOutcomeUnknownError) {
+      sendJson(res, 409, {
+        ok: false,
+        error: { type: "operation_outcome_unknown", message: err.message },
+        waitCondition: err.waitCondition,
+      });
+      return true;
+    }
     const inputStatus = resolveToolInputErrorStatus(err);
     if (inputStatus !== null) {
       sendJson(res, inputStatus, {

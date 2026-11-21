@@ -1,6 +1,9 @@
+import { createHash } from "node:crypto";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { withFileLockSync, SESSION_TASK_BOARD_LOCK_OPTIONS } from "../infra/file-lock.js";
+import { writeJsonAtomicSync } from "../infra/json-files.js";
 import { CONFIG_DIR } from "../utils.js";
 import { evaluateAssetContentReadiness } from "./asset-admission.js";
 import { inferOrganizableAssetClassification } from "./asset-classification.js";
@@ -305,6 +308,8 @@ type StoredSkill = Omit<EmployeeSkillSummary, "versionCount"> & {
 };
 
 type RobotSkillRelation = {
+  tenantId?: string;
+  ownerUserId?: string;
   id: string;
   agentId: string;
   skillId: string;
@@ -316,6 +321,7 @@ type RobotSkillRelation = {
 };
 
 type SkillAssetStore = {
+  invocationCommits?: Record<string, { digest: string; audit: unknown }>;
   skills: StoredSkill[];
   robotRelations: RobotSkillRelation[];
   reviews?: Record<string, SkillReviewRecord>;
@@ -820,6 +826,8 @@ function sanitizeRelation(value: unknown): RobotSkillRelation | null {
     agentId,
     skillId,
     enabled: record.enabled !== false,
+    ...(stringValue(record.tenantId) ? { tenantId: stringValue(record.tenantId) } : {}),
+    ...(stringValue(record.ownerUserId) ? { ownerUserId: stringValue(record.ownerUserId) } : {}),
     installedVersion: stringValue(record.installedVersion, "1.0.0"),
     lastInvokedAt: numberOrNull(record.lastInvokedAt),
     usageCount: Math.max(0, numberOrNull(record.usageCount) ?? 0),
@@ -840,6 +848,9 @@ function readStore(): SkillAssetStore {
     const parsed = JSON.parse(raw) as unknown;
     const record = isRecord(parsed) ? parsed : {};
     return {
+      invocationCommits: isRecord(record.invocationCommits)
+        ? (record.invocationCommits as SkillAssetStore["invocationCommits"])
+        : {},
       skills: Array.isArray(record.skills)
         ? record.skills
             .map(sanitizeStoredSkill)
@@ -857,14 +868,17 @@ function readStore(): SkillAssetStore {
         ? (record.shareAttributions as SkillShareAttribution[])
         : [],
     };
-  } catch {
-    return emptyStore();
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return emptyStore();
+    }
+    throw error;
   }
 }
 
 function writeStore(store: SkillAssetStore): void {
   fs.mkdirSync(STORE_DIR, { recursive: true });
-  fs.writeFileSync(STORE_FILE, `${JSON.stringify(store, null, 2)}\n`, "utf-8");
+  writeJsonAtomicSync(STORE_FILE, store);
 }
 
 function findSkill(store: SkillAssetStore, skillId: string): StoredSkill {
@@ -1116,106 +1130,108 @@ export function saveSkillAsset(params: SaveSkillAssetParams): {
   skillId: string;
   detail: EmployeeSkillDetail;
 } {
-  const sourceAgentId = stringValue(params.sourceAgentId);
-  const now = Date.now();
-  const store = readStore();
-  const requestedSkillId = stringValue(params.skillId);
-  const skillId = requestedSkillId || createSkillId();
-  if (requestedSkillId && store.skills.some((entry) => entry.id === requestedSkillId)) {
-    throw new SkillAssetStoreError(`skill ${requestedSkillId} already exists`);
-  }
-  const rawProfile = sanitizeProfile(params.profile, skillId);
-  const sanitizedRuntime = sanitizeRuntimeDefinition(params.runtimeDefinition, params.contextId);
-  const classified =
-    rawProfile.assetType === "knowledge"
-      ? null
-      : inferOrganizableAssetClassification({
-          name: rawProfile.name,
-          summary: rawProfile.summary,
-          category: rawProfile.category,
-          tags: rawProfile.tags,
-          contextId: params.contextId,
-          runtimeDefinition: sanitizedRuntime,
-        });
-  const profile = {
-    ...rawProfile,
-    id: skillId,
-    ...(classified ? { assetType: classified.assetType } : {}),
-  };
-  if (!profile.name || !profile.summary) {
-    throw new SkillAssetStoreError("skill name and summary are required");
-  }
-  const ownerUserId = stringValue(params.ownerUserId) || null;
-  const runtimeDefinition = completeRuntimeContract(
-    {
-      ...sanitizedRuntime,
-      ...(classified?.toolBinding
-        ? { tools: classified.toolBinding.toolIds, toolBinding: classified.toolBinding }
-        : {}),
-      ...(classified?.mcpBinding ? { mcpBinding: classified.mcpBinding } : {}),
-    },
-    profile,
-  );
-  const skill: StoredSkill = {
-    id: skillId,
-    profile,
-    lifecycle: resolveInitialLifecycle(profile.visibility, params.lifecycle),
-    health: defaultHealth(),
-    sourceRobot: sourceAgentId ? { id: sourceAgentId, name: sourceAgentId } : null,
-    ownerUserId,
-    usageCount: 0,
-    lastUsedAt: null,
-    runtimeDefinition,
-    version: "1.0.0",
-    ...(params.contextId?.trim() ? { sourceLineageId: params.contextId.trim() } : {}),
-    ...(sanitizeDeliverableArtifactRef(params.deliverableArtifact)
-      ? { deliverableArtifact: sanitizeDeliverableArtifactRef(params.deliverableArtifact)! }
-      : {}),
-    versions: [
-      {
-        version: "1.0.0",
-        createdAt: now,
-        summary: "Initial save",
-        profile,
-        runtimeDefinition,
-      },
-    ],
-    sharedGroups:
-      profile.visibility === "group" && params.targetGroupId
-        ? [{ groupId: params.targetGroupId, name: params.targetGroupId }]
-        : [],
-    enterpriseConsumers: sanitizeEnterpriseConsumers(params.enterpriseConsumers),
-    createdAt: now,
-    updatedAt: now,
-  };
-  store.skills.push(skill);
-  // Source-robot relation is allowed for draft (quick-save / req 6.7). Execution
-  // binding still skips draft/reviewing so they do not inject into agent runtime.
-  const mayAutoInstall =
-    Boolean(sourceAgentId) &&
-    params.autoInstallEnabled !== false &&
-    (skill.lifecycle === "draft" ||
-      skill.lifecycle === "private" ||
-      skill.lifecycle === "approved" ||
-      skill.lifecycle === "published");
-  if (sourceAgentId && mayAutoInstall) {
-    const relation: RobotSkillRelation = {
-      id: createRelationId(sourceAgentId, skillId),
-      agentId: sourceAgentId,
-      skillId,
-      enabled: true,
-      installedVersion: skill.version,
-      lastInvokedAt: null,
-      usageCount: 0,
-      createdAt: now,
+  return withFileLockSync(STORE_FILE, SESSION_TASK_BOARD_LOCK_OPTIONS, () => {
+    const sourceAgentId = stringValue(params.sourceAgentId);
+    const now = Date.now();
+    const store = readStore();
+    const requestedSkillId = stringValue(params.skillId);
+    const skillId = requestedSkillId || createSkillId();
+    if (requestedSkillId && store.skills.some((entry) => entry.id === requestedSkillId)) {
+      throw new SkillAssetStoreError(`skill ${requestedSkillId} already exists`);
+    }
+    const rawProfile = sanitizeProfile(params.profile, skillId);
+    const sanitizedRuntime = sanitizeRuntimeDefinition(params.runtimeDefinition, params.contextId);
+    const classified =
+      rawProfile.assetType === "knowledge"
+        ? null
+        : inferOrganizableAssetClassification({
+            name: rawProfile.name,
+            summary: rawProfile.summary,
+            category: rawProfile.category,
+            tags: rawProfile.tags,
+            contextId: params.contextId,
+            runtimeDefinition: sanitizedRuntime,
+          });
+    const profile = {
+      ...rawProfile,
+      id: skillId,
+      ...(classified ? { assetType: classified.assetType } : {}),
     };
-    store.robotRelations.push(relation);
-  }
-  writeStore(store);
-  if (sourceAgentId && mayAutoInstall) {
-    emitSkillRelationMutation({ op: "save", agentId: sourceAgentId, skillId });
-  }
-  return { skillId, detail: projectDetail(skill, store) };
+    if (!profile.name || !profile.summary) {
+      throw new SkillAssetStoreError("skill name and summary are required");
+    }
+    const ownerUserId = stringValue(params.ownerUserId) || null;
+    const runtimeDefinition = completeRuntimeContract(
+      {
+        ...sanitizedRuntime,
+        ...(classified?.toolBinding
+          ? { tools: classified.toolBinding.toolIds, toolBinding: classified.toolBinding }
+          : {}),
+        ...(classified?.mcpBinding ? { mcpBinding: classified.mcpBinding } : {}),
+      },
+      profile,
+    );
+    const skill: StoredSkill = {
+      id: skillId,
+      profile,
+      lifecycle: resolveInitialLifecycle(profile.visibility, params.lifecycle),
+      health: defaultHealth(),
+      sourceRobot: sourceAgentId ? { id: sourceAgentId, name: sourceAgentId } : null,
+      ownerUserId,
+      usageCount: 0,
+      lastUsedAt: null,
+      runtimeDefinition,
+      version: "1.0.0",
+      ...(params.contextId?.trim() ? { sourceLineageId: params.contextId.trim() } : {}),
+      ...(sanitizeDeliverableArtifactRef(params.deliverableArtifact)
+        ? { deliverableArtifact: sanitizeDeliverableArtifactRef(params.deliverableArtifact)! }
+        : {}),
+      versions: [
+        {
+          version: "1.0.0",
+          createdAt: now,
+          summary: "Initial save",
+          profile,
+          runtimeDefinition,
+        },
+      ],
+      sharedGroups:
+        profile.visibility === "group" && params.targetGroupId
+          ? [{ groupId: params.targetGroupId, name: params.targetGroupId }]
+          : [],
+      enterpriseConsumers: sanitizeEnterpriseConsumers(params.enterpriseConsumers),
+      createdAt: now,
+      updatedAt: now,
+    };
+    store.skills.push(skill);
+    // Source-robot relation is allowed for draft (quick-save / req 6.7). Execution
+    // binding still skips draft/reviewing so they do not inject into agent runtime.
+    const mayAutoInstall =
+      Boolean(sourceAgentId) &&
+      params.autoInstallEnabled !== false &&
+      (skill.lifecycle === "draft" ||
+        skill.lifecycle === "private" ||
+        skill.lifecycle === "approved" ||
+        skill.lifecycle === "published");
+    if (sourceAgentId && mayAutoInstall) {
+      const relation: RobotSkillRelation = {
+        id: createRelationId(sourceAgentId, skillId),
+        agentId: sourceAgentId,
+        skillId,
+        enabled: true,
+        installedVersion: skill.version,
+        lastInvokedAt: null,
+        usageCount: 0,
+        createdAt: now,
+      };
+      store.robotRelations.push(relation);
+    }
+    writeStore(store);
+    if (sourceAgentId && mayAutoInstall) {
+      emitSkillRelationMutation({ op: "save", agentId: sourceAgentId, skillId });
+    }
+    return { skillId, detail: projectDetail(skill, store) };
+  });
 }
 
 /** Increment the patch segment of a semver-ish version string ("1.0.0" -> "1.0.1"). */
@@ -1243,35 +1259,37 @@ export function updateCapturedDeliverable(params: {
   content: string;
   deliverableArtifact?: DeliverableArtifactRef;
 }): boolean {
-  const store = readStore();
-  const skill = store.skills.find((entry) => entry.id === params.skillId);
-  if (!skill) {
-    return false;
-  }
-  const now = Date.now();
-  const nextVersion = bumpPatchVersion(skill.version);
-  const nextTitle = params.title?.trim() || skill.profile.name;
-  skill.profile = {
-    ...skill.profile,
-    name: nextTitle,
-    summary: params.summary,
-    outputDescription: params.content,
-  };
-  const artifact = sanitizeDeliverableArtifactRef(params.deliverableArtifact);
-  if (artifact) {
-    skill.deliverableArtifact = artifact;
-  }
-  skill.version = nextVersion;
-  skill.versions.push({
-    version: nextVersion,
-    createdAt: now,
-    summary: "Deliverable updated (latest revision)",
-    profile: { ...skill.profile },
+  return withFileLockSync(STORE_FILE, SESSION_TASK_BOARD_LOCK_OPTIONS, () => {
+    const store = readStore();
+    const skill = store.skills.find((entry) => entry.id === params.skillId);
+    if (!skill) {
+      return false;
+    }
+    const now = Date.now();
+    const nextVersion = bumpPatchVersion(skill.version);
+    const nextTitle = params.title?.trim() || skill.profile.name;
+    skill.profile = {
+      ...skill.profile,
+      name: nextTitle,
+      summary: params.summary,
+      outputDescription: params.content,
+    };
+    const artifact = sanitizeDeliverableArtifactRef(params.deliverableArtifact);
+    if (artifact) {
+      skill.deliverableArtifact = artifact;
+    }
+    skill.version = nextVersion;
+    skill.versions.push({
+      version: nextVersion,
+      createdAt: now,
+      summary: "Deliverable updated (latest revision)",
+      profile: { ...skill.profile },
+    });
+    skill.updatedAt = now;
+    skill.lastUsedAt = now;
+    writeStore(store);
+    return true;
   });
-  skill.updatedAt = now;
-  skill.lastUsedAt = now;
-  writeStore(store);
-  return true;
 }
 
 export function listPersonalSkillAssets(filter?: {
@@ -1327,51 +1345,53 @@ export function rollbackSkillVersion(params: {
   targetVersion: string;
   summary?: string;
 }): { rollback: SkillRollback; detail: EmployeeSkillDetail } {
-  const store = readStore();
-  const skill = findSkill(store, params.skillId);
-  const target = findVersion(skill, params.targetVersion);
-  const previousVersion = skill.version;
-  const now = Date.now();
-  const newVersion = nextPatchVersion(skill.version);
-  const profile = { ...target.profile, id: skill.id };
-  // Restore runtime from the target version pin when present; otherwise keep current runtime.
-  const restoredRuntime =
-    target.runtimeDefinition ?? sanitizeRuntimeDefinition(skill.runtimeDefinition);
-  skill.profile = profile;
-  skill.runtimeDefinition = restoredRuntime;
-  skill.version = newVersion;
-  skill.updatedAt = now;
-  const summary = stringValue(params.summary, "最近更新 · 恢复了较早的能力说明");
-  skill.versions.push({
-    version: newVersion,
-    createdAt: now,
-    summary,
-    profile,
-    runtimeDefinition: restoredRuntime,
-  });
-  // Rollback creates a new head version; robots pinned via installedVersion must follow it.
-  for (const relation of store.robotRelations.filter((entry) => entry.skillId === skill.id)) {
-    relation.installedVersion = newVersion;
-  }
-  writeStore(store);
-  // Refresh materialisations for robots pinned to this skill (version pin / rollback).
-  for (const relation of store.robotRelations.filter((entry) => entry.skillId === skill.id)) {
-    emitSkillRelationMutation({
-      op: "upgrade",
-      agentId: relation.agentId,
-      skillId: skill.id,
-    });
-  }
-  return {
-    rollback: {
-      skillId: skill.id,
-      rolledBackFrom: previousVersion,
-      rolledBackTo: target.version,
-      newVersion,
+  return withFileLockSync(STORE_FILE, SESSION_TASK_BOARD_LOCK_OPTIONS, () => {
+    const store = readStore();
+    const skill = findSkill(store, params.skillId);
+    const target = findVersion(skill, params.targetVersion);
+    const previousVersion = skill.version;
+    const now = Date.now();
+    const newVersion = nextPatchVersion(skill.version);
+    const profile = { ...target.profile, id: skill.id };
+    // Restore runtime from the target version pin when present; otherwise keep current runtime.
+    const restoredRuntime =
+      target.runtimeDefinition ?? sanitizeRuntimeDefinition(skill.runtimeDefinition);
+    skill.profile = profile;
+    skill.runtimeDefinition = restoredRuntime;
+    skill.version = newVersion;
+    skill.updatedAt = now;
+    const summary = stringValue(params.summary, "最近更新 · 恢复了较早的能力说明");
+    skill.versions.push({
+      version: newVersion,
+      createdAt: now,
       summary,
-    },
-    detail: projectDetail(skill, store),
-  };
+      profile,
+      runtimeDefinition: restoredRuntime,
+    });
+    // Rollback creates a new head version; robots pinned via installedVersion must follow it.
+    for (const relation of store.robotRelations.filter((entry) => entry.skillId === skill.id)) {
+      relation.installedVersion = newVersion;
+    }
+    writeStore(store);
+    // Refresh materialisations for robots pinned to this skill (version pin / rollback).
+    for (const relation of store.robotRelations.filter((entry) => entry.skillId === skill.id)) {
+      emitSkillRelationMutation({
+        op: "upgrade",
+        agentId: relation.agentId,
+        skillId: skill.id,
+      });
+    }
+    return {
+      rollback: {
+        skillId: skill.id,
+        rolledBackFrom: previousVersion,
+        rolledBackTo: target.version,
+        newVersion,
+        summary,
+      },
+      detail: projectDetail(skill, store),
+    };
+  });
 }
 
 export function planSkillMigration(params: {
@@ -1412,26 +1432,28 @@ export function recordSkillHealthTelemetry(params: {
   avgLatency?: number | null;
   failureReasons?: string[];
 }): EmployeeSkillDetail {
-  const store = readStore();
-  const skill = findSkill(store, params.skillId);
-  const successRate = boundedRate(params.successRate);
-  const failureReasons = params.failureReasons ?? [];
-  const status: SkillHealthStatus =
-    successRate >= 0.95 && failureReasons.length === 0
-      ? "healthy"
-      : successRate < 0.5
-        ? "broken"
-        : "warning";
-  skill.health = {
-    status,
-    successRate,
-    avgLatency: Math.max(0, params.avgLatency ?? skill.health.avgLatency),
-    lastVerifiedAt: Date.now(),
-    failureReasons,
-  };
-  skill.updatedAt = Date.now();
-  writeStore(store);
-  return projectDetail(skill, store);
+  return withFileLockSync(STORE_FILE, SESSION_TASK_BOARD_LOCK_OPTIONS, () => {
+    const store = readStore();
+    const skill = findSkill(store, params.skillId);
+    const successRate = boundedRate(params.successRate);
+    const failureReasons = params.failureReasons ?? [];
+    const status: SkillHealthStatus =
+      successRate >= 0.95 && failureReasons.length === 0
+        ? "healthy"
+        : successRate < 0.5
+          ? "broken"
+          : "warning";
+    skill.health = {
+      status,
+      successRate,
+      avgLatency: Math.max(0, params.avgLatency ?? skill.health.avgLatency),
+      lastVerifiedAt: Date.now(),
+      failureReasons,
+    };
+    skill.updatedAt = Date.now();
+    writeStore(store);
+    return projectDetail(skill, store);
+  });
 }
 
 export function getRuntimeDependencyGraph(skillId: string): SkillDependencyGraph {
@@ -1462,24 +1484,26 @@ export function registerEnterpriseSkillConsumer(params: {
   name?: string;
   type?: string;
 }): EmployeeSkillDetail {
-  const store = readStore();
-  const skill = findSkill(store, params.skillId);
-  const consumerId = stringValue(params.consumerId);
-  if (!consumerId) {
-    throw new SkillAssetStoreError("consumerId is required");
-  }
-  const name = stringValue(params.name, consumerId);
-  const type = stringValue(params.type, "enterprise");
-  const existing = skill.enterpriseConsumers.find((entry) => entry.consumerId === consumerId);
-  if (existing) {
-    existing.name = name;
-    existing.type = type;
-  } else {
-    skill.enterpriseConsumers.push({ consumerId, name, type });
-  }
-  skill.updatedAt = Date.now();
-  writeStore(store);
-  return projectDetail(skill, store);
+  return withFileLockSync(STORE_FILE, SESSION_TASK_BOARD_LOCK_OPTIONS, () => {
+    const store = readStore();
+    const skill = findSkill(store, params.skillId);
+    const consumerId = stringValue(params.consumerId);
+    if (!consumerId) {
+      throw new SkillAssetStoreError("consumerId is required");
+    }
+    const name = stringValue(params.name, consumerId);
+    const type = stringValue(params.type, "enterprise");
+    const existing = skill.enterpriseConsumers.find((entry) => entry.consumerId === consumerId);
+    if (existing) {
+      existing.name = name;
+      existing.type = type;
+    } else {
+      skill.enterpriseConsumers.push({ consumerId, name, type });
+    }
+    skill.updatedAt = Date.now();
+    writeStore(store);
+    return projectDetail(skill, store);
+  });
 }
 
 /**
@@ -1504,33 +1528,35 @@ export function editPersonalSkillAsset(params: {
   profile: unknown;
   summary?: string;
 }): EmployeeSkillDetail {
-  const store = readStore();
-  const skill = findSkill(store, params.skillId);
-  const patch = sanitizeProfile(params.profile, skill.id);
-  const profile: EmployeeSkillProfile = {
-    ...skill.profile,
-    ...patch,
-    id: skill.id,
-    visibility: patch.visibility,
-  };
-  if (!profile.name || !profile.summary) {
-    throw new SkillAssetStoreError("skill name and summary are required");
-  }
-  const now = Date.now();
-  const version = nextPatchVersion(skill.version);
-  skill.profile = profile;
-  skill.version = version;
-  skill.updatedAt = now;
-  skill.versions.push({
-    version,
-    createdAt: now,
-    summary: stringValue(params.summary, "Profile updated"),
-    profile,
-    // Pin current runtime with this version so installedVersion can replay it.
-    runtimeDefinition: sanitizeRuntimeDefinition(skill.runtimeDefinition),
+  return withFileLockSync(STORE_FILE, SESSION_TASK_BOARD_LOCK_OPTIONS, () => {
+    const store = readStore();
+    const skill = findSkill(store, params.skillId);
+    const patch = sanitizeProfile(params.profile, skill.id);
+    const profile: EmployeeSkillProfile = {
+      ...skill.profile,
+      ...patch,
+      id: skill.id,
+      visibility: patch.visibility,
+    };
+    if (!profile.name || !profile.summary) {
+      throw new SkillAssetStoreError("skill name and summary are required");
+    }
+    const now = Date.now();
+    const version = nextPatchVersion(skill.version);
+    skill.profile = profile;
+    skill.version = version;
+    skill.updatedAt = now;
+    skill.versions.push({
+      version,
+      createdAt: now,
+      summary: stringValue(params.summary, "Profile updated"),
+      profile,
+      // Pin current runtime with this version so installedVersion can replay it.
+      runtimeDefinition: sanitizeRuntimeDefinition(skill.runtimeDefinition),
+    });
+    writeStore(store);
+    return projectDetail(skill, store);
   });
-  writeStore(store);
-  return projectDetail(skill, store);
 }
 
 export function sharePersonalSkillToGroup(params: {
@@ -1538,40 +1564,42 @@ export function sharePersonalSkillToGroup(params: {
   groupId: string;
   sharedBy?: { userId?: string | null; agentId?: string | null; displayName?: string } | null;
 }): EmployeeSkillDetail {
-  const store = readStore();
-  const groupId = stringValue(params.groupId);
-  if (!groupId) {
-    throw new SkillAssetStoreError("groupId is required");
-  }
-  const skill = findSkill(store, params.skillId);
-  assertContentReadyForIncubation(skill, "共享到协作小组");
-  skill.profile = { ...skill.profile, visibility: "group" };
-  skill.lifecycle = "published";
-  skill.updatedAt = Date.now();
-  if (!skill.sharedGroups.some((entry) => entry.groupId === groupId)) {
-    skill.sharedGroups.push({ groupId, name: groupId });
-  }
+  return withFileLockSync(STORE_FILE, SESSION_TASK_BOARD_LOCK_OPTIONS, () => {
+    const store = readStore();
+    const groupId = stringValue(params.groupId);
+    if (!groupId) {
+      throw new SkillAssetStoreError("groupId is required");
+    }
+    const skill = findSkill(store, params.skillId);
+    assertContentReadyForIncubation(skill, "共享到协作小组");
+    skill.profile = { ...skill.profile, visibility: "group" };
+    skill.lifecycle = "published";
+    skill.updatedAt = Date.now();
+    if (!skill.sharedGroups.some((entry) => entry.groupId === groupId)) {
+      skill.sharedGroups.push({ groupId, name: groupId });
+    }
 
-  // 记录分享归因
-  const sharedBy = params.sharedBy ?? null;
-  const shareAttribution: SkillShareAttribution = {
-    shareId: `share_${randomUUID().replaceAll("-", "").slice(0, 12)}`,
-    skillId: skill.id,
-    groupId,
-    sharedBy: {
-      userId: stringValue(sharedBy?.userId) || null,
-      agentId: stringValue(sharedBy?.agentId) || null,
-      displayName: stringValue(sharedBy?.displayName, "未知分享者"),
-    },
-    sharedAt: Date.now(),
-  };
-  if (!store.shareAttributions) {
-    store.shareAttributions = [];
-  }
-  store.shareAttributions.push(shareAttribution);
+    // 记录分享归因
+    const sharedBy = params.sharedBy ?? null;
+    const shareAttribution: SkillShareAttribution = {
+      shareId: `share_${randomUUID().replaceAll("-", "").slice(0, 12)}`,
+      skillId: skill.id,
+      groupId,
+      sharedBy: {
+        userId: stringValue(sharedBy?.userId) || null,
+        agentId: stringValue(sharedBy?.agentId) || null,
+        displayName: stringValue(sharedBy?.displayName, "未知分享者"),
+      },
+      sharedAt: Date.now(),
+    };
+    if (!store.shareAttributions) {
+      store.shareAttributions = [];
+    }
+    store.shareAttributions.push(shareAttribution);
 
-  writeStore(store);
-  return projectDetail(skill, store);
+    writeStore(store);
+    return projectDetail(skill, store);
+  });
 }
 
 export function listGroupSharedSkills(groupId: string): Array<
@@ -1608,40 +1636,44 @@ export function getSkillShareAttributions(skillId: string): SkillShareAttributio
 
 /** Store write only. New RPCs must call submitSkillToEnterpriseReview. */
 export function submitPersonalSkillToEnterprise(skillId: string): EmployeeSkillDetail {
-  const store = readStore();
-  const skill = findSkill(store, skillId);
-  assertContentReadyForIncubation(skill, "提交企业");
-  // Employee "save → submit enterprise" may still be draft; finalize to private first
-  // (same gate as finalizeDraftSkill) so the review transition stays draft→private→reviewing.
-  if (skill.lifecycle === "draft") {
-    skill.lifecycle = "private";
-  }
-  skill.profile = { ...skill.profile, visibility: "enterprise" };
-  skill.lifecycle = "reviewing";
-  skill.updatedAt = Date.now();
-  const installedAgents = store.robotRelations
-    .filter((relation) => relation.skillId === skill.id && relation.enabled)
-    .map((relation) => relation.agentId);
-  writeStore(store);
-  for (const agentId of installedAgents) {
-    emitSkillRelationMutation({ op: "install", agentId, skillId });
-  }
-  return projectDetail(skill, store);
+  return withFileLockSync(STORE_FILE, SESSION_TASK_BOARD_LOCK_OPTIONS, () => {
+    const store = readStore();
+    const skill = findSkill(store, skillId);
+    assertContentReadyForIncubation(skill, "提交企业");
+    // Employee "save → submit enterprise" may still be draft; finalize to private first
+    // (same gate as finalizeDraftSkill) so the review transition stays draft→private→reviewing.
+    if (skill.lifecycle === "draft") {
+      skill.lifecycle = "private";
+    }
+    skill.profile = { ...skill.profile, visibility: "enterprise" };
+    skill.lifecycle = "reviewing";
+    skill.updatedAt = Date.now();
+    const installedAgents = store.robotRelations
+      .filter((relation) => relation.skillId === skill.id && relation.enabled)
+      .map((relation) => relation.agentId);
+    writeStore(store);
+    for (const agentId of installedAgents) {
+      emitSkillRelationMutation({ op: "install", agentId, skillId });
+    }
+    return projectDetail(skill, store);
+  });
 }
 
 export function deletePersonalSkillAsset(skillId: string): { ok: true } {
-  const store = readStore();
-  findSkill(store, skillId);
-  const affectedAgents = store.robotRelations
-    .filter((relation) => relation.skillId === skillId)
-    .map((relation) => relation.agentId);
-  store.skills = store.skills.filter((skill) => skill.id !== skillId);
-  store.robotRelations = store.robotRelations.filter((relation) => relation.skillId !== skillId);
-  writeStore(store);
-  for (const agentId of affectedAgents) {
-    emitSkillRelationMutation({ op: "delete", agentId, skillId });
-  }
-  return { ok: true };
+  return withFileLockSync(STORE_FILE, SESSION_TASK_BOARD_LOCK_OPTIONS, () => {
+    const store = readStore();
+    findSkill(store, skillId);
+    const affectedAgents = store.robotRelations
+      .filter((relation) => relation.skillId === skillId)
+      .map((relation) => relation.agentId);
+    store.skills = store.skills.filter((skill) => skill.id !== skillId);
+    store.robotRelations = store.robotRelations.filter((relation) => relation.skillId !== skillId);
+    writeStore(store);
+    for (const agentId of affectedAgents) {
+      emitSkillRelationMutation({ op: "delete", agentId, skillId });
+    }
+    return { ok: true };
+  });
 }
 
 export function listRobotSkillAssets(agentId: string): RobotSkillEntry[] {
@@ -1656,93 +1688,113 @@ export function listRobotSkillAssets(agentId: string): RobotSkillEntry[] {
     .filter((entry): entry is RobotSkillEntry => entry !== null);
 }
 
-export function toggleRobotSkillAsset(params: {
+function toggleRobotSkillAssetUnscoped(params: {
   agentId: string;
   skillId: string;
   enabled: boolean;
 }): RobotSkillEntry {
-  const store = readStore();
-  const skill = findSkill(store, params.skillId);
-  const relation = findRelation(store, params.agentId, params.skillId);
-  relation.enabled = params.enabled;
-  writeStore(store);
-  emitSkillRelationMutation({
-    op: "toggle",
-    agentId: params.agentId,
-    skillId: params.skillId,
+  return withFileLockSync(STORE_FILE, SESSION_TASK_BOARD_LOCK_OPTIONS, () => {
+    const store = readStore();
+    const skill = findSkill(store, params.skillId);
+    const relation = findRelation(store, params.agentId, params.skillId);
+    relation.enabled = params.enabled;
+    writeStore(store);
+    emitSkillRelationMutation({
+      op: "toggle",
+      agentId: params.agentId,
+      skillId: params.skillId,
+    });
+    return projectRobotSkill(skill, relation);
   });
-  return projectRobotSkill(skill, relation);
 }
 
-export function upgradeRobotSkillAsset(params: {
+function upgradeRobotSkillAssetUnscoped(params: {
   agentId: string;
   skillId: string;
 }): RobotSkillEntry {
-  const store = readStore();
-  const skill = findSkill(store, params.skillId);
-  const relation = findRelation(store, params.agentId, params.skillId);
-  relation.installedVersion = skill.version;
-  writeStore(store);
-  emitSkillRelationMutation({
-    op: "upgrade",
-    agentId: params.agentId,
-    skillId: params.skillId,
+  return withFileLockSync(STORE_FILE, SESSION_TASK_BOARD_LOCK_OPTIONS, () => {
+    const store = readStore();
+    const skill = findSkill(store, params.skillId);
+    const relation = findRelation(store, params.agentId, params.skillId);
+    relation.installedVersion = skill.version;
+    writeStore(store);
+    emitSkillRelationMutation({
+      op: "upgrade",
+      agentId: params.agentId,
+      skillId: params.skillId,
+    });
+    return projectRobotSkill(skill, relation);
   });
-  return projectRobotSkill(skill, relation);
 }
 
-export function removeRobotSkillAsset(params: { agentId: string; skillId: string }): { ok: true } {
-  const store = readStore();
-  const before = store.robotRelations.length;
-  store.robotRelations = store.robotRelations.filter(
-    (relation) => relation.agentId !== params.agentId || relation.skillId !== params.skillId,
-  );
-  if (store.robotRelations.length === before) {
-    throw new SkillAssetStoreError(
-      `skill ${params.skillId} is not installed on robot ${params.agentId}`,
+function removeRobotSkillAssetUnscoped(params: { agentId: string; skillId: string }): { ok: true } {
+  return withFileLockSync(STORE_FILE, SESSION_TASK_BOARD_LOCK_OPTIONS, () => {
+    const store = readStore();
+    const before = store.robotRelations.length;
+    store.robotRelations = store.robotRelations.filter(
+      (relation) => relation.agentId !== params.agentId || relation.skillId !== params.skillId,
     );
-  }
-  writeStore(store);
-  const reports = emitSkillRelationMutation({
-    op: "remove",
-    agentId: params.agentId,
-    skillId: params.skillId,
+    if (store.robotRelations.length === before) {
+      throw new SkillAssetStoreError(
+        `skill ${params.skillId} is not installed on robot ${params.agentId}`,
+      );
+    }
+    writeStore(store);
+    const reports = emitSkillRelationMutation({
+      op: "remove",
+      agentId: params.agentId,
+      skillId: params.skillId,
+    });
+    return stampRelationReports({ ok: true as const }, reports);
   });
-  return stampRelationReports({ ok: true as const }, reports);
 }
 
 export function installSkillToRobotAsset(params: {
   agentId: string;
   skillId: string;
+  tenantId?: string;
+  ownerUserId?: string;
 }): RobotSkillEntry {
-  const store = readStore();
-  const skill = findSkill(store, params.skillId);
-  let relation = store.robotRelations.find(
-    (entry) => entry.agentId === params.agentId && entry.skillId === params.skillId,
-  );
-  if (!relation) {
-    relation = {
-      id: createRelationId(params.agentId, params.skillId),
+  return withFileLockSync(STORE_FILE, SESSION_TASK_BOARD_LOCK_OPTIONS, () => {
+    const store = readStore();
+    const skill = findSkill(store, params.skillId);
+    let relation = store.robotRelations.find(
+      (entry) => entry.agentId === params.agentId && entry.skillId === params.skillId,
+    );
+    if (params.tenantId && !params.ownerUserId?.trim()) {
+      throw new Error("Tenant skill installation requires trusted owner");
+    }
+    if (
+      relation &&
+      (relation.tenantId !== params.tenantId || relation.ownerUserId !== params.ownerUserId)
+    ) {
+      throw new Error("Skill installation ownership conflict; explicit migration required");
+    }
+    if (!relation) {
+      relation = {
+        ...(params.tenantId ? { tenantId: params.tenantId, ownerUserId: params.ownerUserId } : {}),
+        id: createRelationId(params.agentId, params.skillId),
+        agentId: params.agentId,
+        skillId: params.skillId,
+        enabled: true,
+        installedVersion: skill.version,
+        lastInvokedAt: null,
+        usageCount: 0,
+        createdAt: Date.now(),
+      };
+      store.robotRelations.push(relation);
+    } else {
+      relation.enabled = true;
+      relation.installedVersion = skill.version;
+    }
+    writeStore(store);
+    const reports = emitSkillRelationMutation({
+      op: "install",
       agentId: params.agentId,
       skillId: params.skillId,
-      enabled: true,
-      installedVersion: skill.version,
-      lastInvokedAt: null,
-      usageCount: 0,
-      createdAt: Date.now(),
-    };
-    store.robotRelations.push(relation);
-  } else {
-    relation.enabled = true;
-    relation.installedVersion = skill.version;
-  }
-  writeStore(store);
-  const reports = emitSkillRelationMutation({
-    op: "install",
-    agentId: params.agentId,
-    skillId: params.skillId,
+    });
+    return stampRelationReports(projectRobotSkill(skill, relation), reports);
   });
-  return stampRelationReports(projectRobotSkill(skill, relation), reports);
 }
 
 /**
@@ -1786,22 +1838,24 @@ export function getSkillRuntimeDefinitionForBinding(
 /**
  * Atomically bump robot skill usage counters after a real invocation.
  */
-export function recordRobotSkillInvocationStats(params: {
+function recordRobotSkillInvocationStatsUnscoped(params: {
   agentId: string;
   skillId: string;
   atMs?: number;
 }): RobotSkillEntry {
-  const store = readStore();
-  const skill = findSkill(store, params.skillId);
-  const relation = findRelation(store, params.agentId, params.skillId);
-  const atMs = params.atMs ?? Date.now();
-  relation.usageCount += 1;
-  relation.lastInvokedAt = atMs;
-  skill.usageCount += 1;
-  skill.lastUsedAt = atMs;
-  skill.updatedAt = atMs;
-  writeStore(store);
-  return projectRobotSkill(skill, relation);
+  return withFileLockSync(STORE_FILE, SESSION_TASK_BOARD_LOCK_OPTIONS, () => {
+    const store = readStore();
+    const skill = findSkill(store, params.skillId);
+    const relation = findRelation(store, params.agentId, params.skillId);
+    const atMs = params.atMs ?? Date.now();
+    relation.usageCount += 1;
+    relation.lastInvokedAt = atMs;
+    skill.usageCount += 1;
+    skill.lastUsedAt = atMs;
+    skill.updatedAt = atMs;
+    writeStore(store);
+    return projectRobotSkill(skill, relation);
+  });
 }
 
 // ── Dependency summary (G4) ─────────────────────────────────────────────────
@@ -2017,25 +2071,27 @@ export function resetSkillHealthWindowsCacheForTests(): void {
 
 /** draft → private (员工确认完成整理). Re-syncs execution bindings for installed robots. */
 export function finalizeDraftSkill(skillId: string): EmployeeSkillDetail {
-  const store = readStore();
-  const skill = findSkill(store, skillId);
-  if (skill.lifecycle !== "draft") {
-    throw new SkillAssetStoreError(`skill ${skillId} is not in draft state`);
-  }
-  skill.lifecycle = "private";
-  skill.updatedAt = Date.now();
-  writeStore(store);
-  // Promotion to a runnable lifecycle: re-materialise any existing robot relations.
-  for (const relation of store.robotRelations) {
-    if (relation.skillId === skillId && relation.enabled) {
-      emitSkillRelationMutation({
-        op: "install",
-        agentId: relation.agentId,
-        skillId,
-      });
+  return withFileLockSync(STORE_FILE, SESSION_TASK_BOARD_LOCK_OPTIONS, () => {
+    const store = readStore();
+    const skill = findSkill(store, skillId);
+    if (skill.lifecycle !== "draft") {
+      throw new SkillAssetStoreError(`skill ${skillId} is not in draft state`);
     }
-  }
-  return projectDetail(skill, store);
+    skill.lifecycle = "private";
+    skill.updatedAt = Date.now();
+    writeStore(store);
+    // Promotion to a runnable lifecycle: re-materialise any existing robot relations.
+    for (const relation of store.robotRelations) {
+      if (relation.skillId === skillId && relation.enabled) {
+        emitSkillRelationMutation({
+          op: "install",
+          agentId: relation.agentId,
+          skillId,
+        });
+      }
+    }
+    return projectDetail(skill, store);
+  });
 }
 
 /** Applies accepted autofill suggestion fields onto the employee profile (business-layer only). */
@@ -2045,37 +2101,39 @@ export function acceptSkillAutofill(params: {
   acceptFields: string[];
   acceptSummaryRefinement?: boolean;
 }): EmployeeSkillDetail {
-  const store = readStore();
-  const skill = findSkill(store, params.skillId);
-  const accept = new Set(params.acceptFields);
-  const s = params.suggestion ?? {};
-  const profile = { ...skill.profile };
-  if (accept.has("category") && s.category) {
-    profile.category = s.category;
-  }
-  if (accept.has("tags") && Array.isArray(s.tags)) {
-    profile.tags = s.tags;
-  }
-  if (accept.has("inputDescription") && s.inputDescription) {
-    profile.inputDescription = s.inputDescription;
-  }
-  if (accept.has("outputDescription") && s.outputDescription) {
-    profile.outputDescription = s.outputDescription;
-  }
-  if (accept.has("usageExamples") && Array.isArray(s.usageExamples)) {
-    profile.usageExamples = s.usageExamples;
-  }
-  if (accept.has("avatar") && s.avatar) {
-    profile.avatar = s.avatar;
-  }
-  // summary refinement only applies when the employee explicitly accepts it
-  if (params.acceptSummaryRefinement && s.summaryRefinement) {
-    profile.summary = s.summaryRefinement;
-  }
-  skill.profile = profile;
-  skill.updatedAt = Date.now();
-  writeStore(store);
-  return projectDetail(skill, store);
+  return withFileLockSync(STORE_FILE, SESSION_TASK_BOARD_LOCK_OPTIONS, () => {
+    const store = readStore();
+    const skill = findSkill(store, params.skillId);
+    const accept = new Set(params.acceptFields);
+    const s = params.suggestion ?? {};
+    const profile = { ...skill.profile };
+    if (accept.has("category") && s.category) {
+      profile.category = s.category;
+    }
+    if (accept.has("tags") && Array.isArray(s.tags)) {
+      profile.tags = s.tags;
+    }
+    if (accept.has("inputDescription") && s.inputDescription) {
+      profile.inputDescription = s.inputDescription;
+    }
+    if (accept.has("outputDescription") && s.outputDescription) {
+      profile.outputDescription = s.outputDescription;
+    }
+    if (accept.has("usageExamples") && Array.isArray(s.usageExamples)) {
+      profile.usageExamples = s.usageExamples;
+    }
+    if (accept.has("avatar") && s.avatar) {
+      profile.avatar = s.avatar;
+    }
+    // summary refinement only applies when the employee explicitly accepts it
+    if (params.acceptSummaryRefinement && s.summaryRefinement) {
+      profile.summary = s.summaryRefinement;
+    }
+    skill.profile = profile;
+    skill.updatedAt = Date.now();
+    writeStore(store);
+    return projectDetail(skill, store);
+  });
 }
 
 // ── Autofill job (G2) ────────────────────────────────────────────────────────
@@ -2175,20 +2233,22 @@ export function acceptSkillClassification(params: {
   acceptCategory?: string | null;
   acceptTags?: string[];
 }): EmployeeSkillDetail {
-  const store = readStore();
-  const skill = findSkill(store, params.skillId);
-  const profile = { ...skill.profile };
-  const category = stringValue(params.acceptCategory);
-  if (category) {
-    profile.category = category;
-  }
-  if (Array.isArray(params.acceptTags) && params.acceptTags.length > 0) {
-    profile.tags = uniqueSuggestions([...profile.tags, ...stringArray(params.acceptTags)]);
-  }
-  skill.profile = profile;
-  skill.updatedAt = Date.now();
-  writeStore(store);
-  return projectDetail(skill, store);
+  return withFileLockSync(STORE_FILE, SESSION_TASK_BOARD_LOCK_OPTIONS, () => {
+    const store = readStore();
+    const skill = findSkill(store, params.skillId);
+    const profile = { ...skill.profile };
+    const category = stringValue(params.acceptCategory);
+    if (category) {
+      profile.category = category;
+    }
+    if (Array.isArray(params.acceptTags) && params.acceptTags.length > 0) {
+      profile.tags = uniqueSuggestions([...profile.tags, ...stringArray(params.acceptTags)]);
+    }
+    skill.profile = profile;
+    skill.updatedAt = Date.now();
+    writeStore(store);
+    return projectDetail(skill, store);
+  });
 }
 
 // ── Recommendations (G5) ─────────────────────────────────────────────────────
@@ -2261,34 +2321,36 @@ export function submitSkillForReview(params: {
   skillId: string;
   scope: unknown;
 }): SkillReviewRecord {
-  const store = readStore();
-  const skill = findSkill(store, params.skillId);
-  if (skill.lifecycle === "draft") {
-    throw new SkillAssetStoreError("draft skills cannot be submitted to enterprise review");
-  }
-  skill.profile = { ...skill.profile, visibility: "enterprise" };
-  skill.lifecycle = "reviewing";
-  skill.updatedAt = Date.now();
-  const record: SkillReviewRecord = {
-    skillId: skill.id,
-    submittedAt: Date.now(),
-    reviewer: null,
-    applicableScope: normalizeReviewScope(params.scope),
-    security: null,
-    quality: null,
-    decision: null,
-    rejectionReason: null,
-    improvementSuggestions: [],
-  };
-  store.reviews = { ...store.reviews, [skill.id]: record };
-  const installedAgents = store.robotRelations
-    .filter((relation) => relation.skillId === skill.id && relation.enabled)
-    .map((relation) => relation.agentId);
-  writeStore(store);
-  for (const agentId of installedAgents) {
-    emitSkillRelationMutation({ op: "install", agentId, skillId: skill.id });
-  }
-  return record;
+  return withFileLockSync(STORE_FILE, SESSION_TASK_BOARD_LOCK_OPTIONS, () => {
+    const store = readStore();
+    const skill = findSkill(store, params.skillId);
+    if (skill.lifecycle === "draft") {
+      throw new SkillAssetStoreError("draft skills cannot be submitted to enterprise review");
+    }
+    skill.profile = { ...skill.profile, visibility: "enterprise" };
+    skill.lifecycle = "reviewing";
+    skill.updatedAt = Date.now();
+    const record: SkillReviewRecord = {
+      skillId: skill.id,
+      submittedAt: Date.now(),
+      reviewer: null,
+      applicableScope: normalizeReviewScope(params.scope),
+      security: null,
+      quality: null,
+      decision: null,
+      rejectionReason: null,
+      improvementSuggestions: [],
+    };
+    store.reviews = { ...store.reviews, [skill.id]: record };
+    const installedAgents = store.robotRelations
+      .filter((relation) => relation.skillId === skill.id && relation.enabled)
+      .map((relation) => relation.agentId);
+    writeStore(store);
+    for (const agentId of installedAgents) {
+      emitSkillRelationMutation({ op: "install", agentId, skillId: skill.id });
+    }
+    return record;
+  });
 }
 
 export function getSkillReviewRecord(skillId: string): SkillReviewRecord | null {
@@ -2301,45 +2363,51 @@ export function publishSkillReview(params: {
   skillId: string;
   scope: unknown;
 }): EmployeeSkillDetail {
-  const store = readStore();
-  const skill = findSkill(store, params.skillId);
-  skill.lifecycle = "published";
-  skill.profile = { ...skill.profile, visibility: "enterprise" };
-  skill.updatedAt = Date.now();
-  const existing = store.reviews?.[skill.id];
-  if (existing) {
-    existing.decision = "approved";
-    existing.applicableScope = normalizeReviewScope(params.scope);
-    store.reviews = { ...store.reviews, [skill.id]: existing };
-  }
-  const installedAgents = store.robotRelations
-    .filter((relation) => relation.skillId === skill.id && relation.enabled)
-    .map((relation) => relation.agentId);
-  writeStore(store);
-  for (const agentId of installedAgents) {
-    emitSkillRelationMutation({ op: "install", agentId, skillId: skill.id });
-  }
-  return projectDetail(skill, store);
+  return withFileLockSync(STORE_FILE, SESSION_TASK_BOARD_LOCK_OPTIONS, () => {
+    const store = readStore();
+    const skill = findSkill(store, params.skillId);
+    skill.lifecycle = "published";
+    skill.profile = { ...skill.profile, visibility: "enterprise" };
+    skill.updatedAt = Date.now();
+    const existing = store.reviews?.[skill.id];
+    if (existing) {
+      existing.decision = "approved";
+      existing.applicableScope = normalizeReviewScope(params.scope);
+      store.reviews = { ...store.reviews, [skill.id]: existing };
+    }
+    const installedAgents = store.robotRelations
+      .filter((relation) => relation.skillId === skill.id && relation.enabled)
+      .map((relation) => relation.agentId);
+    writeStore(store);
+    for (const agentId of installedAgents) {
+      emitSkillRelationMutation({ op: "install", agentId, skillId: skill.id });
+    }
+    return projectDetail(skill, store);
+  });
 }
 
 /** published → deprecated (G5). */
 export function deprecateSkillReview(skillId: string): EmployeeSkillDetail {
-  const store = readStore();
-  const skill = findSkill(store, skillId);
-  skill.lifecycle = "deprecated";
-  skill.updatedAt = Date.now();
-  writeStore(store);
-  return projectDetail(skill, store);
+  return withFileLockSync(STORE_FILE, SESSION_TASK_BOARD_LOCK_OPTIONS, () => {
+    const store = readStore();
+    const skill = findSkill(store, skillId);
+    skill.lifecycle = "deprecated";
+    skill.updatedAt = Date.now();
+    writeStore(store);
+    return projectDetail(skill, store);
+  });
 }
 
 /** deprecated → retired (G5). */
 export function retireSkillReview(skillId: string): EmployeeSkillDetail {
-  const store = readStore();
-  const skill = findSkill(store, skillId);
-  skill.lifecycle = "retired";
-  skill.updatedAt = Date.now();
-  writeStore(store);
-  return projectDetail(skill, store);
+  return withFileLockSync(STORE_FILE, SESSION_TASK_BOARD_LOCK_OPTIONS, () => {
+    const store = readStore();
+    const skill = findSkill(store, skillId);
+    skill.lifecycle = "retired";
+    skill.updatedAt = Date.now();
+    writeStore(store);
+    return projectDetail(skill, store);
+  });
 }
 
 /**
@@ -2350,63 +2418,291 @@ export function restoreSkillLifecycleState(
   skillId: string,
   lifecycle: SkillLifecycleState,
 ): EmployeeSkillDetail {
-  const store = readStore();
-  const skill = findSkill(store, skillId);
-  skill.lifecycle = lifecycle;
-  skill.updatedAt = Date.now();
-  writeStore(store);
-  return projectDetail(skill, store);
+  return withFileLockSync(STORE_FILE, SESSION_TASK_BOARD_LOCK_OPTIONS, () => {
+    const store = readStore();
+    const skill = findSkill(store, skillId);
+    skill.lifecycle = lifecycle;
+    skill.updatedAt = Date.now();
+    writeStore(store);
+    return projectDetail(skill, store);
+  });
 }
 
 /**
  * Evolution adapter rollback only. Restores this robot's installation relation.
  * Does not rewrite skill content or other robots' pins.
  */
-export function restoreRobotSkillInstallation(params: {
+function restoreRobotSkillInstallationUnscoped(params: {
   agentId: string;
   skillId: string;
   installed: boolean;
   installedVersion?: string;
   enabled?: boolean;
 }): void {
-  const store = readStore();
-  findSkill(store, params.skillId);
-  const index = store.robotRelations.findIndex(
-    (entry) => entry.agentId === params.agentId && entry.skillId === params.skillId,
-  );
-  if (!params.installed) {
+  return withFileLockSync(STORE_FILE, SESSION_TASK_BOARD_LOCK_OPTIONS, () => {
+    const store = readStore();
+    findSkill(store, params.skillId);
+    const index = store.robotRelations.findIndex(
+      (entry) => entry.agentId === params.agentId && entry.skillId === params.skillId,
+    );
+    if (!params.installed) {
+      if (index >= 0) {
+        store.robotRelations.splice(index, 1);
+        writeStore(store);
+        emitSkillRelationMutation({
+          op: "remove",
+          agentId: params.agentId,
+          skillId: params.skillId,
+        });
+      }
+      return;
+    }
+    const skill = findSkill(store, params.skillId);
     if (index >= 0) {
-      store.robotRelations.splice(index, 1);
-      writeStore(store);
-      emitSkillRelationMutation({
-        op: "remove",
+      const relation = store.robotRelations[index];
+      relation.enabled = params.enabled ?? relation.enabled;
+      relation.installedVersion = params.installedVersion ?? relation.installedVersion;
+    } else {
+      store.robotRelations.push({
+        id: createRelationId(params.agentId, params.skillId),
         agentId: params.agentId,
         skillId: params.skillId,
+        enabled: params.enabled ?? true,
+        installedVersion: params.installedVersion ?? skill.version,
+        lastInvokedAt: null,
+        usageCount: 0,
+        createdAt: Date.now(),
       });
     }
-    return;
-  }
-  const skill = findSkill(store, params.skillId);
-  if (index >= 0) {
-    const relation = store.robotRelations[index];
-    relation.enabled = params.enabled ?? relation.enabled;
-    relation.installedVersion = params.installedVersion ?? relation.installedVersion;
-  } else {
-    store.robotRelations.push({
-      id: createRelationId(params.agentId, params.skillId),
+    writeStore(store);
+    emitSkillRelationMutation({
+      op: "install",
       agentId: params.agentId,
       skillId: params.skillId,
-      enabled: params.enabled ?? true,
-      installedVersion: params.installedVersion ?? skill.version,
-      lastInvokedAt: null,
-      usageCount: 0,
-      createdAt: Date.now(),
     });
-  }
-  writeStore(store);
-  emitSkillRelationMutation({
-    op: "install",
-    agentId: params.agentId,
-    skillId: params.skillId,
   });
+}
+
+/** Legacy unowned installs are excluded; missing attribution is not an empty installed set. */
+export function listTenantRobotSkillAssets(scope: {
+  tenantId: string;
+  userId: string;
+  agentId: string;
+}): RobotSkillEntry[] {
+  if ([scope.tenantId, scope.userId, scope.agentId].some((value) => !value.trim())) {
+    throw new Error("Skill scope requires trusted identity");
+  }
+  const store = readStore();
+  const relations = store.robotRelations.filter((row) => row.agentId === scope.agentId);
+  if (relations.some((row) => !row.tenantId || !row.ownerUserId)) {
+    throw new Error("Legacy skill ownership requires migration");
+  }
+  const skills = new Map(store.skills.map((skill) => [skill.id, skill]));
+  return relations
+    .filter((row) => row.tenantId === scope.tenantId && row.ownerUserId === scope.userId)
+    .map((row) => {
+      const skill = skills.get(row.skillId);
+      if (!skill) {
+        throw new Error("Installed skill source missing");
+      }
+      return projectRobotSkill(skill, row);
+    });
+}
+
+/** Exact persisted relation check; callers must obtain scope from membership authority. */
+export function assertRobotSkillRelationScope(scope: {
+  tenantId: string;
+  userId: string;
+  agentId: string;
+  skillId: string;
+}): void {
+  const store = readStore();
+  const relation = store.robotRelations.find(
+    (row) => row.agentId === scope.agentId && row.skillId === scope.skillId,
+  );
+  if (
+    !scope.tenantId.trim() ||
+    !scope.userId.trim() ||
+    !relation ||
+    relation.tenantId !== scope.tenantId ||
+    relation.ownerUserId !== scope.userId
+  ) {
+    throw new Error("Skill relation is not owned by the authorized tenant/user");
+  }
+}
+
+export class SkillRelationScopeError extends Error {
+  constructor() {
+    super("Skill mutation requires matching persisted tenant/user scope");
+    this.name = "SkillRelationScopeError";
+  }
+}
+
+type RobotRelationScope = { tenantId: string; userId: string };
+function scopedRelationMutation<T>(
+  params: { agentId: string; skillId: string; scope?: RobotRelationScope },
+  apply: () => T,
+): T {
+  return withFileLockSync(STORE_FILE, SESSION_TASK_BOARD_LOCK_OPTIONS, () => {
+    const relation = findRelation(readStore(), params.agentId, params.skillId);
+    if (relation.tenantId || relation.ownerUserId || params.scope) {
+      if (
+        !params.scope ||
+        relation.tenantId !== params.scope.tenantId ||
+        relation.ownerUserId !== params.scope.userId
+      ) {
+        throw new SkillRelationScopeError();
+      }
+    }
+    return apply();
+  });
+}
+export function toggleRobotSkillAsset(params: {
+  agentId: string;
+  skillId: string;
+  enabled: boolean;
+  scope?: RobotRelationScope;
+}): RobotSkillEntry {
+  return scopedRelationMutation(params, () => toggleRobotSkillAssetUnscoped(params));
+}
+export function upgradeRobotSkillAsset(params: {
+  agentId: string;
+  skillId: string;
+  scope?: RobotRelationScope;
+}): RobotSkillEntry {
+  return scopedRelationMutation(params, () => upgradeRobotSkillAssetUnscoped(params));
+}
+export function removeRobotSkillAsset(params: {
+  agentId: string;
+  skillId: string;
+  scope?: RobotRelationScope;
+}): { ok: true } {
+  return scopedRelationMutation(params, () => removeRobotSkillAssetUnscoped(params));
+}
+
+export function recordRobotSkillInvocationStats(params: {
+  agentId: string;
+  skillId: string;
+  atMs?: number;
+  scope?: RobotRelationScope;
+}): RobotSkillEntry {
+  return scopedRelationMutation(params, () => recordRobotSkillInvocationStatsUnscoped(params));
+}
+export function restoreRobotSkillInstallation(params: {
+  agentId: string;
+  skillId: string;
+  installed: boolean;
+  installedVersion?: string;
+  enabled?: boolean;
+  scope?: RobotRelationScope;
+}): void {
+  return withFileLockSync(STORE_FILE, SESSION_TASK_BOARD_LOCK_OPTIONS, () => {
+    const existing = readStore().robotRelations.find(
+      (row) => row.agentId === params.agentId && row.skillId === params.skillId,
+    );
+    if (existing) {
+      scopedRelationMutation(params, () => restoreRobotSkillInstallationUnscoped(params));
+      return;
+    }
+    if (params.scope && params.installed) {
+      installSkillToRobotAsset({
+        agentId: params.agentId,
+        skillId: params.skillId,
+        tenantId: params.scope.tenantId,
+        ownerUserId: params.scope.userId,
+      });
+      restoreRobotSkillInstallationUnscoped(params);
+      return;
+    }
+    restoreRobotSkillInstallationUnscoped(params);
+  });
+}
+
+/** Canonical invocation audit fact, counter and receipt publish as one snapshot. */
+export function commitRobotSkillInvocation(params: {
+  agentId: string;
+  skillId: string;
+  invocationId: string;
+  atMs: number;
+  audit: unknown;
+  scope?: RobotRelationScope;
+}): "applied" | "duplicate" {
+  return withFileLockSync(STORE_FILE, SESSION_TASK_BOARD_LOCK_OPTIONS, () => {
+    if (!params.invocationId.trim()) {
+      throw new Error("Skill invocation identity required");
+    }
+    return withFileLockSync(STORE_FILE, SESSION_TASK_BOARD_LOCK_OPTIONS, () => {
+      const store = readStore();
+      const relation = findRelation(store, params.agentId, params.skillId);
+      if (relation.tenantId || relation.ownerUserId || params.scope) {
+        if (
+          !params.scope ||
+          relation.tenantId !== params.scope.tenantId ||
+          relation.ownerUserId !== params.scope.userId
+        ) {
+          throw new SkillRelationScopeError();
+        }
+      }
+      const digest = createHash("sha256").update(JSON.stringify(params.audit)).digest("hex");
+      const commits = store.invocationCommits ?? {};
+      if (Object.hasOwn(commits, params.invocationId)) {
+        if (commits[params.invocationId].digest !== digest) {
+          throw new Error("Skill invocation payload conflict");
+        }
+        return "duplicate";
+      }
+      const skill = findSkill(store, params.skillId);
+      relation.usageCount++;
+      relation.lastInvokedAt = params.atMs;
+      skill.usageCount++;
+      skill.lastUsedAt = params.atMs;
+      skill.updatedAt = params.atMs;
+      store.invocationCommits = {
+        ...commits,
+        [params.invocationId]: { digest, audit: params.audit },
+      };
+      writeStore(store);
+      return "applied";
+    });
+  });
+}
+
+/** Read committed audit facts only, scoped by authoritative persisted event attribution. */
+export function listCommittedSkillInvocationAudits(scope: {
+  tenantId: string;
+  userId: string;
+  limit?: number;
+  afterInvocationId?: string;
+  agentIds?: readonly string[];
+}): unknown[] {
+  if (!scope.tenantId.trim() || !scope.userId.trim()) {
+    throw new Error("Audit recovery requires trusted scope");
+  }
+  const limit = scope.limit ?? 1000;
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 10000) {
+    throw new Error("Invalid audit recovery limit");
+  }
+  return Object.values(readStore().invocationCommits ?? {})
+    .map((commit) => commit.audit)
+    .filter(
+      (audit) =>
+        isRecord(audit) &&
+        audit.tenantId === scope.tenantId &&
+        audit.userId === scope.userId &&
+        (!scope.agentIds || scope.agentIds.includes(String(audit.agentId))),
+    )
+    .filter((audit) => isRecord(audit) && typeof audit.invocationId === "string")
+    .toSorted((left, right) =>
+      String((left as Record<string, unknown>).invocationId).localeCompare(
+        String((right as Record<string, unknown>).invocationId),
+      ),
+    )
+    .filter(
+      (audit) =>
+        !scope.afterInvocationId ||
+        String((audit as Record<string, unknown>).invocationId).localeCompare(
+          scope.afterInvocationId,
+        ) > 0,
+    )
+    .slice(0, limit);
 }

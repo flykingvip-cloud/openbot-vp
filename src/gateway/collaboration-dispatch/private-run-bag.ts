@@ -1,3 +1,4 @@
+import { createHash, randomUUID } from "node:crypto";
 /**
  * Per-bot private run bag (ephemeral) for collaboration group discussion turns.
  *
@@ -14,11 +15,13 @@
  *
  * Gated by collaboration.privateRunBag (default false).
  */
-
-import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { ParticipationOverlay } from "@openbot/collaboration-runtime";
+import {
+  executionOperationKey,
+  type OperationIdentity,
+} from "../../agent-runtime/contracts/operation.js";
 import {
   executeClaimedToolOperation,
   readToolOperation,
@@ -101,6 +104,7 @@ export function recordPrivateRunBagToolSideEffect(
 }
 
 export type DurableToolSideEffectFingerprint = {
+  operationIdentity?: OperationIdentity;
   taskId: string;
   boardItemId: string;
   stepId: string;
@@ -109,6 +113,21 @@ export type DurableToolSideEffectFingerprint = {
 
 /** Stable key for one side-effecting tool step of one task. */
 export function durableToolSideEffectKey(fingerprint: DurableToolSideEffectFingerprint): string {
+  if (fingerprint.operationIdentity) {
+    if (
+      fingerprint.operationIdentity.taskId !== fingerprint.taskId.trim() ||
+      fingerprint.operationIdentity.stepId !== fingerprint.stepId.trim()
+    ) {
+      throw new Error("Operation identity conflicts with admitted delivery task/step");
+    }
+    return executionOperationKey({
+      ...fingerprint.operationIdentity,
+      operationId: JSON.stringify([
+        fingerprint.operationIdentity.operationId,
+        fingerprint.toolName.trim(),
+      ]),
+    });
+  }
   return [
     fingerprint.taskId.trim(),
     fingerprint.boardItemId.trim(),
@@ -155,6 +174,9 @@ export async function scheduleDurableToolSideEffect<T>(params: {
   const nowMs = params.nowMs ?? Date.now();
   const body = `${JSON.stringify({
     key,
+    ...(params.fingerprint.operationIdentity
+      ? { operationIdentity: params.fingerprint.operationIdentity }
+      : {}),
     taskId: params.fingerprint.taskId.trim(),
     boardItemId: params.fingerprint.boardItemId.trim(),
     stepId: params.fingerprint.stepId.trim(),

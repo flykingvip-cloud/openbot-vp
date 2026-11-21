@@ -173,3 +173,417 @@
 - 9 unit/integration-seam tests and 1 isolated real PostgreSQL scenario pass. Scoped lint on 11 TS files passes; full tsgo errors are outside modified paths; full check remains blocked by existing repository issues — codex-runtime
 - Shutdown cleanup errors no longer skip other gateway shutdown work. dispose returns pending renewal promise; per-turn cleanup awaits it before closing pool — codex-runtime
 - Submission is opt-in WIP integration, not production readiness certification: provider query consumers, trusted cancel ingress, DB+legacy outcome reconciliation, real gateway shutdown fault tests and no-callback runtime timeout remain open — codex-runtime
+
+## Full remaining scope acceptance gates
+
+User instruction: do not submit/push new implementation until ALL gates pass. Prior commits retained and rebased onto refreshed origin/main — codex-runtime
+
+- [ ] Unified trusted identity/global operation key consumed by chat, cron, recovery, sub-agent and Fabric execution, not only type declarations.
+- [ ] Tool-specific query consumers use trusted receipts; unknown retains wait without replaying writes; confirmed restores original result.
+- [ ] Durable wait consumer owns claims, persists retry/backoff, wakes original execution, survives restart and duplicate delivery.
+- [ ] Trusted cancellation ingress invalidates DB owner and aborts live work; cancel-vs-acceptance race produces one terminal fact.
+- [ ] Growth/statistics/AOR projection consumers persist receipts and replay idempotently; accounting/policy remain reliable.
+- [ ] Postgres task Repository supports authoritative task state, operations, recovery scans, lease renewal and transactional Outbox; no parallel file authority.
+- [ ] Real process pause → takeover → old process resume rejects old writes; provider result-loss and billing crash tests pass.
+- [ ] Acceptance/delivery commits are fenced; legacy outcome dual-write reconciles; gateway shutdown/renewal fault tests pass.
+- [ ] Recovery and cost metrics emitted with definitions; scoped checks, real DB integration, build and ownership gates pass.
+
+## Additional ingress correlation WIP
+
+- Fabric gated execution now forwards canonical operation correlation identity/key to ToolRunner when tenant/task/request/node correlation fields exist. This is NOT persisted deduplication or authority; source tenant still requires existing policy validation. ToolInvoker consumer does not yet enforce it — codex-runtime
+- Existing Fabric execution tests 14/14 pass. Child spawn currently allocates new random childIdem per call; cron needs occurrence ownership persisted at scheduler source. Neither is complete; no submission/push — codex-runtime
+
+## Spawn durable identity audit
+
+- Subagent childSessionKey and childIdem allocated randomly per spawn invocation; gateway agent dedupe reads context.dedupe. Neither establishes persisted logical parent-operation → original-child mapping — codex-runtime
+- Do not hash task prose or use parentRunId+toolCallId as cross-recovery identity: both collapse legitimate duplicates or change on recovery. Required trusted dispatch record must own logical child operation, request digest, pending/accepted/unknown state and child receipt before retries reuse it — codex-runtime
+- Scheduler currentFireId is already persisted; avoid duplicate trigger journal. Child spawn and downstream persistence remain unfinished; no new submission/push — codex-runtime
+
+## Spawn identity concurrent/restart verification
+
+- Replaced direct wx publication with complete private staging + no-replace hardlink publication. Racing readers see either absent or complete canonical JSON; staging cleanup in finally — codex-runtime
+- Real Node process test: six IPC-barrier workers resolve one recorded call to identical identity; fresh seventh process reuses the receipt; one canonical record and no normal-exit staging residue. Corrupt published JSON fails closed. 2/2 tests and scoped lint pass — codex-runtime
+- This covers resolver concurrency and process restart, not power-loss durability or killing mid-staging. All new work remains uncommitted per user instruction — codex-runtime
+
+## Identity publication crash validation
+
+- Added staging-file fsync and post-link directory fsync before returning identity. Real child SIGKILL tests cover partial private write, pre-link and post-link boundaries; restart returns one complete canonical identity, post-link identity is reused — codex-runtime
+- Resolver suite 5/5 passes; previous scoped lint passes. Orphan private .pending files after SIGKILL are ignored, not garbage-collected.
+- Actual power failure not tested. Directory ancestor creation durability and device/cache guarantees remain outside evidence; fsync is a durability measure, not proof of power-loss survival — codex-runtime
+
+## Consolidated audit 2026-11-20
+
+- Re-ran 14 focused test files: 68 tests passed. Isolated real PostgreSQL scenario passed separately; temporary server stopped — codex-runtime
+- Full tsgo exposed logical identity incorrectly forwarded to skill rendering options; moved it to actual createOpenClawCodingTools invocation. This corrected an earlier unverified propagation claim — codex-runtime
+- Actual power-loss testing unavailable without disposable VM/block-device fault setup; process SIGKILL evidence is not power-loss certification.
+- Remaining full-pack gates are still open: all-entry event lifecycle, provider query consumers and recovery scheduler, cross-process billing consumption, trusted cancel ingress, projection Outbox migration, authoritative DB task state and full worker takeover/dual-write reconciliation. No new commits/push — codex-runtime
+
+## Waiting handoff transaction WIP
+
+- Added fenced owner/version guarded running→waiting transition and same-statement Outbox event; deferred acceptance wrapper invokes it for pending/unsuccessful closeout rather than leaving running state behind — codex-runtime
+- Turn wrapper tests 5/5 pass; isolated PostgreSQL scenario extended for waiting state/reason, cleared lease and exactly one handoff event and passed. Temporary server stopped — codex-runtime
+- Recovery scanner/consumer must route waiting by reason and original result evidence before any reexecution. This is not implemented; automatic waiting reclaim must not be enabled as blind model rerun. Full four-package scope remains incomplete. No commits/push — codex-runtime
+
+## Outbox consumer ownership WIP
+
+- Added PostgreSQL Outbox token claims with SKIP LOCKED, DB-clock expiry, token/expiry guarded ack, retry scheduling and errors. Tenant-scoped lookups and index included — codex-runtime
+- Isolated PostgreSQL integration scenario passes: wrong tenant no claim; wrong/expired token no ack; expired claim replaced with new token; duplicate ack rejected. This is sequential transaction evidence, not multi-worker process proof — codex-runtime
+- Concrete growth/statistics/AOR consumers and atomic effect+ack or receipt-based deduplication remain unimplemented; at-least-once transport cannot guarantee exactly-once projections by itself. No commit/push — codex-runtime
+
+## Independent Outbox consumers verification
+
+- Real PostgreSQL test uses 3 independent connections and committed isolated schema. Concurrent claims select different events; disconnected claimant's expired event is reclaimed with a new token; old token rejected and both events acknowledged once — codex-runtime
+- Outbox and execution integration scenarios 2/2 pass. Isolated schema dropped and temporary server stopped. This verifies connection-loss/expiry, not OS worker SIGKILL or effect+ack exactly-once — codex-runtime
+- Growth/statistics/AOR migration and recovery handlers remain open. All new work uncommitted per instruction — codex-runtime
+
+## Outbox scheduler composition WIP
+
+- Scheduler composes claim/drain and event handler resolver, serializes in-process ticks, aborts new work and awaits in-flight drain during stop. 7 consumer/handler/scheduler tests pass; scoped lint passes — codex-runtime
+- Gateway does not start it yet: concrete replay-safe growth/statistics/AOR and recovery ports are missing. Scheduler scope requires trusted tenant list/connection lifecycle before activation. Not production connected, no commit/push — codex-runtime
+
+## Projection receipt foundation WIP
+
+- Added immutable tenant/consumer/event projection receipts with payload+execution conflict rejection and duplicate idempotence. Real PostgreSQL integration scenario passes with one receipt — codex-runtime
+- Existing Growth JSON, operational metrics JSON and AOR bandit/audit files are not transactionally coupled to this receipt; no projection consumer is enabled yet. This foundation cannot claim exactly-once effects — codex-runtime
+- Temporary DB stopped. No commits/push per user instruction — codex-runtime
+
+## Strict AOR projection boundary WIP
+
+- Extracted strict AOR feedback port: invalid target/write failures propagate; legacy best-effort wrapper preserves existing warning behavior. AOR feedback tests 8/8 pass; scoped lint passes — codex-runtime
+- Strict port is not replay-idempotent and is deliberately not registered with Outbox yet. Database receipt and file bandit mutation are still separate authorities. Growth/statistics/AOR production migration remains unfinished, no submission/push — codex-runtime
+
+## AOR event projection atomicity WIP
+
+- New recordAorFeedbackEvent writes bandit mutation and payload-digest receipt into one locked atomic snapshot; duplicate does not increment trials, conflicting event fails. AOR tests 9/9 and scoped lint pass — codex-runtime
+- Legacy PersistentBanditFeedbackStore writer exports state without eventReceipts and could erase receipts. New event port is NOT registered in production until all same-file writers preserve receipts/use protocol; tests do not prove mixed-writer safety — codex-runtime
+- No new commits/push — codex-runtime
+
+## AOR legacy writer convergence
+
+- Gateway legacy/strict feedback now delegate to same receipt-preserving atomic writer; compatibility calls are distinct observations with unique legacy IDs. Mixed old/new gateway API test passes; AOR tests 10/10 — codex-runtime
+- Added concrete validated AOR event handler with host-configured destination, not event-supplied path. Not registered in gateway yet; SDK direct persistent-bandit writers still outside this protocol. Growth/statistics and recovery consumers remain incomplete — codex-runtime
+- No new commits/push — codex-runtime
+
+## Concrete AOR consumer composition
+
+- Composed real AOR handler with event resolver and drainer. Ack-lost replay increments trial once; payload cannot override host projection target; invalid score writes nothing. 2/2 tests and scoped lint pass — codex-runtime
+- Fixed test callback type against RuntimeOutboxEvent after full tsgo caught narrowing. Production scheduler still not registered; SDK/multi-process mixed-writer safety remains open; growth/statistics/recovery handlers remain incomplete. No commits/push — codex-runtime
+
+## Atomic statistics projection WIP
+
+- Added PostgreSQL statistics projection with receipt insert and counter mutation in one CTE statement; replay no increment and altered duplicate payload rejected. Real database scenario passes with total/success exactly 1 — codex-runtime
+- This is not yet registered as statistics.refresh handler (that event lacks outcome success) and does not replace existing JSON read authority. SDK mixed-writer solution remains open; an unprotected pre-write check was rejected as insufficient. Production scheduler still disabled — codex-runtime
+- No new commits/push — codex-runtime
+
+## Statistics outcome consumer binding
+
+- Added statistics.outcome strict boolean-result event route and concrete tenant-bound PostgresStatisticsProjection handler. Missing/invalid result or unregistered handler remains unhandled, not acknowledged — codex-runtime
+- Consumer/handler/scheduler suites 8 tests pass, scoped lint passes. Verified task-acceptance producer and production gateway handler registration remain missing. Growth/recovery handlers still incomplete — codex-runtime
+- No new commits/push — codex-runtime
+
+## Verified acceptance statistics producer
+
+- Postgres settle inserts terminal fact plus statistics.outcome (when trusted agent provided) in one statement; reply acceptance callback supplies run.agentId after explicit passed acceptance + delivered receipt — codex-runtime
+- Turn binding suite 5/5 and real PostgreSQL integration scenario pass; DB asserts completed execution produces terminal+statistics events. No producer from bare model success — codex-runtime
+- Gateway concrete consumer registration, growth/recovery handlers, terminal audit retention still incomplete. Temporary DB stopped; no commits/push — codex-runtime
+
+## Opt-in statistics gateway registration WIP
+
+- Added OPENBOT_RUNTIME_STATISTICS_CONSUMER=1 registration requiring DB URL and trusted OPENBOT_RUNTIME_CONSUMER_TENANT_ID. Gateway startup composes real SQL projection and scheduler; gateway resource registry owns shutdown — codex-runtime
+- Outbox filter restricts claim to statistics.outcome; real DB proves audit and recovery events remain unclaimed. 2 DB integration scenarios pass, full tsgo and scoped lint pass — codex-runtime
+- No running config changed. Gateway startup failure/shutdown fault integration tests missing. Growth/AOR/recovery registrations and SDK mixed writing remain incomplete. No commits/push — codex-runtime
+
+## Statistics consumer lifecycle verification
+
+- Added 3 composition tests: disabled/missing tenant avoids pool; real projection SQL precedes ack; registry stop closes pool and timer; DB errors observable and cleaned up. Tests and scoped lint pass — codex-runtime
+- This is injected SQL pool + gateway resource registry evidence, not complete gateway process boot/close. Other projection/recovery registrations and SDK mixed-writer protocol still incomplete. No commits/push — codex-runtime
+
+## Deterministic growth snapshot WIP
+
+- Added Postgres operational growth snapshot from statistics source and receipt in one statement; duplicate event is harmless, missing statistics source fails. Real database integration scenario passes — codex-runtime
+- Snapshot is NOT full GrowthStatus/adaptive learning; existing JSON read authority remains. No growth producer/scheduler registration yet; source ordering must be enforced by atomic statistics→growth event emission. No commits/push — codex-runtime
+
+## Remove parallel growth model
+
+- Removed this task's untracked growth-projection.ts, runtime_growth_projection schema and prototype DB assertions. Runtime statistics remains source data; GrowthStatus remains sole growth aggregate — codex-runtime
+- 11 growth store/operational consumer/legacy projection/self-tuning regression tests pass. Tenant directory resolver audit confirms host context and tenant-root checks required; production registration cannot infer filesystem authority from env tenant string — codex-runtime
+- No user DB schema was changed or dropped; removed only uncommitted prototype creation source. No commits/push — codex-runtime
+
+## Trusted GrowthStatus consumer scope
+
+- Added host-client-bound operational consumer factory: re-resolves authoritative membership per event; tenant mismatch blocks before directory resolution; uses existing resolveAgentDirForClient. Revocation regression 1/1 passes; scoped lint passes — codex-runtime
+- Gateway background boot lacks authenticated client and cannot fabricate it. This factory is not a production background registration; service-principal authority path still required. No commits/push — codex-runtime
+
+## Existing operational producer convergence
+
+- syncRobotGrowthFromOperationalMetrics now applies through same GrowthStatus event aggregate, with content-derived operational snapshot ID and observation timestamp; preserves legacy callers while removing separate state write path — codex-runtime
+- 12 growth regression tests and scoped lint pass. Self-tuning still runs BEFORE aggregate event dedupe; duplicate sync can repeat adaptive behavior. It is not asynchronous/replay-safe yet. Background authority and Outbox registration remain open. No commits/push — codex-runtime
+
+## Authorized growth Outbox composition
+
+- Added startGrowthOutboxConsumer requiring host DB + live service authorization, startup tenant check, per-event grant validation, growth.operational-only claim and registry-owned stop. Auth/lifecycle tests 3/3, scoped lint and full tsgo pass — codex-runtime
+- Main gateway does not invoke factory: actual service authorization provider and immutable operational event producer are not implemented. Connection ownership stays with host. This is composition, not production activation; no commits/push — codex-runtime
+
+## Durable service authorization source WIP
+
+- Added disabled-by-default expiring database grants scoped to tenant/principal/user/domain/agent allowlist. Authorizer queries every time, rejects absent/expired/invalid grants. Environment identity is selection only, not authority. Revocation unit test and scoped lint pass — codex-runtime
+- No grant provisioned, no migration applied to production. Main gateway still not composing growth service; immutable producer still incomplete. No commits/push — codex-runtime
+
+## Main gateway growth service wiring
+
+- Main gateway recovery startup calls opt-in startPostgresGrowthService. Requires configured DB, tenant and principal selection plus a live DB grant; creates scheduler only after authorization; registry stops scheduler and pool — codex-runtime
+- Startup missing-grant/authorized lifecycle tests 2/2 pass, scoped lint and full tsgo pass. Running config/grants unchanged. Startup sits inside existing catch/log recovery block; enabled authorization failure is logged rather than aborting whole gateway startup — codex-runtime
+- Complete immutable growth.operational production and end-to-end delivery still missing; no deployment or new commits/push — codex-runtime
+
+## Immutable growth event producer WIP
+
+- Added enqueueOperationalGrowth: complete metrics/observation time/skill snapshot, canonical sorting, execution existence guard and idempotent event payload conflict. 2 producer tests and lint pass — codex-runtime
+- Producer is not connected to recordTaskOutcome because that path lacks DB/lease host context. Do not open a new DB pool in Growth module; execution host must pass transaction/tenant authority. Main gateway still not full end-to-end — codex-runtime
+
+## Real closeout growth producer WIP
+
+- Opt-in leased turn deferred closeout calls produceCloseoutGrowth after legacy outcome commit. Revalidates DB service grant and agent allowlist, requires configured legacy metric directory equal authorized tenant directory before snapshot enqueue — codex-runtime
+- Scoped lint passes; existing turn tests run with growth flag off. Enabled end-to-end path not validated. Skill catalog tenant ownership still requires audit.
+- Known double-write window remains: DB terminal and legacy metric commit precede growth snapshot enqueue; crash there may omit event. Snapshot sampled on a later retry may conflict under same event ID. No claim of atomic end-to-end completion; must persist immutable intent/snapshot in original closeout transaction or reconciler. No commits/push — codex-runtime
+
+## Growth production path acceptance audit
+
+- 6 focused files / 16 tests pass: closeout grant/directory/enqueue boundaries, gateway service startup, consumer lifecycle, full aggregate projection and lease acceptance. Scoped lint and full tsgo pass — codex-runtime
+- Added mismatch test proves no global metric/skill read before authorized directory match. Enqueue failures propagate. These use mocked boundaries and are NOT real gateway+DB end-to-end evidence.
+- Acceptance remains blocked on immutable closeout intent/snapshot atomicity and tenant-scoped skill catalog source. No production activation or commits/push — codex-runtime
+
+## Atomic growth capture intent
+
+- Enabled growth completion transaction now persists growth.capture with tenant/execution/agent and delivery evidence together with completion/statistics. DB scenario confirms all 3 events; turn suite 5/5 and full tsgo pass — codex-runtime
+- Intent prevents completely unrecorded capture work after post-completion crash, but no growth.capture consumer exists yet. Original metrics+snapshot capture is still a separate dual-write; not a fully closed recovery path.
+- Skill store audit: global robotRelations keyed by agentId, no tenant qualifier. Directory equality does not establish skill ownership; real tenant skill binding source required before production safety claim. No commits/push — codex-runtime
+
+## growth.capture consumer protocol WIP
+
+- Added capture event route and consumer: checks downstream immutable event first, reuses persisted publication after lost ack, only invokes injected authorized snapshot source if absent. Failed capture propagates, no silent ack. 5 capture/handler tests pass; scoped lint passes — codex-runtime
+- Not registered in production: authoritative tenant skill snapshot source absent; robot relation has no tenant/user. Requires install/read migration and explicit historical ownership mapping, no guessing from global agentId. Full two-gap closure and real gateway acceptance incomplete. No commits/push — codex-runtime
+
+## Latest verification 2026-11-20
+
+- Real PostgreSQL execution+Outbox scenarios 2/2 pass; 11 focused growth/skill/spawn files 53 tests pass; full tsgo passes; isolated OPENBOT_STATE_DIR pnpm build exits 0; diff whitespace passes — codex-runtime
+- DB server stopped. Build output remained inside worktree; no running config/gateway changed.
+- Not full gateway end-to-end: no single real DB→authorized capture→GrowthStatus test or process boot+crash+recovery. Partial mocked-boundary tests cannot close this gate. No new commits/push — codex-runtime
+
+## Real growth pipeline verification
+
+- Added real child-process test with isolated state/tenant roots, real skill install ownership, PostgreSQL grant, growth.capture→growth.operational claim/dispatch and real GrowthStatus publication. Both events acked; observation=100 and score>0 asserted. 1 integration scenario passes — codex-runtime
+- Temporary schema/root cleaned and DB stopped. This is real service-function pipeline, not HTTP gateway boot or SIGKILL recovery. Those acceptance gates remain open; no commits/push — codex-runtime
+
+## Real projection-before-ack SIGKILL recovery
+
+- Real pipeline test now kills consumer after GrowthStatus publication before Outbox ack, expires claim deterministically with DB clock, launches fresh Node process and replays original operational event. Full persisted state exactly unchanged; both capture+operational events ultimately acked. 1 real integration scenario passes — codex-runtime
+- Scoped lint passes. Temporary schema/root removed and DB stopped. This is service process recovery, not full gateway HTTP boot/close validation or power-loss test. No commits/push — codex-runtime
+
+## Full gateway process lifecycle baseline
+
+- Started actual startGatewayServer under isolated OPENBOT_STATE_DIR/CONFIG_PATH/TENANTS_ROOT and loopback port 19543, control UI/browser/mDNS disabled. Non-minimal normal startup completed; server.close completed and process exited 0. Markers/log in /tmp/runtime-gateway-process.log — codex-runtime
+- DB growth consumer was OFF in this baseline. This does not certify enabled consumer startup/close or real HTTP-triggered growth end-to-end; that remains open. No existing gateway/config touched, no commits/push — codex-runtime
+
+## Enabled full gateway growth consumption acceptance
+
+- Actual non-minimal gateway process started on isolated port 19544 with real PostgreSQL schema, enabled growth flag and expiring service grant. Preloaded immutable growth.operational event consumed automatically, GrowthStatus written under authorized tenant/user agent directory, DB delivered_at confirmed; server.close and process exit 0. Markers in /tmp/runtime-enabled-gateway.log — codex-runtime
+- Temporary DB schema dropped and server stopped. Running production config/grants untouched. Harness is /tmp/runtime-enabled-gateway.mjs, not yet a checked-in reproducible regression. This covers preloaded operational event→gateway consumer, not model acceptance producer or gateway SIGKILL recovery. No commits/push — codex-runtime
+
+## Full gateway SIGKILL recovery evidence
+
+- Isolated full gateway on 19545 with real PostgreSQL grant and operational event; test-only instance process patched ack method to pause after GrowthStatus write. Parent SIGKILLed gateway, expired claim in DB and started fresh full gateway; event acked and growth file byte-identical, then normal close. Exit 0 marker FULL_GATEWAY_SIGKILL_RECOVERY_PASSED in /tmp/runtime-full-gateway-kill.log — codex-runtime
+- Harness remains /tmp/runtime-gateway-kill-parent.mjs, not checked-in regression; injected prototype override is isolated process fault seam. Tests use preloaded event and forced DB expiry, not real elapsed lease or physical power failure. Temporary schema dropped, test DB stopped; no commits/push — codex-runtime
+
+## Authoritative terminal result fact WIP
+
+- Added runtime_task_result_facts; settle persists immutable tenant/execution terminal state, delivery evidence and agent in same SQL statement as state and Outbox. Real DB fact assertion passes; real acceptance/growth SIGKILL scenario passes — codex-runtime
+- Growth capture still reads legacy metrics; facts-to-metrics reconstruction not implemented, so stale-snapshot dual-write gap is not fully closed. Request cancellation method does not yet emit matching result fact. No commits/push — codex-runtime
+
+## Terminal facts → operational task metrics
+
+- Added tenant/agent-scoped rebuildOperationalMetrics from runtime_task_result_facts: counts completed/failed, excludes cancellation from task judgement; derives stable latest fact timestamp. Growth authorized capture now uses DB aggregate, not legacy metrics JSON — codex-runtime
+- Missing tool/takeover/satisfaction evidence contributes zero observation denominator, not a perfect score. Those fact streams and historical metric migration remain unfinished. Empty tenant scope returns no observations.
+- 3 capture unit tests, real DB execution and acceptance→growth SIGKILL scenarios 2/2 pass; scoped lint passes. Legacy directory equality guard retained for destination consistency, not metrics authority. No commits/push — codex-runtime
+
+## Cancellation fact completeness
+
+- requestCancellation now atomically inserts cancelled result fact alongside state/fence and Outbox; admission row stores trusted agentId for attribution. Real DB scenario passes; turn wrapper 5/5 and scoped lint pass — codex-runtime
+- Cancelled excluded from task-judgement denominator; transient execution failure remains waiting, not fabricated task failure. Trusted cancellation ingress/AbortSignal wiring remains incomplete; tools/takeover/satisfaction fact streams still missing. No commits/push — codex-runtime
+
+## Cross-connection cancellation and terminal competition
+
+- Real DB scenario with 3 independent connections: remote cancel causes lease abort at renewal; ended worker DB connection causes renewal error and abort; 12 concurrent cancel/complete rounds each yield exactly one accepted transition, result fact and event. Scenario passed — codex-runtime
+- Same OS process/independent DB connections simulate nodes; not multi-host proof. Network blackhole/hung query and real HTTP cancel authorization remain untested. Default cancellation detection is renewal cadence, not immediate remote push. Temporary schema dropped and server stopped; no commits/push — codex-runtime
+
+## Hung-renewal deadline and cancellation regression
+
+- Added independent local lease expiry watchdog; hung renewal promise aborts at local expiry, late response cannot revive aborted lease. Renewal success uses request-start timestamp conservatively. Lease+turn tests 10 pass; scoped lint passes — codex-runtime
+- Existing chat-abort/RPC owner-pause/persistence suites 16 tests pass. This is not HTTP auth evidence or real remote-host evidence. No authorized second host was provided; real multi-host execution remains unverified. Hung dispose still awaits pending renewal; driver/network timeout and shutdown deadline remain needed. No commits/push — codex-runtime
+
+## Focused skill authority convergence WIP
+
+- Robot skill list/toggle/upgrade/remove RPCs now obtain authoritative membership; mutation checks persisted exact tenant/user relation before invoking legacy store operation. List uses scoped read. 23 store tests, scoped lint and tsgo pass — codex-runtime
+- Unauthenticated/local legacy RPC calls now reject: compatibility decision must be validated; install fallback, rollback, execution binding and auto-install still unclosed. Read-check-write is not a transactional scoped store mutation; concurrent relation replacement must be addressed before final isolation acceptance. No commits/push — codex-runtime
+
+## Scoped skill invocation and restore WIP
+
+- Invocation statistics and restore installation wrap same scope protocol; invocation event passes tenant/user when present; new scoped restore seeds attributed install then restores pin. 24 store regression tests, scoped lint and tsgo pass — codex-runtime
+- Actual restore/evolution callers not fully migrated; invocation catch still swallows relation authorization errors. All skill writers not yet share lock, so global concurrent mutation safety not accepted. No commits/push — codex-runtime
+
+## Skill invocation authority failures no longer swallowed
+
+- Typed SkillRelationScopeError propagates through invocation completion before seen receipt is written, instead of silently accepting authorization failure. Missing legacy relation tolerance retained. Store+invocation attribution 30 tests, scoped lint and full tsgo pass — codex-runtime
+- Not exactly-once invocation stats: audit append/counter/seen remain distinct. Evolution default port lacks trusted scope and is not yet migrated. No commits/push — codex-runtime
+
+## Invocation audit projection ordering WIP
+
+- Canonical invocation snapshot commits before completed JSONL projection. Non-missing-relation errors propagate; JSONL completed append uses lock+invocationId duplicate/content conflict guard. 31 store/invocation tests, scoped lint and tsgo pass — codex-runtime
+- No snapshot→JSONL reconciliation scanner yet; mixed legacy skill writers can still overwrite snapshot/receipts. Scope constructor production migration still incomplete. JSONL scanning is O(history) per completed append and requires scaling review. No commits/push — codex-runtime
+
+## Committed audit reconciliation WIP
+
+- Added tenant/user-scoped read of canonical invocation audit facts and idempotent JSONL replay function. Real file test publishes missing audit, repeats harmlessly, does not increment counters and excludes other tenant; store suite 26/26, lint and tsgo pass — codex-runtime
+- No production schedule or complete pagination yet; first-N scan can starve later history. Runtime audit shape validation is partial. Other skill writers and scope construction remain incomplete. No commits/push — codex-runtime
+
+## Audit reconciliation cursor WIP
+
+- Added tenant/user-hashed durable cursor with lock, ordered pagination and cursor advance only after audit append. Empty page wraps sweep so late earlier IDs are not starved. Page size 1/late insertion regression passes; store suite 27/27 — codex-runtime
+- Normal replay is safe; explicit append-failure cursor test and production authorization/schedule still missing. Current implementation loads/sorts full receipt history per page, not scalable indexed pagination. Other skill writers/scope construction remain incomplete. No commits/push — codex-runtime
+
+## Audit append failure and service scope
+
+- Injected JSONL disk append failure, rerun projects original event once and skill counter remains one; 28 store tests pass. Added optional agent allowlist to committed audit scan; cursor identity includes sorted allowlist to avoid cross-grant cursor reuse — codex-runtime
+- Scoped lint and full tsgo pass. Agent allowlist regression and production audit scheduler still missing. Full skill writer locking and scope constructor migration remain incomplete. No commits/push — codex-runtime
+
+## Audit recovery lifecycle fault verification 2026-11-21
+
+- Added revocation recheck, projection failure retry, hung authorization bounded stop and no late scan regressions. Audit scheduler+growth service suites 5/5 pass; scoped lint/full tsgo/diff checks pass — codex-runtime
+- Growth service stop now attempts audit and consumer stops concurrently with deadlines, so one failure does not skip the other before pool cleanup. Actual enabled audit gateway fault process test still missing; all-writer skill protocol still incomplete. No commits/push — codex-runtime
+
+## All direct skill-store writers lock convergence WIP
+
+- AST inventory found 24 functions directly invoking writeStore; all now acquire same synchronous file-lock protocol around full function body/RMW. writeStore atomic snapshot already used. Corrupt store reads now fail rather than silently replacing with empty state — codex-runtime
+- Skill store/invocation/evolution 34 tests pass; initial full tsgo and lint pass. After strict-read change skill suite 29 passes. Mixed-process stress and lock-held mutation-hook safety remain untested.
+- Enabled audit full-gateway failure acceptance not executed in this turn. Scope migration still incomplete; no new commits/push — codex-runtime
+
+## Real mixed-process skill snapshot evidence
+
+- Added real Node IPC barrier race: 4 workers each create 10 distinct skills then atomic invocation commits; asserts 40 skills, 40 relations, 40 receipts, every relation counter=1. Test and lint pass — codex-runtime
+- Does not cover delete/upgrade/rollback combinations or registered projection hooks; enabled audit full-gateway failure acceptance still open. No commits/push — codex-runtime
+
+## Full gateway audit whitelist/revocation acceptance
+
+- Actual non-minimal gateway on 19546, real DB grant + invocation snapshot: only allowed agent projected to tenant/user JSONL; denied agent absent. Revoked enabled grant, appended another fact and waited real 31 seconds; fact not projected; normal gateway close and process exit 0. Marker FULL_GATEWAY_AUDIT_SCOPE_REVOCATION_CLOSE_PASSED in /tmp/runtime-gateway-audit-accept.log — codex-runtime
+- Schema dropped/test DB stopped. Harness /tmp/runtime-gateway-audit-accept.mjs is not checked-in regression. Hook mixed-writer stress/scope production migration and broader original runtime goals remain open. No commits/push — codex-runtime
+
+## Mixed writer hooks and repeatable audit harness WIP
+
+- Real four-process test now registers actual skill execution hooks and mixes create/invocation/toggle/upgrade/remove. Expected 40 skills, 20 remaining relations, 40 invocation receipts and count=1 pass; no observed deadlock — codex-runtime
+- Copied prior full gateway audit script into scripts/runtime-acceptance/gateway-audit.mjs, adding isolated-root opt-in and loopback DB guard; lint passes. New checked-in version has not rerun; fixed schema/port/root requirements still need parameterization. Global agentId execution projection remains a multi-tenant gap. No commits/push — codex-runtime
+
+## Repository audit harness rerun
+
+- gateway-audit.mjs now uses unique safe schema and auto-reserved test port; production tenant runtime resolver derives projection path; schema dropped only if created. Requires isolated-root opt-in and loopback DB.
+- Ran repository script with fresh state root and real PostgreSQL; actual gateway whitelist, real 31s grant revocation and close pass, marker in /tmp/runtime-audit-repo-harness.log; DB stopped — codex-runtime
+- Port reservation race and supplied-root isolation assertion remain operator-managed; not parallel-safe reused roots. Same-relation stress and tenant-qualified execution projections remain open. No commits/push — codex-runtime
+
+## HTTP durable operation admission regression
+
+- Added real local HTTP test with authenticated tenant identity: identical operation replay invokes tool once; changed params rejected before duplicate execution; tenant mismatch 403. HTTP suite 24/24, lint and tsgo pass — codex-runtime
+- Admission is local-file only, no DB fence; Fabric loopback gateway-token identity may lack enterprise attribution, so actual Fabric execution still not accepted end-to-end. Need service identity and trusted logical ownership, not request tenant trust. No commits/push — codex-runtime
+
+## Durable admission concurrent publication
+
+- Child/HTTP shared durable admission now publishes complete unique staging via no-replace hardlink rather than exposing partial wx claim JSON. 12 concurrent attempts test confirms at-most-one dispatch, unknown losers, receipt replay. 3 tests and lint pass; full tsgo passes after test discriminant fix — codex-runtime
+- Fabric gateway bootstrap still supplies global operator token, not tenant service authorization; no unsafe tenant-header bypass added. DB fencing and authoritative service execution grant remain incomplete. No commits/push — codex-runtime
+
+## Fabric authority regression gate
+
+- Added RPC tests: spoofed tenant/user rejects before service.execute, authorized tenant binds membership user, stream tenant mismatch registers no recipient. Fabric handlers suite 15/15, lint and full tsgo pass — codex-runtime
+- Service authority transfer and DB fencing not implemented: global gateway token cannot imply tenant execution ownership. HTTP checks deliberately remain strict; short-lived execution-specific authorization bound to admitted task/owner/fence is required. No commits/push — codex-runtime
+
+## DB execution-bound tool authorization WIP
+
+- Added hashed random token grants issued only under live owner/fence/task match; binds tenant/task/execution/step/operation/tool/session/request digest, expires no later than lease. Validate rechecks live lease/fence. Real DB scenario verifies matching grant, payload mismatch rejection and cancellation invalidation — codex-runtime
+- Not wired to Fabric issue or HTTP validation. No durable result CAS under grant yet; external effects without downstream fencing remain uncertain after stale worker resumes. No commits/push — codex-runtime
+
+## Fabric grant transport and HTTP validation WIP
+
+- Loopback invoker requires injected host grant issuer for identity-bearing calls and sends execution grant header. HTTP validates provided grant against DB before and after invocation while retaining authenticated tenant/policy checks — codex-runtime
+- Main gateway does NOT yet supply issuer; token-only Fabric remains rejected. Header is optional for legacy tenant-auth HTTP path, not full mandatory fencing. No dedicated integration tests yet; attempted loopback test file absent. Not production-complete. No commits/push — codex-runtime
+
+## Host-bound Fabric grant issuer
+
+- Added per-admitted-execution issuer binding host tenant/task/execution/session/owner/fence and AbortSignal; overrides rejected before SQL; invoker requires issuer and transmits capability. 2 issuer/transport tests and scoped lint pass; full tsgo passes after typed fetch mock fix — codex-runtime
+- Global FabricService bootstrap still lacks request-scoped lease host. No issuer registered globally; sharing a user's lease across global service is forbidden. HTTP grant+tenant identity integration remains incomplete. No commits/push — codex-runtime
+
+## Billing Outbox local cross-process locking WIP
+
+- All receipt mutations use shared file lock inside existing in-process serialization; drain and direct-record drain share separate per-file delivery lock across processes. 6 existing recovery/hold/store tests pass, lint and tsgo pass — codex-runtime
+- Real 4-process receipt writers retain all 60 receipts. This proves concurrent enqueue, not live debit exactly-once; direct-record done behavior and interrupted debit stages still require audit. File locks are single-host only; no Postgres billing authority implied. No commits/push — codex-runtime
+
+## Gap-by-gap closure governance
+
+- Created open-gaps.md and closed-gaps.md. No parent gap closed without production/test/fault evidence. G1 DB-mode identity request missing grant now denies before tool execute; HTTP tests 25/25 and full tsgo pass — codex-runtime
+- Only G1 missing-grant subcase accepted; valid grant and request-scoped Fabric lifecycle still pending. Identity-less legacy requests are not covered by mandatory grant policy. No commits/push — codex-runtime
+
+## G1 real DB grant + HTTP acceptance subgate
+
+- HTTP suite now 26/26 with real PostgreSQL grant: valid invoke+replay executes once, changed args rejected, cancellation invalidates even local completed-result replay. Schema and temp state cleaned, DB stopped; lint and full tsgo pass — codex-runtime
+- Mock gateway auth/tool surface remains in test. Full request-scoped Fabric host and atomic fenced result repository absent; G1 remains open. No commits/push — codex-runtime
+
+## G1 fenced result publication repository subgate
+
+- Added runtime_tool_results and commitGrantedToolResult: locks current execution row, validates complete grant binding/live owner/fence and atomically inserts result. Identical replay accepted; conflicting result or cancelled execution denied. Real PostgreSQL scenario and scoped lint pass — codex-runtime
+- Not wired into HTTP durable dispatch. No start-intent operation claim, takeover race or full Fabric host test yet. G1 stays open, no commits/push — codex-runtime
+
+## G1 database intent admission WIP
+
+- Added runtime_tool_intents and claimGrantedToolIntent: current grant/fence lock, unique logical operation claim, repeat unknown, mismatched grant digest denied. Real DB scenario and lint pass — codex-runtime
+- Not wired into HTTP; result commit not yet requiring exact matching intent, cross-node result replay missing, sequential DB test is not concurrency proof. G1 remains open; no commits/push — codex-runtime
+
+## G1 HTTP database operation protocol
+
+- Grant-bearing HTTP bypasses local file dispatch: validates grant, replays matching DB result, uniquely claims DB intent, executes once, commits result under exact original intent grant/fence. Unresolved intent returns unknown. DB result commit now requires intent match — codex-runtime
+- HTTP+repository real DB suites 27 tests pass; lint/full tsgo pass. DB stopped. Concurrent HTTP/lease takeover and request-scoped Fabric host still absent; no parent closure or commits/push — codex-runtime
+
+## G1 HTTP concurrent and takeover subgate
+
+- Real PG+HTTP regression pauses first mocked tool, concurrent same-op request 409 without second execution; then expires lease after tool started, new owner claims, old result commit returns unknown and new owner cannot redispatch orphan intent. HTTP 26/26 pass — codex-runtime
+- Tool/auth remain test doubles; no external destination fencing proof. Fabric request-scoped host and service identity propagation still incomplete; G1 stays open, no commits/push — codex-runtime
+
+## G1 request host isolation WIP
+
+- Added FabricService wrapper separating shared check/catalog from per-request admitted execution service and disposal; concurrent hosts and failure disposal/admission reject tests 2/2 pass; lint/tsgo pass — codex-runtime
+- Wrapper not registered in gateway; actual admit must derive membership-bound DB lease and trusted service identity. Catalog mutation propagation into request services still requires design. G1 remains open, no commits/push — codex-runtime
+
+## G1 resumed after release-chat alignment
+
+- Refreshed main ancestry valid. Request host now checks admitted AbortSignal before invoke and before accepting result; cancellation regression confirms cleanup. Host/issuer/transport suites 5 tests pass. Main bootstrap still uses global service, G1 remains open — codex-runtime
+- Updated stale gap ledger: HTTP PG intent/result CAS and valid-grant/concurrency/takeover tests are completed subgates, not full Fabric completion. No commits/push — codex-runtime
+
+## G1 request-scoped gateway production host WIP
+
+- Main gateway DB mode now wraps Fabric execute/stream in request admission: requires existing persisted ingress=fabric + tenant/task/user/session record, claims lease, builds scoped issuer and service, registry cleanup; never creates authority from request. Native process runner disabled in this mode to avoid HTTP bypass — codex-runtime
+- Host/issuer/transport tests 5 pass; lint/full tsgo pass. Actual admission producer missing; HTTP global-token cannot yet recover tenant identity from validated grant; dynamic adapter catalog not propagated into new service; new admission lacks real DB regression. G1 OPEN, no commits/push — codex-runtime
+
+## G1 authenticated admission and shared catalog production wiring
+
+- Authenticated Fabric RPC persists full tenant/user/task/session/request binding using conflict-checked DB upsert before service execution; request host consumes record. Shared AdapterRegistry used by global and per-request services so dynamic adapters persist — codex-runtime
+- Full tsgo passes. Complete RPC→host→issuer→HTTP grant identity→result test still missing; parent G1 not closed. Request correlation is still client-selected under auth and needs task ownership validation. No commits/push — codex-runtime
+
+## G1 task authority binding WIP
+
+- Fabric admission INSERT now requires matching existing live non-Fabric task execution under authenticated tenant/user/session, rather than creating arbitrary task authority from request. Chat lease admission persists trusted platformUserId/sessionKey/ingress for this check — codex-runtime
+- Chat wrapper tests 5/5 and scoped lint pass. Existing rows lack fields and reject until explicit migration; active task concurrency and full authorized Fabric request path still untested. SQL authority query is not a complete task ACL model. G1 open, no commits/push — codex-runtime
+
+## G1 real component chain verification
+
+- HTTP real DB test now provisions existing task authority, invokes real persistAuthorizedFabricRequest, request host, shared adapter, issuer and loopback HTTP under operator auth with no tenant. HTTP restores tenant/user from valid grant before tool construction; executes successfully. 26 HTTP tests pass including concurrency/takeover — codex-runtime
+- Found fixed service identity resolution incorrectly overriding authenticated member grant path; resolve only if no authenticated enterprise. Real DB cleaned/stopped. RPC auth/tool remain mocks; full gateway Fabric RPC and host teardown/retry policy missing. G1 stays OPEN. No commits/push — codex-runtime
+
+## User-requested integration freeze 2026-11-21
+
+- User superseded defer-all-commits instruction: freeze and commit current isolated work for multi-agent shared baseline review. No merge/deploy authorization inferred — codex-runtime
+- Current snapshot is incomplete architecture work, NOT production-ready. G1 and G2-G10 remain open. DB-enabled Fabric behavior can reject legacy/unowned tasks; skill RPC membership requirements change compatibility. Keep opt-in features disabled pending integration review — codex-runtime
+- Historical agents/paths retained in registry; this isolated snapshot designated lander solely for current edits. Full tsgo passes before freeze. pnpm check executed; repository-wide existing checks may remain failing. No bypass of commit hooks — codex-runtime

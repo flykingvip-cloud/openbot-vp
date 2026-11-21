@@ -21,6 +21,10 @@ import { submitSkillToEnterpriseReview } from "../skill-enterprise-submission.js
 import { ensureSkillExecutionBindingHooksRegistered } from "../skill-execution-binding/index.js";
 import { recordSkillInvocationCompleted } from "../skill-invocation/index.js";
 import {
+  assertRobotSkillRelationScope,
+  listTenantRobotSkillAssets,
+} from "../skill-lifecycle-store.js";
+import {
   acceptSkillAutofill,
   acceptSkillClassification,
   deletePersonalSkillAsset,
@@ -52,6 +56,7 @@ import {
   type SkillLifecycleState,
   type SkillRelationMutationHookResult,
 } from "../skill-lifecycle-store.js";
+import { resolveAuthoritativeMembership } from "../tenant-context.js";
 import {
   resolvePackSkillInstallBlock,
   respondIfPackSkillReviewBlocked,
@@ -679,15 +684,33 @@ export const skillLifecycleHandlers: GatewayRequestHandlers = {
     }
   },
 
-  "robot-skills.list": ({ params, respond }) => {
+  "robot-skills.list": async ({ params, respond, client }) => {
     const agentId = requiredString(params, "agentId", respond);
     if (!agentId) {
       return;
     }
-    respond(true, { skills: listRobotSkillAssets(agentId) }, undefined);
+    try {
+      const authority = await resolveAuthoritativeMembership(client);
+      if (!authority.tenantId || !authority.userId) {
+        throw new Error("Robot skills require authoritative tenant membership");
+      }
+      respond(
+        true,
+        {
+          skills: listTenantRobotSkillAssets({
+            tenantId: authority.tenantId,
+            userId: authority.userId,
+            agentId,
+          }),
+        },
+        undefined,
+      );
+    } catch (error) {
+      respondSkillError(respond, error);
+    }
   },
 
-  "robot-skills.toggle": ({ params, respond }) => {
+  "robot-skills.toggle": async ({ params, respond, client }) => {
     const agentId = requiredString(params, "agentId", respond);
     const skillId = requiredString(params, "skillId", respond);
     if (!agentId || !skillId) {
@@ -698,9 +721,26 @@ export const skillLifecycleHandlers: GatewayRequestHandlers = {
       return;
     }
     try {
+      const authority = await resolveAuthoritativeMembership(client);
+      if (!authority.tenantId || !authority.userId) {
+        throw new Error("Robot skill mutation requires authoritative tenant membership");
+      }
+      assertRobotSkillRelationScope({
+        tenantId: authority.tenantId,
+        userId: authority.userId,
+        agentId,
+        skillId,
+      });
       respond(
         true,
-        { skill: toggleRobotSkillAsset({ agentId, skillId, enabled: params.enabled }) },
+        {
+          skill: toggleRobotSkillAsset({
+            agentId,
+            skillId,
+            enabled: params.enabled,
+            scope: { tenantId: authority.tenantId, userId: authority.userId },
+          }),
+        },
         undefined,
       );
     } catch (error) {
@@ -708,27 +748,61 @@ export const skillLifecycleHandlers: GatewayRequestHandlers = {
     }
   },
 
-  "robot-skills.upgrade": ({ params, respond }) => {
+  "robot-skills.upgrade": async ({ params, respond, client }) => {
     const agentId = requiredString(params, "agentId", respond);
     const skillId = requiredString(params, "skillId", respond);
     if (!agentId || !skillId) {
       return;
     }
     try {
-      respond(true, { skill: upgradeRobotSkillAsset({ agentId, skillId }) }, undefined);
+      const authority = await resolveAuthoritativeMembership(client);
+      if (!authority.tenantId || !authority.userId) {
+        throw new Error("Robot skill mutation requires authoritative tenant membership");
+      }
+      assertRobotSkillRelationScope({
+        tenantId: authority.tenantId,
+        userId: authority.userId,
+        agentId,
+        skillId,
+      });
+      respond(
+        true,
+        {
+          skill: upgradeRobotSkillAsset({
+            agentId,
+            skillId,
+            scope: { tenantId: authority.tenantId, userId: authority.userId },
+          }),
+        },
+        undefined,
+      );
     } catch (error) {
       respondSkillError(respond, error);
     }
   },
 
-  "robot-skills.remove": ({ params, respond }) => {
+  "robot-skills.remove": async ({ params, respond, client }) => {
     const agentId = requiredString(params, "agentId", respond);
     const skillId = requiredString(params, "skillId", respond);
     if (!agentId || !skillId) {
       return;
     }
     try {
-      const removed = removeRobotSkillAsset({ agentId, skillId });
+      const authority = await resolveAuthoritativeMembership(client);
+      if (!authority.tenantId || !authority.userId) {
+        throw new Error("Robot skill mutation requires authoritative tenant membership");
+      }
+      assertRobotSkillRelationScope({
+        tenantId: authority.tenantId,
+        userId: authority.userId,
+        agentId,
+        skillId,
+      });
+      const removed = removeRobotSkillAsset({
+        agentId,
+        skillId,
+        scope: { tenantId: authority.tenantId, userId: authority.userId },
+      });
       const projection = projectionFromReports(readSkillRelationMutationReports(removed), "remove");
       respond(
         true,
@@ -796,7 +870,17 @@ export const skillLifecycleHandlers: GatewayRequestHandlers = {
         }
       }
       assertRobotSkillInstallAllowed(agentId, skillId);
-      const skill = installSkillToRobotAsset({ agentId, skillId });
+      const authority = await resolveAuthoritativeMembership(client);
+      if (!authority.tenantId || !authority.userId) {
+        throw new Error("Skill install requires authoritative tenant membership");
+      }
+      const skill = installSkillToRobotAsset({
+        agentId,
+        skillId,
+        ...(authority.tenantId && authority.userId
+          ? { tenantId: authority.tenantId, ownerUserId: authority.userId }
+          : {}),
+      });
       const projection = projectionFromReports(readSkillRelationMutationReports(skill), "install");
       const cfg = loadConfig();
       // P0 onboarding：技能真实安装成功才写里程碑（FWW）。

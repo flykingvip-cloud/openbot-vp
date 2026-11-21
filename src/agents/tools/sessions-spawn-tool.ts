@@ -1,4 +1,5 @@
 import { Type } from "@sinclair/typebox";
+import type { OperationIdentity } from "../../agent-runtime/contracts/operation.js";
 import type { ExecutionIdentityContext } from "../../gateway/execution-identity-context.js";
 import { assertFreeChatSessionsSpawnAllowed } from "../../gateway/supervisor/free-chat-cli-guard.js";
 import { attachCollaborationReturnProvenance } from "../../infra/execution-chain-provenance.js";
@@ -80,6 +81,8 @@ export function createSessionsSpawnTool(
     requesterAgentIdOverride?: string;
     /** Current agent run identity for inherit-only Objective observation. */
     parentRunId?: string;
+    /** Host resolves a persisted operation; never derived from model arguments here. */
+    resolveSpawnOperationIdentity?: (toolCallId: string) => Promise<OperationIdentity | undefined>;
     tenantId?: string;
     /** Frozen parent-turn identity; never read from sessions_spawn tool args. */
     executionIdentity?: ExecutionIdentityContext;
@@ -229,6 +232,7 @@ export function createSessionsSpawnTool(
           requesterAgentIdOverride: opts?.requesterAgentIdOverride,
           workspaceDir: opts?.workspaceDir,
           parentRunId: opts?.parentRunId,
+          operationIdentity: await opts?.resolveSpawnOperationIdentity?.(_toolCallId),
           tenantId: opts?.tenantId,
           executionIdentity: opts?.executionIdentity,
         },

@@ -1,8 +1,10 @@
+import path from "node:path";
 import { createReadTool } from "@earendil-works/pi-coding-agent";
 import { wrapToolWithBeforeToolCallHook } from "../agent-runtime/capabilities/index.js";
 import type { TaskCompletionBinding } from "../agent-runtime/contracts/task-binding.js";
 import { captureTaskActionBoundary } from "../agent-runtime/state/task-action.js";
 import type { OpenBotConfig } from "../config/config.js";
+import { resolveStateDir } from "../config/paths.js";
 import type { ToolLoopDetectionConfig } from "../config/types.tools.js";
 import {
   applyLaneModeToolPolicy,
@@ -73,6 +75,7 @@ import {
 } from "./sandbox/account-computer-browser-routing.js";
 import { isAccountExecWorkspaceMount } from "./sandbox/effective-workspace.js";
 import { isXaiProvider } from "./schema/clean-for-xai.js";
+import { createSpawnOperationResolver } from "./spawn-operation-identity.js";
 import {
   createToolFsPolicy,
   resolveEffectiveToolFsWorkspaceOnly,
@@ -244,6 +247,8 @@ export function createOpenClawCodingTools(options?: {
   /** Ephemeral session UUID — regenerated on /new and /reset. */
   sessionId?: string;
   /** Stable run identifier for this agent invocation. */
+  logicalExecutionId?: string;
+  logicalTaskId?: string;
   runId?: string;
   /** What initiated this run (for trigger-specific tool restrictions). */
   trigger?: string;
@@ -646,6 +651,17 @@ export function createOpenClawCodingTools(options?: {
       accountComputerBrowser: options?.sandbox?.accountComputerBrowser === true,
       agentSessionKey: options?.sessionKey,
       agentRunId: options?.runId,
+      resolveSpawnOperationIdentity:
+        options?.logicalExecutionId &&
+        options?.logicalTaskId &&
+        options?.executionIdentity?.enterpriseId
+          ? createSpawnOperationResolver({
+              root: path.join(resolveStateDir(), "runtime-spawn-identities"),
+              tenantId: options.executionIdentity.enterpriseId,
+              taskId: options.logicalTaskId,
+              logicalExecutionId: options.logicalExecutionId,
+            })
+          : undefined,
       agentChannel: resolveGatewayMessageChannel(options?.messageProvider),
       agentAccountId: options?.agentAccountId,
       agentTo: options?.messageTo,

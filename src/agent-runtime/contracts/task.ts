@@ -50,6 +50,7 @@ export type TrackedTask = {
   /** Deliverable version stamp for late-complete isolation (C4). */
   deliverableVersion?: string;
   /** Execution attempt stamp for late-complete isolation (C4). */
+  logicalExecutionId?: string;
   executionAttempt?: string;
   /** Durable automatic-continuation reservations; scoped to this task and session. */
   continuationWakeAtMs?: number[];
