@@ -2140,7 +2140,7 @@ async function saveSystemSettingsGroup(
       finalDecisionPolicy: {
         mode: draft.finalDecisionMode.trim() || "human_required",
         defaultFinalDeciderRole: draft.finalDecisionRole.trim() || "owner",
-        allowAgentPublishProposal: true,
+        allowAgentPublishProposal: draft.allowAgentPublishProposal,
       },
       openDiscussionWithoutMention: draft.openDiscussionWithoutMention,
       maxVisibleBotRepliesPerRound: Math.max(
@@ -2652,17 +2652,7 @@ function buildWorkbenchSettingsGroupMemberRows(space: {
 }
 
 function scopedAgentsListForEmployeeWorkbench(state: AppPortState) {
-  const access = state.platformAuthState?.employeeAccess;
-  const seatId = access?.currentSeat?.seatId;
-  const seatAgentIds = access?.agentIds;
-  if (!seatId && !seatAgentIds) {
-    return filterAgentsListForEmployeeWorkbench(state.agentsList);
-  }
-  return filterAgentsListForEmployeeWorkbench(state.agentsList, {
-    seatId,
-    employeeUserId: access?.employeeUserId,
-    seatAgentIds,
-  });
+  return filterAgentsListForEmployeeWorkbench(state.agentsList);
 }
 
 // Temporary bridge while the workbench chain is being recovered.
