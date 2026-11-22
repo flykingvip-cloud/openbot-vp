@@ -160,6 +160,8 @@ import {
 } from "../knowledge/personal-mutations.js";
 import { deleteReservedDeliverableOriginal } from "../knowledge/reserved-deliverable-original.js";
 import { resolveWebClipContent } from "../knowledge/resolve-web-clip-content.js";
+import { accessDocumentRetrievalSummary } from "../knowledge/retrieval-summary-document.js";
+import { parseRetrievalSummaryFields } from "../knowledge/retrieval-summary-validation.js";
 import {
   knowledgeAgentProfile,
   knowledgeActionsList,
@@ -2110,6 +2112,117 @@ export const knowledgeHandlers: GatewayRequestHandlers = {
         indexRoot: resolveKnowledgeIndexRootForBase(knowledgeBase),
       });
       respond(true, { knowledgeBaseId: kbId, documents });
+    } catch (error) {
+      respondKnowledgeBaseError(respond, error);
+    }
+  },
+
+  "knowledge.document.summary": async ({ params, respond, client }) => {
+    const record = params && typeof params === "object" ? params : {};
+    const kbId = stringParam(record.knowledgeBaseId);
+    const docId = stringParam(record.documentId);
+    if (!kbId || !docId) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, "knowledgeBaseId and documentId required"),
+      );
+      return;
+    }
+    const context = await resolveKnowledgeSourceContext(client);
+    const fields = record.fields;
+    const base = authorizedKnowledgeBase(
+      kbId,
+      context,
+      clientUserEmail(client),
+      fields === undefined && record.retry !== true && record.metadata === undefined
+        ? "read"
+        : "write",
+    );
+    if (!base) {
+      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "knowledge base not found"));
+      return;
+    }
+    let parsedFields;
+    if (fields !== undefined) {
+      parsedFields = parseRetrievalSummaryFields(fields);
+      if (!parsedFields) {
+        respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "invalid summary fields"));
+        return;
+      }
+    }
+    let metadata:
+      | import("../knowledge/retrieval-summary.js").RetrievalSummary["sourceRelations"]
+      | undefined;
+    let editorialStatus: "draft" | "final" | undefined;
+    if (record.metadata !== undefined) {
+      if (
+        !record.metadata ||
+        typeof record.metadata !== "object" ||
+        Array.isArray(record.metadata)
+      ) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, "invalid summary metadata"),
+        );
+        return;
+      }
+      const value = record.metadata as Record<string, unknown>;
+      if (
+        value.editorialStatus !== undefined &&
+        value.editorialStatus !== "draft" &&
+        value.editorialStatus !== "final"
+      ) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, "invalid editorial status"),
+        );
+        return;
+      }
+      editorialStatus = value.editorialStatus;
+      if (value.sourceRelations !== undefined) {
+        if (
+          !Array.isArray(value.sourceRelations) ||
+          value.sourceRelations.length > 50 ||
+          !value.sourceRelations.every(
+            (item) =>
+              item &&
+              typeof item === "object" &&
+              ["revision-of", "derived-from", "duplicate-of", "supersedes"].includes(item.kind) &&
+              typeof item.documentId === "string" &&
+              item.documentId.length < 500 &&
+              (item.versionId === undefined || typeof item.versionId === "string"),
+          )
+        ) {
+          respond(
+            false,
+            undefined,
+            errorShape(ErrorCodes.INVALID_REQUEST, "invalid source relations"),
+          );
+          return;
+        }
+        metadata = value.sourceRelations;
+      }
+    }
+    try {
+      const summary = await accessDocumentRetrievalSummary({
+        knowledgeBase: base,
+        docId,
+        indexRoot: resolveKnowledgeIndexRootForBase(base),
+        fields: parsedFields,
+        retry: record.retry === true,
+        metadata:
+          record.metadata === undefined && parsedFields === undefined
+            ? undefined
+            : {
+                sourceRelations: metadata,
+                editorialStatus,
+                reviewedBy: context.userId ?? undefined,
+              },
+      });
+      respond(true, { documentId: docId, summary: summary ?? null });
     } catch (error) {
       respondKnowledgeBaseError(respond, error);
     }

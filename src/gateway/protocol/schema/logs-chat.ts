@@ -44,6 +44,8 @@ export const ChatHistoryParamsSchema = Type.Object(
 export const ChatSendParamsSchema = Type.Object(
   {
     sessionKey: ChatSendSessionKeyString,
+    dependencyResumeId: Type.Optional(Type.String({ pattern: "^[a-f0-9]{40}$" })),
+    dependencyResumeCapability: Type.Optional(Type.String({ pattern: "^[a-f0-9]{64}$" })),
     message: Type.String(),
     thinking: Type.Optional(Type.String()),
     deliver: Type.Optional(Type.Boolean()),

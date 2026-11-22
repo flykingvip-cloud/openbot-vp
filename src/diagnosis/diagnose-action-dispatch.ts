@@ -15,6 +15,7 @@ import { buildAgentToAgentMessageContext } from "../agents/tools/sessions-send-h
 import { loadConfig } from "../config/config.js";
 import { loadSessionStore, resolveStorePath } from "../config/sessions.js";
 import { callGateway } from "../gateway/call.js";
+import { conversationSeatAgentIds } from "../gateway/conversation-seat-grants.js";
 import { findActiveOwnershipRecord } from "../gateway/ownership-store.js";
 import {
   issuePendingStewardCall,
@@ -43,6 +44,7 @@ export type DiagnoseActionDispatchRequest = {
   plainConversation?: boolean;
   /** Name the recipient should use to keep talking. Not shown in the user chat. */
   fromDisplayName?: string;
+  idempotencyKey?: string;
   sessionExists?: (agentId: string, sessionKey: string) => boolean;
   send?: DiagnoseActionSessionSend;
   injectReceipt?: DiagnoseActionReceiptInject;
@@ -76,6 +78,7 @@ export type DiagnoseActionSessionSend = (input: {
   sessionOwnerPlatformUserId?: string;
   plainConversation?: boolean;
   fromDisplayName?: string;
+  idempotencyKey?: string;
 }) => Promise<{ runId: string }>;
 
 export type DiagnoseActionReceiptInject = (input: {
@@ -205,7 +208,13 @@ export async function dispatchDiagnoseConversationAction(
   input: DiagnoseActionDispatchRequest,
 ): Promise<DiagnoseActionDispatchResult> {
   const stewardTarget = Boolean(extractEmployeeStewardUserIdFromSessionKey(input.targetSessionKey));
-  if (!stewardTarget && !canDispatchDiagnoseAction(input)) {
+  const targetAllowed =
+    input.plainConversation && input.tenantId
+      ? (await conversationSeatAgentIds(input.tenantId, input.requesterUserId)).includes(
+          input.targetAgentId,
+        )
+      : canDispatchDiagnoseAction(input);
+  if (!stewardTarget && !targetAllowed) {
     return { ok: false, reason: "unauthorized" };
   }
   let stewardCaller = input.stewardCaller;
@@ -277,6 +286,7 @@ export async function dispatchDiagnoseConversationAction(
       message: planned.message,
       requesterSessionKey: planned.requesterSessionKey,
       sessionOwnerPlatformUserId: input.requesterUserId,
+      ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
       ...(input.plainConversation ? { plainConversation: true } : {}),
       ...(input.fromDisplayName?.trim() ? { fromDisplayName: input.fromDisplayName.trim() } : {}),
     });
@@ -373,8 +383,9 @@ async function defaultDiagnoseActionSessionSend(input: {
   sessionOwnerPlatformUserId?: string;
   plainConversation?: boolean;
   fromDisplayName?: string;
+  idempotencyKey?: string;
 }): Promise<{ runId: string }> {
-  const idempotencyKey = crypto.randomUUID();
+  const idempotencyKey = input.idempotencyKey ?? crypto.randomUUID();
   const extraSystemPrompt = [
     buildAgentToAgentMessageContext({
       requesterSessionKey: input.requesterSessionKey,

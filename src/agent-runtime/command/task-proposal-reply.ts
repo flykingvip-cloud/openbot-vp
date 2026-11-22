@@ -11,6 +11,10 @@ export function formatTaskProposalReply(
   result: TaskProposalMutationResult,
 ): string {
   if (result.kind === "applied") {
+    // Status is a board observation, never a model-authored execution claim.
+    if (decision.kind === "task_control" && decision.action === "status") {
+      return result.text;
+    }
     return [decision.answer, result.text].filter(Boolean).join("\n\n");
   }
   // Applied-but-not-effective facts come only from the host. A model answer

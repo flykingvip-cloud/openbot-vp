@@ -10,6 +10,7 @@ export type TaskCompletionBinding = {
 };
 
 export type CurrentTaskResumeRequest = {
+  action?: "resume" | "continue";
   taskId: string;
   expectedFocusRevision: number;
   expectedWriteEpoch: number;

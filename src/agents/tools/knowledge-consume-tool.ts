@@ -12,6 +12,8 @@ import { parseKnowledgeEvidenceUri } from "../../gateway/knowledge/kb-retrieve.j
 import {
   retrievalContextFromKnowledgeSourceContext,
   searchKnowledgeEvidence,
+  searchScopedKnowledgeBaseWithFallback,
+  searchAuthorizedSummaryCandidates,
 } from "../../gateway/knowledge/knowledge-retrieval-runtime.js";
 import { knowledgeObject, knowledgeSearch } from "../../gateway/knowledge/router.js";
 import type { KnowledgeObject } from "../../gateway/knowledge/types.js";
@@ -154,14 +156,16 @@ function hitFromObject(object: KnowledgeObject): KnowledgeSearchHit {
   const excerptLimit =
     object.source === "enterprise" ? ENTERPRISE_SEARCH_EXCERPT_CHARS : SEARCH_EXCERPT_CHARS;
   return {
-    objectId: object.id,
-    docId: parseDocumentObjectId(object.id) ?? "",
-    kbId: null,
+    objectId: object.retrievalNavigation
+      ? `obj:doc:${object.retrievalNavigation.docId}`
+      : object.id,
+    docId: object.retrievalNavigation?.docId ?? parseDocumentObjectId(object.id) ?? "",
+    kbId: object.retrievalNavigation?.kbId ?? null,
     title: object.title,
-    sourceUri: null,
+    sourceUri: object.retrievalNavigation?.sourceUri ?? null,
     section: null,
     excerpt: truncateUtf16Safe(object.summary.trim().replace(/\s+/g, " "), excerptLimit),
-    score: null,
+    score: object.retrievalNavigation?.score ?? null,
     governance: null,
   };
 }
@@ -431,36 +435,40 @@ export function createKnowledgeSearchTool(options?: KnowledgeConsumeToolOptions)
       }
 
       if (knowledgeBaseId) {
-        const evidence = await searchKnowledgeEvidence({
+        const result = await searchScopedKnowledgeBaseWithFallback({
+          client,
+          knowledgeBaseId,
           query,
           retrievalContext,
-          kbScope: [knowledgeBaseId],
           maxResults: limit,
         });
-        if (evidence.length > 0) {
-          return jsonResult({
-            ok: true,
-            searchMode: "indexed",
-            hits: evidence.map(hitFromEvidence),
-          });
-        }
         return jsonResult({
           ok: true,
-          searchMode: "substring",
-          hits: [],
-          hint: "not_indexed",
+          searchMode: result.searchMode,
+          hits: [
+            ...result.substringMatches.map(hitFromObject),
+            ...result.evidence.map(hitFromEvidence),
+          ].slice(0, limit),
+          note: "Summary matches are document navigation only; use knowledge_get to verify original evidence.",
         });
       }
 
       const result = await knowledgeSearch(client, { query, limit });
+      const summaryCandidates = await searchAuthorizedSummaryCandidates({
+        query,
+        retrievalContext,
+        limit,
+      });
+      const summaryHits = summaryCandidates.map(hitFromObject);
       const feedHits = result.results
         .filter((item) => item.source === "enterprise")
         .map(hitFromObject);
       if (result.searchMode === "indexed" && result.evidence.length > 0) {
-        const hits = [...feedHits, ...result.evidence.slice(0, limit).map(hitFromEvidence)].slice(
-          0,
-          limit,
-        );
+        const hits = [
+          ...summaryHits,
+          ...feedHits,
+          ...result.evidence.slice(0, limit).map(hitFromEvidence),
+        ].slice(0, limit);
         return jsonResult({
           ok: true,
           searchMode: feedHits.length > 0 ? "enterprise_feed" : "indexed",
@@ -475,7 +483,10 @@ export function createKnowledgeSearchTool(options?: KnowledgeConsumeToolOptions)
       return jsonResult({
         ok: true,
         searchMode: feedHits.length > 0 ? "enterprise_feed" : "substring",
-        hits: result.results.slice(0, limit).map(hitFromObject),
+        hits: [...summaryHits, ...result.results.slice(0, limit).map(hitFromObject)].slice(
+          0,
+          limit,
+        ),
         ...(feedHits.length > 0
           ? {
               note: "Enterprise feed hits are materialized knowledge objects. Cite their title and excerpt. Do not open 云电脑 and do not invoke connector actions.",

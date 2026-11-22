@@ -199,6 +199,7 @@ const BASE_METHOD_SCOPE_GROUPS: Record<OperatorScope, readonly string[]> = {
     "node.list",
     "node.describe",
     "chat.history",
+    "task.activity.get",
     "conversations.list",
     "conversations.get",
     "conversations.job",

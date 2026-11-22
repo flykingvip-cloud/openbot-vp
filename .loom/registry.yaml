@@ -1,5 +1,135 @@
 version: 1
 tasks:
+  - id: private-dependency-closure:codex-kb-implement
+    owner: codex-kb-implement
+    intent: []
+    paths:
+      - src/conversation-task/private-dependency*
+      - src/agents/tools/conversation-send-tool.ts
+      - src/conversation-task/conversation-handoff.ts
+      - src/diagnosis/diagnose-action-dispatch.ts
+      - src/gateway/server-maintenance.ts
+      - src/gateway/server-methods/chat.ts
+      - src/gateway/protocol/schema/logs-chat.ts
+      - .kiro/specs/private-dependency-closure/**
+      - src/gateway/server-methods/task-dependency-resume.test.ts
+    state: active
+    sessions:
+      - id: dependency-20261122
+        taskId: private-dependency-closure:codex-kb-implement
+        ide: codex
+        agent: codex-kb-implement
+        status: active
+        lastSignalAt: 2026-11-22T10:53:45.845Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-22
+    metadata: {}
+  - id: dynamic-task-activity:codex-kb-implement
+    owner: codex-kb-implement
+    intent: []
+    paths:
+      - src/shared/task-activity.ts
+      - src/gateway/server-methods/task-activity*
+      - ui/src/ui/chat/task-activity*
+      - ui/src/ui/views/chat.ts
+      - ui/src/ui/controllers/chat.ts
+      - .kiro/specs/dynamic-task-activity/**
+      - ui/src/ui/controllers/chat-task-progress-race.node.test.ts
+      - src/gateway/server-methods/chat.ts
+      - src/gateway/method-scopes.ts
+      - src/gateway/server-methods-list.ts
+    state: active
+    sessions:
+      - id: task-activity-20261122
+        taskId: dynamic-task-activity:codex-kb-implement
+        ide: codex
+        agent: codex-kb-implement
+        status: active
+        lastSignalAt: 2026-11-22T09:31:48.833Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-22
+    metadata: {}
+  - id: same-task-continuation:codex-kb-implement
+    owner: codex-kb-implement
+    intent:
+      - Bound continue/status interaction preserving task identity
+    paths:
+      - .kiro/specs/same-task-continuation/**
+      - src/agent-runtime/contracts/interaction.ts
+      - src/agent-runtime/contracts/task-binding.ts
+      - src/agent-runtime/command/interpret-interaction*
+      - src/agent-runtime/model/interaction-completion.ts
+      - src/agent-runtime/model/interaction-output-contract.ts
+      - src/agent-runtime/state/mutations/interaction-proposal.ts
+      - src/agent-runtime/state/mutations/resume-current*
+      - src/agent-runtime/command/task-proposal-reply*
+      - src/auto-reply/reply/get-reply-run.ts
+      - src/auto-reply/types.ts
+      - src/gateway/server-methods/chat.ts
+      - src/agent-runtime/wiring/same-task-continuation.test.ts
+    state: active
+    sessions:
+      - id: same-task-20261122
+        taskId: same-task-continuation:codex-kb-implement
+        ide: codex
+        agent: codex-kb-implement
+        status: active
+        lastSignalAt: 2026-11-22T08:14:09.836Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-22
+    metadata: {}
+  - id: office-pdf-font:codex-kb-implement
+    owner: codex-kb-implement
+    intent:
+      - Correct CFF OpenType PDF embedding and portable CJK font discovery
+    paths:
+      - src/office-suite/ttf*
+      - src/office-suite/pdf*
+    state: active
+    sessions:
+      - id: pdf-font-cff-20261122
+        taskId: office-pdf-font:codex-kb-implement
+        ide: codex
+        agent: codex-kb-implement
+        status: active
+        lastSignalAt: 2026-11-22T07:48:36.237Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-22
+    metadata: {}
+  - id: knowledge-retrieval-summary:codex-kb-implement
+    owner: codex-kb-implement
+    intent: []
+    paths:
+      - src/gateway/knowledge/retrieval-summary*
+      - src/gateway/knowledge/kb-ingest.ts
+      - src/gateway/knowledge/knowledge-base-library-content.ts
+      - src/gateway/knowledge/knowledge-retrieval-runtime.ts
+      - src/gateway/knowledge/types.ts
+      - src/gateway/server-maintenance.ts
+      - src/gateway/server-methods-list.ts
+      - src/gateway/server-methods/knowledge*
+      - src/agents/tools/knowledge-consume-tool*
+      - ui/src/ui/ports/employee/views/my-bot-data-surface*
+      - ui/src/ui/ports/employee/views/my-bot-workspace-panel.ts
+      - .kiro/specs/knowledge-retrieval-summary/**
+      - ui/src/ui/ports/employee/views/my-bot-data-surface.node.test.ts
+      - src/gateway/knowledge/kb-index.ts
+    state: active
+    sessions:
+      - id: kb-summary-implementation-session
+        taskId: knowledge-retrieval-summary:codex-kb-implement
+        ide: codex
+        agent: codex-kb-implement
+        status: active
+        lastSignalAt: 2026-11-22T05:04:33.627Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-22
+    metadata: {}
   - id: arch-remediation-wp-b-slice3-credits-reservation
     owner: codex-wpb-successor
     intent: []
@@ -15393,6 +15523,133 @@ tasks:
     since: 2026-11-22
     metadata: {}
 landingStreams:
+  - id: knowledge-retrieval-summary:codex-kb-review
+    landingPolicy: serial
+    paths:
+      - .kiro/specs/knowledge-retrieval-summary/design.md
+      - .kiro/specs/knowledge-retrieval-summary/tasks.md
+      - src/agents/tools/knowledge-consume-tool.test.ts
+      - src/agents/tools/knowledge-consume-tool.ts
+      - src/gateway/knowledge/kb-index.ts
+      - src/gateway/knowledge/kb-ingest.ts
+      - src/gateway/knowledge/knowledge-base-library-content.ts
+      - src/gateway/knowledge/knowledge-retrieval-runtime.ts
+      - src/gateway/knowledge/retrieval-summary-authority.test.ts
+      - src/gateway/knowledge/retrieval-summary-authority.ts
+      - src/gateway/knowledge/retrieval-summary-document.ts
+      - src/gateway/knowledge/retrieval-summary-evaluation.test.ts
+      - src/gateway/knowledge/retrieval-summary-hierarchy.test.ts
+      - src/gateway/knowledge/retrieval-summary-hierarchy.ts
+      - src/gateway/knowledge/retrieval-summary-live-evidence.test.ts
+      - src/gateway/knowledge/retrieval-summary-recall.test.ts
+      - src/gateway/knowledge/retrieval-summary-recall.ts
+      - src/gateway/knowledge/retrieval-summary-runtime.test.ts
+      - src/gateway/knowledge/retrieval-summary-runtime.ts
+      - src/gateway/knowledge/retrieval-summary-store.test.ts
+      - src/gateway/knowledge/retrieval-summary-store.ts
+      - src/gateway/knowledge/retrieval-summary-validation.test.ts
+      - src/gateway/knowledge/retrieval-summary-validation.ts
+      - src/gateway/knowledge/retrieval-summary-worker.test.ts
+      - src/gateway/knowledge/retrieval-summary-worker.ts
+      - src/gateway/knowledge/retrieval-summary.test.ts
+      - src/gateway/knowledge/retrieval-summary.ts
+      - src/gateway/knowledge/types.ts
+      - src/gateway/server-maintenance.ts
+      - src/gateway/server-methods-list.ts
+      - src/gateway/server-methods/knowledge-base-search-rpc.test.ts
+      - src/gateway/server-methods/knowledge.ts
+      - ui/src/ui/ports/employee/views/my-bot-data-surface.node.test.ts
+      - ui/src/ui/ports/employee/views/my-bot-data-surface.ts
+      - ui/src/ui/ports/employee/views/my-bot-workspace-panel.ts
+    canLandWith: []
+    metadata:
+      owner: codex-kb-review
+      task: knowledge-retrieval-summary
+  - id: closure-transfer-activity:codex-cron
+    landingPolicy: serial
+    paths:
+      - .kiro/specs/dynamic-task-activity/tasks.md
+      - src/gateway/method-scopes.ts
+      - src/gateway/server-methods-list.ts
+      - src/gateway/server-methods/task-activity-rpc.test.ts
+      - src/gateway/server-methods/task-activity-view.test.ts
+      - src/gateway/server-methods/task-activity-view.ts
+      - src/shared/task-activity.ts
+      - ui/src/ui/chat/task-activity-state.node.test.ts
+      - ui/src/ui/chat/task-activity-state.ts
+      - ui/src/ui/chat/task-activity.browser.test.ts
+      - ui/src/ui/chat/task-activity.ts
+      - ui/src/ui/controllers/chat-task-progress-race.node.test.ts
+      - ui/src/ui/controllers/chat.ts
+      - ui/src/ui/views/chat.ts
+    canLandWith:
+      - closure-transfer-delegation:codex-cron
+    metadata:
+      owner: codex-cron
+      task: autonomous-task-closure
+      reason: Explicit user-authorized ownership transfer; historical stream records
+        preserved.
+  - id: closure-transfer-delegation:codex-cron
+    landingPolicy: serial
+    paths:
+      - .kiro/specs/autonomous-task-closure-audit/findings.md
+      - src/agent-runtime/policy/dependency-resolution.test.ts
+      - src/agent-runtime/policy/dependency-resolution.ts
+      - src/agents/tools/conversation-send-dispatch.test.ts
+      - src/agents/tools/conversation-send-dispatch.ts
+      - src/agents/tools/conversation-send-tool.ts
+      - src/conversation-task/conversation-handoff.ts
+      - src/conversation-task/private-dependency-entry.test.ts
+      - src/conversation-task/private-dependency-runtime.ts
+      - src/conversation-task/private-dependency-state.ts
+      - src/conversation-task/private-dependency-store.ts
+      - src/conversation-task/private-dependency.test.ts
+      - src/diagnosis/diagnose-action-dispatch.ts
+      - src/gateway/protocol/schema/logs-chat.ts
+      - src/gateway/server-maintenance.ts
+      - src/gateway/server-methods/chat.ts
+      - src/gateway/server-methods/task-dependency-resume.test.ts
+    canLandWith:
+      - closure-transfer-activity:codex-cron
+    metadata:
+      owner: codex-cron
+      task: autonomous-task-closure
+      reason: Explicit user-authorized ownership transfer; historical stream records
+        preserved.
+  - id: closure-transfer-continuation:codex-cron
+    landingPolicy: serial
+    paths:
+      - .kiro/specs/same-task-continuation/tasks.md
+      - src/agent-runtime/command/interpret-interaction.ts
+      - src/agent-runtime/command/task-proposal-reply.test.ts
+      - src/agent-runtime/command/task-proposal-reply.ts
+      - src/agent-runtime/contracts/interaction.ts
+      - src/agent-runtime/contracts/task-binding.ts
+      - src/agent-runtime/model/interaction-completion.ts
+      - src/agent-runtime/model/interaction-output-contract.ts
+      - src/agent-runtime/state/mutations/interaction-proposal.ts
+      - src/agent-runtime/state/mutations/resume-current.test.ts
+      - src/agent-runtime/state/mutations/resume-current.ts
+      - src/agent-runtime/wiring/same-task-continuation.test.ts
+      - src/auto-reply/reply/get-reply-run.ts
+    canLandWith: []
+    metadata:
+      owner: codex-cron
+      task: autonomous-task-closure
+      reason: Explicit user-authorized ownership transfer; historical stream records
+        preserved.
+  - id: closure-transfer-pdf:codex-cron
+    landingPolicy: serial
+    paths:
+      - src/office-suite/pdf-font.test.ts
+      - src/office-suite/pdf.ts
+      - src/office-suite/ttf.ts
+    canLandWith: []
+    metadata:
+      owner: codex-cron
+      task: autonomous-task-closure
+      reason: Explicit user-authorized ownership transfer; historical stream records
+        preserved.
   - id: cron-fire-budget-reviewed-integration
     landingPolicy: serial
     paths:

@@ -21,7 +21,9 @@ export function commitInteractionTaskProposal(params: {
     const current = board.current;
     if (
       !current ||
-      (!current.unfinished && params.decision.kind !== "task_change") ||
+      (!current.unfinished &&
+        params.decision.kind !== "task_change" &&
+        !(params.decision.kind === "task_control" && params.decision.action === "status")) ||
       !taskMatchesResetGeneration(current, board) ||
       current.taskId !== params.decision.target.taskId ||
       board.focusRevision !== params.expectedFocusRevision ||
@@ -58,6 +60,16 @@ export function commitInteractionTaskProposal(params: {
         text: "要求已写入原任务板；后续恢复将读取最新要求。",
         abort: false,
       };
+    }
+    if (params.decision.action === "status") {
+      return {
+        kind: "applied",
+        text: `任务板记录：「${current.title}」${current.unfinished ? "尚未完成" : "已结束待核对"}。${current.stop.summary || "暂无进度记录。"}`,
+        abort: false,
+      };
+    }
+    if (params.decision.action === "continue") {
+      return { kind: "rejected", reason: "continue_requires_live_recheck" };
     }
     if (params.decision.action === "resume") {
       // Resume still requires Gateway's live authorization and stop recheck.

@@ -226,8 +226,15 @@ function serializePdf(input: {
     objects.push(Buffer.isBuffer(body) ? body : Buffer.from(body, "latin1"));
     return objects.length;
   };
+  const isCff = input.font?.outlineFormat === "opentype-cff";
   const fontFile = input.font
-    ? add(streamObject("<< /Length ", deflateSync(input.font.bytes), " /Filter /FlateDecode >>"))
+    ? add(
+        streamObject(
+          "<< /Length ",
+          deflateSync(input.font.bytes),
+          isCff ? " /Filter /FlateDecode /Subtype /OpenType >>" : " /Filter /FlateDecode >>",
+        ),
+      )
     : 0;
   const toUnicodeMap = new Map<number, string>();
   for (const page of input.pages) {
@@ -247,20 +254,31 @@ function serializePdf(input: {
   );
   const descriptor = add(
     `<< /Type /FontDescriptor /FontName /OpenBotOffice /Flags 4 /FontBBox [0 -200 1000 900] /ItalicAngle 0 /Ascent 900 /Descent -200 /CapHeight 700${
-      fontFile ? ` /FontFile2 ${fontFile} 0 R` : ""
+      fontFile ? ` /${isCff ? "FontFile3" : "FontFile2"} ${fontFile} 0 R` : ""
     } >>`,
   );
   const cidFont = add(
-    `<< /Type /Font /Subtype /CIDFontType2 /BaseFont /OpenBotOffice /CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> /FontDescriptor ${descriptor} 0 R /DW 1000 >>`,
+    `<< /Type /Font /Subtype /${isCff ? "CIDFontType0" : "CIDFontType2"} /BaseFont /OpenBotOffice /CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> /FontDescriptor ${descriptor} 0 R /DW 1000 >>`,
   );
   const fontRef = add(
     `<< /Type /Font /Subtype /Type0 /BaseFont /OpenBotOffice /Encoding /Identity-H /DescendantFonts [${cidFont} 0 R] /ToUnicode ${toUnicode} 0 R >>`,
   );
   const fieldRefs: number[] = [];
   for (const field of input.fields) {
+    const fieldMissing = new Set<string>();
+    const fieldHex = Array.from(field.value)
+      .map((char) => glyphId(char, input.font, fieldMissing).toString(16).padStart(4, "0"))
+      .join("");
+    const appearance = add(
+      streamObject(
+        `<< /Type /XObject /Subtype /Form /BBox [0 0 230 22] /Resources << /Font << /F1 ${fontRef} 0 R >> >> /Length `,
+        Buffer.from(`BT /F1 11 Tf 1 0 0 1 2 5 Tm <${fieldHex}> Tj ET`, "latin1"),
+        " >>",
+      ),
+    );
     fieldRefs.push(
       add(
-        `<< /Type /Annot /Subtype /Widget /FT /Tx /T ${pdfHexString(field.name)} /V ${pdfHexString(field.value)} /Rect [50 36 280 58] /F 4 /DA (/Helv 11 Tf 0 g) >>`,
+        `<< /Type /Annot /Subtype /Widget /FT /Tx /T ${pdfHexString(field.name)} /V ${pdfHexString(field.value)} /Rect [50 36 280 58] /F 4 /DA (/F1 11 Tf 0 g) /AP << /N ${appearance} 0 R >> >>`,
       ),
     );
   }
@@ -296,7 +314,7 @@ function serializePdf(input: {
     throw new Error("pdf page tree id drifted");
   }
   const acro = fieldRefs.length
-    ? ` /AcroForm << /Fields [${fieldRefs.map((ref) => `${ref} 0 R`).join(" ")}] /NeedAppearances true >>`
+    ? ` /AcroForm << /Fields [${fieldRefs.map((ref) => `${ref} 0 R`).join(" ")}] /NeedAppearances false /DR << /Font << /F1 ${fontRef} 0 R >> >> >>`
     : "";
   const catalog = add(`<< /Type /Catalog /Pages ${pagesRef} 0 R${acro} >>`);
   let pdf = Buffer.from("%PDF-1.4\n%\xFF\xFF\xFF\xFF\n", "latin1");

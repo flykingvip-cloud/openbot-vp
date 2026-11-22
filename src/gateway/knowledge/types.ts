@@ -40,6 +40,7 @@ export type KnowledgeObject = {
   source: KnowledgeSource;
   kind: KnowledgeObjectKind;
   summary: string;
+  retrievalNavigation?: { docId: string; kbId: string; sourceUri: string; score: number };
   tags: string[];
   updatedAt: number;
   relatedObjectIds?: string[];
