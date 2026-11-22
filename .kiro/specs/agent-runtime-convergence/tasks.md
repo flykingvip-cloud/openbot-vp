@@ -1511,37 +1511,37 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 ### SHA chain (D1→D6)
 
-| Slice | SHA | Summary |
-| --- | --- | --- |
-| D1 | `46583726e5fc927a7bb77761759210bf2898f862` | Freeze `createControlledExecutionUseCase` / stage order; lifecycle factories implement it |
-| D2 | `05d38f2106d61f66b885f07349459c21c5d7c3f3` | Chat `runAdmittedTurn` scene adapter + stage assert; success≠delivery |
-| D3 | `2233b3cd3019d2f38c92931244d2174fdb2a65ce` | Command host → same use-case; E2/E3/E6 ports retained; deny before ACP/candidate |
-| D4 | `d9410d90d6ef699d8cb7e817152ea1d5adb2533a` | Cron/Followup `controlledExecution` + shared `assertControlledExecutionStages` |
-| D5 | `c11635004a53d03a0f4f271eb5990cef01d6545c` | Memory flush + slug → `resolveAuxiliaryModelGovernance` (no task creation) |
-| D6 | `2dfcb9c80055b54b0fa28301d5d5883572c48a20` | Supervisor work-item admit via `createSupervisorWorkItemLifecycle` before CLI/node |
+| Slice | SHA                                        | Summary                                                                                   |
+| ----- | ------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| D1    | `46583726e5fc927a7bb77761759210bf2898f862` | Freeze `createControlledExecutionUseCase` / stage order; lifecycle factories implement it |
+| D2    | `05d38f2106d61f66b885f07349459c21c5d7c3f3` | Chat `runAdmittedTurn` scene adapter + stage assert; success≠delivery                     |
+| D3    | `2233b3cd3019d2f38c92931244d2174fdb2a65ce` | Command host → same use-case; E2/E3/E6 ports retained; deny before ACP/candidate          |
+| D4    | `d9410d90d6ef699d8cb7e817152ea1d5adb2533a` | Cron/Followup `controlledExecution` + shared `assertControlledExecutionStages`            |
+| D5    | `c11635004a53d03a0f4f271eb5990cef01d6545c` | Memory flush + slug → `resolveAuxiliaryModelGovernance` (no task creation)                |
+| D6    | `2dfcb9c80055b54b0fa28301d5d5883572c48a20` | Supervisor work-item admit via `createSupervisorWorkItemLifecycle` before CLI/node        |
 
 ### Duty / production call sites
 
-| Host | Owner of stage order | Production entry | Scene retains |
-| --- | --- | --- | --- |
-| Chat | `createExecutionLifecycle` → controlled use-case | `execution/index.runAdmittedTurn` | task binding, tip budget, recovery, deferred `commitGrowthOutcome` |
-| Command | `createCommandExecutionLifecycle` | `commands/agent.ts` | E2/E3/E6, ACP, command budget/outcome |
-| Cron | `createExecutionLifecycle` | `cron/isolated-agent/run.ts` | ledger, schedule, delivery |
-| Followup | `createExecutionLifecycle` | `auto-reply/reply/followup-runner.ts` | queue/OGUI/typing/delivery |
-| Memory/slug | auxiliary model contract (not work-item lifecycle) | `agent-runner-memory.ts`, `hooks/llm-slug-generator.ts` | file write (flush), filename only (slug) |
-| Supervisor | `createSupervisorWorkItemLifecycle` | `gateway/supervisor/worker-executor.ts` | placement, node invoke, CLI worker, cancel registry |
+| Host        | Owner of stage order                               | Production entry                                        | Scene retains                                                      |
+| ----------- | -------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------ |
+| Chat        | `createExecutionLifecycle` → controlled use-case   | `execution/index.runAdmittedTurn`                       | task binding, tip budget, recovery, deferred `commitGrowthOutcome` |
+| Command     | `createCommandExecutionLifecycle`                  | `commands/agent.ts`                                     | E2/E3/E6, ACP, command budget/outcome                              |
+| Cron        | `createExecutionLifecycle`                         | `cron/isolated-agent/run.ts`                            | ledger, schedule, delivery                                         |
+| Followup    | `createExecutionLifecycle`                         | `auto-reply/reply/followup-runner.ts`                   | queue/OGUI/typing/delivery                                         |
+| Memory/slug | auxiliary model contract (not work-item lifecycle) | `agent-runner-memory.ts`, `hooks/llm-slug-generator.ts` | file write (flush), filename only (slug)                           |
+| Supervisor  | `createSupervisorWorkItemLifecycle`                | `gateway/supervisor/worker-executor.ts`                 | placement, node invoke, CLI worker, cancel registry                |
 
 ### Order regressions (D7 suite on HEAD)
 
 OPENBOT_TEST_PROFILE=low — **12 files / 63 PASS**. No environment failures in this run (stderr lines are expected agent-error logs inside PASS cases, not env FAIL).
 
-| Requirement | Evidence |
-| --- | --- |
-| Refuse admission → no backend | controlled-execution deny; admitted-turn deny; command-lifecycle deny; supervisor-lifecycle deny; cron ledger “does not prefetch…when admission is denied” |
-| Cancel → no next candidate / no CLI start | controlled-execution cancel; admitted-turn cancel; command-lifecycle cancel; supervisor cancel-after-prepare |
-| Fail/fallback billing identity | admitted-turn cleanup order release-before-forget; supervisor billing `executionId` uses commercial admission run id; command/admission-session release-before-forget |
-| Dispose exactly once | controlled/command/supervisor dispose-once tests; chat finally dispose |
-| Execution success ≠ delivery | admitted-turn deferred `commitGrowthOutcome`; command outcome closeout separate from infer |
+| Requirement                               | Evidence                                                                                                                                                              |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Refuse admission → no backend             | controlled-execution deny; admitted-turn deny; command-lifecycle deny; supervisor-lifecycle deny; cron ledger “does not prefetch…when admission is denied”            |
+| Cancel → no next candidate / no CLI start | controlled-execution cancel; admitted-turn cancel; command-lifecycle cancel; supervisor cancel-after-prepare                                                          |
+| Fail/fallback billing identity            | admitted-turn cleanup order release-before-forget; supervisor billing `executionId` uses commercial admission run id; command/admission-session release-before-forget |
+| Dispose exactly once                      | controlled/command/supervisor dispose-once tests; chat finally dispose                                                                                                |
+| Execution success ≠ delivery              | admitted-turn deferred `commitGrowthOutcome`; command outcome closeout separate from infer                                                                            |
 
 Also: auxiliary governance 3 PASS; slug wiring 1 PASS; memory governance 8 PASS; worker-executor 5 PASS; commercial-hint 2 PASS.
 
@@ -1599,34 +1599,34 @@ Also: auxiliary governance 3 PASS; slug wiring 1 PASS; memory governance 8 PASS;
 
 ### SHA chain (P2-D1→P2-D4)
 
-| Slice | SHA | Summary |
-| --- | --- | --- |
+| Slice | SHA                                        | Summary                                                                                                                                           |
+| ----- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | P2-D1 | `eb5e1e5303b9fe24245cccac549e3dd08557ecfe` | Durable async-wait job intent under `dirname(sessionFile)/async-wait-jobs/`; record on background+notify; mark exited; clear on refuse/owner stop |
-| P2-D2 | `168c164f733c340056cf0cf269f128784c3b955e` | Boot recovery claim next to TaskOutcome consumer-boot in `server.impl`; pid alive → wait; exited → one bounded wake; light recheck |
-| P2-D3 | `e7c1763894fbbe32139bbe5eeae8641f724d4c2e` | Stale callback after pause/cancel/replace does not wake/exec; cleared intent short-circuits notify; claimQueuedExecution rejects |
-| P2-D4 | `529eaa1fe12bc133b31971f22de2100bfb5b6cef` | Proactive recovered-completion delivery via pending-delivery + system-event + heartbeat; idempotent `proactiveDeliveryIssuedAtMs` |
+| P2-D2 | `168c164f733c340056cf0cf269f128784c3b955e` | Boot recovery claim next to TaskOutcome consumer-boot in `server.impl`; pid alive → wait; exited → one bounded wake; light recheck                |
+| P2-D3 | `e7c1763894fbbe32139bbe5eeae8641f724d4c2e` | Stale callback after pause/cancel/replace does not wake/exec; cleared intent short-circuits notify; claimQueuedExecution rejects                  |
+| P2-D4 | `529eaa1fe12bc133b31971f22de2100bfb5b6cef` | Proactive recovered-completion delivery via pending-delivery + system-event + heartbeat; idempotent `proactiveDeliveryIssuedAtMs`                 |
 
 ### Duty / production call sites
 
-| Concern | Owner | Production entry | Notes |
-| --- | --- | --- | --- |
-| Intent write | `async-wait-job` repo | `bash-process-registry.markBackgrounded` / `markExited` | Only notify+live boundary |
-| Intent clear | same | `maybeNotifyOnExit` boundary refuse; `suppressCurrentTaskWake` / `cancelCurrentTask` (+ sessionFile); explicit/interaction control | Owner stop wins |
-| Boot recovery | `async-wait-job-recovery` | `gateway/server.impl` next to `recoverTaskOutcomeConsumersAtGatewayBoot` | Scans agent sessions `async-wait-jobs/`; recheck interval unref'd |
-| Proactive delivery | `deliverRecoveredAsyncWaitCompletion` | claim path at boot/recheck | Registers `async-wait-recovery:<jobId>` pending-delivery; one event+wake |
-| Stale fence | TaskActionBoundary + claimQueuedExecution | exec notify, followup, delivery-queue/deliver | Existing hosts retained |
+| Concern            | Owner                                     | Production entry                                                                                                                   | Notes                                                                    |
+| ------------------ | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Intent write       | `async-wait-job` repo                     | `bash-process-registry.markBackgrounded` / `markExited`                                                                            | Only notify+live boundary                                                |
+| Intent clear       | same                                      | `maybeNotifyOnExit` boundary refuse; `suppressCurrentTaskWake` / `cancelCurrentTask` (+ sessionFile); explicit/interaction control | Owner stop wins                                                          |
+| Boot recovery      | `async-wait-job-recovery`                 | `gateway/server.impl` next to `recoverTaskOutcomeConsumersAtGatewayBoot`                                                           | Scans agent sessions `async-wait-jobs/`; recheck interval unref'd        |
+| Proactive delivery | `deliverRecoveredAsyncWaitCompletion`     | claim path at boot/recheck                                                                                                         | Registers `async-wait-recovery:<jobId>` pending-delivery; one event+wake |
+| Stale fence        | TaskActionBoundary + claimQueuedExecution | exec notify, followup, delivery-queue/deliver                                                                                      | Existing hosts retained                                                  |
 
 ### Order regressions (P2 suite on evidence HEAD)
 
 OPENBOT_TEST_PROFILE=low — **5 files / 20 PASS**:
 
-| Requirement | Evidence |
-| --- | --- |
-| Durable intent survives reread | async-wait-job 4 PASS |
-| pid alive → wait; exited → one wake | async-wait-job-recovery (alive/exit/boot) |
-| Proactive delivery idempotent | recovery “proactive recovered delivery is idempotent” |
-| Pause/cancel/replace → no wake/exec | exec.task-binding 5 PASS (incl. cancelled); stale-callback 3 PASS; claimQueuedExecution rejected after cancel |
-| Task board authority under real background exit | async-process-lifecycle 2 PASS |
+| Requirement                                     | Evidence                                                                                                      |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Durable intent survives reread                  | async-wait-job 4 PASS                                                                                         |
+| pid alive → wait; exited → one wake             | async-wait-job-recovery (alive/exit/boot)                                                                     |
+| Proactive delivery idempotent                   | recovery “proactive recovered delivery is idempotent”                                                         |
+| Pause/cancel/replace → no wake/exec             | exec.task-binding 5 PASS (incl. cancelled); stale-callback 3 PASS; claimQueuedExecution rejected after cancel |
+| Task board authority under real background exit | async-process-lifecycle 2 PASS                                                                                |
 
 ### Gates on evidence HEAD
 
@@ -1659,21 +1659,21 @@ OPENBOT_TEST_PROFILE=low — **5 files / 20 PASS**:
 
 ### Evidence (isolated)
 
-| Kind | Suite | Result |
-| --- | --- | --- |
-| Unit / same-process | async-wait-job 6, recovery 6, stale-callback 3 | PASS |
-| Mock heartbeat/events | removed as delivery proof; continue enqueue mocked in unit recovery | PASS |
-| Real two-process | async-wait-recovery.cross-process 4 (A write→B execute+receipt; dual claim; crash-retry; stop concurrent) | PASS |
-| Related retain | exec.task-binding 5, async-process-lifecycle 2, confirm-pending 5 | PASS |
+| Kind                  | Suite                                                                                                     | Result |
+| --------------------- | --------------------------------------------------------------------------------------------------------- | ------ |
+| Unit / same-process   | async-wait-job 6, recovery 6, stale-callback 3                                                            | PASS   |
+| Mock heartbeat/events | removed as delivery proof; continue enqueue mocked in unit recovery                                       | PASS   |
+| Real two-process      | async-wait-recovery.cross-process 4 (A write→B execute+receipt; dual claim; crash-retry; stop concurrent) | PASS   |
+| Related retain        | exec.task-binding 5, async-process-lifecycle 2, confirm-pending 5                                         | PASS   |
 
 Registry sharedPaths remain uncommitted for kiro-loom. Protected files preserved. No push/merge/deploy. ### Remediation SHA chain
 
-| Commit | SHA | Focus |
-| --- | --- | --- |
-| Atomic claim + evidence | `0255a06bc3e7cab4a5a142dffe86dc36f9eb75e2` | lock transitions; PID unconfirmed ≠ success |
-| Continue mainline | `62cc6114cf25c512d13b46f6ec6523ee6988ecfd` | arm task-board continue; bind real runId; confirm→delivered |
-| Evidence note | `5c9c5cc6d378f41301f4aea87966caa8e96cfee9` | tasks.md remediations |
-| Cross-process coverage | `d2bafcb14b47153e83cafc22d3daebf8ded8a7c3` | A→B execute+receipt; dual claim; crash retry; stop |
+| Commit                  | SHA                                        | Focus                                                       |
+| ----------------------- | ------------------------------------------ | ----------------------------------------------------------- |
+| Atomic claim + evidence | `0255a06bc3e7cab4a5a142dffe86dc36f9eb75e2` | lock transitions; PID unconfirmed ≠ success                 |
+| Continue mainline       | `62cc6114cf25c512d13b46f6ec6523ee6988ecfd` | arm task-board continue; bind real runId; confirm→delivered |
+| Evidence note           | `5c9c5cc6d378f41301f4aea87966caa8e96cfee9` | tasks.md remediations                                       |
+| Cross-process coverage  | `d2bafcb14b47153e83cafc22d3daebf8ded8a7c3` | A→B execute+receipt; dual claim; crash retry; stop          |
 
 **Re-acceptance tip:** `d2bafcb14b47153e83cafc22d3daebf8ded8a7c3`
 
@@ -1695,15 +1695,15 @@ Preserved: lock-in-RMW, clear protection, PID-missing=unconfirmed, actual boot c
 
 ### Evidence (labeled)
 
-| Kind | Suite | Result |
-| --- | --- | --- |
-| Real queue/process + model stub + channel stub | `async-wait-recovery.production-path` 1 | PASS (boot→enqueue→followup drain→claim→model stub→channel stub→confirmPending→delivered) |
-| Trusted enqueue + cold-start consumer | `async-wait-recovery-enqueue` 2 | PASS |
-| Claim prompt merge | `claim-queued-execution.recovery-prompt` 2 | PASS |
-| Stage/token fences + overlapping stop | `async-wait-job.claim-fence` 5 | PASS |
-| Unit recovery (incl. delivery_only + attempt sync) | `async-wait-job-recovery` 8 | PASS |
-| Intent / stale-callback | async-wait-job 6, stale-callback 3 | PASS |
-| Real two-process (renamed; NOT full loop proof) | cross-process 4 — manual-inject receipt; dual claim; crash-retry; sequential stop-then-retry | PASS |
+| Kind                                               | Suite                                                                                        | Result                                                                                    |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Real queue/process + model stub + channel stub     | `async-wait-recovery.production-path` 1                                                      | PASS (boot→enqueue→followup drain→claim→model stub→channel stub→confirmPending→delivered) |
+| Trusted enqueue + cold-start consumer              | `async-wait-recovery-enqueue` 2                                                              | PASS                                                                                      |
+| Claim prompt merge                                 | `claim-queued-execution.recovery-prompt` 2                                                   | PASS                                                                                      |
+| Stage/token fences + overlapping stop              | `async-wait-job.claim-fence` 5                                                               | PASS                                                                                      |
+| Unit recovery (incl. delivery_only + attempt sync) | `async-wait-job-recovery` 8                                                                  | PASS                                                                                      |
+| Intent / stale-callback                            | async-wait-job 6, stale-callback 3                                                           | PASS                                                                                      |
+| Real two-process (renamed; NOT full loop proof)    | cross-process 4 — manual-inject receipt; dual claim; crash-retry; sequential stop-then-retry | PASS                                                                                      |
 
 Registry sharedPaths for new files appended uncommitted for kiro-loom. Protected files preserved. No push/merge/deploy. Package 3 not started.
 
@@ -1728,16 +1728,16 @@ Preserved: prior remelt cold-start consumer, claim fences, trusted enqueue field
 
 ### Validation evidence
 
-| Case | Suite | Result |
-| --- | --- | --- |
-| ensure+createFollowupRunner → delivered from stubs | production-path happy | PASS |
-| channel fail ≠ delivered; delivery-only retry no re-model | production-path channel-fail | PASS |
-| missing trusted identity refuse | production-path identity | PASS |
-| crash after claim recoverable | cross-process crash-retry | PASS |
-| dual-process cannot overwrite same exec | cross-process dual claim | PASS |
-| stage/token fences + stop/stale | claim-fence 5 | PASS |
-| delivery_only arm + attempt sync | async-wait-job-recovery | PASS |
-| Related Package2 suites | 7 files / 30 tests | PASS |
+| Case                                                      | Suite                        | Result |
+| --------------------------------------------------------- | ---------------------------- | ------ |
+| ensure+createFollowupRunner → delivered from stubs        | production-path happy        | PASS   |
+| channel fail ≠ delivered; delivery-only retry no re-model | production-path channel-fail | PASS   |
+| missing trusted identity refuse                           | production-path identity     | PASS   |
+| crash after claim recoverable                             | cross-process crash-retry    | PASS   |
+| dual-process cannot overwrite same exec                   | cross-process dual claim     | PASS   |
+| stage/token fences + stop/stale                           | claim-fence 5                | PASS   |
+| delivery_only arm + attempt sync                          | async-wait-job-recovery      | PASS   |
+| Related Package2 suites                                   | 7 files / 30 tests           | PASS   |
 
 Typed oxlint on changed sources: 0 warnings / 0 errors.
 
@@ -1760,18 +1760,17 @@ Preserved: production `ensureAsyncWaitRecoveryFollowupConsumer` → `createFollo
 
 ### Regression evidence
 
-| Case | Suite | Result |
-| --- | --- | --- |
-| Original payload retry match + channel fail no close/no re-model | production-path 3 | PASS |
-| Payload retain / token reject / CAS rollback / prepare holder / no double claim | four-defects 6 | PASS |
-| Live/dead fence + exclusive bind + delivery_only | claim-fence 5 | PASS |
-| Real process crash/dual/stop | cross-process 4 | PASS |
-| Related Package2 | 8 files / 36 tests | PASS |
+| Case                                                                            | Suite              | Result |
+| ------------------------------------------------------------------------------- | ------------------ | ------ |
+| Original payload retry match + channel fail no close/no re-model                | production-path 3  | PASS   |
+| Payload retain / token reject / CAS rollback / prepare holder / no double claim | four-defects 6     | PASS   |
+| Live/dead fence + exclusive bind + delivery_only                                | claim-fence 5      | PASS   |
+| Real process crash/dual/stop                                                    | cross-process 4    | PASS   |
+| Related Package2                                                                | 8 files / 36 tests | PASS   |
 
 Typed oxlint on changed sources: 0 warnings / 0 errors.
 
 **Remelt tip for re-acceptance:** `378a65402` (4-defect close). Prior failed tip `efe0e2ce9` retained above. — grok-bot
-
 
 ## Package 2 remelt — close 3 remaining defects (2026-11-08)
 
@@ -1787,12 +1786,12 @@ Preserved: original payload remelt, delivery_unknown, accepted/rejected bind, de
 
 ### Regression evidence
 
-| Case | Suite | Result |
-| --- | --- | --- |
-| Same token different run refused; original unchanged | four-defects | PASS |
-| Gateway-alive after release recoverable; old token fenced | four-defects | PASS |
-| Absent identity rollback → original binding re-claims | four-defects | PASS |
-| Prior four-defects + production-path + claim-fence + related | 7 files / 34 tests | PASS |
+| Case                                                         | Suite              | Result |
+| ------------------------------------------------------------ | ------------------ | ------ |
+| Same token different run refused; original unchanged         | four-defects       | PASS   |
+| Gateway-alive after release recoverable; old token fenced    | four-defects       | PASS   |
+| Absent identity rollback → original binding re-claims        | four-defects       | PASS   |
+| Prior four-defects + production-path + claim-fence + related | 7 files / 34 tests | PASS   |
 
 Typed oxlint on changed sources: 0 warnings / 0 errors.
 
@@ -1810,20 +1809,20 @@ Charter applied: only fix (1) new main-chain takeover, (2) duty mix, or (3) old 
 
 #### Already done (evidence — do not rebuild)
 
-| Item | Production owner / consumer | Evidence |
-| --- | --- | --- |
-| Individual material catalog + `assembleIndividual` | `context/catalog/individual.ts` → `get-reply-run` individual branch | tasks 2026-11-08 individual catalog; assembly rejects group ids; aside-dialogue non-collab must not contain `GROUP_MIDDLE` (4 PASS this turn) |
-| Collaboration material catalog + `assembleCollaborationMember` | `runtime-context-assembly` → catalog order | tasks collab catalog; host reads + delivery side-effect stay in host; collab capability context 4 PASS |
-| Shared late-context ordering | `appendSharedTurnContext` on both branches | tasks late-context; assembly.test shared-order + reject unknown |
-| Capability declaration inventory (data-only) | `capabilities/catalog.declareCapability` attached in `before-call` wrap | contract: metadata never grants permission; catalog.test 3 PASS; tool policy / task boundary / hooks remain real gates |
-| Cron pre-admission tool prefetch retired | scheduled host no longer prefeches before denied admission | prior Package work; not reopened |
-| Composer mention pre-admission execute suppressed | mention → hints only; admitted runner owns tools | get-reply-run comments + prior remelt |
+| Item                                                           | Production owner / consumer                                             | Evidence                                                                                                                                      |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Individual material catalog + `assembleIndividual`             | `context/catalog/individual.ts` → `get-reply-run` individual branch     | tasks 2026-11-08 individual catalog; assembly rejects group ids; aside-dialogue non-collab must not contain `GROUP_MIDDLE` (4 PASS this turn) |
+| Collaboration material catalog + `assembleCollaborationMember` | `runtime-context-assembly` → catalog order                              | tasks collab catalog; host reads + delivery side-effect stay in host; collab capability context 4 PASS                                        |
+| Shared late-context ordering                                   | `appendSharedTurnContext` on both branches                              | tasks late-context; assembly.test shared-order + reject unknown                                                                               |
+| Capability declaration inventory (data-only)                   | `capabilities/catalog.declareCapability` attached in `before-call` wrap | contract: metadata never grants permission; catalog.test 3 PASS; tool policy / task boundary / hooks remain real gates                        |
+| Cron pre-admission tool prefetch retired                       | scheduled host no longer prefeches before denied admission              | prior Package work; not reopened                                                                                                              |
+| Composer mention pre-admission execute suppressed              | mention → hints only; admitted runner owns tools                        | get-reply-run comments + prior remelt                                                                                                         |
 
 #### Package3 blockers (would fix now)
 
-| Item | Verdict |
-| --- | --- |
-| *(none)* | No dual context assembly path controlling the reply mainline outside catalogs. No capability metadata authorizing execution. No old individual path still injecting group materials. loadTransform / full Builder lifecycle / per-adapter contracts do **not** meet the three-criteria breakpoint test without rebuilding catalogs or inventing a new control surface. |
+| Item     | Verdict                                                                                                                                                                                                                                                                                                                                                                |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| _(none)_ | No dual context assembly path controlling the reply mainline outside catalogs. No capability metadata authorizing execution. No old individual path still injecting group materials. loadTransform / full Builder lifecycle / per-adapter contracts do **not** meet the three-criteria breakpoint test without rebuilding catalogs or inventing a new control surface. |
 
 #### Follow-up (no breakpoint — must not block this package)
 
@@ -1849,11 +1848,11 @@ Tool path: wrapToolWithBeforeToolCallHook → existing policy/hooks/boundary; de
 
 ### Verification this turn (read-only)
 
-| Suite | Result |
-| --- | --- |
-| `context/assembly` + `capabilities/catalog` + `model-resolve-hooks` | 3 files / 14 PASS |
-| `get-reply-run.aside-dialogue-context` + `collaboration-capability-context` | 2 files / 8 PASS |
-| Source edits for Package3 blockers | **none** (zero blockers) |
+| Suite                                                                       | Result                   |
+| --------------------------------------------------------------------------- | ------------------------ |
+| `context/assembly` + `capabilities/catalog` + `model-resolve-hooks`         | 3 files / 14 PASS        |
+| `get-reply-run.aside-dialogue-context` + `collaboration-capability-context` | 2 files / 8 PASS         |
+| Source edits for Package3 blockers                                          | **none** (zero blockers) |
 
 **Remelt tip for Package3 acceptance:** `17101ca9eca4010b0765720c81d47d684f14ad67` (gap verification only; zero blockers). Prior Package2 tip `4509f11b9` retained. — grok-bot
 
@@ -1871,22 +1870,22 @@ Focus checks verified on committed tip (worktree also carries unrelated concurre
 
 #### Already done (evidence — reuse)
 
-| Focus | Current production behavior | Evidence this turn |
-| --- | --- | --- |
-| Silent ≠ delivered without send | `completeReplyDelivery` sets `deliveryPhase: sent ? "delivered" : "awaiting"`; legitimate silence (group/heartbeat/internal/filtered) commits `delivery: { status: "pending" }` unless reaction/messaging-tool send observed | `complete-reply.test` 23 PASS (silence→pending; messaging-tool→delivered) |
-| Placeholder ≠ close | Language-filtered process placeholder commits `processPlaceholder: true` and keeps continuation; TaskOutcome keeps acceptance/delivery pending | complete-reply placeholder case + runtime-from-runner comments |
-| Visible prepare ≠ delivered | `prepareVisibleDelivery` always `deliveryPhase: "awaiting"`; only transport `confirmPendingTurnDelivery` may mark delivered | prepare-visible 12 PASS; confirm-pending 5 PASS |
-| Delivery fail ≠ re-run business | Async-wait recovery: channel fail → `delivery_unknown`; retry is delivery-only with original `boundPayloads` (no model) | production-path 3 PASS incl. channel-fail delivery-only |
-| Verified work ≠ business continue before receipt | Visible `acceptanceStatus===passed` skips `considerContinuation` | complete-reply.ts + prior tasks checkpoint |
-| Artifact version bind / stale edit | Acceptance criteria bind task+`deliverableVersion`+hash; validator match detects stale/version_mismatch; PPTX patch CAS one-writer | criteria 5 + validation 3 + patch-pptx 1 PASS |
-| PPT preview vs download isolation | HTML preview lane keeps separate original-byte download URL; sidebar refuses Office HTML as `.pptx` download; save refuses preview text as Office original | download-lane 9 + html-preview 6 + deliverable-save 24 + workspace-file-preview 21 + pptx-preview-edit 4 PASS |
-| Cron presentation ≠ board mutate | Prior Package work; presentation-only notices | tasks cron presentation checkpoint |
+| Focus                                            | Current production behavior                                                                                                                                                                                                  | Evidence this turn                                                                                            |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Silent ≠ delivered without send                  | `completeReplyDelivery` sets `deliveryPhase: sent ? "delivered" : "awaiting"`; legitimate silence (group/heartbeat/internal/filtered) commits `delivery: { status: "pending" }` unless reaction/messaging-tool send observed | `complete-reply.test` 23 PASS (silence→pending; messaging-tool→delivered)                                     |
+| Placeholder ≠ close                              | Language-filtered process placeholder commits `processPlaceholder: true` and keeps continuation; TaskOutcome keeps acceptance/delivery pending                                                                               | complete-reply placeholder case + runtime-from-runner comments                                                |
+| Visible prepare ≠ delivered                      | `prepareVisibleDelivery` always `deliveryPhase: "awaiting"`; only transport `confirmPendingTurnDelivery` may mark delivered                                                                                                  | prepare-visible 12 PASS; confirm-pending 5 PASS                                                               |
+| Delivery fail ≠ re-run business                  | Async-wait recovery: channel fail → `delivery_unknown`; retry is delivery-only with original `boundPayloads` (no model)                                                                                                      | production-path 3 PASS incl. channel-fail delivery-only                                                       |
+| Verified work ≠ business continue before receipt | Visible `acceptanceStatus===passed` skips `considerContinuation`                                                                                                                                                             | complete-reply.ts + prior tasks checkpoint                                                                    |
+| Artifact version bind / stale edit               | Acceptance criteria bind task+`deliverableVersion`+hash; validator match detects stale/version_mismatch; PPTX patch CAS one-writer                                                                                           | criteria 5 + validation 3 + patch-pptx 1 PASS                                                                 |
+| PPT preview vs download isolation                | HTML preview lane keeps separate original-byte download URL; sidebar refuses Office HTML as `.pptx` download; save refuses preview text as Office original                                                                   | download-lane 9 + html-preview 6 + deliverable-save 24 + workspace-file-preview 21 + pptx-preview-edit 4 PASS |
+| Cron presentation ≠ board mutate                 | Prior Package work; presentation-only notices                                                                                                                                                                                | tasks cron presentation checkpoint                                                                            |
 
 #### Package4 blockers (would fix now)
 
-| Item | Verdict |
-| --- | --- |
-| *(none)* | All four focus checks already have production owners and green regressions. Historical “silent mapped to delivered” was corrected to awaiting/pending without send evidence. PPT text-only preview / HTML-as-.pptx download defects remain fixed in tree with tests. No new quality platform required. |
+| Item     | Verdict                                                                                                                                                                                                                                                                                                |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| _(none)_ | All four focus checks already have production owners and green regressions. Historical “silent mapped to delivered” was corrected to awaiting/pending without send evidence. PPT text-only preview / HTML-as-.pptx download defects remain fixed in tree with tests. No new quality platform required. |
 
 #### Follow-up (no breakpoint — must not block)
 
@@ -1912,12 +1911,12 @@ PPTX: original bytes retained → HTML preview derivative; download/save use ori
 
 ### Verification this turn (read-only)
 
-| Suite | Result |
-| --- | --- |
-| delivery dispatch/acceptance/artifacts | 6 files / 49 PASS |
-| PPT UI download/preview/save/edit wiring | 5 files / 64 PASS |
-| async-wait production-path (delivery-only) | 1 file / 3 PASS |
-| Source edits for Package4 blockers | **none** |
+| Suite                                      | Result            |
+| ------------------------------------------ | ----------------- |
+| delivery dispatch/acceptance/artifacts     | 6 files / 49 PASS |
+| PPT UI download/preview/save/edit wiring   | 5 files / 64 PASS |
+| async-wait production-path (delivery-only) | 1 file / 3 PASS   |
+| Source edits for Package4 blockers         | **none**          |
 
 **Remelt tip for Package4 acceptance:** `6fc0bf08c1efd190fde3dc3cbb56fe0ed694f364` (gap verification only; zero blockers). Prior Package3 tip `5b2af981a` retained. — grok-bot
 
@@ -1932,20 +1931,20 @@ Charter: strip/archive/retire old control paths that still interfere with the ne
 
 ### Audit matrix (verified at Package4 tip)
 
-| Candidate | Intent | Production consumers | Durable assets | New-main takeover | Verdict |
-| --- | --- | --- | --- | --- | --- |
-| `claimAsyncWaitJobIntent` / `deliverRecoveredAsyncWaitCompletion` | Legacy recovery names; mapped continue_armed → `"woke"` / implied delivery | **None** (definitions + public re-exports only) | None | `armAsyncWaitRecoveryContinuation` + `confirmPendingTurnDelivery` | **Retire now** (removed) |
-| `agents/cli-runner.ts` thin façade | Forward to `execution/runner/cli-run` | Tests + wiring still import façade | CLI session/cred state in backend | Unique CLI adapter in execution | **Keep** — forward-only; migrate consumers before delete |
-| `agents/pi-embedded.ts` / `pi-embedded-runner.ts` façades | Forward run/abort/lane APIs | Gateway chat/reset, cron, commands, auto-reply (live) | Active-run registry in execution | `runEmbeddedPiAgent` in execution/index | **Keep** — capability backend + live consumers; not old main chain |
-| Embedded/CLI execution backends | Model/tool loop providers | admitted-turn / cron / followup / command | Sessions, tools, abort | Same backends under execution/runner | **Keep** — backends until state migration clears them |
-| Lobster (`extensions/lobster`) | External workflow + resumeToken | Plugin tool path; install/allowlist unknown in this audit | resumeToken / pipeline files unknown | Declared delegated_workflow in capability catalog | **Keep** — no config+asset proof to delete |
-| OpenProse (`extensions/open-prose`) | Skill-shipped prose VM / sessions_spawn | Skill load path; user `.prose` assets unknown | Programs / VM / child sessions unknown | N/A without asset migration | **Keep** — no asset proof |
-| `task-orchestration` | Shadow observe / dormant dispatch | `dispatch-from-config` web-read shadow observe; LIVE_INVOKE frozen false | Ledger/job stores unused when dormant | Reply mainline is `runAdmittedTurn` | **Keep** — observe/dormant; not bulk-delete by name |
-| BOOT / cron / followup triggers | Legitimate scene adapters | Gateway boot, cron isolated agent, followup runner | Queues / tickets | Controlled execution lifecycle | **Keep** — triggers ≠ redundant |
-| `agents/usage.ts`, `pi-tools.abort.ts`, `execution-preflight/validation.ts`, session-usage façades | Forward-only to shared/runtime | Many live imports | N/A | Single implementations elsewhere | **Keep** — harmless façades; do not force-delete for zero count |
-| Already-removed shells (`untrusted-context`, `execution-stall-continue-loop`, `agent-runner-payloads`) | Prior safe-retirements | Gone | Archive in git history | Public runtime APIs | **Archive pointer only** (safe-retirements.md) |
-| Composer mention eager `tool.execute` | Pre-admission auto-execute | Retired earlier (7f13e7930) | N/A | Admitted runner hints only | Already retired — do not redo |
-| Concurrent WIP (`executor-evidence/`, task-outcome model-call closeout, etc.) | Other team | Uncommitted on worktree | Unknown | Out of Package5 | **Leave untouched** — do not stage |
+| Candidate                                                                                              | Intent                                                                     | Production consumers                                                     | Durable assets                         | New-main takeover                                                 | Verdict                                                            |
+| ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------ | -------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `claimAsyncWaitJobIntent` / `deliverRecoveredAsyncWaitCompletion`                                      | Legacy recovery names; mapped continue_armed → `"woke"` / implied delivery | **None** (definitions + public re-exports only)                          | None                                   | `armAsyncWaitRecoveryContinuation` + `confirmPendingTurnDelivery` | **Retire now** (removed)                                           |
+| `agents/cli-runner.ts` thin façade                                                                     | Forward to `execution/runner/cli-run`                                      | Tests + wiring still import façade                                       | CLI session/cred state in backend      | Unique CLI adapter in execution                                   | **Keep** — forward-only; migrate consumers before delete           |
+| `agents/pi-embedded.ts` / `pi-embedded-runner.ts` façades                                              | Forward run/abort/lane APIs                                                | Gateway chat/reset, cron, commands, auto-reply (live)                    | Active-run registry in execution       | `runEmbeddedPiAgent` in execution/index                           | **Keep** — capability backend + live consumers; not old main chain |
+| Embedded/CLI execution backends                                                                        | Model/tool loop providers                                                  | admitted-turn / cron / followup / command                                | Sessions, tools, abort                 | Same backends under execution/runner                              | **Keep** — backends until state migration clears them              |
+| Lobster (`extensions/lobster`)                                                                         | External workflow + resumeToken                                            | Plugin tool path; install/allowlist unknown in this audit                | resumeToken / pipeline files unknown   | Declared delegated_workflow in capability catalog                 | **Keep** — no config+asset proof to delete                         |
+| OpenProse (`extensions/open-prose`)                                                                    | Skill-shipped prose VM / sessions_spawn                                    | Skill load path; user `.prose` assets unknown                            | Programs / VM / child sessions unknown | N/A without asset migration                                       | **Keep** — no asset proof                                          |
+| `task-orchestration`                                                                                   | Shadow observe / dormant dispatch                                          | `dispatch-from-config` web-read shadow observe; LIVE_INVOKE frozen false | Ledger/job stores unused when dormant  | Reply mainline is `runAdmittedTurn`                               | **Keep** — observe/dormant; not bulk-delete by name                |
+| BOOT / cron / followup triggers                                                                        | Legitimate scene adapters                                                  | Gateway boot, cron isolated agent, followup runner                       | Queues / tickets                       | Controlled execution lifecycle                                    | **Keep** — triggers ≠ redundant                                    |
+| `agents/usage.ts`, `pi-tools.abort.ts`, `execution-preflight/validation.ts`, session-usage façades     | Forward-only to shared/runtime                                             | Many live imports                                                        | N/A                                    | Single implementations elsewhere                                  | **Keep** — harmless façades; do not force-delete for zero count    |
+| Already-removed shells (`untrusted-context`, `execution-stall-continue-loop`, `agent-runner-payloads`) | Prior safe-retirements                                                     | Gone                                                                     | Archive in git history                 | Public runtime APIs                                               | **Archive pointer only** (safe-retirements.md)                     |
+| Composer mention eager `tool.execute`                                                                  | Pre-admission auto-execute                                                 | Retired earlier (7f13e7930)                                              | N/A                                    | Admitted runner hints only                                        | Already retired — do not redo                                      |
+| Concurrent WIP (`executor-evidence/`, task-outcome model-call closeout, etc.)                          | Other team                                                                 | Uncommitted on worktree                                                  | Unknown                                | Out of Package5                                                   | **Leave untouched** — do not stage                                 |
 
 ### Retired this package
 
@@ -1965,12 +1964,12 @@ Deprecated aliases: removed (no callers).
 
 ### Verification
 
-| Suite | Result |
-| --- | --- |
-| package5-retire (new) | 3 PASS |
+| Suite                   | Result |
+| ----------------------- | ------ |
+| package5-retire (new)   | 3 PASS |
 | async-wait-job-recovery | 8 PASS |
-| production-path | 3 PASS |
-| oxlint changed sources | 0/0 |
+| production-path         | 3 PASS |
+| oxlint changed sources  | 0/0    |
 
 **Remelt tip for Package5 acceptance:** `8d596ac185cca586f060ff45e80c8cf3987bb62f` (alias retire + audit). Prior Package4 tip `8d60206fb` retained. — grok-bot
 
@@ -1985,12 +1984,12 @@ Charter: freeze one reproducible candidate; prove personal + collab applicable m
 
 ### Freeze
 
-| Field | Value |
-| --- | --- |
-| Freeze source (clean tests) | `a1b14f80c0de6483ab3a9659c090eb6881912ffe` |
-| `origin/main` ancestor | `658bb327ef7470433f092b50dd122d8d6bc5262b` — PASS |
-| Clean worktree | `/tmp/openbot-p6-freeze-a1b14f80c` detached + clean |
-| Src fixes this package | **none** (docs-only remelt / corrections) |
+| Field                       | Value                                               |
+| --------------------------- | --------------------------------------------------- |
+| Freeze source (clean tests) | `a1b14f80c0de6483ab3a9659c090eb6881912ffe`          |
+| `origin/main` ancestor      | `658bb327ef7470433f092b50dd122d8d6bc5262b` — PASS   |
+| Clean worktree              | `/tmp/openbot-p6-freeze-a1b14f80c` detached + clean |
+| Src fixes this package      | **none** (docs-only remelt / corrections)           |
 
 ### Call graph (by scenario — corrected)
 
@@ -2001,29 +2000,29 @@ Charter: freeze one reproducible candidate; prove personal + collab applicable m
 
 ### Matrix summary (all on freeze source SHA)
 
-| Window | Verdict |
-| --- | --- |
-| Personal main chain (chat `runAdmittedTurn` path) | **PASS** (unit) |
-| Collab main chain (claim → member exec → submit → review → integrate / group delivery; member turn ≠ close group) | **PASS** (integration P1/P3 + org dispatch + static ownership) |
-| Async / restart / stale cancel / claim race / delivery-only original payload | **PASS** (unit + stub-channel + real-process) |
-| Artifacts preview/download/save-edit consistency | **PASS** (unit); PPT physical render **runtime GAP** |
-| Two recovery aliases unreachable; delete no break | **PASS** (static + package5-retire) |
-| Kept CLI/embedded backends, needed façades, triggers, independent collab contracts | Recorded — duties retained |
-| Lobster/OpenProse + unknown external recovery assets | Kept for **insufficient evidence** — **not** “full config audit complete” |
-| All old executors retired? | **No — do not claim** |
+| Window                                                                                                            | Verdict                                                                   |
+| ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Personal main chain (chat `runAdmittedTurn` path)                                                                 | **PASS** (unit)                                                           |
+| Collab main chain (claim → member exec → submit → review → integrate / group delivery; member turn ≠ close group) | **PASS** (integration P1/P3 + org dispatch + static ownership)            |
+| Async / restart / stale cancel / claim race / delivery-only original payload                                      | **PASS** (unit + stub-channel + real-process)                             |
+| Artifacts preview/download/save-edit consistency                                                                  | **PASS** (unit); PPT physical render **runtime GAP**                      |
+| Two recovery aliases unreachable; delete no break                                                                 | **PASS** (static + package5-retire)                                       |
+| Kept CLI/embedded backends, needed façades, triggers, independent collab contracts                                | Recorded — duties retained                                                |
+| Lobster/OpenProse + unknown external recovery assets                                                              | Kept for **insufficient evidence** — **not** “full config audit complete” |
+| All old executors retired?                                                                                        | **No — do not claim**                                                     |
 
 ### Verification this turn (freeze SHA) — not all green
 
-| Suite group | Result |
-| --- | --- |
-| delivery/async/context (batch A) | 14 files / 90 PASS |
-| admission/restart/cross-process (batch B) | 14 files / 56 PASS |
-| interpret/PPT wiring/org dispatch (+ UI sidebar) | 11 files / 129 PASS |
-| collab board/dialogue/continuity (batch D) | 63 PASS / **3 FAIL** — **pending test-contract** (board-tool mock `{item,eventRelay}` shape) |
-| controlled collab + PPT stubs (batch E) | 29 PASS / **1 FAIL** — **pending test-contract** (P4 `human_todo` assert) |
-| package5-retire | 3 PASS |
-| Source edits for Package6 blockers | **none** |
-| Visible failures kept in pack | **4** (not continuity blockers; must not be described as all green) |
+| Suite group                                      | Result                                                                                       |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| delivery/async/context (batch A)                 | 14 files / 90 PASS                                                                           |
+| admission/restart/cross-process (batch B)        | 14 files / 56 PASS                                                                           |
+| interpret/PPT wiring/org dispatch (+ UI sidebar) | 11 files / 129 PASS                                                                          |
+| collab board/dialogue/continuity (batch D)       | 63 PASS / **3 FAIL** — **pending test-contract** (board-tool mock `{item,eventRelay}` shape) |
+| controlled collab + PPT stubs (batch E)          | 29 PASS / **1 FAIL** — **pending test-contract** (P4 `human_todo` assert)                    |
+| package5-retire                                  | 3 PASS                                                                                       |
+| Source edits for Package6 blockers               | **none**                                                                                     |
+| Visible failures kept in pack                    | **4** (not continuity blockers; must not be described as all green)                          |
 
 ### Evidence archive boundary
 
@@ -2031,16 +2030,16 @@ Local `/tmp/p6-batch-*.log` and freeze dir matched `a1b14f80c…` for this run. 
 
 ### Runtime final acceptance (separate checklist — not closed)
 
-1. Same-candidate real-model personal + collab loops.  
-2. Authorized-env real channel outbound + receipts.  
-3. Real PPT render image + physical preview + original download.  
+1. Same-candidate real-model personal + collab loops.
+2. Authorized-env real channel outbound + receipts.
+3. Real PPT render image + physical preview + original download.
 
 Do **not** expand architecture to close these. Stub/unit ≠ runtime final pass.
 
 ### Pending test-contract (not blockers) / other follow-up
 
-1. Board-tool unit mocks → `{ item, eventRelay }` shape.  
-2. P4 allow `human_todo` after escalate exhaustion.  
+1. Board-tool unit mocks → `{ item, eventRelay }` shape.
+2. P4 allow `human_todo` after escalate exhaustion.
 3. Foreign WIP stays out of convergence commits.
 
 **Closure:** source-code migration phase (Packages 1–6) **closable** after these doc corrections. Runtime final acceptance remains separate — **no merge/deploy/restart** and **no claim** of full executor retirement or deploy readiness until that checklist closes.

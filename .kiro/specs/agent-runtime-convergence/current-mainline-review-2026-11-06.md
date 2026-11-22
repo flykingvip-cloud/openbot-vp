@@ -12,20 +12,20 @@ Visible normal and followup delivery share prepareVisibleDelivery and confirmPen
 
 ## Repairs and retirement evidence
 
-| Checkpoint | Actual change | Boundary |
-| --- | --- | --- |
-| 35ff9a762 | Vision candidates receive sanitized pixels; text-only candidates disclose unavailable pixels | Does not guarantee vision model selection |
-| 7f13e7930 | Removed eager composer mention argument guessing/direct tool execution | Mention hints and optional tool availability remain; admitted tools use common invocation |
-| 2282db7b2 | Background completion checks its original task/attempt/constraints before notification | Does not kill an already-backgrounded child or prove restart recovery |
-| 48a33ec5a | Legacy activation flag cannot restore pre-admission task creation at human dispatch | Internal activation implementation is not globally deleted |
-| c905a49a6 | Duplicate/rejected interaction replies persist through the conversation writer | Not universal cross-process transcript serialization |
-| d94542c91 / d251e160c | Immutable latest exact-version validator verdict; explicit result required | No default pass; no claim of general factual or visual QA |
-| 56f3de10b | Settlement input carries secondary-write failure evidence instead of executable callback | Fixed host ports retain approved artifact effects |
-| 3b66c2468 | Stale admitted task rejected before outcome/commercial bookkeeping | Tools and provider startup retain additional live checks |
-| d611e30d9 | Aged file lock cannot be reclaimed from a living owner | Does not claim every lock-recovery race eliminated |
-| ae945403f | Queued output joins shared acceptance/delivery receipt closure | Empty/unverified/failed/enqueue-only results cannot close the task |
-| a86ec6726 | Capability declarations distinguish delegated workflow/lifecycle/atomic/unclassified | Metadata grants no authority and changes no enabled extension |
-| d89442132 | Followup uses the existing shared governed model session | Existing followup credit outbox and stable child budget are preserved |
+| Checkpoint            | Actual change                                                                                | Boundary                                                                                  |
+| --------------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| 35ff9a762             | Vision candidates receive sanitized pixels; text-only candidates disclose unavailable pixels | Does not guarantee vision model selection                                                 |
+| 7f13e7930             | Removed eager composer mention argument guessing/direct tool execution                       | Mention hints and optional tool availability remain; admitted tools use common invocation |
+| 2282db7b2             | Background completion checks its original task/attempt/constraints before notification       | Does not kill an already-backgrounded child or prove restart recovery                     |
+| 48a33ec5a             | Legacy activation flag cannot restore pre-admission task creation at human dispatch          | Internal activation implementation is not globally deleted                                |
+| c905a49a6             | Duplicate/rejected interaction replies persist through the conversation writer               | Not universal cross-process transcript serialization                                      |
+| d94542c91 / d251e160c | Immutable latest exact-version validator verdict; explicit result required                   | No default pass; no claim of general factual or visual QA                                 |
+| 56f3de10b             | Settlement input carries secondary-write failure evidence instead of executable callback     | Fixed host ports retain approved artifact effects                                         |
+| 3b66c2468             | Stale admitted task rejected before outcome/commercial bookkeeping                           | Tools and provider startup retain additional live checks                                  |
+| d611e30d9             | Aged file lock cannot be reclaimed from a living owner                                       | Does not claim every lock-recovery race eliminated                                        |
+| ae945403f             | Queued output joins shared acceptance/delivery receipt closure                               | Empty/unverified/failed/enqueue-only results cannot close the task                        |
+| a86ec6726             | Capability declarations distinguish delegated workflow/lifecycle/atomic/unclassified         | Metadata grants no authority and changes no enabled extension                             |
+| d89442132             | Followup uses the existing shared governed model session                                     | Existing followup credit outbox and stable child budget are preserved                     |
 
 ## Reproducible evidence
 
