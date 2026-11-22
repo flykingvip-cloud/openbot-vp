@@ -2,7 +2,7 @@
 
 When GitHub-hosted Actions jobs **do not obtain a runner** (observed pattern:
 `runner_id=0`, empty `steps`, job log HTTP 404), use this **local substitute** for
-*parts* of `.github/workflows/ci-gate.yml`
+_parts_ of `.github/workflows/ci-gate.yml`
 before merging to `main`.
 
 ## Observed pattern vs root cause
@@ -41,11 +41,11 @@ steps may be absent; hosted toolchains differ).
 
 ### Machine-readable results
 
-| `result=` | exit | meaning |
-|---|---|---|
-| `blocked` | 3 | fetch failed, or fresh `origin/main` / chosen base not ancestor of candidate |
-| `partial` | 0 | subset finished but absolute gates skipped and/or checkout≠candidate / dirty tree — **not** a merge-gate PASS |
-| `passed` | 0 | subset finished with absolute gates run, clean checkout matching candidate, fresh main ancestry OK — still not “remote CI green” |
+| `result=` | exit | meaning                                                                                                                          |
+| --------- | ---- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `blocked` | 3    | fetch failed, or fresh `origin/main` / chosen base not ancestor of candidate                                                     |
+| `partial` | 0    | subset finished but absolute gates skipped and/or checkout≠candidate / dirty tree — **not** a merge-gate PASS                    |
+| `passed`  | 0    | subset finished with absolute gates run, clean checkout matching candidate, fresh main ancestry OK — still not “remote CI green” |
 
 Never report `passed` on a blocked or partial run.
 
