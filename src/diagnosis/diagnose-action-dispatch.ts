@@ -15,6 +15,7 @@ import { buildAgentToAgentMessageContext } from "../agents/tools/sessions-send-h
 import { loadConfig } from "../config/config.js";
 import { loadSessionStore, resolveStorePath } from "../config/sessions.js";
 import { callGateway } from "../gateway/call.js";
+import { conversationSeatAgentIds } from "../gateway/conversation-seat-grants.js";
 import { findActiveOwnershipRecord } from "../gateway/ownership-store.js";
 import {
   issuePendingStewardCall,
@@ -205,7 +206,13 @@ export async function dispatchDiagnoseConversationAction(
   input: DiagnoseActionDispatchRequest,
 ): Promise<DiagnoseActionDispatchResult> {
   const stewardTarget = Boolean(extractEmployeeStewardUserIdFromSessionKey(input.targetSessionKey));
-  if (!stewardTarget && !canDispatchDiagnoseAction(input)) {
+  const targetAllowed =
+    input.plainConversation && input.tenantId
+      ? (await conversationSeatAgentIds(input.tenantId, input.requesterUserId)).includes(
+          input.targetAgentId,
+        )
+      : canDispatchDiagnoseAction(input);
+  if (!stewardTarget && !targetAllowed) {
     return { ok: false, reason: "unauthorized" };
   }
   let stewardCaller = input.stewardCaller;

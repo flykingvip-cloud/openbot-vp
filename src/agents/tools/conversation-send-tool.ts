@@ -228,7 +228,7 @@ export function createConversationSendTool(options?: {
         return jsonResult({
           ok: false,
           reason: "not_registered",
-          hint: "不在企业注册表里。agents_list 和这里是同一份名单。",
+          hint: "未在当前可派发目录中找到目标。请核对当前席位授权或机器人登记。",
           reachable: roster,
         });
       }

@@ -9,20 +9,16 @@ import { isBuiltinStewardAgent } from "../agents/builtin-steward/identity.js";
 import { readLatestAssistantReply } from "../agents/tools/agent-step.js";
 import { loadSessionStore, resolveSessionFilePath } from "../config/sessions.js";
 import {
-  canDispatchDiagnoseAction,
   defaultSessionExists,
   dispatchDiagnoseConversationAction,
   type DiagnoseActionDispatchResult,
 } from "../diagnosis/diagnose-action-dispatch.js";
-import {
-  extractEmployeeStewardUserId,
-  listOwnedDiagnoseAgentIds,
-} from "../diagnosis/diagnose-conversation.js";
+import { extractEmployeeStewardUserId } from "../diagnosis/diagnose-conversation.js";
 import { extractDiagnoseSpaceGroupId } from "../diagnosis/diagnose-policy.js";
 import { listAgentAssets } from "../gateway/agent-registry/registry.js";
 import { loadAgentRegistryStore } from "../gateway/agent-registry/store.js";
 import { callGateway } from "../gateway/call.js";
-import { findActiveOwnershipRecord } from "../gateway/ownership-store.js";
+import { conversationSeatAgentIds } from "../gateway/conversation-seat-grants.js";
 import type { GatewayClient } from "../gateway/server-methods/types.js";
 import { buildSessionStorePathResolver } from "../gateway/tenant-context.js";
 import { normalizeInputProvenance } from "../sessions/input-provenance.js";
@@ -299,9 +295,7 @@ export async function listConversationPeers(input: {
     return [];
   }
   const store = await loadAgentRegistryStore();
-  const owned = new Set(
-    listOwnedDiagnoseAgentIds({ userId: requesterUserId, tenantId }).map((id) => id.trim()),
-  );
+  const owned = new Set(await conversationSeatAgentIds(tenantId, requesterUserId));
   const exists = input.sessionExists ?? defaultSessionExists;
   const peers: ConversationPeer[] = [];
   for (const asset of listAgentAssets(store, tenantId)) {
@@ -332,42 +326,19 @@ export async function listConversationPeers(input: {
   return peers;
 }
 
-export function canSendConversationHandoff(input: {
+export async function canSendConversationHandoff(input: {
   requesterUserId: string;
   tenantId: string | null;
   tenantAdmin: boolean;
   targetAgentId: string;
   callerAgentId?: string;
-}): boolean {
-  // Tenant-admin conversation handoff must not reach another user's assistant.
-  void input.tenantAdmin;
-  if (
-    canDispatchDiagnoseAction({
-      targetAgentId: input.targetAgentId,
-      requesterUserId: input.requesterUserId,
-      tenantId: input.tenantId,
-      tenantAdmin: false,
-    })
-  ) {
-    return true;
-  }
-  const tenantId = input.tenantId?.trim();
-  const callerAgentId = input.callerAgentId?.trim();
-  const targetAgentId = input.targetAgentId.trim();
-  if (!tenantId || !callerAgentId || !targetAgentId || isBuiltinStewardAgent(callerAgentId)) {
-    return false;
-  }
-  const callerOwner = findActiveOwnershipRecord({
-    tenantId,
-    subjectKind: "agent",
-    subjectId: callerAgentId,
-  })?.currentManagerUserId;
-  const targetOwner = findActiveOwnershipRecord({
-    tenantId,
-    subjectKind: "agent",
-    subjectId: targetAgentId,
-  })?.currentManagerUserId;
-  return Boolean(callerOwner && targetOwner && callerOwner === targetOwner);
+}): Promise<boolean> {
+  return Boolean(
+    input.tenantId &&
+    (await conversationSeatAgentIds(input.tenantId, input.requesterUserId)).includes(
+      input.targetAgentId,
+    ),
+  );
 }
 
 export async function dispatchConversationHandoff(input: {
@@ -384,13 +355,10 @@ export async function dispatchConversationHandoff(input: {
   sessionExists?: (agentId: string, sessionKey: string) => boolean;
 }): Promise<DiagnoseActionDispatchResult & { reply?: string; answerInChat?: boolean }> {
   if (
-    !canSendConversationHandoff({
-      requesterUserId: input.requesterUserId,
-      tenantId: input.tenantId,
-      tenantAdmin: input.tenantAdmin,
-      targetAgentId: input.targetAgentId,
-      callerAgentId: input.callerAgentId,
-    })
+    !input.tenantId ||
+    !(await conversationSeatAgentIds(input.tenantId, input.requesterUserId)).includes(
+      input.targetAgentId,
+    )
   ) {
     return { ok: false, reason: "unauthorized" };
   }
