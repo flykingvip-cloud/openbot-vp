@@ -23,7 +23,7 @@ export type RobotOperationalIdentityPanelProps = {
   onOpenEnterpriseBinding: () => void;
 };
 
-function robotIdentityAgentScope(entry: WorkbenchSettingsRobotEntry): "owned" | "shared" {
+export function robotIdentityAgentScope(entry: WorkbenchSettingsRobotEntry): "owned" | "shared" {
   if (entry.operationalAgentScope === "shared") {
     return "shared";
   }
