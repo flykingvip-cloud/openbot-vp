@@ -25,6 +25,9 @@ export type RobotDataAtomLink = {
 export type RobotDataOpenState = {
   title: string;
   text: string;
+  editSummary?: (fieldsJson: string) => Promise<void>;
+  retrySummary?: () => Promise<void>;
+  summaryFieldsJson?: string;
 };
 
 export type RobotDataSurface = {
@@ -367,7 +370,54 @@ export async function openRobotDataItem(
       }),
     );
     const text = raw ? decodePreviewText(raw) : "";
-    surface.open = { title: item.title, text: clip(text) || "这份知识暂时没有可阅读的正文。" };
+    const summaryResponse = asRecord(
+      await host.client
+        .request("knowledge.document.summary", {
+          knowledgeBaseId: item.knowledgeBaseId,
+          documentId: item.documentId,
+        })
+        .catch(() => ({ summary: null })),
+    );
+    const summary = asRecord(summaryResponse?.summary);
+    const summaryFields = asRecord(summary?.fields);
+    const summaryText = typeof summaryFields?.purpose === "string" ? summaryFields.purpose : "";
+    const rawStatus = typeof summary?.state === "string" ? summary.state : "pending";
+    const status =
+      (
+        {
+          pending: "待生成",
+          processing: "生成中",
+          ready: "可用",
+          failed: "生成失败",
+          stale: "原文已更新，待复核",
+        } as Record<string, string>
+      )[rawStatus] ?? "待生成";
+    surface.open = {
+      title: item.title,
+      summaryFieldsJson: JSON.stringify(
+        summaryFields ?? { purpose: "", keyPoints: [], coverage: [], entities: [], boundaries: [] },
+        null,
+        2,
+      ),
+      retrySummary: async () => {
+        await host.client!.request("knowledge.document.summary", {
+          knowledgeBaseId: item.knowledgeBaseId,
+          documentId: item.documentId,
+          retry: true,
+        });
+        await openRobotDataItem(host, item, render);
+      },
+      editSummary: async (fieldsJson) => {
+        const fields: unknown = JSON.parse(fieldsJson);
+        await host.client!.request("knowledge.document.summary", {
+          knowledgeBaseId: item.knowledgeBaseId,
+          documentId: item.documentId,
+          fields,
+        });
+        await openRobotDataItem(host, item, render);
+      },
+      text: `检索摘要状态：${status}${typeof summary?.failureCode === "string" ? "（请核对原文访问和模型配置后重试）" : ""}\n${summaryText}\n\n${clip(text) || "这份知识暂时没有可阅读的正文。"}`,
+    };
   } catch {
     surface.open = { title: item.title, text: "这份知识暂时打不开。" };
   }

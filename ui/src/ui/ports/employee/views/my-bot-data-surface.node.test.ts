@@ -11,6 +11,73 @@ afterEach(() => {
 });
 
 describe("robot data surface", () => {
+  it("edits a document summary through its maintenance RPC and reloads", async () => {
+    let saved = false;
+    const client = {
+      request: async (method: string, params?: unknown) => {
+        if (method === "knowledge.document.preview") {
+          return { text: "original" };
+        }
+        if (method === "knowledge.document.summary") {
+          const record = params as { fields?: unknown };
+          if (record.fields) {
+            saved = true;
+          }
+          return {
+            summary: {
+              state: "ready",
+              fields: {
+                purpose: saved ? "edited" : "initial",
+                keyPoints: [],
+                coverage: [],
+                entities: [],
+                boundaries: [],
+              },
+            },
+          };
+        }
+        if (method === "agents.files.list") {
+          return { files: [] };
+        }
+        if (method === "data.memory.list") {
+          return { entries: [], atoms: [] };
+        }
+        if (method === "knowledge.base.list") {
+          return { knowledgeBases: [] };
+        }
+        if (method === "agents.files.get") {
+          return { file: { missing: true } };
+        }
+        throw Error(method);
+      },
+    };
+    await ensureRobotDataSurface({ client, connected: true }, "law", () => undefined);
+    await openRobotDataItem(
+      { client, connected: true },
+      {
+        kind: "knowledge",
+        agentId: "law",
+        knowledgeBaseId: "kb",
+        documentId: "doc",
+        title: "Doc",
+      },
+      () => undefined,
+    );
+    const state = peekRobotDataSurface("law")?.open;
+    expect(state?.text).toContain("initial");
+    await state?.editSummary?.(
+      JSON.stringify({
+        purpose: "edited",
+        keyPoints: [],
+        coverage: [],
+        entities: [],
+        boundaries: [],
+      }),
+    );
+    expect(saved).toBe(true);
+    expect(peekRobotDataSurface("law")?.open?.text).toContain("edited");
+  });
+
   it("loads the workspace path, memory ledger, and only knowledge bound to this robot", async () => {
     const requests: string[] = [];
     const client = {

@@ -661,6 +661,7 @@ const BASE_METHODS = [
   "context.scope.audit.list",
   "knowledge.base.get",
   "knowledge.base.documents.list",
+  "knowledge.document.summary",
   "knowledge.document.preview",
   "knowledge.base.snippets.list",
   "knowledge.base.recycle.list",

@@ -7,6 +7,11 @@ import { tickScheduledConnectorSync } from "./enterprise-data/scheduled-connecto
 import { tickScheduledProjectionMaterialization } from "./enterprise-data/scheduled-projection-materializer.js";
 import { tickAgentKnowledgeGeneration } from "./knowledge/agent-knowledge-generation-runtime.js";
 import { tickKnowledgeGovernanceJobs } from "./knowledge/governance/runtime/gateway-tick.js";
+import { createRetrievalSummaryGenerationAuthority } from "./knowledge/retrieval-summary-authority.js";
+import {
+  setRetrievalSummaryGenerationAuthority,
+  tickConfiguredRetrievalSummaries,
+} from "./knowledge/retrieval-summary-runtime.js";
 import { tickDueWebSourceRefreshes } from "./knowledge/web-source-refresh-runtime.js";
 import { runMeetingReminderTick } from "./meeting-reminder-runtime.js";
 import type { ChatRunEntry } from "./server-chat.js";
@@ -93,6 +98,7 @@ export function startGatewayMaintenanceTimers(params: {
     .catch((err) => params.logHealth.error(`initial refresh failed: ${formatError(err)}`));
 
   // dedupe cache cleanup
+  setRetrievalSummaryGenerationAuthority(createRetrievalSummaryGenerationAuthority());
   let governanceJobsInFlight = false;
   let webRefreshInFlight = false;
   let agentKnowledgeGenInFlight = false;
@@ -223,6 +229,7 @@ export function startGatewayMaintenanceTimers(params: {
     if (!agentKnowledgeGenInFlight) {
       agentKnowledgeGenInFlight = true;
       void tickAgentKnowledgeGeneration()
+        .then(() => tickConfiguredRetrievalSummaries())
         .catch((err) => {
           params.logHealth.error(`agent knowledge generation failed: ${formatError(err)}`);
         })
