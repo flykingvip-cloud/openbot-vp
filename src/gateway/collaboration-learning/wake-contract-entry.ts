@@ -167,3 +167,14 @@ export async function getCollaborationAdminDailySummary(params: {
   });
   return { message: result.message };
 }
+
+export {
+  isWakeOpGatewayRecoveryEnabled,
+  resolveWakeOpGatewayRecoveryGroupAllowlist,
+  mintTrustedGatewaySessionFromClient,
+  resolvePlatformAuthFieldsFromGatewayClient,
+  releaseWakeOpForRetryViaGatewaySession,
+  confirmWakeOpCompletedViaGatewaySession,
+  WakeOpGatewayRecoveryFlagOffError,
+  WakeOpGatewayRecoveryEntryError,
+} from "./wake-op-gateway-recovery-entry.js";
