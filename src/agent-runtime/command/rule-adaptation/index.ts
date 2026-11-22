@@ -43,3 +43,6 @@ export {
 } from "./activate.js";
 export { createOfficialFixtureContextCapPort } from "./fixture-context-cap-port.js";
 export { decideDynamicContextWindow } from "./context-window-decision.js";
+
+export { loadRuleLibrary, runRuleAgentLibraryCycle } from "./library-feedback.js";
+export { buildShadowResult } from "./result.js";
