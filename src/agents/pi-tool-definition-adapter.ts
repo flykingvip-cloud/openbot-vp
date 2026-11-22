@@ -6,9 +6,15 @@ import type {
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import type { HookContext } from "../agent-runtime/capabilities/index.js";
 import {
+  assertToolResultReplayAllowed,
   isToolWrappedWithBeforeToolCallHook,
   runBeforeToolCallHook,
 } from "../agent-runtime/capabilities/index.js";
+import {
+  ToolOperationOutcomeUnknownError,
+  withToolOperationAdmission,
+  commitToolOperationWriteIntent,
+} from "../agent-runtime/state/repository/tool-operation.js";
 import { checkTaskActionBoundary } from "../agent-runtime/state/task-action.js";
 import type { OpenBotConfig } from "../config/config.js";
 import { runDeliveryToolSideEffect } from "../gateway/collaboration-dispatch/delivery-tool-side-effect.js";
@@ -187,24 +193,37 @@ export function toToolDefinitions(
         const { toolCallId, params, onUpdate, signal } = splitToolExecuteArgs(args);
         let executeParams = params;
         try {
-          if (!beforeHookWrapped) {
-            const hookOutcome = await runBeforeToolCallHook({
-              toolName: name,
-              params,
-              toolCallId,
-            });
-            if (hookOutcome.blocked) {
-              throw new Error(hookOutcome.reason);
-            }
-            executeParams = hookOutcome.params;
-          }
-          const scheduled = await runDeliveryToolSideEffect({
-            schedule: options?.deliveryToolSideEffect,
-            toolName: name,
-            cfg: options?.cfg,
-            bag: options?.privateRunBag,
-            run: () => tool.execute(toolCallId, executeParams, signal, onUpdate),
-          });
+          let effectInvoked = false;
+          const scheduled = await withToolOperationAdmission(
+            JSON.stringify([options?.deliveryToolSideEffect ?? null, normalizedName, params]),
+            () =>
+              runDeliveryToolSideEffect({
+                schedule: options?.deliveryToolSideEffect,
+                toolName: name,
+                cfg: options?.cfg,
+                bag: options?.privateRunBag,
+                run: async () => {
+                  effectInvoked = true;
+                  if (!beforeHookWrapped) {
+                    const hookOutcome = await runBeforeToolCallHook({
+                      toolName: name,
+                      params,
+                      toolCallId,
+                    });
+                    if (hookOutcome.blocked) {
+                      throw new Error(hookOutcome.reason);
+                    }
+                    executeParams = hookOutcome.params;
+                  }
+                  if (!beforeHookWrapped) {
+                    signal?.throwIfAborted();
+                    await commitToolOperationWriteIntent();
+                    signal?.throwIfAborted();
+                  }
+                  return tool.execute(toolCallId, executeParams, signal, onUpdate);
+                },
+              }),
+          );
           if (scheduled.skipped) {
             return jsonResult({
               status: "skipped",
@@ -212,6 +231,9 @@ export function toToolDefinitions(
               reason: "durable_side_effect_already_claimed",
               key: scheduled.key,
             });
+          }
+          if (!effectInvoked) {
+            await assertToolResultReplayAllowed(tool, executeParams, signal);
           }
           const rawResult = scheduled.value;
           const result = normalizeToolExecutionResult({
@@ -229,6 +251,16 @@ export function toToolDefinitions(
               : "";
           if (name === "AbortError") {
             throw err;
+          }
+          if (err instanceof ToolOperationOutcomeUnknownError) {
+            return jsonResult({
+              status: "waiting",
+              tool: normalizedName,
+              operationId: err.operationId,
+              waitCondition: err.waitCondition,
+              retryAllowed: false,
+              reason: "external_operation_requires_reconciliation",
+            });
           }
           const described = describeToolExecutionError(err);
           if (described.stack && described.stack !== described.message) {

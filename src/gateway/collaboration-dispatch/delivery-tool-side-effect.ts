@@ -13,6 +13,7 @@
  */
 import path from "node:path";
 import type { Task } from "@openbot/collaboration-core";
+import type { OperationIdentity } from "../../agent-runtime/contracts/operation.js";
 import { resolveCoreToolCapability } from "../../agents/tool-catalog.js";
 import { normalizeToolName } from "../../agents/tool-policy.js";
 import type { OpenBotConfig } from "../../config/config.js";
@@ -28,6 +29,7 @@ import { asGovernedTask } from "./task-runtime.js";
 import { isTaskStopAccepted } from "./task-stop-control.js";
 
 export type DeliveryToolSideEffectSchedule = {
+  operationIdentity?: OperationIdentity;
   ledgerDir: string;
   taskId: string;
   boardItemId: string;
@@ -122,6 +124,7 @@ export async function runDeliveryToolSideEffect<T>(params: {
   const scheduled = await scheduleDurableToolSideEffect({
     ledgerDir: params.schedule.ledgerDir,
     fingerprint: {
+      operationIdentity: params.schedule.operationIdentity,
       taskId: params.schedule.taskId,
       boardItemId: params.schedule.boardItemId,
       stepId: params.schedule.stepId,

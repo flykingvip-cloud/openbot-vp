@@ -15286,6 +15286,55 @@ tasks:
     ownerHistory: []
     since: 2026-11-18
     metadata: {}
+  - id: runtime-beforeeffect-journal-review:codex-runtime
+    owner: codex-runtime
+    intent: []
+    paths:
+      - src/agent-runtime/capabilities/invocation/before-call.ts
+      - src/agents/pi-tool-definition-adapter.ts
+      - src/agents/pi-tools.ts
+      - src/gateway/collaboration-dispatch/delivery-tool-side-effect.test.ts
+      - src/gateway/collaboration-dispatch/delivery-tool-side-effect.ts
+      - src/gateway/collaboration-dispatch/private-run-bag.test.ts
+      - src/gateway/collaboration-dispatch/private-run-bag.ts
+      - src/agent-runtime/capabilities/invocation/before-call.before-effect.test.ts
+      - src/agent-runtime/contracts/execution-protocol.ts
+      - src/agent-runtime/contracts/operation.ts
+      - src/agent-runtime/state/repository/tool-operation.test.ts
+      - src/agent-runtime/state/repository/tool-operation.ts
+      - src/agents/authoritative-write-recheck.ts
+      - src/agents/pi-tools.authoritative-revoke.slice2.test.ts
+      - src/agent-runtime/capabilities/index.ts
+      - src/agent-runtime/state/tool-operation.ts
+    state: active
+    sessions:
+      - id: runtime-pr-20261122
+        taskId: runtime-beforeeffect-journal-review:codex-runtime
+        ide: codex
+        agent: codex-runtime
+        status: active
+        metadata: {}
+        lastSignalAt: 2026-11-22T00:53:29.129Z
+    ownerHistory: []
+    since: 2026-11-22
+    metadata: {}
+  - id: runtime-changelog-332:codex-runtime
+    owner: codex-runtime
+    intent: []
+    paths:
+      - CHANGELOG.md
+    state: active
+    sessions:
+      - id: runtime-changelog-332-20261122
+        taskId: runtime-changelog-332:codex-runtime
+        ide: codex
+        agent: codex-runtime
+        status: active
+        metadata: {}
+        lastSignalAt: 2026-11-22T02:56:14.674Z
+    ownerHistory: []
+    since: 2026-11-22
+    metadata: {}
 landingStreams:
   - id: cron-fire-budget-reviewed-integration
     landingPolicy: serial
@@ -30761,6 +30810,74 @@ landingStreams:
       reason: Only seven previously unmatched exact paths; preserve all prior stream
         order/classification
 sharedPaths:
+  - glob: CHANGELOG.md
+    landerTask: runtime-changelog-332:codex-runtime
+    reason: Human-authorized single PR332 compatibility release note; preserve all
+      other content and historical ownership.
+  - glob: src/agent-runtime/capabilities/invocation/before-call.ts
+    landerTask: runtime-beforeeffect-journal-review:codex-runtime
+    reason: Human-authorized exact Runtime PR integration; predecessor task and
+      session history retained.
+  - glob: src/agents/pi-tool-definition-adapter.ts
+    landerTask: runtime-beforeeffect-journal-review:codex-runtime
+    reason: Human-authorized exact Runtime PR integration; predecessor task and
+      session history retained.
+  - glob: src/agents/pi-tools.ts
+    landerTask: runtime-beforeeffect-journal-review:codex-runtime
+    reason: Human-authorized exact Runtime PR integration; predecessor task and
+      session history retained.
+  - glob: src/gateway/collaboration-dispatch/delivery-tool-side-effect.test.ts
+    landerTask: runtime-beforeeffect-journal-review:codex-runtime
+    reason: Human-authorized exact Runtime PR integration; predecessor task and
+      session history retained.
+  - glob: src/gateway/collaboration-dispatch/delivery-tool-side-effect.ts
+    landerTask: runtime-beforeeffect-journal-review:codex-runtime
+    reason: Human-authorized exact Runtime PR integration; predecessor task and
+      session history retained.
+  - glob: src/gateway/collaboration-dispatch/private-run-bag.test.ts
+    landerTask: runtime-beforeeffect-journal-review:codex-runtime
+    reason: Human-authorized exact Runtime PR integration; predecessor task and
+      session history retained.
+  - glob: src/gateway/collaboration-dispatch/private-run-bag.ts
+    landerTask: runtime-beforeeffect-journal-review:codex-runtime
+    reason: Human-authorized exact Runtime PR integration; predecessor task and
+      session history retained.
+  - glob: src/agent-runtime/capabilities/invocation/before-call.before-effect.test.ts
+    landerTask: runtime-beforeeffect-journal-review:codex-runtime
+    reason: Human-authorized exact Runtime PR integration; predecessor task and
+      session history retained.
+  - glob: src/agent-runtime/contracts/execution-protocol.ts
+    landerTask: runtime-beforeeffect-journal-review:codex-runtime
+    reason: Human-authorized exact Runtime PR integration; predecessor task and
+      session history retained.
+  - glob: src/agent-runtime/contracts/operation.ts
+    landerTask: runtime-beforeeffect-journal-review:codex-runtime
+    reason: Human-authorized exact Runtime PR integration; predecessor task and
+      session history retained.
+  - glob: src/agent-runtime/state/repository/tool-operation.test.ts
+    landerTask: runtime-beforeeffect-journal-review:codex-runtime
+    reason: Human-authorized exact Runtime PR integration; predecessor task and
+      session history retained.
+  - glob: src/agent-runtime/state/repository/tool-operation.ts
+    landerTask: runtime-beforeeffect-journal-review:codex-runtime
+    reason: Human-authorized exact Runtime PR integration; predecessor task and
+      session history retained.
+  - glob: src/agents/authoritative-write-recheck.ts
+    landerTask: runtime-beforeeffect-journal-review:codex-runtime
+    reason: Human-authorized exact Runtime PR integration; predecessor task and
+      session history retained.
+  - glob: src/agents/pi-tools.authoritative-revoke.slice2.test.ts
+    landerTask: runtime-beforeeffect-journal-review:codex-runtime
+    reason: Human-authorized exact Runtime PR integration; predecessor task and
+      session history retained.
+  - glob: src/agent-runtime/capabilities/index.ts
+    landerTask: runtime-beforeeffect-journal-review:codex-runtime
+    reason: Human-authorized exact Runtime PR integration; predecessor task and
+      session history retained.
+  - glob: src/agent-runtime/state/tool-operation.ts
+    landerTask: runtime-beforeeffect-journal-review:codex-runtime
+    reason: Human-authorized exact Runtime PR integration; predecessor task and
+      session history retained.
   - glob: src/objective-shadow/get-reply-run.ingress.test.ts
     landerTask: baseline-gates-repair-20261122:codex-wpb-successor
     reason: Human-authorized exact full-gate fixture repair; previous owner history retained.

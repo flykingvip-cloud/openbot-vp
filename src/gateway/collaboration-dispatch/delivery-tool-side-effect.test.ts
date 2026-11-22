@@ -127,12 +127,7 @@ describe("delivery tool side effect loop", () => {
     const second = await execute(message, "m2");
     expect(messageCalls).toBe(1);
     expect(first.details).toMatchObject({ status: "ok" });
-    expect(second.details).toMatchObject({
-      status: "skipped",
-      tool: "message",
-      reason: "durable_side_effect_already_claimed",
-      key: "task-1|item-1|step-1|message",
-    });
+    expect(JSON.stringify(second)).toContain("unverifiable");
 
     await execute(read, "r1");
     await execute(read, "r2");
@@ -145,10 +140,7 @@ describe("delivery tool side effect loop", () => {
     }
     const skippedExec = await execute(execAgain, "b2");
     expect(bashCalls).toBe(1);
-    expect(skippedExec.details).toMatchObject({
-      status: "skipped",
-      key: "task-1|item-1|step-1|exec",
-    });
+    expect(JSON.stringify(skippedExec)).toContain("unverifiable");
 
     const files = await fs.readdir(ledgerDir);
     expect(files.length).toBeGreaterThan(0);
@@ -209,7 +201,11 @@ describe("delivery tool side effect loop", () => {
     const skipped = await execute(message, "m2");
     expect(calls).toBe(1);
     expect(failed.details).toMatchObject({ status: "error", error: "send failed" });
-    expect(skipped.details).toMatchObject({ status: "skipped" });
+    expect(skipped.details).toMatchObject({
+      status: "waiting",
+      retryAllowed: false,
+      waitCondition: { reason: "external_operation" },
+    });
   });
 
   it("indexes the private run bag once and never double-fires the same fingerprint", async () => {
@@ -467,9 +463,256 @@ describe("delivery fingerprint reaches the tool loop from prompt assembly", () =
     await execute(message, "m1");
     const skipped = await execute(message, "m2");
     expect(calls).toBe(1);
-    expect(skipped.details).toMatchObject({
-      status: "skipped",
-      key: `${TASK_ID}|${itemId}|step-send|message`,
-    });
+    expect(JSON.stringify(skipped)).toContain("unverifiable");
   });
 });
+
+it("carries canonical admitted operation identity through the actual SDK tool chain", async () => {
+  const ledgerDir = await fs.mkdtemp(path.join(os.tmpdir(), "canonical-operation-chain-"));
+  tempDirs.push(ledgerDir);
+  const operationIdentity = {
+    tenantId: "tenant",
+    taskId: "task",
+    executionId: "chat:execution",
+    stepId: "step",
+    operationId: "send",
+  };
+  let writes = 0;
+  const schedule = {
+    ledgerDir,
+    taskId: "task",
+    boardItemId: "item",
+    stepId: "step",
+    operationIdentity,
+  };
+  const tools = splitSdkTools({
+    sandboxEnabled: false,
+    deliveryToolSideEffect: schedule,
+    tools: [
+      tool("message", () => {
+        writes += 1;
+        return { content: [{ type: "text", text: "sent" }], details: { status: "ok" } };
+      }),
+    ],
+  }).customTools;
+  await execute(tools[0], "first-attempt-call");
+  await execute(tools[0], "retry-different-call");
+  expect(writes).toBe(1);
+  const claims = (await fs.readdir(ledgerDir)).filter((name) => name.endsWith(".json"));
+  expect(claims).toHaveLength(1);
+  const claim = JSON.parse(await fs.readFile(path.join(ledgerDir, claims[0]), "utf8"));
+  expect(claim.key).toMatch(/^operation:v1:[a-f0-9]{64}$/);
+});
+
+it("review regression: issued unknown result remains unknown in durable journal and retry adapter", async () => {
+  const ledgerDir = await fs.mkdtemp(path.join(os.tmpdir(), "review-unknown-journal-"));
+  tempDirs.push(ledgerDir);
+  let effects = 0;
+  const sdk = splitSdkTools({
+    sandboxEnabled: false,
+    deliveryToolSideEffect: {
+      ledgerDir,
+      taskId: "review-task",
+      boardItemId: "review-item",
+      stepId: "review-step",
+    },
+    tools: [
+      tool("message", () => {
+        effects++;
+        return {
+          content: [{ type: "text", text: '{"status":"result_unknown"}' }],
+          details: { status: "result_unknown" },
+        };
+      }),
+    ],
+  }).customTools[0];
+  const first = await execute(sdk, "first");
+  expect(first.details).toMatchObject({ status: "result_unknown" });
+  const [journal] = (await fs.readdir(ledgerDir)).filter((name) => name.endsWith(".result"));
+  const persisted = JSON.parse(await fs.readFile(path.join(ledgerDir, journal), "utf8"));
+  expect.soft(persisted.state).not.toBe("succeeded");
+  const second = await execute(sdk, "retry");
+  expect.soft(second.details).toMatchObject({ status: "waiting", retryAllowed: false });
+  expect(effects).toBe(1);
+});
+
+it("replays a durable success only while current scope permits, without a second effect", async () => {
+  const { wrapToolWithBeforeToolCallHook } =
+    await import("../../agent-runtime/capabilities/index.js");
+  const ledgerDir = await fs.mkdtemp(path.join(os.tmpdir(), "review-success-replay-"));
+  let allowed = true;
+  let effects = 0;
+  const schedule = {
+    ledgerDir,
+    taskId: "replay-task",
+    boardItemId: "replay-item",
+    stepId: "replay-step",
+  };
+  const wrapped = wrapToolWithBeforeToolCallHook(
+    tool("message", () => {
+      effects++;
+      return {
+        content: [{ type: "text", text: "receipt-1" }],
+        details: { status: "ok", receipt: "receipt-1" },
+      };
+    }),
+    {
+      authorizeStoredResultRead: () => (allowed ? "allowed" : "denied"),
+      beforeEffect: async () => {
+        if (!allowed) {
+          throw new Error("authority_revoked");
+        }
+      },
+    },
+  );
+  const { customTools } = splitSdkTools({
+    tools: [wrapped],
+    sandboxEnabled: false,
+    deliveryToolSideEffect: schedule,
+  });
+  const first = await execute(customTools[0], "first");
+  const replay = await execute(customTools[0], "second");
+  expect(replay).toEqual(first);
+  allowed = false;
+  expect(JSON.stringify(await execute(customTools[0], "revoked"))).toContain("denied");
+  expect(effects).toBe(1);
+  const names = await fs.readdir(ledgerDir);
+  const journal = JSON.parse(
+    await fs.readFile(
+      path.join(ledgerDir, names.find((name) => name.endsWith(".result"))!),
+      "utf8",
+    ),
+  );
+  expect(journal.state).toBe("succeeded");
+  expect(journal.result.details.receipt).toBe("receipt-1");
+});
+
+it("re-admits a refused operation through the real scheduler while retaining refusal audit", async () => {
+  const { wrapToolWithBeforeToolCallHook } =
+    await import("../../agent-runtime/capabilities/index.js");
+  const ledgerDir = await fs.mkdtemp(path.join(os.tmpdir(), "review-readmission-"));
+  tempDirs.push(ledgerDir);
+  let allowed = false;
+  let effects = 0;
+  const wrapped = wrapToolWithBeforeToolCallHook(
+    tool("message", () => {
+      effects++;
+      return { content: [], details: { status: "ok" } };
+    }),
+    {
+      authorizeStoredResultRead: () => (allowed ? "allowed" : "denied"),
+      beforeEffect: async () => {
+        if (!allowed) {
+          throw new Error("authority_revoked");
+        }
+      },
+    },
+  );
+  const { customTools } = splitSdkTools({
+    tools: [wrapped],
+    sandboxEnabled: false,
+    deliveryToolSideEffect: {
+      ledgerDir,
+      taskId: "readmit-task",
+      boardItemId: "readmit-item",
+      stepId: "readmit-step",
+    },
+  });
+  expect(JSON.stringify(await execute(customTools[0], "refused"))).toContain("authority_revoked");
+  const names = await fs.readdir(ledgerDir);
+  const journalPath = path.join(ledgerDir, names.find((name) => name.endsWith(".result"))!);
+  const refused = JSON.parse(await fs.readFile(journalPath, "utf8"));
+  expect(refused.state).toBe("not_issued");
+  expect(refused.refusals).toHaveLength(1);
+  expect(effects).toBe(0);
+  allowed = true;
+  expect((await execute(customTools[0], "reauthorized")).details).toMatchObject({ status: "ok" });
+  await execute(customTools[0], "replay");
+  const success = JSON.parse(await fs.readFile(journalPath, "utf8"));
+  expect(success.state).toBe("succeeded");
+  expect(success.attemptId).not.toBe(refused.attemptId);
+  expect(success.refusals).toEqual(refused.refusals);
+  expect(effects).toBe(1);
+});
+
+it("returns waiting while the prepared owner is active and dispatches only once", async () => {
+  const { wrapToolWithBeforeToolCallHook } =
+    await import("../../agent-runtime/capabilities/index.js");
+  const ledgerDir = await fs.mkdtemp(path.join(os.tmpdir(), "review-prepared-owner-"));
+  tempDirs.push(ledgerDir);
+  let release!: () => void;
+  let entered!: () => void;
+  const ready = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const hold = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let effects = 0;
+  const wrapped = wrapToolWithBeforeToolCallHook(
+    tool("message", () => {
+      effects++;
+      return { content: [], details: { status: "ok" } };
+    }),
+    {
+      beforeEffect: async () => {
+        entered();
+        await hold;
+      },
+    },
+  );
+  const { customTools } = splitSdkTools({
+    tools: [wrapped],
+    sandboxEnabled: false,
+    deliveryToolSideEffect: {
+      ledgerDir,
+      taskId: "prepared-task",
+      boardItemId: "prepared-item",
+      stepId: "prepared-step",
+    },
+  });
+  const first = execute(customTools[0], "owner");
+  await ready;
+  const names = await fs.readdir(ledgerDir);
+  const record = JSON.parse(
+    await fs.readFile(
+      path.join(ledgerDir, names.find((name) => name.endsWith(".result"))!),
+      "utf8",
+    ),
+  );
+  expect(record.state).toBe("prepared");
+  const second = await execute(customTools[0], "contender");
+  expect(second.details).toMatchObject({ status: "waiting", retryAllowed: false });
+  expect(effects).toBe(0);
+  release();
+  await first;
+  expect(effects).toBe(1);
+});
+
+it.each(["denied", "unverifiable", "missing"] as const)(
+  "does not expose a stored receipt when read guard is %s",
+  async (decision) => {
+    const { wrapToolWithBeforeToolCallHook } =
+      await import("../../agent-runtime/capabilities/index.js");
+    const ledgerDir = await fs.mkdtemp(path.join(os.tmpdir(), "stored-read-denial-"));
+    tempDirs.push(ledgerDir);
+    let effects = 0;
+    const wrapped = wrapToolWithBeforeToolCallHook(
+      tool("message", () => {
+        effects++;
+        return { content: [{ type: "text", text: "PRIVATE_RECEIPT" }], details: { status: "ok" } };
+      }),
+      { authorizeStoredResultRead: decision === "missing" ? undefined : () => decision },
+    );
+    const { customTools } = splitSdkTools({
+      tools: [wrapped],
+      sandboxEnabled: false,
+      deliveryToolSideEffect: { ledgerDir, taskId: "private", boardItemId: "item", stepId: "step" },
+    });
+    expect(JSON.stringify(await execute(customTools[0], "first"))).toContain("PRIVATE_RECEIPT");
+    const replay = JSON.stringify(await execute(customTools[0], "replay"));
+    expect(replay).not.toContain("PRIVATE_RECEIPT");
+    expect(replay).toContain("Stored result read authorization");
+    expect(effects).toBe(1);
+  },
+);
