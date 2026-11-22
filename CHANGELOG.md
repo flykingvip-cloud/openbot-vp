@@ -320,6 +320,8 @@ Docs: https://docs.openbot.love
 - Skills/patterns: keep human-approved pattern publications as draft capabilities with lineage and no automatic installation; preserve ordinary classification and concrete tool/MCP precedence. (#333) Thanks @flykingvip-cloud.
 - Discord/webhooks: guard outbound requests, release response resources, reject redirects, and redact secret-bearing URL paths from opted-in blocked-request audits. (#333) Thanks @flykingvip-cloud.
 
+- Runtime: preserve uncertain tool-write outcomes without automatic retries; cached results require explicit host read authorization. Missing authorization denies replay and may pause receipt-dependent recovery. (#332) Thanks @flykingvip-cloud.
+
 ## 2026.3.8
 
 ### Changes
