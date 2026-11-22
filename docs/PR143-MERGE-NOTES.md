@@ -4,14 +4,14 @@ Short audit pointer for the PR. Full evidence lives **outside** the repo:
 
 `/Users/daniel/AI VP/ux-dialogue-observe-20261029/market-assistant-20261029/`
 
-| Doc | Role |
-|-----|------|
-| `PR143-PREACCEPTANCE.md` | Merge-prep pre-acceptance rebound to `02c26fab…` |
-| `PR143-STEP2-FINAL.md` | Exploratory four-scenario PASS package |
-| `PR143-MERGE-CRITERIA.md` | Go criteria + mandatory disclosures |
-| `PR143-STEP2-CLOUD-RETEST-02c26fab.md` | Cloud retest (S1/S4 PASS; S3 then closed) |
-| `PR143-STEP2-S3-RESUME-REFUSE.md` | S3 resume-after-stop hard refuse PASS |
-| `preaccept-logs/merge-prep-focused-20261029-195302.log` | Focused vitest **9 files / 163 PASS** |
+| Doc                                                     | Role                                             |
+| ------------------------------------------------------- | ------------------------------------------------ |
+| `PR143-PREACCEPTANCE.md`                                | Merge-prep pre-acceptance rebound to `02c26fab…` |
+| `PR143-STEP2-FINAL.md`                                  | Exploratory four-scenario PASS package           |
+| `PR143-MERGE-CRITERIA.md`                               | Go criteria + mandatory disclosures              |
+| `PR143-STEP2-CLOUD-RETEST-02c26fab.md`                  | Cloud retest (S1/S4 PASS; S3 then closed)        |
+| `PR143-STEP2-S3-RESUME-REFUSE.md`                       | S3 resume-after-stop hard refuse PASS            |
+| `preaccept-logs/merge-prep-focused-20261029-195302.log` | Focused vitest **9 files / 163 PASS**            |
 
 ## Disclosures (summary)
 
