@@ -12,6 +12,7 @@ import { resolveBootstrapContextForRun } from "../../agents/bootstrap-files.js";
 import { resolveContextBudget } from "../../agents/resolve-context-budget.js";
 import { buildWorkspaceSkillSnapshot } from "../../agents/skills.js";
 import type { OpenBotConfig } from "../../config/config.js";
+import { isCollabTaskClaimContractEnabled } from "../collaboration-dispatch/claim-contract.js";
 import type { ExecutionIdentityRunFields } from "../execution-identity-context.js";
 
 export type GroupUnderstandingInput = {
@@ -91,6 +92,15 @@ export async function understandGroupInteraction(input: GroupUnderstandingInput)
             (availability
               ? " Host history is incomplete under the current context budget. Treat projected records as a restricted reference view, not a complete authorization record. Independent ordinary questions may still be answered. Do not invent missing history or treat omitted records as approved work."
               : ""),
+        },
+        {
+          role: "system",
+          content: [
+            "Current-message intent boundary: interpret ONLY the latest live message. Historical pending work and blocked formal-task receipts do not make a new question an execution request.",
+            "Questions about how to start, prerequisites, available capabilities, permissions or configuration are reply/clarify, even when they mention establishing a formal task. Explain the available host facts; do not retry admission or output execution_request merely to explain it. An explicit instruction to start/establish work, including confirmation of earlier agreed scope, remains execution_request and must still pass the host gate. Never turn a question into confirmation or claim to enable a feature.",
+            `Host formal-task capability: ${isCollabTaskClaimContractEnabled(input.config, input.groupId, input.identity.executionIdentity?.enterpriseId ?? "_local") ? "enabled" : "disabled"}. This is capability availability, not authorization.`,
+            "When disabled, explain that an authorized operator must enable collaboration.task.claimContract globally or include the tenant/group in collaboration.task.claimContractGroupAllowlist, then recheck group membership/task-write permission and explicitly request task establishment. Do not change configuration, promise enablement, or say a formal task exists. A conversation alone does not enable the switch.",
+          ].join("\n"),
         },
         {
           role: "user",

@@ -1,4 +1,5 @@
 import { expect, it, vi } from "vitest";
+import { maybeControlledDiscussToTaskBeforeDiscussion } from "./discuss-to-task-chat-hook.js";
 import { understandGroupInteraction } from "./group-interaction-understanding.js";
 
 const calls = vi.hoisted(() => ({ understand: vi.fn(), bootstrap: vi.fn() }));
@@ -144,3 +145,52 @@ it("charges group preparation against the shared interaction budget before model
     vi.useRealTimers();
   }
 });
+
+it.each([false, true])(
+  "keeps capability consultation separate from execution when the formal flag is %s",
+  async (enabled) => {
+    calls.bootstrap.mockResolvedValue({ contextFiles: [] });
+    calls.understand.mockClear();
+    calls.understand.mockResolvedValue({
+      kind: "understood",
+      decision: {
+        kind: "reply",
+        text: "An authorized operator must configure the task capability first.",
+      },
+    });
+    const result = await understandGroupInteraction({
+      config: { collaboration: { task: { claimContract: enabled } } },
+      runId: "consult",
+      groupId: "g",
+      agentId: "bot",
+      sessionKey: "s",
+      workspaceDir: "/tmp/group",
+      provider: "p",
+      model: "m",
+      timeoutMs: 1000,
+      identity: { gatewayClientPlatformUserId: "owner" },
+      message: "如何才能启动正式任务？",
+      history: [{ role: "assistant", content: "当前组未启用正式任务能力，尚未建立正式任务。" }],
+      groupContext: {},
+    });
+    expect(result).toMatchObject({ decision: { kind: "reply" } });
+    expect(
+      await maybeControlledDiscussToTaskBeforeDiscussion({
+        groupId: "g",
+        sourceMessageId: "consult",
+        actor: "human:owner",
+        client: {},
+        tenant: null,
+        cfg: { collaboration: { task: { claimContract: enabled } } },
+        message: "如何才能启动正式任务？",
+        understanding: result.decision,
+      }),
+    ).toBeNull();
+    const request = calls.understand.mock.calls[0][0];
+    const context = request.input.context.map((row: { content: string }) => row.content).join("\n");
+    expect(context).toContain(`Host formal-task capability: ${enabled ? "enabled" : "disabled"}`);
+    expect(context).toContain("Questions about how to start");
+    expect(context).toContain("confirmation of earlier agreed scope");
+    expect(context).toContain("claimContractGroupAllowlist");
+  },
+);
