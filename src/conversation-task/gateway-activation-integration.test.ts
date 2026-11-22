@@ -167,7 +167,8 @@ describe("dispatchReplyFromConfig activation wiring", () => {
       cfg: emptyCfg,
       dispatcher: createDispatcher(),
     });
-    expect(statuses).toEqual([]);
+    // The retired activation path may report its no-detection diagnostic; it must not write a task.
+    expect(statuses).toEqual(["not_detected"]);
     expect(fs.readdirSync(root)).toEqual([]);
   });
 });
