@@ -3,10 +3,12 @@
 Command: `pnpm delivery:ledger:audit` in audit worktree; exit **30**.
 
 ## Counts
+
 - ERROR lines: 147
 - warn lines: 37
 
 ## By class
+
      157 regression
       15 overlay-debt
        9 timeline-gap
@@ -15,9 +17,11 @@ Command: `pnpm delivery:ledger:audit` in audit worktree; exit **30**.
        1 ledger: 149 releases, 147 errors, 36 warnings
 
 ## Tip window (seq 146–151)
-  ERROR seq 151 [open-interval] 2 rows omit liveTo (seq 127, 151); at most one open interval (the current LIVE row) is allowed
+
+ERROR seq 151 [open-interval] 2 rows omit liveTo (seq 127, 151); at most one open interval (the current LIVE row) is allowed
 
 ## Interpretation (audit)
+
 - Dense ERROR [regression] on historical seq hops = SHA-ancestry drops between successive LIVE tips; many later rows are dual-track full-dist tips that are not git-merge ancestors of the prior LIVE tip.
 - timeline-gap warns include known seq 99–103 backfill holes called out in RELEASE_RECORD.
 - overlay-debt warns are historical scoped-UI debt; R9 ban is forward-looking.

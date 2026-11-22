@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildCandidateRelationships, buildCandidateRelationshipsAsync } from "./relationship-builder.js";
+import type { KnowledgeObject } from "../types.js";
+import {
+  buildCandidateRelationships,
+  buildCandidateRelationshipsAsync,
+} from "./relationship-builder.js";
 import {
   detectRelationshipConflicts,
   detectRelationshipConflictsAsync,
@@ -9,7 +13,6 @@ import {
   buildIntelligentRelationshipGraphAsync,
   clearRelationshipRuntimeCache,
 } from "./relationship-runtime.js";
-import type { KnowledgeObject } from "../types.js";
 
 function objectAt(index: number): KnowledgeObject {
   return {
@@ -32,7 +35,12 @@ describe("cooperative pairwise graph build", () => {
     let candidateYields = 0;
     const asyncCandidates = await buildCandidateRelationshipsAsync(
       { objects },
-      { yieldEvery: 10, yieldFn: async () => { candidateYields += 1; } },
+      {
+        yieldEvery: 10,
+        yieldFn: async () => {
+          candidateYields += 1;
+        },
+      },
     );
     expect(asyncCandidates).toEqual(syncCandidates);
     expect(candidateYields).toBeGreaterThan(0);
@@ -41,7 +49,9 @@ describe("cooperative pairwise graph build", () => {
     let conflictYields = 0;
     const asyncConflicts = await detectRelationshipConflictsAsync(objects, {
       yieldEvery: 10,
-      yieldFn: async () => { conflictYields += 1; },
+      yieldFn: async () => {
+        conflictYields += 1;
+      },
     });
     expect(asyncConflicts).toEqual(syncConflicts);
     expect(conflictYields).toBeGreaterThan(0);
@@ -51,10 +61,13 @@ describe("cooperative pairwise graph build", () => {
     clearRelationshipRuntimeCache();
     const sync = buildIntelligentRelationshipGraph({ objects });
     clearRelationshipRuntimeCache();
-    const asyncResult = await buildIntelligentRelationshipGraphAsync({ objects }, {
-      yieldEvery: 10,
-      yieldFn: async () => {},
-    });
+    const asyncResult = await buildIntelligentRelationshipGraphAsync(
+      { objects },
+      {
+        yieldEvery: 10,
+        yieldFn: async () => {},
+      },
+    );
     expect(asyncResult.graph).toEqual(sync.graph);
     expect(asyncResult.conflicts).toEqual(sync.conflicts);
   });

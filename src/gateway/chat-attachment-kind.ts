@@ -40,7 +40,13 @@ const NON_IMAGE_ATTACHMENT_EXTENSIONS = new Set([
   ".pptx",
 ]);
 
-const VISION_IMAGE_MIME = new Set(["image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp"]);
+const VISION_IMAGE_MIME = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/jpg",
+  "image/gif",
+  "image/webp",
+]);
 
 export function isNonImageAttachmentFileName(fileName?: string | null): boolean {
   if (!fileName) {
@@ -81,7 +87,11 @@ export function resolveAttachmentEffectiveMime(params: {
     if (ext === ".txt" || ext === ".text") {
       return "text/plain";
     }
-    return sniffed && !isImageMime(sniffed) ? sniffed : provided && !isImageMime(provided) ? provided : "text/plain";
+    return sniffed && !isImageMime(sniffed)
+      ? sniffed
+      : provided && !isImageMime(provided)
+        ? provided
+        : "text/plain";
   }
   if (sniffed) {
     return sniffed;

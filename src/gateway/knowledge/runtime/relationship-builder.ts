@@ -2,9 +2,9 @@ import {
   normalizeKnowledgeTitleKey,
   titleKeysForWikilinkTarget,
 } from "../document-obsidian-extract.js";
+import type { EventLoopYielder } from "../event-loop-yield.js";
 import type { ExplicitDocumentMetadataRecord } from "../explicit-metadata-store.js";
 import type { DataCapabilityDescriptor, KnowledgeObject, RelationshipEdgeType } from "../types.js";
-import type { EventLoopYielder } from "../event-loop-yield.js";
 import type { CandidateRelationship } from "./types.js";
 
 /** Pair iterations between yield checks during a cache-miss graph build. */
@@ -126,7 +126,6 @@ export function buildCandidateRelationships(params: {
 
   return candidates;
 }
-
 
 function addNonPairwiseCandidateRelationships(params: {
   objects: KnowledgeObject[];
@@ -284,7 +283,6 @@ function addNonPairwiseCandidateRelationships(params: {
       }
     }
   }
-
 }
 
 export async function buildCandidateRelationshipsAsync(

@@ -18,24 +18,24 @@
 
 ## 文档变更清单（本轮）
 
-| 路径 | 变更要点 |
-| --- | --- |
-| `runs/2026-11-02-credentials-omit/00-pin.md` | 追加独立复核口径 |
+| 路径                                                                 | 变更要点                                           |
+| -------------------------------------------------------------------- | -------------------------------------------------- |
+| `runs/2026-11-02-credentials-omit/00-pin.md`                         | 追加独立复核口径                                   |
 | `runs/2026-11-02-credentials-omit/01-credentials-omit-root-cause.md` | 证据分层；安全收紧；修复建议收窄；独立复现 BLOCKED |
-| `runs/2026-11-02-credentials-omit/README.md` | 同步上述 |
-| `fullstack-2026-11-01/10-credentials-omit.md` | 摘要对齐 |
-| `fullstack-2026-11-01/10-coverage-inventory-tracked.md` | 去 PARTIAL；拆原子行；穷尽性声明；频道表纠偏 |
-| `fullstack-2026-11-01/10-acceptance-conclusion.md` | FAIL/NOT READY；核准范围；不批准 #193 |
-| `fullstack-2026-11-01/10-pr193-review.md` | 收回「据此可合并」口径 |
-| `fullstack-2026-11-01/09-coverage-progress.md` | 追加本轮 corrections 节 |
-| `p1-fix-2026-11-01/defect-status.md` | DEF-008 字段同步 |
-| `runs/2026-11-02-independent-reviewer-corrections/*` | 本目录新建 |
+| `runs/2026-11-02-credentials-omit/README.md`                         | 同步上述                                           |
+| `fullstack-2026-11-01/10-credentials-omit.md`                        | 摘要对齐                                           |
+| `fullstack-2026-11-01/10-coverage-inventory-tracked.md`              | 去 PARTIAL；拆原子行；穷尽性声明；频道表纠偏       |
+| `fullstack-2026-11-01/10-acceptance-conclusion.md`                   | FAIL/NOT READY；核准范围；不批准 #193              |
+| `fullstack-2026-11-01/10-pr193-review.md`                            | 收回「据此可合并」口径                             |
+| `fullstack-2026-11-01/09-coverage-progress.md`                       | 追加本轮 corrections 节                            |
+| `p1-fix-2026-11-01/defect-status.md`                                 | DEF-008 字段同步                                   |
+| `runs/2026-11-02-independent-reviewer-corrections/*`                 | 本目录新建                                         |
 
 ## 明确未做
 
-- 未改 `src/**` / 产品修复  
-- 未 `pnpm install` / 未装工具链  
-- 未 `gh pr merge`  
+- 未改 `src/**` / 产品修复
+- 未 `pnpm install` / 未装工具链
+- 未 `gh pr merge`
 - 未触碰共享脏树 `/Users/daniel/AI VP/openbot/` 作产品写入（本轮文档工作仅在 coverage worktree）
 
 ## 后续：独立验收 Agent 本机核实第 2 轮

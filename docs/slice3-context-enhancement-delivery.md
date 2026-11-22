@@ -14,23 +14,23 @@
 
 ## 本轮阻塞与修复（通用写入口过期快照）
 
-| 红灯 | 修复 | 绿证 |
-|---|---|---|
+| 红灯                                                                                                                      | 修复                                                                                                                                                                                                                                      | 绿证                                                                                                    |
+| ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | `writeSessionTaskBoard(sessionFile, board)` 只锁最终写入；调用方可在锁外读改，B 追加后被 A 旧快照整体写回（epoch 仍递增） | ① 生产 RMW 一律 `mutateSessionTaskBoard`（同锁内读最新→改→写）；② `writeSessionTaskBoard` 对非空盘做 **writeEpoch CAS**：缺省/不匹配 → `StaleSessionTaskBoardWriteError`；③ 测试夹具改 `seedSessionTaskBoard`（显式无 CAS，禁止生产使用） | cross-process：constraint×complete / pause·cancel / focus-switch；stale_write 拒写；in-process CAS 单测 |
 
 文档**不再**宣称「CAS 单独保障并发」；生产正确性 = **文件锁临界区 RMW** + 通用写入口的 **epoch 拒过期**。
 
 ## 生产 `writeSessionTaskBoard` 调用方审计（测试除外）
 
-| 调用方 | 原问题 | 本轮改法 |
-|---|---|---|
-| `src/auto-reply/reply/agent-runner.ts`（主人暂停/取消） | 锁外 `read` → `applyIncomingUserMessage` → `writeSessionTaskBoard` | 改为 `mutateSessionTaskBoard`：临界区内 apply + 写 |
-| `src/conversation-task/session-task-board.ts` → `recordCheckedTaskCompletion` | 同上（完成落盘） | `mutateSessionTaskBoard` + `finishCurrentTask` |
-| `src/conversation-task/session-task-board.ts` → `commitAutomaticPark` | 同上（自动挂起） | `mutateSessionTaskBoard` 内 park |
-| `src/conversation-task/session-task-board.ts` → `applyFocusSwitchGate` | 同上（焦点切换） | `mutateSessionTaskBoard` 内 `applyIncomingUserMessage` |
-| `src/agents/task-surface/apply.ts`（keep-only） | 锁外读 board 后写 keep-only 快照 | `mutateSessionTaskBoard(live => applyKeepOnlyToBoard(live, plan))` |
-| `commitSameTaskConstraint` / `commitBoardMutation` | 已在锁内 RMW | **保持**；仍走 `writeSessionTaskBoardUnlocked` |
-| 导出的 `writeSessionTaskBoard` | 可被误用提交过期快照 | **保留**但加 epoch CAS；生产 RMW 不得再走此路径 |
+| 调用方                                                                        | 原问题                                                             | 本轮改法                                                           |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| `src/auto-reply/reply/agent-runner.ts`（主人暂停/取消）                       | 锁外 `read` → `applyIncomingUserMessage` → `writeSessionTaskBoard` | 改为 `mutateSessionTaskBoard`：临界区内 apply + 写                 |
+| `src/conversation-task/session-task-board.ts` → `recordCheckedTaskCompletion` | 同上（完成落盘）                                                   | `mutateSessionTaskBoard` + `finishCurrentTask`                     |
+| `src/conversation-task/session-task-board.ts` → `commitAutomaticPark`         | 同上（自动挂起）                                                   | `mutateSessionTaskBoard` 内 park                                   |
+| `src/conversation-task/session-task-board.ts` → `applyFocusSwitchGate`        | 同上（焦点切换）                                                   | `mutateSessionTaskBoard` 内 `applyIncomingUserMessage`             |
+| `src/agents/task-surface/apply.ts`（keep-only）                               | 锁外读 board 后写 keep-only 快照                                   | `mutateSessionTaskBoard(live => applyKeepOnlyToBoard(live, plan))` |
+| `commitSameTaskConstraint` / `commitBoardMutation`                            | 已在锁内 RMW                                                       | **保持**；仍走 `writeSessionTaskBoardUnlocked`                     |
+| 导出的 `writeSessionTaskBoard`                                                | 可被误用提交过期快照                                               | **保留**但加 epoch CAS；生产 RMW 不得再走此路径                    |
 
 审计后：**无**生产路径再「锁外读改 + writeSessionTaskBoard」。  
 `rg 'writeSessionTaskBoard\(' src --glob '!**/session-task-board.ts'` 仅剩测试与 `cross-process-child` 的 stale_write 场景。
@@ -47,15 +47,15 @@
 
 文件：`session-task-board.cross-process.test.ts` + `…-child.ts`（`BOARD_MODE`）。
 
-| 场景 | 断言（业务状态，非仅 epoch） |
-|---|---|
-| 双进程 constraint | 甲/乙行均落盘，无丢行 |
-| constraint × **complete** | `unfinished===false`；已成功提交的约束仍在 current 上 |
-| constraint × **cancel** | `current` 清空；`tombstone` 含 task-a；**不复活** |
-| constraint × **pause** | `wakeSuppress===true`；已落地约束保留 |
+| 场景                          | 断言（业务状态，非仅 epoch）                                     |
+| ----------------------------- | ---------------------------------------------------------------- |
+| 双进程 constraint             | 甲/乙行均落盘，无丢行                                            |
+| constraint × **complete**     | `unfinished===false`；已成功提交的约束仍在 current 上            |
+| constraint × **cancel**       | `current` 清空；`tombstone` 含 task-a；**不复活**                |
+| constraint × **pause**        | `wakeSuppress===true`；已落地约束保留                            |
 | constraint × **focus switch** | current ≠ A；A 的已落地约束在 parked（或归档）上，不丢、不写到 B |
-| stale_write × constraint | 陈旧 `writeSessionTaskBoard` 被拒；约束 30 行全在 |
-| in-process CAS | 缺 epoch / 错 epoch 抛错；匹配 epoch 可写 |
+| stale_write × constraint      | 陈旧 `writeSessionTaskBoard` 被拒；约束 30 行全在                |
+| in-process CAS                | 缺 epoch / 错 epoch 抛错；匹配 epoch 可写                        |
 
 本机定向（Asia/Shanghai）：`session-task-board.cross-process` 7、`slice3-context` 8、`constraint-identity` 5、`slice3-context-event-sequence` 1 → **4 files / 21 passed**（本轮复跑）。
 

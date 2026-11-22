@@ -42,10 +42,18 @@ vi.mock("../auto-reply/reply/queue.js", async (importOriginal) => {
   return { ...actual, enqueueFollowupRun: vi.fn(), scheduleFollowupDrain: vi.fn() };
 });
 
+// Stub only the model execution boundary used by the production admitted executor.
+vi.mock("../agent-runtime/execution/runner/embedded-run.js", () => ({
+  runEmbeddedPiAgent: (params: unknown) => mocks.runEmbeddedPiAgent(params),
+}));
+
 import { runReplyAgent } from "../auto-reply/reply/agent-runner.js";
 import { dispatchReplyFromConfig } from "../auto-reply/reply/dispatch-from-config.js";
 import { resetInboundDedupe } from "../auto-reply/reply/inbound-dedupe.js";
 import { createReplyDispatcher } from "../auto-reply/reply/reply-dispatcher.js";
+
+// Resolve the official state port after the production entry and mock modules finish initialization.
+const { sessionTaskState } = await import("../agent-runtime/state/index.js");
 
 describe("R85g: top-level dispatchReplyFromConfig integration", () => {
   let agentDir = "";
@@ -121,6 +129,23 @@ describe("R85g: top-level dispatchReplyFromConfig integration", () => {
     text?: string;
   }) {
     const sessionKey = opts.sessionKey;
+    const sessionFile = path.join(agentDir, "session.jsonl");
+    const board = sessionTaskState.readForInteraction(sessionFile);
+    const admitted = sessionTaskState.admitExecution({
+      sessionFile,
+      requestId: `test-admission:${sessionKey}:${opts.runId ?? "generated-run"}`,
+      goal: "Exercise the admitted delivery lifecycle",
+      lifecycle: "turn",
+      acceptance: ["Return the fixture result and preserve delivery evidence"],
+      expectedFocusRevision: board.focusRevision,
+      expectedWriteEpoch: board.writeEpoch ?? 0,
+      expectedTaskId: board.current?.taskId,
+    });
+    expect(admitted.kind).toBe("accepted_turn");
+    if (admitted.kind !== "accepted_turn") {
+      throw new Error("Test admission fixture was rejected");
+    }
+
     return {
       commandBody: opts.text ?? "hello",
       followupRun: {
@@ -132,7 +157,9 @@ describe("R85g: top-level dispatchReplyFromConfig integration", () => {
           sessionId: "session",
           sessionKey,
           messageProvider: "telegram",
-          sessionFile: path.join(agentDir, "session.jsonl"),
+          sessionFile,
+          executionAdmitted: true,
+          turnExecutionAdmission: admitted.admission,
           workspaceDir: agentDir,
           config: cfg,
           provider: "anthropic",

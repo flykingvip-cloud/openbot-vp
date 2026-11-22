@@ -1,11 +1,11 @@
 import { recordOrNull as asRecord } from "../records.js";
 import { EnterpriseDataStoreError } from "./connector-action-store.js";
-import { extractYonyouTplusRows } from "./yonyou-tplus-rows.js";
 import type {
   DataGatewaySuccessResponse,
   EnterpriseKnowledgeProjectionSpec,
   ProjectionTemplateKey,
 } from "./types.js";
+import { extractYonyouTplusRows } from "./yonyou-tplus-rows.js";
 
 export type ProjectionTemplateResult = {
   title: string;

@@ -6,6 +6,7 @@ import {
   assertNoPrivateRunBagInPublicPayload,
   containsPrivateRunBagMarker,
   createCollaborationPrivateRunBag,
+  durableToolSideEffectKey,
   isCollaborationPrivateRunBagEnabled,
   recordPrivateRunBagToolSideEffect,
   scheduleDurableToolSideEffect,
@@ -113,8 +114,8 @@ describe("private-run-bag", () => {
         return "again";
       },
     });
-    expect(second.skipped).toBe(true);
-    expect(second.value).toBeUndefined();
+    expect(second.skipped).toBe(false);
+    expect(second.value).toBe("ok");
     expect(calls).toEqual(["fired"]);
     expect(restartedBag.toolSideEffectIndex).toHaveLength(0);
 
@@ -150,7 +151,7 @@ describe("private-run-bag", () => {
     };
     let fires = 0;
     const workers = 12;
-    const results = await Promise.all(
+    const results = await Promise.allSettled(
       Array.from({ length: workers }, () =>
         scheduleDurableToolSideEffect({
           ledgerDir,
@@ -162,11 +163,16 @@ describe("private-run-bag", () => {
         }),
       ),
     );
-    const ran = results.filter((row) => !row.skipped);
-    const skipped = results.filter((row) => row.skipped);
+    const ran = results.filter((row) => row.status === "fulfilled");
+    const waiting = results.filter((row) => row.status === "rejected");
+    for (const row of waiting) {
+      if (row.status === "rejected") {
+        expect(row.reason).toMatchObject({ name: "ToolOperationOutcomeUnknownError" });
+      }
+    }
     expect(fires).toBe(1);
     expect(ran).toHaveLength(1);
-    expect(skipped).toHaveLength(workers - 1);
+    expect(waiting).toHaveLength(workers - 1);
   });
 
   it("unknown outcome after claim: failed run stays claimed — no blind rematerialize", async () => {
@@ -193,15 +199,81 @@ describe("private-run-bag", () => {
     ).rejects.toThrow(/result unknown/);
     expect(fires).toEqual(["first"]);
 
-    const retry = await scheduleDurableToolSideEffect({
+    await expect(
+      scheduleDurableToolSideEffect({
+        ledgerDir,
+        fingerprint,
+        run: async () => {
+          fires.push("blind-retry");
+          return "should-not-run";
+        },
+      }),
+    ).rejects.toMatchObject({
+      name: "ToolOperationOutcomeUnknownError",
+      waitCondition: { reason: "external_operation" },
+    });
+    expect(fires).toEqual(["first"]);
+  });
+});
+
+it("requires reconciliation for an orphaned claim without a result journal", async () => {
+  const ledgerDir = await fs.mkdtemp(path.join(os.tmpdir(), "orphan-side-effect-"));
+  tempDirs.push(ledgerDir);
+  const fingerprint = {
+    taskId: "orphan-task",
+    boardItemId: "item",
+    stepId: "step",
+    toolName: "message",
+  };
+  await expect(
+    scheduleDurableToolSideEffect({
       ledgerDir,
       fingerprint,
       run: async () => {
-        fires.push("blind-retry");
-        return "should-not-run";
+        throw new Error("interrupted");
       },
-    });
-    expect(retry.skipped).toBe(true);
-    expect(fires).toEqual(["first"]);
-  });
+    }),
+  ).rejects.toThrow("interrupted");
+  for (const name of await fs.readdir(ledgerDir)) {
+    const file = path.join(ledgerDir, name);
+    if (name.endsWith(".result")) {
+      await fs.unlink(file);
+    } else if (name.endsWith(".json")) {
+      const claim = JSON.parse(await fs.readFile(file, "utf8"));
+      expect(claim.ownerToken).toBeTruthy();
+      claim.ownerPid = 2147483647;
+      await fs.writeFile(file, JSON.stringify(claim));
+    }
+  }
+  let retried = false;
+  await expect(
+    scheduleDurableToolSideEffect({
+      ledgerDir,
+      fingerprint,
+      run: async () => {
+        retried = true;
+      },
+    }),
+  ).rejects.toMatchObject({ name: "ToolOperationOutcomeUnknownError" });
+  expect(retried).toBe(false);
+});
+
+it("isolates canonical tool operations and rejects task identity mismatches", () => {
+  const fingerprint = {
+    taskId: "task",
+    boardItemId: "item",
+    stepId: "step",
+    toolName: "message",
+    operationIdentity: {
+      tenantId: "tenant",
+      taskId: "task",
+      executionId: "execution",
+      stepId: "step",
+      operationId: "operation",
+    },
+  };
+  expect(durableToolSideEffectKey(fingerprint)).not.toBe(
+    durableToolSideEffectKey({ ...fingerprint, toolName: "exec" }),
+  );
+  expect(() => durableToolSideEffectKey({ ...fingerprint, taskId: "other" })).toThrow("conflicts");
 });

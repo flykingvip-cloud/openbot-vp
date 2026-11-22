@@ -13,18 +13,19 @@
 
 ## 1. 行为分录（强制分开）
 
-| 维度 | 含义 | 本轮证据 |
-|---|---|---|
-| **消息已送达** | 前端 busy 不扣队；控制/进度/amend/board_readonly 经 `chat.send` / `runReplyAgent` | mid-task + Gateway 停止测 |
-| **约束已应用** | 长约束全文进 `effectiveConstraints`；steer **一次**；**无** followup 再执行；绑定 `expectedTaskId` | `collect-amend-steer`；`session-task-board.constraint-identity`；身份切换失败不报完整成功 |
-| **回答已产生** | 进度查询立即「任务板最近记录…」；目标/约束只读问句 `board_readonly` 即时答；**不**输出 `wakeSuppress` | mid-task-dialogue / mid-task-aside；事件序列 |
-| **活动已停** | 真实 `chat.send`「暂停/取消」→ abort 活动 run + `abortEmbeddedPiRun` + `clearSessionQueues` → **不** `dispatchInboundMessage` → 板 `wakeSuppress`/tombstone → 旧 claim 拒绝 | `chat.owner-pause-abort.test.ts` |
+| 维度           | 含义                                                                                                                                                                        | 本轮证据                                                                                  |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| **消息已送达** | 前端 busy 不扣队；控制/进度/amend/board_readonly 经 `chat.send` / `runReplyAgent`                                                                                           | mid-task + Gateway 停止测                                                                 |
+| **约束已应用** | 长约束全文进 `effectiveConstraints`；steer **一次**；**无** followup 再执行；绑定 `expectedTaskId`                                                                          | `collect-amend-steer`；`session-task-board.constraint-identity`；身份切换失败不报完整成功 |
+| **回答已产生** | 进度查询立即「任务板最近记录…」；目标/约束只读问句 `board_readonly` 即时答；**不**输出 `wakeSuppress`                                                                       | mid-task-dialogue / mid-task-aside；事件序列                                              |
+| **活动已停**   | 真实 `chat.send`「暂停/取消」→ abort 活动 run + `abortEmbeddedPiRun` + `clearSessionQueues` → **不** `dispatchInboundMessage` → 板 `wakeSuppress`/tombstone → 旧 claim 拒绝 | `chat.owner-pause-abort.test.ts`                                                          |
 
 入队 ≠ 即时对话。**一般普通插问（reply_lane）本轮已落地**：ephemeral `disableTools` embedded，不以进度/board_readonly 特例替代；见 §4 与 `docs/slice2-aside-reply-design.md`。诚实缺口见该文 §6。
 
 ## 2. 本轮交叉验证（相对四项基线）
 
 ### A. Gateway 实际入口停止
+
 - 测试：`src/gateway/server-methods/chat.owner-pause-abort.test.ts`
 - 路径：`chatHandlers["chat.send"]`（真实 handler）+ 活动 `chatAbortControllers` + mock `dispatchInboundMessage` / `abortEmbeddedPiRun` / `clearSessionQueues`
 - 断言序列：`controller.aborted` → 无 dispatch → queue 已清 → respond/`broadcastChat` final 含暂停文案 → `wakeSuppress` + `claimTaskBoardContinue` 拒绝
@@ -33,28 +34,30 @@
 代码：`chat.ts` 在 `ownerAbortInFlight` 时除 `abortChatRuns…(task-park)` 外，再 `abortEmbeddedPiRun` + `clearSessionQueues`（与 agent-runner 控制语路径对齐）。
 
 ### B. 约束绑定原任务身份
+
 - 板 API：`commitSameTaskConstraint({ sessionFile, constraintText, expectedTaskId })` — 当前 unfinished `taskId` 必须仍等于接收约束的 id；写失败/切换返回 `false`
 - `agent-runner`：steer **前**捕获 `expectedTaskId`；`!persisted` 时回复「未能写入原任务板…不视为完整成功」，**不**用完整 ack
 - 测试：`session-task-board.constraint-identity.test.ts`；`agent-runner.collect-amend-steer.test.ts`「mid-steer switch to B」
 
 ### C. 交付文档
+
 - 本文件 + `docs/slice2-chat-during-task-evidence.md` + `docs/slice2-aside-reply-design.md` 与 PR 同步；附件以 PR 内最新版为准。
 
 ## 3. 四项阻塞（基线 `6c4081a3c`）保留摘要
 
-1. 暂停/取消 `abortInFlight` → gateway + agent-runner abort  
-2. `effectiveConstraints` 全文；summary 仅展示截断  
-3. 约束更新唯一入口 = 任务板；回复层只展示  
-4. 进度「任务板最近记录」；不把 unfinished 说成正在推进  
+1. 暂停/取消 `abortInFlight` → gateway + agent-runner abort
+2. `effectiveConstraints` 全文；summary 仅展示截断
+3. 约束更新唯一入口 = 任务板；回复层只展示
+4. 进度「任务板最近记录」；不把 unfinished 说成正在推进
 
 ## 4. 普通插问能力边界
 
-| 能力 | 状态 |
-|---|---|
-| 进度查询即时答 | **已实现**（板投影） |
-| 目标/有效约束只读问句即时答 | **本轮局部检查点已实现**（`board_readonly`，不写板） |
+| 能力                                       | 状态                                                                                     |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| 进度查询即时答                             | **已实现**（板投影）                                                                     |
+| 目标/有效约束只读问句即时答                | **本轮局部检查点已实现**（`board_readonly`，不写板）                                     |
 | 一般 aside 及时独立 LLM 回复（reply_lane） | **本轮已落地**（`mid-task-aside-reply-lane`；隔离测绿；缺口：共址转录 / 清桶 hardening） |
-| 第二任务控制者 / 并发改同一任务资源 | **不做** |
+| 第二任务控制者 / 并发改同一任务资源        | **不做**                                                                                 |
 
 最小方案要点：reply_lane = 原入口旁路短回合，独立 ephemeral session + `disableTools`，禁止写板/写工作区工具。本回合已接线 disposition → board_readonly **与** reply_lane。
 

@@ -12,14 +12,14 @@ ledger file was not written.
 
 ## This is not a shallow-clone artifact
 
-| Fact | Value |
-| --- | --- |
-| `git rev-parse --is-shallow-repository` | `false` |
-| `.git/shallow` | absent |
-| `git rev-list --count HEAD` (`origin/main` `a78c5b66959dac3db4ecb2ecd2065aaec029b3c3`) | 422 |
-| `git rev-list --all --count` after `git fetch origin` | 2124 |
-| Remote-tracking branches | 205 |
-| Tags on `origin` (`git ls-remote --tags origin`) | **0**, including **0** `provenance/sha-*` tags |
+| Fact                                                                                   | Value                                          |
+| -------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `git rev-parse --is-shallow-repository`                                                | `false`                                        |
+| `.git/shallow`                                                                         | absent                                         |
+| `git rev-list --count HEAD` (`origin/main` `a78c5b66959dac3db4ecb2ecd2065aaec029b3c3`) | 422                                            |
+| `git rev-list --all --count` after `git fetch origin`                                  | 2124                                           |
+| Remote-tracking branches                                                               | 205                                            |
+| Tags on `origin` (`git ls-remote --tags origin`)                                       | **0**, including **0** `provenance/sha-*` tags |
 
 Checkout depth is therefore not the reason objects are missing. The remaining
 explanations are: the SHA is not on any advertised ref of this GitHub remote,
@@ -32,12 +32,12 @@ Unique ledger SHAs: **159**. Machine-readable snapshot:
 [c2-classification-summary.json](c2-classification-summary.json),
 [c2-missing-object-classification.jsonl](c2-missing-object-classification.jsonl).
 
-| Class | Unique SHAs | Meaning |
-| --- | ---: | --- |
-| `present-in-this-github-object-graph` | 21 | `git cat-file` succeeds after fetching all origin refs. Rows **seq 145–165**. Confirmed by GitHub commits API HTTP 200 for samples `065840dfba12`, `d37bed5117d6`, `342de3076099`. |
-| `absent-from-this-github-remote` | 138 | Missing locally, and `git fetch origin <sha>` returns `fatal: remote error: upload-pack: not our ref`. GitHub commits API HTTP **422** for samples `9a8e91d19e893fc5d963103538cdbd35f315ac30` (seq 144) and `1e1143012db2276329ee0357ee78b51b7a89f41f`. |
-| fetchable-by-SHA but unadvertised | 0 | No dangling SHA on this remote was fetchable by id. |
-| probe-inconclusive | 0 | — |
+| Class                                 | Unique SHAs | Meaning                                                                                                                                                                                                                                                 |
+| ------------------------------------- | ----------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `present-in-this-github-object-graph` |          21 | `git cat-file` succeeds after fetching all origin refs. Rows **seq 145–165**. Confirmed by GitHub commits API HTTP 200 for samples `065840dfba12`, `d37bed5117d6`, `342de3076099`.                                                                      |
+| `absent-from-this-github-remote`      |         138 | Missing locally, and `git fetch origin <sha>` returns `fatal: remote error: upload-pack: not our ref`. GitHub commits API HTTP **422** for samples `9a8e91d19e893fc5d963103538cdbd35f315ac30` (seq 144) and `1e1143012db2276329ee0357ee78b51b7a89f41f`. |
+| fetchable-by-SHA but unadvertised     |           0 | No dangling SHA on this remote was fetchable by id.                                                                                                                                                                                                     |
+| probe-inconclusive                    |           0 | —                                                                                                                                                                                                                                                       |
 
 Rows with both gateway and UI SHAs present: 21 (seq 145–165).
 Rows with at least one SHA absent from this remote: 142 (seq 1–144, excluding

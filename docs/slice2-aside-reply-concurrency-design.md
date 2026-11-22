@@ -10,13 +10,13 @@
 
 ## 2. 可复用的既有并发机制（候选，须验证）
 
-| 机制 | 现状 | 复用方式 | 风险 |
-|---|---|---|---|
-| 独立 `runId` / `idempotencyKey` | chat.send 已有 | B 全程挂自己的 run 身份 | 终局清理若按 session 一把清会误伤 A |
-| `chatAbortControllers` map | 按 run 登记 | B 自有 AbortController；暂停/取消可同时 abort A+B 或按策略 | 取消范围若只按 sessionId 会误伤或漏伤 |
-| Embedded PI 多 run | 需核实同 session 是否允许第二 embedded 运行 | 若运行时已支持并行只读 run，则挂 reply-only 工具集 | 会话锁 / 转录写入是否互斥未证 |
-| followup 队列 | 默认 collect | **降级路径**：无法隔离写工具时诚实串行并标明「任务结束后作答」 | 不能伪装已即时答 |
-| steer | 已有 amend 注入 | **不用于**一般插问（会混入 A 工具循环） | 已否决 |
+| 机制                            | 现状                                        | 复用方式                                                       | 风险                                  |
+| ------------------------------- | ------------------------------------------- | -------------------------------------------------------------- | ------------------------------------- |
+| 独立 `runId` / `idempotencyKey` | chat.send 已有                              | B 全程挂自己的 run 身份                                        | 终局清理若按 session 一把清会误伤 A   |
+| `chatAbortControllers` map      | 按 run 登记                                 | B 自有 AbortController；暂停/取消可同时 abort A+B 或按策略     | 取消范围若只按 sessionId 会误伤或漏伤 |
+| Embedded PI 多 run              | 需核实同 session 是否允许第二 embedded 运行 | 若运行时已支持并行只读 run，则挂 reply-only 工具集             | 会话锁 / 转录写入是否互斥未证         |
+| followup 队列                   | 默认 collect                                | **降级路径**：无法隔离写工具时诚实串行并标明「任务结束后作答」 | 不能伪装已即时答                      |
+| steer                           | 已有 amend 注入                             | **不用于**一般插问（会混入 A 工具循环）                        | 已否决                                |
 
 **结论**：不新增任务控制者；若实施，优先「原入口旁路 + 独立 runId + 只读工具集」，否则降级 followup 并诚实披露。
 
@@ -37,13 +37,13 @@
 
 ## 5. 本轮实施对照
 
-| 闸门 | 本轮做法 | 证据 |
-|---|---|---|
-| 转录写入隔离 | B 用 ephemeral `sessionFile`（`openbot-aside-reply-*`），不写 A jsonl | `mid-task-aside-reply-lane.test.ts` |
-| 会话锁 | 不同 sessionId → 不占 `ACTIVE_EMBEDDED_RUNS[A]`；aside 锁自己的文件 | isolation assert + run args |
-| 消息归属 | aside `runId` = 本次 chat `opts.runId`；返回 payloads 不走 followup | `agent-runner.aside-reply-lane.test.ts` |
-| 取消范围 | `abortInFlight` → `abortEmbeddedPiRun(A)` + `abortMidTaskAsideLanes(A)` | 同测 + registry |
-| 任务板 | `disableTools`；跑前后 epoch/约束断言不变 | reply_lane 单测 |
+| 闸门         | 本轮做法                                                                | 证据                                    |
+| ------------ | ----------------------------------------------------------------------- | --------------------------------------- |
+| 转录写入隔离 | B 用 ephemeral `sessionFile`（`openbot-aside-reply-*`），不写 A jsonl   | `mid-task-aside-reply-lane.test.ts`     |
+| 会话锁       | 不同 sessionId → 不占 `ACTIVE_EMBEDDED_RUNS[A]`；aside 锁自己的文件     | isolation assert + run args             |
+| 消息归属     | aside `runId` = 本次 chat `opts.runId`；返回 payloads 不走 followup     | `agent-runner.aside-reply-lane.test.ts` |
+| 取消范围     | `abortInFlight` → `abortEmbeddedPiRun(A)` + `abortMidTaskAsideLanes(A)` | 同测 + registry                         |
+| 任务板       | `disableTools`；跑前后 epoch/约束断言不变                               | reply_lane 单测                         |
 
 **仍缺口**：A/B 共址 jsonl、Gateway 清桶专项 hardening、真实多模型流式并行压测。  
 仍禁止第二任务引擎 / 独立裁决模型 / 自动替代唤醒。

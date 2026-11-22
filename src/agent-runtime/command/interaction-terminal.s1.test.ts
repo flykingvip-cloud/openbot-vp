@@ -27,7 +27,7 @@ import {
   createInteractionResourceBudget,
   formatInteractionFailureReply,
 } from "../model/index.js";
-import { INTERACTION_EMPTY_OUTPUT_TEXT } from "../model/interaction-resource-wait.js";
+import { INTERACTION_EMPTY_OUTPUT_TEXT } from "../model/index.js";
 import { runAuthorizedInteraction } from "./index.js";
 import { formatRestrictedInteractionNotice } from "./index.js";
 import { routeInteraction } from "./index.js";

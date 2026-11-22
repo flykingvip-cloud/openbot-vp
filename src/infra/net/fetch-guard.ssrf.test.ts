@@ -2,6 +2,12 @@ import { EnvHttpProxyAgent } from "undici";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fetchWithSsrFGuard, GUARDED_FETCH_MODE } from "./fetch-guard.js";
 
+const auditWarnings = vi.hoisted(() => vi.fn());
+vi.mock("../../logger.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../logger.js")>();
+  return { ...actual, logWarn: (...args: unknown[]) => auditWarnings(...args) };
+});
+
 function redirectResponse(location: string): Response {
   return new Response(null, {
     status: 302,
@@ -14,6 +20,42 @@ function okResponse(body = "ok"): Response {
 }
 
 describe("fetchWithSsrFGuard hardening", () => {
+  it("redacts an opted-in secret path in the complete blocked-request audit", async () => {
+    auditWarnings.mockClear();
+    const fakeToken = "FAKE_WEBHOOK_TOKEN_FOR_TEST_ONLY";
+    const fetchImpl = vi.fn();
+    await expect(
+      fetchWithSsrFGuard({
+        url: `https://discord.com/api/v10/webhooks/fake-id/${fakeToken}`,
+        fetchImpl,
+        redactPathInAudit: true,
+        auditContext: "discord-webhook-send",
+        lookupFn: (async () => [{ address: "127.0.0.1", family: 4 }]) as unknown as NonNullable<
+          Parameters<typeof fetchWithSsrFGuard>[0]["lookupFn"]
+        >,
+      }),
+    ).rejects.toThrow();
+    const completeAudit = JSON.stringify(auditWarnings.mock.calls);
+    expect(completeAudit).not.toContain(fakeToken);
+    expect(completeAudit).not.toContain("/api/v10/webhooks");
+    expect(completeAudit).toContain("https://discord.com/[redacted]");
+    expect(completeAudit).toContain("reason=");
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+  it("keeps existing audit path visibility when redaction is not requested", async () => {
+    auditWarnings.mockClear();
+    await expect(
+      fetchWithSsrFGuard({
+        url: "https://example.com/public-resource",
+        lookupFn: (async () => [{ address: "127.0.0.1", family: 4 }]) as unknown as NonNullable<
+          Parameters<typeof fetchWithSsrFGuard>[0]["lookupFn"]
+        >,
+      }),
+    ).rejects.toThrow();
+    expect(JSON.stringify(auditWarnings.mock.calls)).toContain(
+      "https://example.com/public-resource",
+    );
+  });
   type LookupFn = NonNullable<Parameters<typeof fetchWithSsrFGuard>[0]["lookupFn"]>;
   const CROSS_ORIGIN_REDIRECT_STRIPPED_HEADERS = [
     "authorization",

@@ -4,11 +4,11 @@ Hypothesis H1 from Batch A: hosted jobs fail with `steps=[]` / `runner_id=0` / l
 
 ## Attempts this session
 
-| Probe | Result |
-|---|---|
+| Probe                                                                                       | Result                 |
+| ------------------------------------------------------------------------------------------- | ---------------------- |
 | `gh api orgs/flykingvip-cloud/settings/billing/actions` (Mac, authed as `flykingvip-cloud`) | HTTP **404** Not Found |
-| shared-storage billing sibling | HTTP **404** |
-| Box-side earlier probes | same 404 class |
+| shared-storage billing sibling                                                              | HTTP **404**           |
+| Box-side earlier probes                                                                     | same 404 class         |
 
 GitHub documents these endpoints, but this org token/role does not return billing payloads (common when billing is plan-gated, fine-grained PAT lacks `organization_administration`/`billing`, or org uses enterprise billing UI only).
 

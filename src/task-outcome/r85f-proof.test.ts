@@ -54,6 +54,9 @@ import { runReplyAgent } from "../auto-reply/reply/agent-runner.js";
 import { confirmPendingTurnDelivery } from "../auto-reply/reply/dispatch-from-config.js";
 import { createReplyDispatcher } from "../auto-reply/reply/reply-dispatcher.js";
 
+// Resolve the official state port after the production entry and mock modules finish initialization.
+const { sessionTaskState } = await import("../agent-runtime/state/index.js");
+
 describe("R85f: classify from preflight intent (not hookDelivery presence)", () => {
   it("hookDelivery/not_required + chat intent → chat_turn waiver", () => {
     const contract = resolveTurnContractFromRunMeta({
@@ -193,6 +196,23 @@ describe("R85f: four production-entry scenarios (runReplyAgent + production conf
     >["pendingTurnDeliveryRef"];
   }) {
     const sessionKey = opts.sessionKey ?? "sess";
+    const sessionFile = path.join(agentDir, "session.jsonl");
+    const board = sessionTaskState.readForInteraction(sessionFile);
+    const admitted = sessionTaskState.admitExecution({
+      sessionFile,
+      requestId: `test-admission:${sessionKey}:${opts.runId ?? "generated-run"}`,
+      goal: "Exercise the admitted delivery lifecycle",
+      lifecycle: "turn",
+      acceptance: ["Return the fixture result and preserve delivery evidence"],
+      expectedFocusRevision: board.focusRevision,
+      expectedWriteEpoch: board.writeEpoch ?? 0,
+      expectedTaskId: board.current?.taskId,
+    });
+    expect(admitted.kind).toBe("accepted_turn");
+    if (admitted.kind !== "accepted_turn") {
+      throw new Error("Test admission fixture was rejected");
+    }
+
     return {
       commandBody: "hello",
       followupRun: {
@@ -204,7 +224,9 @@ describe("R85f: four production-entry scenarios (runReplyAgent + production conf
           sessionId: "session",
           sessionKey,
           messageProvider: "telegram",
-          sessionFile: path.join(agentDir, "session.jsonl"),
+          sessionFile,
+          executionAdmitted: true,
+          turnExecutionAdmission: admitted.admission,
           workspaceDir: agentDir,
           config: cfg,
           provider: "anthropic",
@@ -262,6 +284,14 @@ describe("R85f: four production-entry scenarios (runReplyAgent + production conf
       },
     });
   }
+
+  it("still refuses a run without execution admission before invoking the model", async () => {
+    const params = buildParams({ runId: "unadmitted-fixture" });
+    params.followupRun.run.executionAdmitted = false;
+    const result = await runReplyAgent(params);
+    expect(result).toMatchObject({ text: expect.stringContaining("尚未通过交互层的执行准入") });
+    expect(mocks.runEmbeddedPiAgent).not.toHaveBeenCalled();
+  });
 
   it("1) ordinary chat: hookDelivery/not_required + real send success → closed/success, one positive", async () => {
     const runId = "run-r85f-chat-ok";

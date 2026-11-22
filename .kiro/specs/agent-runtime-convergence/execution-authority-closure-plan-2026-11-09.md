@@ -33,19 +33,19 @@
 
 ## 3. 最终结构与依赖要求
 
-| 区域 | 权威职责 | 不允许 |
-|---|---|---|
-| contracts | 主题化数据和接口契约 | 行为实现、任意参数袋 |
-| command | 交互解释、目标关联、准入、个人与协作编排 | 深入工具循环、裸写存储 |
-| execution | 已准入工作推进、尝试、等待及恢复生命周期 | 二次语义分类、关闭群契约 |
-| delivery | 验收、展示、成果与实际投递回执 | 根据回复非空推断送达 |
-| context | 供三层使用的来源读取边界、选择、信任、预算、装配 | 掌握任务准入或完成权 |
-| capabilities | 工具、MCP、插件和连接器调用适配 | 用声明元数据授予权限 |
-| policy | 快照到决定的纯规则、合法转移和限制 | IO、模型调用、调度和状态写入 |
-| state | 各作用域的存储、原子变更、身份版本校验 | 拼提示词、渠道投递 |
-| model | 身份、授权、预算、回退、计费、取消的共享治理 | 自己创建任务或成为执行宿主 |
-| wiring | 绑定依赖与公开端口 | 新增业务判断 |
-| 外部 adapter | Gateway、渠道、定时等接入和触发 | 独立分类、关闭、恢复或重试权威 |
+| 区域         | 权威职责                                         | 不允许                         |
+| ------------ | ------------------------------------------------ | ------------------------------ |
+| contracts    | 主题化数据和接口契约                             | 行为实现、任意参数袋           |
+| command      | 交互解释、目标关联、准入、个人与协作编排         | 深入工具循环、裸写存储         |
+| execution    | 已准入工作推进、尝试、等待及恢复生命周期         | 二次语义分类、关闭群契约       |
+| delivery     | 验收、展示、成果与实际投递回执                   | 根据回复非空推断送达           |
+| context      | 供三层使用的来源读取边界、选择、信任、预算、装配 | 掌握任务准入或完成权           |
+| capabilities | 工具、MCP、插件和连接器调用适配                  | 用声明元数据授予权限           |
+| policy       | 快照到决定的纯规则、合法转移和限制               | IO、模型调用、调度和状态写入   |
+| state        | 各作用域的存储、原子变更、身份版本校验           | 拼提示词、渠道投递             |
+| model        | 身份、授权、预算、回退、计费、取消的共享治理     | 自己创建任务或成为执行宿主     |
+| wiring       | 绑定依赖与公开端口                               | 新增业务判断                   |
+| 外部 adapter | Gateway、渠道、定时等接入和触发                  | 独立分类、关闭、恢复或重试权威 |
 
 依赖按具体接口声明，不以笼统的“所有层从上往下”代替依赖图。policy/contracts 不反向依赖宿主；execution 不依赖 wiring；外部消费者经公开入口进入。state 可以在锁内使用纯 policy；跨域编排由 command/受控宿主组织。不得通过 barrel 引入循环依赖。
 
@@ -53,30 +53,30 @@
 
 下文设计文档均相对 `.kiro/specs/agent-runtime-convergence/`。
 
-| 旧组件/现役锚点 | 处置与目标 | 对照文档 | 工作项 |
-|---|---|---|---|
-| conversation-task/turn-relation.ts | 拆开现役谓词与旧分类器；必要纯规则进 policy，重复分类归档 | individual 文档；archive/interaction-retirement-2026-11-05.md；command-public-api.md | T3 |
-| conversation-task/focus-switch.ts | 核准启发式消费者；纯规则、transcript IO、文案分别归位 | individual 文档；authority-map.md | T3/T7 |
-| conversation-task/focus-policy.ts | 核准槽位/任务容量语义；纯 wake 规则进 policy，触发留宿主 | transition-baseline.md；individual 文档 | T3/T4 |
-| conversation-task/reply-completion.ts | 拆清完成条件、ledger 编排与板事务；核准部分成功窗口 | task-close-audit.md；delivery-outlet-map.md | T4 |
-| conversation-task/session-task-board.ts | 保留必要门面直至消费者迁完；不得新增长期业务实现 | core-contract-map.md；completion-gates.md | T4/T8 |
-| conversation-task/control-plane.ts、ledger-binding.ts | 保留领域含义，不粗并会话板；证明是否仍有独立控制权 | original-intent-preservation.md；retirement-intent-contract.md | T4/T8 |
-| task-orchestration/complex-task-loop.ts | 核实配置与消费者；观察不控权，重复分类/关闭归档 | retirement-intent-audit.md；extension-disposition.md | T3/T8 |
-| gateway/collaboration-dispatch/effective-policy.ts | 不变量、模板、权限及类型按职责拆分 | collab 文档；scenario-architecture.md | T5 |
-| 同目录 policy-compiler.ts、policy-compiler-sections.ts、policy-compiler-hash.ts、resolve-effective-policy.ts | 纯编译/哈希归 policy；宿主仅供快照和配置；保留 hash 语义 | collab 文档；wiring-policy-boundaries.md | T5 |
-| 同目录 submit-review-versioning.ts、governance-gate.ts、plan-gate-exec.ts | 纯规则唯一归 policy；IO 留对应事务/宿主 | collab 文档；authority-map.md | T5 |
-| 同目录 peer-review-gate.ts | 分离评审判定和评审事实事务 | collab 文档；scenario-architecture.md | T5/T6 |
-| 同目录 claim-contract.ts | 合法边进 policy；群板锁内事务进 state；领域编排归 command | collab 文档；retirement-intent-contract.md | T5/T6 |
-| 同目录 executor-private-todolist.ts、handoff-contract.ts | 私有计划/交接状态进独立 state 作用域，编排与判定分离 | collab 文档；scenario-architecture.md | T6 |
-| 同目录 legacy-production-executor.ts、round-runtime/decision/wake/floor 相关文件 | 保留现役行为；区分领域编排、适配与策略，不整目录删除 | scenario-architecture.md；original-intent-preservation.md | T6/T8 |
-| auto-reply/reply/get-reply-run.ts、agent-runner.ts | 受控回复宿主；逐项核准是否残留第二决策权威 | admitted-turn-ownership.md；execution-ports-plan.md | T1/T8 |
-| commands/agent.ts、cron/isolated-agent/run.ts、auto-reply/reply/followup-runner.ts | 保留场景宿主，共用 controlled lifecycle；不强并入口 | candidate-extraction-map.md；candidate-invariants.md | T1/T9 |
-| agent-runtime/execution/runner/embedded-attempt*.ts、embedded-run.ts、cli-run.ts | 保留执行后端；验证拆分顺序、清理和失败结算 | phase-split-repair-20261109.md；execution-five-stage-map.md | T7/T9 |
-| auto-reply/reply/groups.ts、runtime-context-assembly.ts | 群材料归 context；个人路径不误加载群材料 | context-source-map.md；context-component-plan.md | T7 |
-| agents/system-prompt*.ts、agent-runtime/context/system-prompt.ts | 保留必要宿主 IO；纯投影唯一归 context，不造空统一服务 | builder-component-contract.md；context-budget-map.md | T7 |
-| agent-runtime/capabilities/catalog.ts、Tool/MCP/插件适配 | 声明与授权分离；保持 unknown/not_declared 的真实性 | extension-disposition.md；admitted-backend-port.md | T7 |
-| hooks transform、Lobster、OpenProse 的加载/恢复路径 | 定位真实入口、配置、用户资产、token 后逐项决定保留或退役 | extension-disposition.md；retirement-gates.md | T8 |
-| agent-runtime/state/repository/async-wait-*、delivery/dispatch/confirm-pending.ts | 保留恢复主链与确认权威，防旧回调、重复执行与重复送达 | completion-gates.md；package6-same-sha-acceptance.md | T4/T9 |
+| 旧组件/现役锚点                                                                                              | 处置与目标                                                | 对照文档                                                                             | 工作项 |
+| ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------- | ------------------------------------------------------------------------------------ | ------ |
+| conversation-task/turn-relation.ts                                                                           | 拆开现役谓词与旧分类器；必要纯规则进 policy，重复分类归档 | individual 文档；archive/interaction-retirement-2026-11-05.md；command-public-api.md | T3     |
+| conversation-task/focus-switch.ts                                                                            | 核准启发式消费者；纯规则、transcript IO、文案分别归位     | individual 文档；authority-map.md                                                    | T3/T7  |
+| conversation-task/focus-policy.ts                                                                            | 核准槽位/任务容量语义；纯 wake 规则进 policy，触发留宿主  | transition-baseline.md；individual 文档                                              | T3/T4  |
+| conversation-task/reply-completion.ts                                                                        | 拆清完成条件、ledger 编排与板事务；核准部分成功窗口       | task-close-audit.md；delivery-outlet-map.md                                          | T4     |
+| conversation-task/session-task-board.ts                                                                      | 保留必要门面直至消费者迁完；不得新增长期业务实现          | core-contract-map.md；completion-gates.md                                            | T4/T8  |
+| conversation-task/control-plane.ts、ledger-binding.ts                                                        | 保留领域含义，不粗并会话板；证明是否仍有独立控制权        | original-intent-preservation.md；retirement-intent-contract.md                       | T4/T8  |
+| task-orchestration/complex-task-loop.ts                                                                      | 核实配置与消费者；观察不控权，重复分类/关闭归档           | retirement-intent-audit.md；extension-disposition.md                                 | T3/T8  |
+| gateway/collaboration-dispatch/effective-policy.ts                                                           | 不变量、模板、权限及类型按职责拆分                        | collab 文档；scenario-architecture.md                                                | T5     |
+| 同目录 policy-compiler.ts、policy-compiler-sections.ts、policy-compiler-hash.ts、resolve-effective-policy.ts | 纯编译/哈希归 policy；宿主仅供快照和配置；保留 hash 语义  | collab 文档；wiring-policy-boundaries.md                                             | T5     |
+| 同目录 submit-review-versioning.ts、governance-gate.ts、plan-gate-exec.ts                                    | 纯规则唯一归 policy；IO 留对应事务/宿主                   | collab 文档；authority-map.md                                                        | T5     |
+| 同目录 peer-review-gate.ts                                                                                   | 分离评审判定和评审事实事务                                | collab 文档；scenario-architecture.md                                                | T5/T6  |
+| 同目录 claim-contract.ts                                                                                     | 合法边进 policy；群板锁内事务进 state；领域编排归 command | collab 文档；retirement-intent-contract.md                                           | T5/T6  |
+| 同目录 executor-private-todolist.ts、handoff-contract.ts                                                     | 私有计划/交接状态进独立 state 作用域，编排与判定分离      | collab 文档；scenario-architecture.md                                                | T6     |
+| 同目录 legacy-production-executor.ts、round-runtime/decision/wake/floor 相关文件                             | 保留现役行为；区分领域编排、适配与策略，不整目录删除      | scenario-architecture.md；original-intent-preservation.md                            | T6/T8  |
+| auto-reply/reply/get-reply-run.ts、agent-runner.ts                                                           | 受控回复宿主；逐项核准是否残留第二决策权威                | admitted-turn-ownership.md；execution-ports-plan.md                                  | T1/T8  |
+| commands/agent.ts、cron/isolated-agent/run.ts、auto-reply/reply/followup-runner.ts                           | 保留场景宿主，共用 controlled lifecycle；不强并入口       | candidate-extraction-map.md；candidate-invariants.md                                 | T1/T9  |
+| agent-runtime/execution/runner/embedded-attempt\*.ts、embedded-run.ts、cli-run.ts                            | 保留执行后端；验证拆分顺序、清理和失败结算                | phase-split-repair-20261109.md；execution-five-stage-map.md                          | T7/T9  |
+| auto-reply/reply/groups.ts、runtime-context-assembly.ts                                                      | 群材料归 context；个人路径不误加载群材料                  | context-source-map.md；context-component-plan.md                                     | T7     |
+| agents/system-prompt\*.ts、agent-runtime/context/system-prompt.ts                                            | 保留必要宿主 IO；纯投影唯一归 context，不造空统一服务     | builder-component-contract.md；context-budget-map.md                                 | T7     |
+| agent-runtime/capabilities/catalog.ts、Tool/MCP/插件适配                                                     | 声明与授权分离；保持 unknown/not_declared 的真实性        | extension-disposition.md；admitted-backend-port.md                                   | T7     |
+| hooks transform、Lobster、OpenProse 的加载/恢复路径                                                          | 定位真实入口、配置、用户资产、token 后逐项决定保留或退役  | extension-disposition.md；retirement-gates.md                                        | T8     |
+| agent-runtime/state/repository/async-wait-\*、delivery/dispatch/confirm-pending.ts                           | 保留恢复主链与确认权威，防旧回调、重复执行与重复送达      | completion-gates.md；package6-same-sha-acceptance.md                                 | T4/T9  |
 
 表中前三列为迁移线索，不等于已核准结论。不得把历史文档中的路径或描述直接当当前消费者事实。
 
@@ -172,20 +172,20 @@ hooks/Lobster/OpenProse 配置与资产证据不足时保留并注明未知；�
 
 ## 9. 原切片覆盖矩阵
 
-| 原切片 | 本方案 | 决策 |
-|---|---|---|
-| 个体 I0 | T2/T3 | 等价后去重，非同义不硬合 |
-| 个体 I1 | T3/T8 | 现役谓词迁移，重复分类核准退役 |
-| 个体 I2 | T3/T4 | 判定、认领、唤醒分离 |
-| 个体 I3 | T3/T7 | 仅保留必要规则与 IO 适配 |
-| 个体 I4 | T4 | 提前核准完成一致性 |
-| 协作 S0 | T2/T5 | 不变量唯一实现 |
-| 协作 S1 | T5 | 提交版本规则 |
-| 协作 S2 | T5/T6 | 治理/评审判断与写入分离 |
-| 协作 S3 | T5/T6 | 计划门槛与计划事务 |
-| 协作 S4 | T5/T6 | 转移与锁内事务 |
-| 协作 S5 | T5 | 编译/hash 等价 |
-| 协作文档未单列切片的私有计划、handoff、评审写入 | T6 | 显式纳入，不遗漏 |
+| 原切片                                          | 本方案 | 决策                           |
+| ----------------------------------------------- | ------ | ------------------------------ |
+| 个体 I0                                         | T2/T3  | 等价后去重，非同义不硬合       |
+| 个体 I1                                         | T3/T8  | 现役谓词迁移，重复分类核准退役 |
+| 个体 I2                                         | T3/T4  | 判定、认领、唤醒分离           |
+| 个体 I3                                         | T3/T7  | 仅保留必要规则与 IO 适配       |
+| 个体 I4                                         | T4     | 提前核准完成一致性             |
+| 协作 S0                                         | T2/T5  | 不变量唯一实现                 |
+| 协作 S1                                         | T5     | 提交版本规则                   |
+| 协作 S2                                         | T5/T6  | 治理/评审判断与写入分离        |
+| 协作 S3                                         | T5/T6  | 计划门槛与计划事务             |
+| 协作 S4                                         | T5/T6  | 转移与锁内事务                 |
+| 协作 S5                                         | T5     | 编译/hash 等价                 |
+| 协作文档未单列切片的私有计划、handoff、评审写入 | T6     | 显式纳入，不遗漏               |
 
 ## 10. T9 同版本测试与验收
 
@@ -197,18 +197,18 @@ hooks/Lobster/OpenProse 配置与资产证据不足时保留并注明未知；�
 
 ### 10.2 最终行为矩阵
 
-| 场景 | 必须证明 |
-|---|---|
-| 普通聊天 | 不建任务、不启动工具执行层 |
-| 明确任务 | 目标/验收/待办经受控准入 |
-| 活动期间交流 | 查询不改目标；修订作用正确目标；无第二语义路由 |
-| 控制 | 暂停/取消实际生效；旧回调拒绝 |
-| 异步与重启 | 可恢复、无重复业务/投递、原身份不串 |
-| 成果失败 | 验收失败保持未完成 |
-| 投递失败 | 执行成功独立可查；仅重投同版本原成果 |
-| 协作 | 认领→成员执行→提交→评审→集成→组投递；成员不关闭群契约 |
-| 上下文 | 个人/群隔离；预算/信任/顺序/调用次数未退化 |
-| 成果链 | 预览、保存、编辑版本、下载一致；真实 PPT 渲染另验 |
+| 场景         | 必须证明                                              |
+| ------------ | ----------------------------------------------------- |
+| 普通聊天     | 不建任务、不启动工具执行层                            |
+| 明确任务     | 目标/验收/待办经受控准入                              |
+| 活动期间交流 | 查询不改目标；修订作用正确目标；无第二语义路由        |
+| 控制         | 暂停/取消实际生效；旧回调拒绝                         |
+| 异步与重启   | 可恢复、无重复业务/投递、原身份不串                   |
+| 成果失败     | 验收失败保持未完成                                    |
+| 投递失败     | 执行成功独立可查；仅重投同版本原成果                  |
+| 协作         | 认领→成员执行→提交→评审→集成→组投递；成员不关闭群契约 |
+| 上下文       | 个人/群隔离；预算/信任/顺序/调用次数未退化            |
+| 成果链       | 预览、保存、编辑版本、下载一致；真实 PPT 渲染另验     |
 
 记录 current SHA / dirty diff 指纹 / 测试文件 / 命令 / 数量 / 失败与未跑原因。修复生产源码后相关证据失效，须重跑；不得把旧 SHA Package6 或模拟结果当当前真实终验。
 
@@ -216,13 +216,13 @@ hooks/Lobster/OpenProse 配置与资产证据不足时保留并注明未知；�
 
 ## 11. 执行批次、交付物和放行
 
-| 批次 | 范围 | 独立验收放行 |
-|---|---|---|
-| A | T0—T2 | 权威、消费者、分类目录准确后开 B |
-| B | T3—T4 | 个体准入/状态/完成闭环后开 C |
-| C | T5—T6 | 协作三作用域及事务闭环后开 D |
-| D | T7—T8 | 供给边界和退役证据通过后开 E |
-| E | T9 | 同版本源码验收；运行缺口另列，不自动部署 |
+| 批次 | 范围  | 独立验收放行                             |
+| ---- | ----- | ---------------------------------------- |
+| A    | T0—T2 | 权威、消费者、分类目录准确后开 B         |
+| B    | T3—T4 | 个体准入/状态/完成闭环后开 C             |
+| C    | T5—T6 | 协作三作用域及事务闭环后开 D             |
+| D    | T7—T8 | 供给边界和退役证据通过后开 E             |
+| E    | T9    | 同版本源码验收；运行缺口另列，不自动部署 |
 
 每批一个明确负责人；旧组件所有者交接后才改，保持小步绿色提交。不同时修改个人和协作热文件，跨批依赖通过已核准接口衔接。
 

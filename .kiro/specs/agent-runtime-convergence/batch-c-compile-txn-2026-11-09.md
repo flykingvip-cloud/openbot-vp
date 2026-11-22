@@ -30,12 +30,12 @@ A request for 99 visible replies still clamps to 12. Its hash is `81431e09394079
 
 `src/agent-runtime/state/collaboration/round-txn.ts`, exported from `state/index`:
 
-| Store | Entry | What stayed outside |
-| --- | --- | --- |
-| ClaimContract | `mutateBoardClaimLog`, `appendBoardClaimLog` | flag check, status decision, wake / fan-out |
-| ExecutorPrivateTodolist | `commitPrivateTodolistLog` | propose / confirm / revise decisions; separate directory |
-| Peer review | `appendPeerReviewLog` | author and verdict checks; quality ledger after the lock |
-| Handoff | `withHandoffRoundLock`, `appendHandoffLogLine`, `writeHandoffJson` | flag, governance check, recovery callback, wake after unlock |
+| Store                   | Entry                                                              | What stayed outside                                          |
+| ----------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------ |
+| ClaimContract           | `mutateBoardClaimLog`, `appendBoardClaimLog`                       | flag check, status decision, wake / fan-out                  |
+| ExecutorPrivateTodolist | `commitPrivateTodolistLog`                                         | propose / confirm / revise decisions; separate directory     |
+| Peer review             | `appendPeerReviewLog`                                              | author and verdict checks; quality ledger after the lock     |
+| Handoff                 | `withHandoffRoundLock`, `appendHandoffLogLine`, `writeHandoffJson` | flag, governance check, recovery callback, wake after unlock |
 
 The three stores are not merged. Locks still wrap read, check, and append. Handoff recovery still runs inside the lock and does not delete an already written fact.
 

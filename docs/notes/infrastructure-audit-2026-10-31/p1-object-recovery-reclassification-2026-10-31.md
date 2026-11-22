@@ -2,24 +2,24 @@
 
 > **历史合入状态（不要按今天阅读表内 OPEN）：** 基线表里的「#171 OPEN」「#172 未合入」以及文末「未合入 #171/#172」记录的是 2026-10-31 写本文时的状态。2026-11-01 现行合入与验收边界见 [closeout-2026-11-01.md](closeout-2026-11-01.md)。表内单元格保持原句。
 
+<!-- prettier-ignore -->
 > **SUPERSEDED ADJUDICATION (2026-10-31 later same day):** the 「5 proven DAG break」claim below is **withdrawn** as final adjudication. **权威当前分类**见 `p1-current-classification-2026-10-31.json`（145 forward-only + 1 incomplete_graph_unknown；完整 146 本轮未重遍历）。详见 `p1-dag-break-evidence-closure-2026-10-31.md`。seqs **52/100/121/140 → forward-only**；seq **145 → incomplete_graph_unknown**（「当前联合对象图下非祖先」, **not** 「历史无共同祖先」）。Donor 亦 shallow；**禁止**称「联合完整图」。Counts 141+5 仅为 *HISTORICAL donor_primary* 已发表拆分，非现行定案。恢复计数三分项：inventory/清单 **137**，捕获时 `refs/audit-recovery/*` **5**。
-
 
 > **性质**：证据包（evidence-only）。**不**修改 `deploy/production/releases.jsonl` / `RELEASE_RECORD.md`；**不**写 `regressionAcknowledged`；**不**合入、DIGEST、部署或触发 A3。
 > **与 #172 关系**：独立于 [#172](https://github.com/flykingvip-cloud/openbot-vp/pull/172)（限定账本修复）。本 PR 仅交付对象恢复与重新分类证据。Codex 独立验收；实施方不自宣布 PASS。
 
 ## 基线
 
-| 项 | 值 |
-|---|---|
-| origin/main | `0e4d269615e26909bbac606f1dfb755b3511400c` |
-| #171 head | `e049e76bf41aed231828dc2c276a97cb31171580` OPEN |
-| #172 head / 账本审计 tip | `d189e74f85ff2838b0df0b469ca5eeae39bf9724` OPEN（限定修复已验收，**未合入**） |
-| audit worktree | `/Users/daniel/AI VP/openbot-infrastructure-audit` @ `audit/ledger-integrity-seq127-release-record` |
-| audit clone shallow | **true**；boundary = `9a8e91d19e893fc5d963103538cdbd35f315ac30`（seq144 tip） |
-| 权威对象库 donor | `/Users/daniel/AI项目/openbot`（本地；非 GitHub 可达 tip 的完整对象源） |
-| Loom stream | `infrastructure-audit-p1-object-recovery-20261031` |
-| 账本路径（只读审计） | `deploy/production/releases.jsonl` @ #172 tip（seq127 已关；仅 seq151 开放） |
+| 项                       | 值                                                                                                  |
+| ------------------------ | --------------------------------------------------------------------------------------------------- |
+| origin/main              | `0e4d269615e26909bbac606f1dfb755b3511400c`                                                          |
+| #171 head                | `e049e76bf41aed231828dc2c276a97cb31171580` OPEN                                                     |
+| #172 head / 账本审计 tip | `d189e74f85ff2838b0df0b469ca5eeae39bf9724` OPEN（限定修复已验收，**未合入**）                       |
+| audit worktree           | `/Users/daniel/AI VP/openbot-infrastructure-audit` @ `audit/ledger-integrity-seq127-release-record` |
+| audit clone shallow      | **true**；boundary = `9a8e91d19e893fc5d963103538cdbd35f315ac30`（seq144 tip）                       |
+| 权威对象库 donor         | `/Users/daniel/AI项目/openbot`（本地；非 GitHub 可达 tip 的完整对象源）                             |
+| Loom stream              | `infrastructure-audit-p1-object-recovery-20261031`                                                  |
+| 账本路径（只读审计）     | `deploy/production/releases.jsonl` @ #172 tip（seq127 已关；仅 seq151 开放）                        |
 
 ## 方法
 
@@ -32,21 +32,21 @@
 
 ### 分类判定（forward-only）
 
-| 分类 | 判定 |
-|---|---|
-| forward-only | 对象存在，祖先检查成立 |
-| proven DAG break | 对象存在，祖先检查返回非祖先 |
-| missing object | 缺少必要对象 |
-| incomplete graph / command failure | 无法可靠判断，保持 unknown |
+| 分类                               | 判定                         |
+| ---------------------------------- | ---------------------------- |
+| forward-only                       | 对象存在，祖先检查成立       |
+| proven DAG break                   | 对象存在，祖先检查返回非祖先 |
+| missing object                     | 缺少必要对象                 |
+| incomplete graph / command failure | 无法可靠判断，保持 unknown   |
 
 ## 前后差异（原 146 条 ERROR regression）
 
-| 分类 | 恢复前（audit shallow 叙事） | 恢复后（donor-primary） |
-|---|---:|---:|
-| forward-only | 0 | **141** |
-| proven DAG break | 1（仅 seq145） | **5**（52, 100, 121, 140, 145） |
-| missing object | 145 | **0**（双库联合视角） |
-| incomplete graph / unknown | （被误并进 missing） | **0**（权威分类后） |
+| 分类                       | 恢复前（audit shallow 叙事） |         恢复后（donor-primary） |
+| -------------------------- | ---------------------------: | ------------------------------: |
+| forward-only               |                            0 |                         **141** |
+| proven DAG break           |               1（仅 seq145） | **5**（52, 100, 121, 140, 145） |
+| missing object             |                          145 |           **0**（双库联合视角） |
+| incomplete graph / unknown |         （被误并进 missing） |             **0**（权威分类后） |
 
 历史仍 **fail-closed**（exit 30）；不得称交付门禁通过。现行口径见 `p1-current-classification-2026-10-31.json`（145 FO + 1 incomplete_graph_unknown；proven_dag_break=0）。HISTORICAL donor_primary 曾报少数 proven DAG break，已撤回为定案。**不再**把缺对象统称为已证明 regression。
 
@@ -54,13 +54,13 @@
 
 ## Proven DAG break（HISTORICAL donor_primary 表；≠ 功能内容回退；现行已撤回）
 
-| seq | prior | current | 分类源 |
-|---:|---|---|---|
-| 52 | `59be50660d8e…` | `756a577ec77e…` | donor_primary |
+| seq | prior           | current         | 分类源                                                 |
+| --: | --------------- | --------------- | ------------------------------------------------------ |
+|  52 | `59be50660d8e…` | `756a577ec77e…` | donor_primary                                          |
 | 100 | `28ef650e0f97…` | `6628f4bf364b…` | donor_primary（audit shallow 曾假 forward-only，已弃） |
-| 121 | `0411972cd38c…` | `13ff093d281b…` | donor_primary |
-| 140 | `d95f332d39c8…` | `c33c140167bf…` | donor_primary |
-| 145 | `9a8e91d19e89…` | `065840dfba12…` | audit_fallback（donor 缺 145 tip） |
+| 121 | `0411972cd38c…` | `13ff093d281b…` | donor_primary                                          |
+| 140 | `d95f332d39c8…` | `c33c140167bf…` | donor_primary                                          |
+| 145 | `9a8e91d19e89…` | `065840dfba12…` | audit_fallback（donor 缺 145 tip）                     |
 
 以上均为双向非祖先、`merge-base` 空的 **DAG/SoT 不连续**。**不可**据此断言功能内容回退；**未** acknowledge。
 
@@ -75,16 +75,16 @@
 
 ## 附件清单（本目录）
 
-| 文件 | 说明 |
-|---|---|
+| 文件                                        | 说明                                                        |
+| ------------------------------------------- | ----------------------------------------------------------- |
 | `p1-current-classification-2026-10-31.json` | **权威当前分类**（145 FO + 1 incomplete；勿合并旧补丁字段） |
-| `p1-reclassification-summary.json` | HISTORICAL donor_primary 快照（非现行） |
-| `missing-object-inventory.jsonl` | 恢复前缺失 tip 清单（137） |
-| `recovered-shas.txt` | 从 donor 收回的 tip 列表 |
-| `reclassification-donor-primary.jsonl` | 146 条权威重分类全表 |
-| `seq145-evidence.json` | seq145 双方对象 / 祖先 / 共同祖先证据 |
-| `github-commit-api-sample.json` | GitHub commits API 抽样（均为 422） |
-| `ledger-audit-raw-snippet.txt` | 审计输出脱敏摘录（exit 30） |
+| `p1-reclassification-summary.json`          | HISTORICAL donor_primary 快照（非现行）                     |
+| `missing-object-inventory.jsonl`            | 恢复前缺失 tip 清单（137）                                  |
+| `recovered-shas.txt`                        | 从 donor 收回的 tip 列表                                    |
+| `reclassification-donor-primary.jsonl`      | 146 条权威重分类全表                                        |
+| `seq145-evidence.json`                      | seq145 双方对象 / 祖先 / 共同祖先证据                       |
+| `github-commit-api-sample.json`             | GitHub commits API 抽样（均为 422）                         |
+| `ledger-audit-raw-snippet.txt`              | 审计输出脱敏摘录（exit 30）                                 |
 
 ## 已证明 / 待验证 / 环境限制
 

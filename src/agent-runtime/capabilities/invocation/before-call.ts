@@ -11,10 +11,20 @@ import type { SessionState } from "../../../logging/diagnostic-session-state.js"
 import { createSubsystemLogger } from "../../../logging/subsystem.js";
 import { getGlobalHookRunner } from "../../../plugins/hook-runner-global.js";
 import { isPlainObject } from "../../../utils.js";
+import {
+  commitToolOperationWriteIntent,
+  enterOpaqueToolAdmission,
+  trustedToolAdmissionRefusal,
+} from "../../state/repository/tool-operation.js";
 import { checkTaskActionBoundary, type TaskActionBoundary } from "../../state/task-action.js";
 import { declareCapability } from "../catalog.js";
 
 export type HookContext = {
+  /** Trusted wiring port, evaluated after plugin hooks and before the effect. */
+  authorizeStoredResultRead?: (
+    params: unknown,
+  ) => Promise<"allowed" | "denied" | "unverifiable"> | "allowed" | "denied" | "unverifiable";
+  beforeEffect?: (params: unknown) => Promise<void> | void;
   taskBoundary?: TaskActionBoundary;
   agentId?: string;
   sessionKey?: string;
@@ -32,6 +42,24 @@ type HookOutcome = { blocked: true; reason: string } | { blocked: false; params:
 
 const log = createSubsystemLogger("agents/tools");
 const BEFORE_TOOL_CALL_WRAPPED = Symbol("beforeToolCallWrapped");
+const RESULT_REPLAY_GUARD = Symbol("toolResultReplayGuard");
+
+/** A stored success is reusable only under the current trusted execution scope. */
+export async function assertToolResultReplayAllowed(
+  tool: AnyAgentTool,
+  params: unknown,
+  signal?: AbortSignal,
+): Promise<void> {
+  signal?.throwIfAborted();
+  const guard = (tool as AnyAgentTool & { [RESULT_REPLAY_GUARD]?: HookContext["beforeEffect"] })[
+    RESULT_REPLAY_GUARD
+  ];
+  if (!guard) {
+    throw new Error("Stored result read authorization unverifiable");
+  }
+  await guard(params);
+  signal?.throwIfAborted();
+}
 const adjustedParamsByToolCallId = new Map<string, unknown>();
 const MAX_TRACKED_ADJUSTED_PARAMS = 1024;
 const LOOP_WARNING_BUCKET_SIZE = 10;
@@ -182,6 +210,8 @@ export async function runBeforeToolCallHook(args: {
     return { blocked: false, params: args.params };
   }
 
+  // Failure to persist the opaque boundary must prevent plugin dispatch.
+  await enterOpaqueToolAdmission();
   try {
     const normalizedParams = isPlainObject(params) ? params : {};
     const toolContext = {
@@ -247,7 +277,32 @@ export function wrapToolWithBeforeToolCallHook(
       if (lateRefusal) {
         outcome = { blocked: true, reason: lateRefusal };
       }
-      signal?.throwIfAborted();
+      if (signal?.aborted) {
+        throw trustedToolAdmissionRefusal(
+          signal.reason instanceof Error ? signal.reason : new Error("Admission cancelled"),
+        );
+      }
+      if (!outcome.blocked) {
+        try {
+          await ctx?.beforeEffect?.(outcome.params);
+        } catch (error) {
+          throw trustedToolAdmissionRefusal(
+            error instanceof Error ? error.message : "Admission refused",
+          );
+        }
+        // Authority resolution can await too; owner control and cancellation still win.
+        if (signal?.aborted) {
+          throw trustedToolAdmissionRefusal(
+            signal.reason instanceof Error ? signal.reason : new Error("Admission cancelled"),
+          );
+        }
+        const finalRefusal = ctx?.taskBoundary
+          ? checkTaskActionBoundary(ctx.taskBoundary)
+          : undefined;
+        if (finalRefusal) {
+          outcome = { blocked: true, reason: finalRefusal };
+        }
+      }
       const selection: ToolSelectionProvenance = {
         kind: "tool_selection",
         decision_owner: "model",
@@ -261,15 +316,15 @@ export function wrapToolWithBeforeToolCallHook(
         selected_capability: toolName,
         policy_result: outcome.blocked ? "denied" : "allowed",
         execution_allowed: !outcome.blocked,
-        execution_started: !outcome.blocked,
+        execution_started: false,
         session_key: ctx?.sessionKey ?? null,
         session_id: ctx?.sessionId ?? null,
         run_id: ctx?.runId ?? null,
         tool_call_id: toolCallId ?? null,
       };
-      emitExecutionChainProvenance(selection);
       if (outcome.blocked) {
-        throw new Error(outcome.reason);
+        emitExecutionChainProvenance(selection);
+        throw trustedToolAdmissionRefusal(outcome.reason);
       }
       if (toolCallId) {
         const adjustedParamsKey = buildAdjustedParamsKey({ runId: ctx?.runId, toolCallId });
@@ -281,6 +336,17 @@ export function wrapToolWithBeforeToolCallHook(
           }
         }
       }
+      await commitToolOperationWriteIntent();
+      // Intent persistence awaits I/O: a later refusal is unknown, never not_issued.
+      signal?.throwIfAborted();
+      const dispatchRefusal = ctx?.taskBoundary
+        ? checkTaskActionBoundary(ctx.taskBoundary)
+        : undefined;
+      if (dispatchRefusal) {
+        throw new Error(dispatchRefusal);
+      }
+      selection.execution_started = true;
+      emitExecutionChainProvenance(selection);
       const normalizedToolName = normalizeToolName(toolName || "tool");
       try {
         const result = await execute(toolCallId, outcome.params, signal, onUpdate);
@@ -304,6 +370,23 @@ export function wrapToolWithBeforeToolCallHook(
       }
     },
   };
+  Object.defineProperty(wrappedTool, RESULT_REPLAY_GUARD, {
+    enumerable: true,
+    value: async (params: unknown) => {
+      const before = ctx?.taskBoundary ? checkTaskActionBoundary(ctx.taskBoundary) : undefined;
+      if (before) {
+        throw new Error(before);
+      }
+      const decision = await ctx?.authorizeStoredResultRead?.(params);
+      if (decision !== "allowed") {
+        throw new Error(`Stored result read authorization ${decision ?? "unverifiable"}`);
+      }
+      const after = ctx?.taskBoundary ? checkTaskActionBoundary(ctx.taskBoundary) : undefined;
+      if (after) {
+        throw new Error(after);
+      }
+    },
+  });
   Object.defineProperty(wrappedTool, BEFORE_TOOL_CALL_WRAPPED, {
     value: true,
     enumerable: true,

@@ -9,6 +9,10 @@ import { resolveChunkMode } from "../auto-reply/chunk.js";
 import { loadConfig, type OpenBotConfig } from "../config/config.js";
 import { resolveMarkdownTableMode } from "../config/markdown-tables.js";
 import { recordChannelActivity } from "../infra/channel-activity.js";
+import {
+  fetchWithSsrFGuard,
+  withTrustedEnvProxyGuardedFetchMode,
+} from "../infra/net/fetch-guard.js";
 import type { RetryConfig } from "../infra/retry.js";
 import { resolvePreferredOpenClawTmpDir } from "../infra/tmp-openclaw-dir.js";
 import { convertMarkdownTables } from "../markdown/tables.js";
@@ -370,58 +374,67 @@ export async function sendWebhookMessageDiscord(
       throw new Error(refusal);
     }
   }
-  const response = await fetch(
-    resolveWebhookExecutionUrl({
-      webhookId,
-      webhookToken,
-      threadId: opts.threadId,
-      wait: opts.wait,
-    }),
-    {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        content: rewrittenText,
-        username: opts.username?.trim() || undefined,
-        avatar_url: opts.avatarUrl?.trim() || undefined,
-        ...(messageReference ? { message_reference: messageReference } : {}),
+  const { response, release } = await fetchWithSsrFGuard(
+    withTrustedEnvProxyGuardedFetchMode({
+      url: resolveWebhookExecutionUrl({
+        webhookId,
+        webhookToken,
+        threadId: opts.threadId,
+        wait: opts.wait,
       }),
-    },
+      init: {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          content: rewrittenText,
+          username: opts.username?.trim() || undefined,
+          avatar_url: opts.avatarUrl?.trim() || undefined,
+          ...(messageReference ? { message_reference: messageReference } : {}),
+        }),
+      },
+      maxRedirects: 0,
+      auditContext: "discord-webhook-send",
+      redactPathInAudit: true,
+    }),
   );
-  if (!response.ok) {
-    const raw = await response.text().catch(() => "");
-    throw new Error(
-      `Discord webhook send failed (${response.status}${raw ? `: ${raw.slice(0, 200)}` : ""})`,
-    );
-  }
-
-  const payload = (await response.json().catch(() => ({}))) as {
-    id?: string;
-    channel_id?: string;
-  };
   try {
-    const account = resolveDiscordAccount({
-      cfg: opts.cfg ?? loadConfig(),
-      accountId: opts.accountId,
-    });
-    recordChannelActivity({
-      channel: "discord",
-      accountId: account.accountId,
-      direction: "outbound",
-    });
-  } catch {
-    // Best-effort telemetry only.
+    if (!response.ok) {
+      const raw = await response.text().catch(() => "");
+      throw new Error(
+        `Discord webhook send failed (${response.status}${raw ? `: ${raw.slice(0, 200)}` : ""})`,
+      );
+    }
+
+    const payload = (await response.json().catch(() => ({}))) as {
+      id?: string;
+      channel_id?: string;
+    };
+    try {
+      const account = resolveDiscordAccount({
+        cfg: opts.cfg ?? loadConfig(),
+        accountId: opts.accountId,
+      });
+      recordChannelActivity({
+        channel: "discord",
+        accountId: account.accountId,
+        direction: "outbound",
+      });
+    } catch {
+      // Best-effort telemetry only.
+    }
+    return {
+      messageId: payload.id ? String(payload.id) : "unknown",
+      channelId: payload.channel_id
+        ? String(payload.channel_id)
+        : opts.threadId
+          ? String(opts.threadId)
+          : "",
+    };
+  } finally {
+    await release();
   }
-  return {
-    messageId: payload.id ? String(payload.id) : "unknown",
-    channelId: payload.channel_id
-      ? String(payload.channel_id)
-      : opts.threadId
-        ? String(opts.threadId)
-        : "",
-  };
 }
 
 export async function sendStickerDiscord(

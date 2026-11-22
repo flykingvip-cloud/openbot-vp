@@ -67,7 +67,6 @@ Dirty-write / DM-mirror refusal on transcript paths is **always on** (independen
 - Flag-off promote is a no-op
 - Flag-on promote writes learning asset + audit with confidentiality; no transcript markers
 
-
 ## Production RPC entry (P1-C, 2026-10-30)
 
 Gateway method: `collaboration.learning.privateMemory.promote`

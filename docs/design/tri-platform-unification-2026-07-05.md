@@ -114,16 +114,16 @@ OpenBot 员工端 Web 已经不是“只有聊天”的早期形态，而是拥�
 
 ### 3.4 当前品牌状态不是“未开始”，而是“半迁移”
 
-| 维度                             | 当前状态                                                |
-| -------------------------------- | ------------------------------------------------------- |
-| iOS 显示名                       | 已显示为 OpenBot                                        |
-| iOS project / scheme / target 名 | 大量仍为 OpenClaw                                       |
-| iOS bundle 前缀                  | 已是 `ai.openbot.*`                                     |
-| Android app label                | `OpenBot Node`                                          |
+| 维度                             | 当前状态                                                                      |
+| -------------------------------- | ----------------------------------------------------------------------------- |
+| iOS 显示名                       | 已显示为 OpenBot                                                              |
+| iOS project / scheme / target 名 | 大量仍为 OpenClaw                                                             |
+| iOS bundle 前缀                  | 已是 `ai.openbot.*`                                                           |
+| Android app label                | `OpenBot Node`                                                                |
 | Android package / namespace      | 现行 `ai.openbot.app`（2026-07 草稿曾记 `ai.openclaw.app`；旧包不能覆盖升级） |
-| macOS App 名                     | 已是 OpenBot                                            |
-| Apple shared package products    | 已是 `OpenBotProtocol` / `OpenBotKit` / `OpenBotChatUI` |
-| Apple shared package name / path | 已为 `OpenBotKit`                                       |
+| macOS App 名                     | 已是 OpenBot                                                                  |
+| Apple shared package products    | 已是 `OpenBotProtocol` / `OpenBotKit` / `OpenBotChatUI`                       |
+| Apple shared package name / path | 已为 `OpenBotKit`                                                             |
 
 ### 3.5 当前平台基线
 

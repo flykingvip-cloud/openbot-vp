@@ -10,21 +10,21 @@
 
 ## Repo / checkout baseline (recorded Asia/Shanghai 2026-10-31 ~18:40)
 
-| Item | Value |
-|---|---|
-| remote | `git@github.com-flykingvip:flykingvip-cloud/openbot-vp.git` |
-| shared checkout path | `<shared-checkout>` |
-| current branch | `fix/deliverable-open-chip-survive-sanitize` (#169 WIP — **not** audit isolation) |
-| HEAD | `a9e7bd2b8096bdb57d501fd497863ace904764ee` |
-| freshly fetched `origin/main` | `53e11c997463abf68c4b889bc6f94c23f48b9c4e` |
-| relation | `origin/main` is ancestor of HEAD; HEAD is **12 commits ahead** of main (foreign WIP) |
-| untracked (foreign — do not touch) | `Dockerfile.bak`, `handoffs/`, `vendor-docker-cli/` |
-| Node | v22.18.0 |
-| pnpm | 10.23.0 |
-| Bun | 1.2.21 (CI setup targets 1.3.9 — delta noted) |
-| OS | macOS 26.5.2 arm64 |
-| lockfile | `pnpm-lock.yaml` present |
-| Data volume | ~99% used, ~14GiB avail (risk clue only; no cleanup) |
+| Item                               | Value                                                                                 |
+| ---------------------------------- | ------------------------------------------------------------------------------------- |
+| remote                             | `git@github.com-flykingvip:flykingvip-cloud/openbot-vp.git`                           |
+| shared checkout path               | `<shared-checkout>`                                                                   |
+| current branch                     | `fix/deliverable-open-chip-survive-sanitize` (#169 WIP — **not** audit isolation)     |
+| HEAD                               | `a9e7bd2b8096bdb57d501fd497863ace904764ee`                                            |
+| freshly fetched `origin/main`      | `53e11c997463abf68c4b889bc6f94c23f48b9c4e`                                            |
+| relation                           | `origin/main` is ancestor of HEAD; HEAD is **12 commits ahead** of main (foreign WIP) |
+| untracked (foreign — do not touch) | `Dockerfile.bak`, `handoffs/`, `vendor-docker-cli/`                                   |
+| Node                               | v22.18.0                                                                              |
+| pnpm                               | 10.23.0                                                                               |
+| Bun                                | 1.2.21 (CI setup targets 1.3.9 — delta noted)                                         |
+| OS                                 | macOS 26.5.2 arm64                                                                    |
+| lockfile                           | `pnpm-lock.yaml` present                                                              |
+| Data volume                        | ~99% used, ~14GiB avail (risk clue only; no cleanup)                                  |
 
 ## Path ownership (this task)
 

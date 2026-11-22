@@ -357,11 +357,7 @@ describe("P2 executor-private todolist", () => {
       return;
     }
     const itemId = published.value.itemId;
-    await claimBoardItem(
-      auth,
-      { taskId: seedTask.taskId, itemId, claimantId: "bot" },
-      { cfg },
-    );
+    await claimBoardItem(auth, { taskId: seedTask.taskId, itemId, claimantId: "bot" }, { cfg });
     await applyClaim(auth, { taskId: seedTask.taskId, itemId }, seedTask, auth.policy.effective, {
       cfg,
     });

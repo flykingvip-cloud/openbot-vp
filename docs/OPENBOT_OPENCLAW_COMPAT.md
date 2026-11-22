@@ -77,14 +77,14 @@ OTLP / 诊断指标仍可能使用 `openclaw.*` 度量名（时序连续性）�
 
 ### 8. 移动端 / 桌面残留（Follow-up）
 
-| 项                                                              | 说明                                         |
-| --------------------------------------------------------------- | -------------------------------------------- |
-| iOS XcodeGen `OpenClaw` / `OpenClawKit` 包名、`ai.openclaw.ios` | 工程与 bundle id；改名需同步签名与商店       |
+| 项                                                              | 说明                                                                             |
+| --------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| iOS XcodeGen `OpenClaw` / `OpenClawKit` 包名、`ai.openclaw.ios` | 工程与 bundle id；改名需同步签名与商店                                           |
 | Android `applicationId`                                         | 现行 `ai.openbot.app`。旧 `ai.openclaw.app` 不能覆盖升级（并列；重装并重新登录） |
-| Swift 类型前缀 `OpenClawChat*`、`OpenClaw*Payload` 等           | 内部类型；非用户可见；可在独立 PR 机械重命名 |
-| App Support 目录名 `OpenClaw`                                   | 已有用户数据路径；需迁移逻辑后才能改         |
-| ShareExtension `OpenClawShare` domain                           | 错误域字符串                                 |
-| MS Teams 上传文件夹 `OpenClawShared`                            | 远端文件夹名，改名会影响已有文件             |
+| Swift 类型前缀 `OpenClawChat*`、`OpenClaw*Payload` 等           | 内部类型；非用户可见；可在独立 PR 机械重命名                                     |
+| App Support 目录名 `OpenClaw`                                   | 已有用户数据路径；需迁移逻辑后才能改                                             |
+| ShareExtension `OpenClawShare` domain                           | 错误域字符串                                                                     |
+| MS Teams 上传文件夹 `OpenClawShared`                            | 远端文件夹名，改名会影响已有文件                                                 |
 
 ### 9. 历史文档与补丁证据
 

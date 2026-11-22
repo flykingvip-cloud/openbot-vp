@@ -187,6 +187,36 @@ describe("server pattern-detection", () => {
     expect(listRobotSkillAssets("robot-pub")).toHaveLength(0);
   });
 
+  it("keeps default classification and concrete bindings ahead of the host pattern hint", async () => {
+    const { saveSkillAsset, getPersonalSkillAssetDetail } =
+      await import("../skill-lifecycle-store.js");
+    const profile = { name: "周报复核", summary: "稳定工作模式", assetType: "capability" };
+    const automatic = saveSkillAsset({ profile, lifecycle: "draft", runtimeDefinition: {} });
+    expect(getPersonalSkillAssetDetail(automatic.skillId).profile.assetType).toBe("template");
+    const hinted = saveSkillAsset({
+      profile,
+      lifecycle: "draft",
+      classificationPolicy: "approved-pattern-capability",
+      runtimeDefinition: {},
+    });
+    expect(getPersonalSkillAssetDetail(hinted.skillId).profile.assetType).toBe("capability");
+    for (const [runtimeDefinition, expected] of [
+      [{ tools: ["web_search"] }, "tool"],
+      [
+        { mcpBinding: { serverName: "example", transport: "stdio", command: "example-mcp" } },
+        "mcp",
+      ],
+    ] as const) {
+      const bound = saveSkillAsset({
+        profile,
+        lifecycle: "draft",
+        classificationPolicy: "approved-pattern-capability",
+        runtimeDefinition,
+      });
+      expect(getPersonalSkillAssetDetail(bound.skillId).profile.assetType).toBe(expected);
+    }
+  });
+
   it("refuses to publish a candidate with fewer than 3 independent tasks", async () => {
     const { publishPatternCandidateAsDraftSkill } = await import("./publish.js");
     // Force a candidate-shaped object by manually writing is not possible; publish checks count.

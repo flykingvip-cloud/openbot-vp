@@ -7,11 +7,7 @@ import {
   sanitizeModelImageInputs,
 } from "./chat-attachment-kind.js";
 
-export {
-  isNonImageAttachmentFileName,
-  resolveAttachmentEffectiveMime,
-  sanitizeModelImageInputs,
-};
+export { isNonImageAttachmentFileName, resolveAttachmentEffectiveMime, sanitizeModelImageInputs };
 
 export type ChatAttachment = {
   type?: string;
@@ -272,7 +268,9 @@ export async function parseMessageWithAttachments(
           fileName: fileNameHint,
           providedMime,
           sniffedMime,
-        }) || providedMime || mime;
+        }) ||
+        providedMime ||
+        mime;
       if (sniffedMime && providedMime && sniffedMime !== providedMime) {
         log?.warn?.(
           `attachment ${label}: mime mismatch (${providedMime} -> ${sniffedMime}), using ${effectiveMime}`,

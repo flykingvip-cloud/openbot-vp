@@ -14,6 +14,7 @@
 
 ## 矩阵
 
+<!-- prettier-ignore -->
 | 旧组件 / 现役锚点 | 原设计意图 | 当前路径（main efdb1b98d） | 目标归属 | 依赖 | 处置 | 状态 | 对照 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `conversation-task/turn-relation.ts` | 回合关系：安全中止谓词、owner 约束谓词、旧 amend/conversation/new_work 分类、title re-export | 分类器仍在 turn-relation；abort 谓词已拆到 `park-abort.ts` 并由本文件 re-export；title 仍 re-export context | policy：仅现役安全/约束谓词；**不**把 `classifyTurnRelation` 升权威；重复分类→归档 | policy/input-stamp；Gateway chat；session-task-board 约束路径；complex-task-loop（dormant） | **迁移**（谓词）+ **观察保留→归档退役**（整包分类器） | 待验收 | T3 / T8 |
@@ -55,15 +56,15 @@
 
 ## 与原切片覆盖（方案 §9）
 
-| 原切片 | 本矩阵落点 | 决策（不变） |
-| --- | --- | --- |
-| 个体 I0 | STAMP-STRIP / LIM-PARKED-* 行 | 等价后去重；非同义不硬合 |
-| 个体 I1 | turn-relation 拆行 | 现役谓词迁移；分类器不升权威 |
-| 个体 I2 | focus-policy 行 | 判定/认领/唤醒分离 |
-| 个体 I3 | focus-switch 行 | 必要规则 + IO 适配 |
-| 个体 I4 | reply-completion 行 | **提前**完成一致性 |
-| 协作 S0–S5 | effective-policy → claim-contract 诸行 | 行为锁定非文件搬家；flag 保留默认 |
-| 私有计划 / handoff / 评审写 | 对应行 | 显式纳入 T6 |
+| 原切片                      | 本矩阵落点                             | 决策（不变）                      |
+| --------------------------- | -------------------------------------- | --------------------------------- |
+| 个体 I0                     | STAMP-STRIP / LIM-PARKED-\* 行         | 等价后去重；非同义不硬合          |
+| 个体 I1                     | turn-relation 拆行                     | 现役谓词迁移；分类器不升权威      |
+| 个体 I2                     | focus-policy 行                        | 判定/认领/唤醒分离                |
+| 个体 I3                     | focus-switch 行                        | 必要规则 + IO 适配                |
+| 个体 I4                     | reply-completion 行                    | **提前**完成一致性                |
+| 协作 S0–S5                  | effective-policy → claim-contract 诸行 | 行为锁定非文件搬家；flag 保留默认 |
+| 私有计划 / handoff / 评审写 | 对应行                                 | 显式纳入 T6                       |
 
 ## 建议实施顺序（盘点，非自动开工）
 

@@ -4,6 +4,7 @@ Status: **只读清点完成**. No DIGEST, recreate, ledger append, or staging m
 Codex = independent acceptance; this agent does not declare PASS.
 
 ## Scope this pass
+
 - Machine ledger + human release record vs LIVE / private soak identity
 - R9 identity gate (`build-info.commit` == OCI `revision`)
 - Staging pack topology as documented (not a live staging swap)
@@ -11,15 +12,15 @@ Codex = independent acceptance; this agent does not declare PASS.
 
 ## SoT map (declared)
 
-| Role | Path | Notes |
-|---|---|---|
-| Path B machine ledger (append-only) | `deploy/production/releases.jsonl` in `flykingvip-cloud/openbot-vp` | schemaVersion 2; tip open row has no `liveTo` |
-| Human release notes | `deploy/production/RELEASE_RECORD.md` | not machine SoT |
-| Ledger doc pointer | `deploy/production/LEDGER.md` | points at local JSONL |
-| R9 gate | `deploy/production/scripts/verify-live-image-identity.sh` | fail-closed 20/21 |
-| Forward-only / alignment | `verify-forward-only.sh`, `verify-delivery-alignment.sh`, `pnpm delivery:*` | |
-| Staging install pack | `deploy/production/staging-runbook.md` + `env.staging.example` + `docker-compose.prod.yml` | host/process topology guidance |
-| Build provenance stamp | `scripts/write-build-info.ts` → `/app/dist/build-info.json` | |
+| Role                                | Path                                                                                       | Notes                                         |
+| ----------------------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------- |
+| Path B machine ledger (append-only) | `deploy/production/releases.jsonl` in `flykingvip-cloud/openbot-vp`                        | schemaVersion 2; tip open row has no `liveTo` |
+| Human release notes                 | `deploy/production/RELEASE_RECORD.md`                                                      | not machine SoT                               |
+| Ledger doc pointer                  | `deploy/production/LEDGER.md`                                                              | points at local JSONL                         |
+| R9 gate                             | `deploy/production/scripts/verify-live-image-identity.sh`                                  | fail-closed 20/21                             |
+| Forward-only / alignment            | `verify-forward-only.sh`, `verify-delivery-alignment.sh`, `pnpm delivery:*`                |                                               |
+| Staging install pack                | `deploy/production/staging-runbook.md` + `env.staging.example` + `docker-compose.prod.yml` | host/process topology guidance                |
+| Build provenance stamp              | `scripts/write-build-info.ts` → `/app/dist/build-info.json`                                |                                               |
 
 `RELEASE_RECORD.md` still cites a **separate** harness ledger URL historically; dual-track skill (this agent) says Path B rows must **not** be appended to OHBE — product tip + JSONL live in `openbot-vp`.
 
@@ -27,27 +28,27 @@ Codex = independent acceptance; this agent does not declare PASS.
 
 ### HK SaaS LIVE — `root@8.217.93.71` / `openbot-gateway-rc`
 
-| Field | Observed |
-|---|---|
-| status | running |
-| image | `localhost/openbot:rc-amd64-provenance-d37bed5117d6` |
-| StartedAt | `2026-10-31 11:21:00.871 +0800` |
-| `build-info.commit` | `d37bed5117d6969e5ad0ee47b32e4efa8b6d715a` |
-| OCI revision label | `d37bed5117d6969e5ad0ee47b32e4efa8b6d715a` |
-| image digest | `sha256:09c9b4c0db843c8b977f21cc0e5fb78c43ab408dbd633cda9e41573756442c48` |
-| healthz | 200 |
-| readyz | `ready:true`, `failing:[]` |
+| Field               | Observed                                                                  |
+| ------------------- | ------------------------------------------------------------------------- |
+| status              | running                                                                   |
+| image               | `localhost/openbot:rc-amd64-provenance-d37bed5117d6`                      |
+| StartedAt           | `2026-10-31 11:21:00.871 +0800`                                           |
+| `build-info.commit` | `d37bed5117d6969e5ad0ee47b32e4efa8b6d715a`                                |
+| OCI revision label  | `d37bed5117d6969e5ad0ee47b32e4efa8b6d715a`                                |
+| image digest        | `sha256:09c9b4c0db843c8b977f21cc0e5fb78c43ab408dbd633cda9e41573756442c48` |
+| healthz             | 200                                                                       |
+| readyz              | `ready:true`, `failing:[]`                                                |
 
 **R9:** PASS on observation (commit == revision; digest matches ledger tip).
 
 ### Private soak — `root@103.155.77.194:22004` / `openbot-gateway`
 
-| Field | Observed |
-|---|---|
-| image | `openbot:rc-amd64-provenance-d37bed5117d6` |
-| `build-info.commit` | `d37bed5117d6969e5ad0ee47b32e4efa8b6d715a` |
-| healthz | 200 |
-| other containers | `openbot-soak-proxy`, several `aw-browser-*` / `aw-exec-lease-*` |
+| Field               | Observed                                                         |
+| ------------------- | ---------------------------------------------------------------- |
+| image               | `openbot:rc-amd64-provenance-d37bed5117d6`                       |
+| `build-info.commit` | `d37bed5117d6969e5ad0ee47b32e4efa8b6d715a`                       |
+| healthz             | 200                                                              |
+| other containers    | `openbot-soak-proxy`, several `aw-browser-*` / `aw-exec-lease-*` |
 
 Same tip as HK LIVE (follow image). No promote checked or performed.
 
@@ -101,13 +102,13 @@ No clean rebuild executed in this pass (out of Batch C read-only; needs explicit
 
 ## Findings class
 
-| ID | Class | Statement |
-|---|---|---|
-| C1 | 已证实对账 | LIVE + private soak + ledger seq 151 share `d37bed5117d6` / digest `09c9b4c0…`; R9 aligned |
-| C2 | 配置风险 / 文档债务 | `RELEASE_RECORD.md` L3 still seq 107 / `bb72d034` — human SoT lag |
-| C3 | 历史陈述 | 2026-09-12 unregistered_rolling evidence; later ledgered |
-| C4 | 未覆盖 | Fresh staging host install / staging-local-sim execution; GHCR tag listing; clean `docker build` provenance replay |
-| C5 | 环境阻断 | Org Actions billing API still HTTP 404 (see sibling billing note) — H1 minutes exhaustion still 待验证 |
+| ID  | Class               | Statement                                                                                                          |
+| --- | ------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| C1  | 已证实对账          | LIVE + private soak + ledger seq 151 share `d37bed5117d6` / digest `09c9b4c0…`; R9 aligned                         |
+| C2  | 配置风险 / 文档债务 | `RELEASE_RECORD.md` L3 still seq 107 / `bb72d034` — human SoT lag                                                  |
+| C3  | 历史陈述            | 2026-09-12 unregistered_rolling evidence; later ledgered                                                           |
+| C4  | 未覆盖              | Fresh staging host install / staging-local-sim execution; GHCR tag listing; clean `docker build` provenance replay |
+| C5  | 环境阻断            | Org Actions billing API still HTTP 404 (see sibling billing note) — H1 minutes exhaustion still 待验证             |
 
 ## Next (not started)
 

@@ -107,15 +107,26 @@ function waitExit(child: ReturnType<typeof spawn>): Promise<void> {
 describe("cross-process single-writer lock and persist recovery", () => {
   it("records the local filesystem under test and refuses untested network FS use", async () => {
     const dir = await tempDir("exec-lock-fs-");
-    const { stdout: dfOut } = await execFileAsync("df", ["-T", dir]);
-    const { stdout: mntOut } = await execFileAsync("findmnt", [
-      "-T",
-      dir,
-      "-o",
-      "TARGET,FSTYPE,SOURCE",
-    ]);
-    const combined = `${dfOut}\n${mntOut}`;
-    expect(combined).toMatch(/ext4|xfs|btrfs|overlay|tmpfs|virtiofs|9p|fuse/);
+    let combined: string;
+    if (process.platform === "darwin") {
+      const { stdout: dfOut } = await execFileAsync("df", [dir]);
+      const { stdout: mountOut } = await execFileAsync("mount", []);
+      const device = dfOut.trim().split("\n").at(-1)?.trim().split(/\s+/)[0];
+      expect(device).toBeTruthy();
+      const targetMount = mountOut.split("\n").find((line) => line.startsWith(`${device} on `));
+      expect(targetMount).toMatch(/\((?:apfs|hfs),.*\blocal\b/i);
+      combined = `${dfOut}\n${targetMount}`;
+    } else {
+      const { stdout: dfOut } = await execFileAsync("df", ["-T", dir]);
+      const { stdout: mntOut } = await execFileAsync("findmnt", [
+        "-T",
+        dir,
+        "-o",
+        "TARGET,FSTYPE,SOURCE",
+      ]);
+      combined = `${dfOut}\n${mntOut}`;
+      expect(combined).toMatch(/ext4|xfs|btrfs|overlay|tmpfs|virtiofs|9p|fuse/);
+    }
     expect(combined.toLowerCase()).not.toMatch(/\bnfs\b/);
     expect(combined.toLowerCase()).not.toMatch(/\bcifs\b|\bsmb\b/);
     // The fence is documented as local-POSIX only in FileExecStore.
