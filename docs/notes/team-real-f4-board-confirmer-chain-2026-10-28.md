@@ -32,7 +32,6 @@
 - 修复：按 **todolistId** `loadExecutorTodolist` + `buildExecutionTaskBag`（确认后路径，不走 owner 过滤/bag viewer ACL）；`finishAdvance` 打日志；RPC 回传 `autoAdvance.{wakeRecorded,reason,...}`。
 - 不放宽 submit/self_advance/accept/finalize；NO_PROMOTE；不宣称 F4 PASS。
 
-
 ## F4 R7 follow-up（wake consumed 但 dispatch_readiness_not_ready）
 
 - 现象：tip `ead9aa6` S2 PASS（UI confirm → `plan_confirmed_auto_advance`，wakeRecorded/Consumed=true），S3 FAIL：`dispatched:false reason=dispatch_readiness_not_ready`，`targetAgentIds=["bot"]`；group 已在 selfAdvance execute allowlist。
