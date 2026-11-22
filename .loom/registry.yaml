@@ -30585,6 +30585,22 @@ landingStreams:
       task: four-pr-merge-readiness
       agent: codex-runtime-manager
       purpose: Three-way registry merge preserving tasks, sessions and landing history.
+  - id: baseline-gates-repair-unmatched-exact-20261122
+    landingPolicy: serial
+    paths:
+      - docs/audits/2026-11-01-closed-loop-demand-diagnosis-notify.md
+      - docs/repo-split/G1-inventory.md
+      - docs/repo-split/README.md
+      - docs/repo-split/decisions.md
+      - scripts/knowledge-universe-scale-measure.ts
+      - src/discord/send.webhook-activity.test.ts
+      - src/infra/net/fetch-guard.ts
+    canLandWith: []
+    metadata:
+      task: baseline-gates-repair-20261122:codex-wpb-successor
+      authorizedBy: human
+      reason: Only seven previously unmatched exact paths; preserve all prior stream
+        order/classification
 sharedPaths:
   - glob: src/agent-runtime/state/durable-json.ts
     landerTask: baseline-gates-repair-20261122:codex-wpb-successor
