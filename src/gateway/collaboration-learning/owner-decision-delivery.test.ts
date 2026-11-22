@@ -10,6 +10,8 @@ import {
 import type { OpenBotConfig } from "../../config/types.js";
 import {
   normalizeOwnerDecisionDelivery,
+  reconcileOwnerDecisionDelivery,
+  archiveInvalidOwnerDecisionDeliveries,
   ownerDecisionFenceProvesIssuance,
   readOwnerDecisionDeliveries,
   recordOwnerDecisionDelivery,
@@ -142,4 +144,97 @@ describe("owner-decision delivery log", () => {
     expect(JSON.stringify(rows)).not.toContain(secret);
     expect(JSON.stringify(rows)).not.toContain("confirmationToken");
   });
+});
+
+test("reconciles historical delivery against current plan without suppressing new valid or peer cards", () => {
+  const row = sampleDelivery({ version: 1 });
+  expect(
+    reconcileOwnerDecisionDelivery(row, {
+      todolistId: row.todolistId,
+      version: 2,
+      status: "proposed",
+    }),
+  ).toMatchObject({
+    stage: "skipped",
+    userFacing: "stale_version",
+    retryable: false,
+  });
+  expect(
+    reconcileOwnerDecisionDelivery(row, {
+      todolistId: row.todolistId,
+      version: 1,
+      status: "confirmed",
+    }),
+  ).toMatchObject({ stage: "confirmation_consumed", userFacing: "consumed" });
+  expect(
+    reconcileOwnerDecisionDelivery(row, {
+      todolistId: row.todolistId,
+      version: 1,
+      status: "proposed",
+    }),
+  ).toBe(row);
+  const peer = sampleDelivery({
+    stage: "peer_confirmation_consumed",
+    userFacing: "peer_confirmed",
+  });
+  expect(
+    reconcileOwnerDecisionDelivery(peer, {
+      todolistId: peer.todolistId,
+      version: peer.version,
+      status: "confirmed",
+    }),
+  ).toBe(peer);
+});
+test("explicit archive dry run is read-only and append cleanup is idempotent across restart", async () => {
+  const cfg = await useConfig();
+  const locator = await fs.mkdtemp(path.join(os.tmpdir(), "owner-archive-"));
+  tempDirs.push(locator);
+  const row = sampleDelivery({ version: 1 });
+  await recordOwnerDecisionDelivery({
+    groupId: row.groupId,
+    delivery: row,
+    cfg,
+    groupLocator: locator,
+  });
+  const readPlan = async () => ({
+    todolistId: row.todolistId,
+    version: 2,
+    status: "confirmed" as const,
+  });
+  expect(
+    await archiveInvalidOwnerDecisionDeliveries({
+      groupId: row.groupId,
+      cfg,
+      groupLocator: locator,
+      readPlan,
+      dryRun: true,
+    }),
+  ).toHaveLength(1);
+  expect(
+    await readOwnerDecisionDeliveries({ groupId: row.groupId, cfg, groupLocator: locator }),
+  ).toHaveLength(1);
+  expect(
+    await archiveInvalidOwnerDecisionDeliveries({
+      groupId: row.groupId,
+      cfg,
+      groupLocator: locator,
+      readPlan,
+    }),
+  ).toHaveLength(1);
+  expect(
+    await archiveInvalidOwnerDecisionDeliveries({
+      groupId: row.groupId,
+      cfg,
+      groupLocator: locator,
+      readPlan,
+    }),
+  ).toHaveLength(0);
+  const rows = await readOwnerDecisionDeliveries({
+    groupId: row.groupId,
+    cfg,
+    groupLocator: locator,
+  });
+  expect(rows).toHaveLength(2);
+  expect(rows[0].stage).toBe("card_persisted");
+  expect(rows[1].userFacing).toBe("stale_version");
 });
