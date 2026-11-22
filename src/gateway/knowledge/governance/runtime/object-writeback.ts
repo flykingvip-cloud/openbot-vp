@@ -1,10 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { EventLoopYielder } from "../../event-loop-yield.js";
 import type { KnowledgeObject } from "../../types.js";
-import {
-  listChunkKnowledgeBaseIds,
-  listGovernanceTasks,
-} from "../chunk-governance-store.js";
+import { listChunkKnowledgeBaseIds, listGovernanceTasks } from "../chunk-governance-store.js";
 
 export type DocumentGovernanceOverlay = {
   openConflictCount: number;

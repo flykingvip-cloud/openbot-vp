@@ -542,9 +542,7 @@ export function listChunkKnowledgeBaseIds(
     const batch = unique.slice(index, index + KNOWLEDGE_BASE_IN_BATCH);
     const placeholders = batch.map(() => "?").join(", ");
     const rows = db
-      .prepare(
-        `SELECT chunk_id, kb_id FROM chunk_meta WHERE chunk_id IN (${placeholders})`,
-      )
+      .prepare(`SELECT chunk_id, kb_id FROM chunk_meta WHERE chunk_id IN (${placeholders})`)
       .all(...batch) as Array<{ chunk_id: string; kb_id: string }>;
     for (const row of rows) {
       map.set(row.chunk_id, row.kb_id);

@@ -1,3 +1,4 @@
+import type { EventLoopYielder } from "../event-loop-yield.js";
 import { listExplicitDocumentMetadata } from "../explicit-metadata-store.js";
 import type {
   DataCapabilityDescriptor,
@@ -16,7 +17,6 @@ import {
   detectRelationshipConflicts,
   detectRelationshipConflictsAsync,
 } from "./relationship-conflict-detector.js";
-import type { EventLoopYielder } from "../event-loop-yield.js";
 import { scoreRelationshipCandidates } from "./relationship-score-engine.js";
 import type { RelationshipRuntimeInput, RelationshipRuntimeResult } from "./types.js";
 
@@ -215,9 +215,7 @@ function rememberRelationshipRuntimeResult(
   return result;
 }
 
-function takeCachedRelationshipRuntimeResult(
-  signature: string,
-): RelationshipRuntimeResult | null {
+function takeCachedRelationshipRuntimeResult(signature: string): RelationshipRuntimeResult | null {
   const cached = relationshipRuntimeCache.get(signature);
   if (!cached) {
     return null;
