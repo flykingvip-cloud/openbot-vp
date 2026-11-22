@@ -18,10 +18,10 @@ Failure injection before the fix, same command as the new test, against `4ce9c44
 
 `OPENBOT_TEST_PROFILE=low pnpm exec vitest run src/conversation-task/reply-completion.window.test.ts -t "close throws|session file is missing|binding is missing|incomplete|independent conversation"`
 
-| Case | Before | After `54d8394b` |
-| --- | --- | --- |
-| Close throws after the board is checked | Return `undefined`, lifecycle `active`, board `deliverableChecked`, transcript notice count **1** | Same state except transcript notice count **0** |
-| Retry, then a third call | Not reached | Retry returns the notice, lifecycle `closed`, notice count **1**, idempotency key `task-completion:live:run-1:draft-1` once. Third call returns undefined and the count stays 1 |
+| Case                                    | Before                                                                                            | After `54d8394b`                                                                                                                                                                |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Close throws after the board is checked | Return `undefined`, lifecycle `active`, board `deliverableChecked`, transcript notice count **1** | Same state except transcript notice count **0**                                                                                                                                 |
+| Retry, then a third call                | Not reached                                                                                       | Retry returns the notice, lifecycle `closed`, notice count **1**, idempotency key `task-completion:live:run-1:draft-1` once. Third call returns undefined and the count stays 1 |
 
 The three results are separate calls, not a new coordinator:
 
@@ -35,22 +35,22 @@ Returning undefined is not treated as proof the transcript is clean. The test re
 
 `not_applicable` is only both sides absent: no session file and no binding. That keeps the previous independent ConversationTask close.
 
-| Input | Classification | ConversationTask |
-| --- | --- | --- |
-| Neither session file nor binding | `independent` | Closes. No board write. |
-| Binding present, session file missing | `incomplete` / `session_file_missing` | Stays active |
-| Session file present, binding missing | `incomplete` / `binding_missing` | Stays active. Board unfinished. Notice count 0 |
-| Binding `taskId` blank | `incomplete` / `binding_task_id_missing` | Stays active. Board not checked |
+| Input                                                                         | Classification                                | ConversationTask                                    |
+| ----------------------------------------------------------------------------- | --------------------------------------------- | --------------------------------------------------- |
+| Neither session file nor binding                                              | `independent`                                 | Closes. No board write.                             |
+| Binding present, session file missing                                         | `incomplete` / `session_file_missing`         | Stays active                                        |
+| Session file present, binding missing                                         | `incomplete` / `binding_missing`              | Stays active. Board unfinished. Notice count 0      |
+| Binding `taskId` blank                                                        | `incomplete` / `binding_task_id_missing`      | Stays active. Board not checked                     |
 | Binding has `taskId` but omits `executionAttempt` while the board has `run-1` | `ready`, then the board binding check rejects | Stays active. Attempt stays `run-1`. Notice count 0 |
 
 Before the fix, the three incomplete cases closed the conversation task. The independent case already stayed on the old close path and passed.
 
 ## Rejection 3 — policy ownership
 
-| Rule | Owner now | Consumer |
-| --- | --- | --- |
-| `shouldTaskParkAbortInFlight` | `policy/explicit-task-control.ts`, exported from `policy/index.ts` | Gateway `chat.ts` imports the public entry. `turn-relation` and `park-abort.ts` re-export that same function. |
-| `evaluateWakeEligibility` plus heartbeat forbidden actions | Same policy module and public entry | `focus-policy.decideWake` calls that function. Heartbeat and cron still call `decideWake`. |
+| Rule                                                       | Owner now                                                          | Consumer                                                                                                      |
+| ---------------------------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| `shouldTaskParkAbortInFlight`                              | `policy/explicit-task-control.ts`, exported from `policy/index.ts` | Gateway `chat.ts` imports the public entry. `turn-relation` and `park-abort.ts` re-export that same function. |
+| `evaluateWakeEligibility` plus heartbeat forbidden actions | Same policy module and public entry                                | `focus-policy.decideWake` calls that function. Heartbeat and cron still call `decideWake`.                    |
 
 `classifyTurnRelation` is not a policy export.
 

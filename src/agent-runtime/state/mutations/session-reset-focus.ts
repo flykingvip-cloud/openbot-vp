@@ -35,7 +35,10 @@ export type SessionResetFocusResult = {
   changed: boolean;
 };
 
-function unbindBoard(board: SessionTaskBoard, nowMs: number): {
+function unbindBoard(
+  board: SessionTaskBoard,
+  nowMs: number,
+): {
   board: SessionTaskBoard;
   result: SessionResetFocusResult;
 } {

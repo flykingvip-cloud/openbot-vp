@@ -29,15 +29,15 @@ OPENBOT_TEST_PROFILE=low OPENBOT_TEST_SERIAL_GATEWAY=1 pnpm exec vitest run \
 
 ## 本轮已修通（相对归因时的 17 FAIL）
 
-| 簇 | 项数 | 修复要点 |
-| --- | --- | --- |
-| discuss×2 + p2 subprocess（迁移） | 3 | leaf 导入避开 state barrel→carbon；`embedded-payloads` 惰性 getter |
-| episode productionExecutor | 1 | `chat.ts` 参数对象字段顺序 |
-| todolist ACL／owner-decision×5 | 5 | confirm 拒绝文案含「主答」；测试 OS 写 `writeKind:"auth"`+epoch；`members.json` 写权；避免 agent-peer 误自动确认 |
-| r5／r6 confirm／wake／chat×4 | 4 | `isBotLikeMemberId` 不再把 `emp-owner` 当 bot；gateway `agents.list` 与 `/`↔`-` normalize 对齐 |
-| r7 claim lifecycle×2 | 2 | 同上 readiness／agents.list + id match |
-| convergence AC-3 | 1 | 断言对齐 Sprint-2（checkpoint／artifact_ledger，不 mint task_ledger） |
-| heartbeat escalate | 1 | 测试 tick 间隔越过 nudge fail backoff 30s |
+| 簇                                | 项数 | 修复要点                                                                                                         |
+| --------------------------------- | ---- | ---------------------------------------------------------------------------------------------------------------- |
+| discuss×2 + p2 subprocess（迁移） | 3    | leaf 导入避开 state barrel→carbon；`embedded-payloads` 惰性 getter                                               |
+| episode productionExecutor        | 1    | `chat.ts` 参数对象字段顺序                                                                                       |
+| todolist ACL／owner-decision×5    | 5    | confirm 拒绝文案含「主答」；测试 OS 写 `writeKind:"auth"`+epoch；`members.json` 写权；避免 agent-peer 误自动确认 |
+| r5／r6 confirm／wake／chat×4      | 4    | `isBotLikeMemberId` 不再把 `emp-owner` 当 bot；gateway `agents.list` 与 `/`↔`-` normalize 对齐                   |
+| r7 claim lifecycle×2              | 2    | 同上 readiness／agents.list + id match                                                                           |
+| convergence AC-3                  | 1    | 断言对齐 Sprint-2（checkpoint／artifact_ledger，不 mint task_ledger）                                            |
+| heartbeat escalate                | 1    | 测试 tick 间隔越过 nudge fail backoff 30s                                                                        |
 
 ## 仍失败
 

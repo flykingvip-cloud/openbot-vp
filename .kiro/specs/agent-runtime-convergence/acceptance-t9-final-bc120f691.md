@@ -6,23 +6,23 @@ Draft PR：https://github.com/flykingvip-cloud/openbot-vp/pull/263
 
 ## 固定 SHA
 
-| 角色 | SHA |
-| --- | --- |
-| 受测运行时（M3 实现 tip） | `bc120f691c5199b063c7a5ea6e86586e035ffe37` |
+| 角色                           | SHA                                        |
+| ------------------------------ | ------------------------------------------ |
+| 受测运行时（M3 实现 tip）      | `bc120f691c5199b063c7a5ea6e86586e035ffe37` |
 | 本包提交前分支 tip／上一证据头 | `ffb70cefdbdfc1f1988cbd8e1b5ee35806de0192` |
-| 本包证据头（正文＋日志） | `59cad9e726be006718e9eb1b21e0f54f134836d9` |
-| 分支 tip（含本钉 SHA 提交） | （push 后以 origin 为准；本机提交时见 PR） |
+| 本包证据头（正文＋日志）       | `59cad9e726be006718e9eb1b21e0f54f134836d9` |
+| 分支 tip（含本钉 SHA 提交）    | （push 后以 origin 为准；本机提交时见 PR） |
 
 M1–M3 独立内容验收已通过（M3 受测同上；上一证据头 `ffb70cefdbdfc1f1988cbd8e1b5ee35806de0192`）。
 
 ## 工程门禁（本 tip 复跑）
 
-| 门禁 | 结果 | 日志 |
-| --- | --- | --- |
-| `pnpm tsgo` | PASS／EXIT 0 | `acceptance-logs/t9-final-tsgo-bc120f691.log` |
-| `NODE_OPTIONS=--max-old-space-size=8192 pnpm build` | PASS／EXIT 0 | `acceptance-logs/t9-final-build-bc120f691.log` |
-| M3 五文件矩阵 | **5 文件／42 PASS**／EXIT 0 | `acceptance-logs/t9-final-m3-vitest-bc120f691.log` |
-| T9 既有 31 文件矩阵 | **31 文件／266 PASS**／EXIT 0 | `acceptance-logs/t9-final-matrix-bc120f691.log` |
+| 门禁                                                               | 结果                                                     | 日志                                                 |
+| ------------------------------------------------------------------ | -------------------------------------------------------- | ---------------------------------------------------- |
+| `pnpm tsgo`                                                        | PASS／EXIT 0                                             | `acceptance-logs/t9-final-tsgo-bc120f691.log`        |
+| `NODE_OPTIONS=--max-old-space-size=8192 pnpm build`                | PASS／EXIT 0                                             | `acceptance-logs/t9-final-build-bc120f691.log`       |
+| M3 五文件矩阵                                                      | **5 文件／42 PASS**／EXIT 0                              | `acceptance-logs/t9-final-m3-vitest-bc120f691.log`   |
+| T9 既有 31 文件矩阵                                                | **31 文件／266 PASS**／EXIT 0                            | `acceptance-logs/t9-final-matrix-bc120f691.log`      |
 | 扩展 Gateway（`collaboration-learning`＋`collaboration-dispatch`） | **9 文件失败／196 通过；17 测试失败／1626 通过**／EXIT 1 | `acceptance-logs/t9-final-ext-gateway-bc120f691.log` |
 
 **口径**：局部 42 PASS 与 31／266 PASS **不得**写成全库通过。扩展套件失败见下节。
@@ -33,11 +33,11 @@ M1–M3 独立内容验收已通过（M3 受测同上；上一证据头 `ffb70ce
 
 对照报告：`t9-ext-gateway-17-fail-attribution.md`（同目录）。同命令下对失败 9 文件复跑：
 
-| 端 | SHA | 结果 |
-| --- | --- | --- |
-| 候选 tip | `8deb8ce4f…` | 17 FAIL／71 PASS |
-| Batch D | `479f9ba14…` | 17 FAIL／71 PASS（与候选同集合） |
-| T0 迁移前 | `efdb1b98d…` | 14 FAIL／74 PASS |
+| 端        | SHA          | 结果                             |
+| --------- | ------------ | -------------------------------- |
+| 候选 tip  | `8deb8ce4f…` | 17 FAIL／71 PASS                 |
+| Batch D   | `479f9ba14…` | 17 FAIL／71 PASS（与候选同集合） |
+| T0 迁移前 | `efdb1b98d…` | 14 FAIL／74 PASS                 |
 
 分类：**Batch E 引入 0**；**既有（T0 同败）14**；**迁移引入（T0→D）3**（discuss-to-task×2、p2 subprocess×1）。无「归因未定」。本包仍不修复这 17 项、不宣称全绿；**最终验收仍 FAIL**。
 
