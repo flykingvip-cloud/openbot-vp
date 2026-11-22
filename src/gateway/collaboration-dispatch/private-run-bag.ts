@@ -1,3 +1,4 @@
+import { createHash, randomUUID } from "node:crypto";
 /**
  * Per-bot private run bag (ephemeral) for collaboration group discussion turns.
  *
@@ -14,11 +15,18 @@
  *
  * Gated by collaboration.privateRunBag (default false).
  */
-
-import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { ParticipationOverlay } from "@openbot/collaboration-runtime";
+import {
+  executionOperationKey,
+  type OperationIdentity,
+} from "../../agent-runtime/contracts/operation.js";
+import {
+  executeClaimedToolOperation,
+  readToolOperation,
+  ToolOperationOutcomeUnknownError,
+} from "../../agent-runtime/state/tool-operation.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import { assertCollaborationRuntimeWritable } from "./runtime-namespace.js";
 
@@ -96,6 +104,7 @@ export function recordPrivateRunBagToolSideEffect(
 }
 
 export type DurableToolSideEffectFingerprint = {
+  operationIdentity?: OperationIdentity;
   taskId: string;
   boardItemId: string;
   stepId: string;
@@ -104,6 +113,21 @@ export type DurableToolSideEffectFingerprint = {
 
 /** Stable key for one side-effecting tool step of one task. */
 export function durableToolSideEffectKey(fingerprint: DurableToolSideEffectFingerprint): string {
+  if (fingerprint.operationIdentity) {
+    if (
+      fingerprint.operationIdentity.taskId !== fingerprint.taskId.trim() ||
+      fingerprint.operationIdentity.stepId !== fingerprint.stepId.trim()
+    ) {
+      throw new Error("Operation identity conflicts with admitted delivery task/step");
+    }
+    return executionOperationKey({
+      ...fingerprint.operationIdentity,
+      operationId: JSON.stringify([
+        fingerprint.operationIdentity.operationId,
+        fingerprint.toolName.trim(),
+      ]),
+    });
+  }
   return [
     fingerprint.taskId.trim(),
     fingerprint.boardItemId.trim(),
@@ -111,6 +135,8 @@ export function durableToolSideEffectKey(fingerprint: DurableToolSideEffectFinge
     fingerprint.toolName.trim(),
   ].join("|");
 }
+
+const activeSideEffectClaims = new Set<string>();
 
 function durableToolSideEffectFile(ledgerDir: string, key: string): string {
   const digest = createHash("sha256").update(key).digest("hex");
@@ -148,21 +174,69 @@ export async function scheduleDurableToolSideEffect<T>(params: {
   const nowMs = params.nowMs ?? Date.now();
   const body = `${JSON.stringify({
     key,
+    ...(params.fingerprint.operationIdentity
+      ? { operationIdentity: params.fingerprint.operationIdentity }
+      : {}),
     taskId: params.fingerprint.taskId.trim(),
     boardItemId: params.fingerprint.boardItemId.trim(),
     stepId: params.fingerprint.stepId.trim(),
     toolName: params.fingerprint.toolName.trim(),
     claimedAtMs: nowMs,
+    ownerPid: process.pid,
+    ownerToken: randomUUID(),
   })}\n`;
+  const alreadyActive = activeSideEffectClaims.has(file);
+  if (alreadyActive) {
+    throw new ToolOperationOutcomeUnknownError(key);
+  }
+  activeSideEffectClaims.add(file);
   try {
     await fs.writeFile(file, body, { flag: "wx" });
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "EEXIST") {
+      activeSideEffectClaims.delete(file);
+      const operation = await readToolOperation<T>(`${file}.result`);
+      if (operation?.state === "not_issued") {
+        const value = await executeClaimedToolOperation({
+          file: `${file}.result`,
+          operationId: key,
+          run: params.run,
+          nowMs,
+        });
+        return { skipped: false, key, value };
+      }
+      if (operation && operation.state !== "succeeded") {
+        throw new ToolOperationOutcomeUnknownError(key);
+      }
+      if (!operation) {
+        // A claim without a completed admission record never licenses dispatch.
+        throw new ToolOperationOutcomeUnknownError(key);
+      }
+      if (operation?.state === "succeeded") {
+        const value = await executeClaimedToolOperation({
+          file: `${file}.result`,
+          operationId: key,
+          run: params.run,
+          nowMs,
+        });
+        return { skipped: false, key, value };
+      }
       return { skipped: true, key };
     }
+    activeSideEffectClaims.delete(file);
     throw error;
   }
-  const value = await params.run();
+  let value: T;
+  try {
+    value = await executeClaimedToolOperation({
+      file: `${file}.result`,
+      operationId: key,
+      run: params.run,
+      nowMs,
+    });
+  } finally {
+    activeSideEffectClaims.delete(file);
+  }
   if (params.bag) {
     recordPrivateRunBagToolSideEffect(params.bag, {
       toolName: params.fingerprint.toolName.trim(),
