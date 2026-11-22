@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { resolveAgentDir } from "../../agents/agent-scope.js";
 import type { FollowupRun } from "../../auto-reply/reply/queue.js";
-import { runRuleAgentLibraryCycle } from "../command/rule-adaptation/library-feedback.js";
+import { runRuleAgentLibraryCycle } from "../command/rule-adaptation/index.js";
 import type { ContextWindowDecisionSwitch } from "../model/rule-adaptation/index.js";
 import { evaluateExecutionRuleAdoption } from "../policy/rule-adaptation/index.js";
 import { sessionTaskState } from "../state/index.js";
