@@ -1,12 +1,18 @@
 import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
 /** Unicode to glyph id map read from a TrueType cmap (format 4 or 12). */
 export type ParsedTtf = {
   bytes: Buffer;
   unicodeToGid: Map<number, number>;
+  outlineFormat?: "truetype" | "opentype-cff";
 };
 
 const CANDIDATE_FONTS = [
+  path.join(os.homedir(), "Library", "Fonts", "NotoSansCJKsc-Regular.otf"),
+  path.join(os.userInfo().homedir, "Library", "Fonts", "NotoSansCJKsc-Regular.otf"),
+  "/Library/Fonts/NotoSansCJKsc-Regular.otf",
   "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
   "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttf",
   "/usr/share/fonts/opentype/noto/NotoSansCJKsc-Regular.otf",
@@ -37,7 +43,15 @@ export function resolveCjkFontPath(explicit?: string): string | null {
 
 export function loadTtf(filePath: string): ParsedTtf {
   const bytes = fs.readFileSync(filePath);
-  return { bytes, unicodeToGid: parseCmap(bytes) };
+  const signature = bytes.toString("latin1", 0, 4);
+  if (signature !== "OTTO" && bytes.readUInt32BE(0) !== 0x00010000) {
+    throw new Error("unsupported sfnt font format");
+  }
+  return {
+    bytes,
+    unicodeToGid: parseCmap(bytes),
+    outlineFormat: signature === "OTTO" ? "opentype-cff" : "truetype",
+  };
 }
 
 export function parseCmap(bytes: Buffer): Map<number, number> {
