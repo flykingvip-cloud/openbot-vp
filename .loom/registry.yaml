@@ -15318,6 +15318,23 @@ tasks:
     ownerHistory: []
     since: 2026-11-22
     metadata: {}
+  - id: runtime-changelog-332:codex-runtime
+    owner: codex-runtime
+    intent: []
+    paths:
+      - CHANGELOG.md
+    state: active
+    sessions:
+      - id: runtime-changelog-332-20261122
+        taskId: runtime-changelog-332:codex-runtime
+        ide: codex
+        agent: codex-runtime
+        status: active
+        metadata: {}
+        lastSignalAt: 2026-11-22T02:56:14.674Z
+    ownerHistory: []
+    since: 2026-11-22
+    metadata: {}
 landingStreams:
   - id: cron-fire-budget-reviewed-integration
     landingPolicy: serial
@@ -30793,6 +30810,10 @@ landingStreams:
       reason: Only seven previously unmatched exact paths; preserve all prior stream
         order/classification
 sharedPaths:
+  - glob: CHANGELOG.md
+    landerTask: runtime-changelog-332:codex-runtime
+    reason: Human-authorized single PR332 compatibility release note; preserve all
+      other content and historical ownership.
   - glob: src/agent-runtime/capabilities/invocation/before-call.ts
     landerTask: runtime-beforeeffect-journal-review:codex-runtime
     reason: Human-authorized exact Runtime PR integration; predecessor task and
