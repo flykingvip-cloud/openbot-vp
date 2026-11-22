@@ -159,6 +159,15 @@ tasks:
       - ui/src/ui/account-computer/preview-request.ts
       - src/gateway/collaboration-learning/wake-contract-entry.ts
       - src/agent-runtime/state/durable-json.ts
+      - CHANGELOG.md
+      - src/objective-shadow/get-reply-run.ingress.test.ts
+      - src/batch1-capability-enablement/t22-diagnosis-rpc-run.test.ts
+      - src/conversation-task/gateway-activation-integration.test.ts
+      - src/exec-protocol/store-lock-recovery.test.ts
+      - src/office-suite/office-suite.acceptance.test.ts
+      - src/task-outcome/paths-bypass-cleanup.test.ts
+      - src/task-outcome/r85f-proof.test.ts
+      - src/task-outcome/r85g-dispatch-integration.test.ts
     state: active
     sessions:
       - id: baseline-gates-repair-20261122-wpb-successor
@@ -167,7 +176,25 @@ tasks:
         agent: codex-wpb-successor
         status: active
         metadata: {}
-        lastSignalAt: 2026-11-22T00:12:16.118Z
+        lastSignalAt: 2026-11-22T01:46:03.195Z
+      - id: pr333-landpr-changelog-20261122
+        taskId: baseline-gates-repair-20261122:codex-wpb-successor
+        ide: codex
+        agent: codex-wpb-successor
+        status: active
+        metadata:
+          purpose: Only three user-authorized UI/pattern/Discord release notes; no
+            runtime/test behavior change
+        lastSignalAt: 2026-11-22T01:46:03.195Z
+      - id: pr333-full-test-fixtures-20261122
+        taskId: baseline-gates-repair-20261122:codex-wpb-successor
+        ide: codex
+        agent: codex-wpb-successor
+        status: active
+        metadata:
+          purpose: Human-authorized eight test-fixture/portability repairs; no production
+            admission or security relaxation
+        lastSignalAt: 2026-11-22T01:46:03.195Z
     ownerHistory: []
     since: 2026-11-21
     metadata:
@@ -293,6 +320,138 @@ tasks:
         date: 2026-11-22
         scope:
           - src/agent-runtime/state/durable-json.ts
+      changelogTakeover:
+        authorizedBy: human
+        date: 2026-11-22
+        previousOwners:
+          - taskId: device-digital-human-v1:cursor-cloud
+            owner: cursor-cloud
+          - taskId: dabai-guide-gateway-history:cursor-cloud
+            owner: cursor-cloud
+          - taskId: dabai-guide-robot-onboarding:cursor-cloud
+            owner: cursor-cloud
+          - taskId: enterprise-login-session-land:cursor-cloud
+            owner: cursor-cloud
+          - taskId: workspace-write-contract:cursor-cloud
+            owner: cursor-cloud
+          - taskId: wechat-draft-sandbox-guidance:cursor-wechat-sandbox-9804
+            owner: cursor-wechat-sandbox-9804
+          - taskId: platform-diagnosis-approval-decide:cursor-d3a3
+            owner: cursor-d3a3
+          - taskId: mid-exec-interrupt-gaps:cursor-mid-exec
+            owner: cursor-mid-exec
+          - taskId: inbound-publish-depth:cursor-publish-depth
+            owner: cursor-publish-depth
+          - taskId: unsupported-image-dialogue:cursor-cloud-5299
+            owner: cursor-cloud-5299
+          - taskId: wecom-bundled-plugin-loading:codex-wecom
+            owner: codex-wecom
+          - taskId: pi-sdk-family-migration-v3:cursor
+            owner: cursor
+          - taskId: enterprise-pending-controls:cursor-enterprise-controls
+            owner: cursor-enterprise-pending
+          - taskId: enterprise-login-mfa:cursor-cloud
+            owner: cursor-cloud
+          - taskId: device-platform-b1:cursor-b1
+            owner: cursor-b1
+          - taskId: watchdog-task-closure:grok-sentinel-link
+            owner: grok-sentinel-link
+          - taskId: agent-runtime-convergence
+            owner: 双规发布
+        liveWip: clean
+        scope: three entries at end of active Unreleased Fixes
+      fullTestFixtureTakeover:
+        authorizedBy: human
+        date: 2026-11-22
+        liveWip: all eight exact paths clean
+        previous:
+          - path: src/objective-shadow/get-reply-run.ingress.test.ts
+            owners:
+              - taskId: pi-sdk-family-migration-v3:cursor
+                owner: cursor
+              - taskId: task-focus-unified-execution:cursor-task-focus-unify
+                owner: cursor-task-focus-unify
+          - path: src/batch1-capability-enablement/t22-diagnosis-rpc-run.test.ts
+            owners: []
+          - path: src/conversation-task/gateway-activation-integration.test.ts
+            owners:
+              - taskId: conversation-task-activate:cursor-grok
+                owner: cursor-grok
+              - taskId: conversation-task-runtime:kiro-conversation-task-runtime
+                owner: kiro-conversation-task-runtime
+              - taskId: pi-sdk-family-migration-v3:cursor
+                owner: cursor
+              - taskId: agent-runtime-convergence
+                owner: 双规发布
+          - path: src/exec-protocol/store-lock-recovery.test.ts
+            owners:
+              - taskId: pi-sdk-family-migration-v3:cursor
+                owner: cursor
+              - taskId: exec-protocol-v1-min-loop
+                owner: cursor-shuanggui-publish
+            shared:
+              shared:
+                glob: src/exec-protocol/**
+                landerTask: exec-protocol-v1-min-loop
+                reason: Human-authorized isolated PR-B execution protocol v1 minimal loop.
+                  Exact-path lander is exec-protocol-v1-min-loop
+                  (cursor-shuanggui-publish). Does not take over
+                  pi-sdk-family-migration-v3 or other broad globs; their
+                  declarations remain.
+                reviewAfter: 2026-12-31
+              lander: cursor-shuanggui-publish
+          - path: src/office-suite/office-suite.acceptance.test.ts
+            owners:
+              - taskId: pi-sdk-family-migration-v3:cursor
+                owner: cursor
+              - taskId: office-file-suite:cursor-jineng
+                owner: cursor-jineng
+          - path: src/task-outcome/paths-bypass-cleanup.test.ts
+            owners:
+              - taskId: pi-sdk-family-migration-v3:cursor
+                owner: cursor
+              - taskId: askOutcome-p0-task-outcome-contract
+                owner: 执行器收尾
+              - taskId: askOutcome-p0-r83-remediation
+                owner: executor-acceptance
+            shared:
+              shared: &a1
+                glob: src/task-outcome/**
+                landerTask: askOutcome-p0-task-outcome-contract
+                reason: askOutcome P0 unified TaskOutcome module; resolves src/** overlap with
+                  pi-sdk-family-migration-v3.
+                reviewAfter: 2026-11-30
+              lander: 执行器收尾
+          - path: src/task-outcome/r85f-proof.test.ts
+            owners:
+              - taskId: pi-sdk-family-migration-v3:cursor
+                owner: cursor
+              - taskId: askOutcome-p0-task-outcome-contract
+                owner: 执行器收尾
+              - taskId: askOutcome-p0-r83-remediation
+                owner: executor-acceptance
+              - taskId: agent-runtime-convergence
+                owner: 双规发布
+            shared:
+              shared:
+                glob: src/task-outcome/r85f-proof.test.ts
+                landerTask: agent-runtime-convergence
+                reason: Authorized migration acceptance harness repair; retain predecessor
+                  history.
+                reviewAfter: 2026-11-30
+              lander: 双规发布
+          - path: src/task-outcome/r85g-dispatch-integration.test.ts
+            owners:
+              - taskId: pi-sdk-family-migration-v3:cursor
+                owner: cursor
+              - taskId: askOutcome-p0-task-outcome-contract
+                owner: 执行器收尾
+              - taskId: askOutcome-p0-r83-remediation
+                owner: executor-acceptance
+            shared:
+              shared: *a1
+              lander: 执行器收尾
+        office: Use supported font environment; preserve PDF glyph assertion
   - id: local-ui-seams
     owner: codex-runtime-manager
     intent: []
@@ -30602,6 +30761,33 @@ landingStreams:
       reason: Only seven previously unmatched exact paths; preserve all prior stream
         order/classification
 sharedPaths:
+  - glob: src/objective-shadow/get-reply-run.ingress.test.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact full-gate fixture repair; previous owner history retained.
+  - glob: src/batch1-capability-enablement/t22-diagnosis-rpc-run.test.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact full-gate fixture repair; previous owner history retained.
+  - glob: src/conversation-task/gateway-activation-integration.test.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact full-gate fixture repair; previous owner history retained.
+  - glob: src/exec-protocol/store-lock-recovery.test.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact full-gate fixture repair; previous owner history retained.
+  - glob: src/office-suite/office-suite.acceptance.test.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact full-gate fixture repair; previous owner history retained.
+  - glob: src/task-outcome/paths-bypass-cleanup.test.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact full-gate fixture repair; previous owner history retained.
+  - glob: src/task-outcome/r85f-proof.test.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact full-gate fixture repair; previous owner history retained.
+  - glob: src/task-outcome/r85g-dispatch-integration.test.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact full-gate fixture repair; previous owner history retained.
+  - glob: CHANGELOG.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized three PR333 release notes only; predecessor task histories retained.
   - glob: src/agent-runtime/state/durable-json.ts
     landerTask: baseline-gates-repair-20261122:codex-wpb-successor
     reason: Human-authorized exact audit path redaction; previous task history retained.
@@ -31543,10 +31729,6 @@ sharedPaths:
   - glob: src/agent-runtime/policy/constraints.ts
     landerTask: agent-runtime-convergence
     reason: Authorized task context and policy extraction; preserve original behavior and prior history.
-    reviewAfter: 2026-11-30
-  - glob: src/task-outcome/r85f-proof.test.ts
-    landerTask: agent-runtime-convergence
-    reason: Authorized migration acceptance harness repair; retain predecessor history.
     reviewAfter: 2026-11-30
   - glob: src/task-outcome/w3-task-budget.test.ts
     landerTask: agent-runtime-convergence
