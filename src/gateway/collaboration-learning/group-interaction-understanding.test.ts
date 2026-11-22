@@ -183,7 +183,8 @@ it.each([false, true])(
         tenant: null,
         cfg: { collaboration: { task: { claimContract: enabled } } },
         message: "如何才能启动正式任务？",
-        understanding: result.decision,
+        understanding:
+          result.kind === "understood" ? result.decision : { kind: "reply", text: result.text },
       }),
     ).toBeNull();
     const request = calls.understand.mock.calls[0][0];
