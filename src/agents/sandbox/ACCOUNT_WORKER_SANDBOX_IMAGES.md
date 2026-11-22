@@ -11,9 +11,9 @@ Product path still requires `managed_enterprise` + shared tenant addressing. See
 
 ## Images (operator-controlled only)
 
-| Role                             | Default tag                             | Dockerfile                   | Build                              |
-| -------------------------------- | --------------------------------------- | ---------------------------- | ---------------------------------- |
-| Exec / sleep                     | `openbot-sandbox:bookworm-slim`         | `Dockerfile.sandbox`         | `scripts/sandbox-setup.sh`         |
+| Role                             | Default tag                      | Dockerfile                   | Build                              |
+| -------------------------------- | -------------------------------- | ---------------------------- | ---------------------------------- |
+| Exec / sleep                     | `openbot-sandbox:bookworm-slim`  | `Dockerfile.sandbox`         | `scripts/sandbox-setup.sh`         |
 | Browser (Chromium + CDP + noVNC) | `openbot-sandbox-browser:trixie` | `Dockerfile.sandbox-browser` | `scripts/sandbox-browser-setup.sh` |
 
 Resolution order (`resolveAccountWorkerImages`):
