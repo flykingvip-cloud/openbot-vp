@@ -150,7 +150,6 @@ Review blockers addressed:
   proof for this round is: release unlocks exactly one following dispatch that
   leaves `unknown`.
 
-
 ## Round: heartbeat stale-snapshot merge (P1) — 2026-11-01 ~11:25 Asia/Shanghai
 
 - Tip: `b612bc6b369d5c43b06b53212dc9e2dae4304221`
