@@ -44,6 +44,7 @@ export type DiagnoseActionDispatchRequest = {
   plainConversation?: boolean;
   /** Name the recipient should use to keep talking. Not shown in the user chat. */
   fromDisplayName?: string;
+  idempotencyKey?: string;
   sessionExists?: (agentId: string, sessionKey: string) => boolean;
   send?: DiagnoseActionSessionSend;
   injectReceipt?: DiagnoseActionReceiptInject;
@@ -77,6 +78,7 @@ export type DiagnoseActionSessionSend = (input: {
   sessionOwnerPlatformUserId?: string;
   plainConversation?: boolean;
   fromDisplayName?: string;
+  idempotencyKey?: string;
 }) => Promise<{ runId: string }>;
 
 export type DiagnoseActionReceiptInject = (input: {
@@ -284,6 +286,7 @@ export async function dispatchDiagnoseConversationAction(
       message: planned.message,
       requesterSessionKey: planned.requesterSessionKey,
       sessionOwnerPlatformUserId: input.requesterUserId,
+      ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
       ...(input.plainConversation ? { plainConversation: true } : {}),
       ...(input.fromDisplayName?.trim() ? { fromDisplayName: input.fromDisplayName.trim() } : {}),
     });
@@ -380,8 +383,9 @@ async function defaultDiagnoseActionSessionSend(input: {
   sessionOwnerPlatformUserId?: string;
   plainConversation?: boolean;
   fromDisplayName?: string;
+  idempotencyKey?: string;
 }): Promise<{ runId: string }> {
-  const idempotencyKey = crypto.randomUUID();
+  const idempotencyKey = input.idempotencyKey ?? crypto.randomUUID();
   const extraSystemPrompt = [
     buildAgentToAgentMessageContext({
       requesterSessionKey: input.requesterSessionKey,

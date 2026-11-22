@@ -342,6 +342,7 @@ export async function canSendConversationHandoff(input: {
 }
 
 export async function dispatchConversationHandoff(input: {
+  idempotencyKey?: string;
   title: string;
   message: string;
   targetAgentId: string;
@@ -370,6 +371,7 @@ export async function dispatchConversationHandoff(input: {
   const targetSessionKey = defaultConversationSessionKey(input.targetAgentId);
   const startedAt = Date.now();
   const result = await dispatchDiagnoseConversationAction({
+    idempotencyKey: input.idempotencyKey,
     title: input.title,
     agentPrompt: input.message.trim(),
     targetAgentId: input.targetAgentId,

@@ -1,5 +1,9 @@
 import { startDeliveryContextSweep } from "../agents/execution-preflight/completion-hold.js";
 import type { HealthSummary } from "../commands/health.js";
+import {
+  startPrivateDependencyEvents,
+  tickPrivateDependencies,
+} from "../conversation-task/private-dependency-runtime.js";
 import { cleanOldMedia } from "../media/store.js";
 import { drainUsageOutbox } from "./billing/usage-outbox-drain.js";
 import { abortChatRunById, type ChatAbortControllerEntry } from "./chat-abort.js";
@@ -77,6 +81,32 @@ export function startGatewayMaintenanceTimers(params: {
     params.broadcast(event, payload, opts);
   });
   startDeliveryContextSweep();
+  startPrivateDependencyEvents();
+  const dependencyPorts = {
+    wakeRunning: (
+      row: import("../conversation-task/private-dependency-store.js").PrivateDependency,
+    ) => {
+      const run = params.chatAbortControllers.get(row.wakeRunId);
+      return Boolean(
+        run &&
+        run.sessionKey === row.parent.sessionKey &&
+        !run.controller.signal.aborted &&
+        run.expiresAtMs > Date.now(),
+      );
+    },
+    parentBusy: (
+      row: import("../conversation-task/private-dependency-store.js").PrivateDependency,
+    ) =>
+      Array.from(params.chatAbortControllers.values()).some(
+        (run) =>
+          run.sessionKey === row.parent.sessionKey &&
+          !run.controller.signal.aborted &&
+          run.expiresAtMs > Date.now(),
+      ),
+  };
+  void tickPrivateDependencies({ ports: dependencyPorts }).catch((error) =>
+    params.logHealth.error(`dependency recovery failed: ${formatError(error)}`),
+  );
 
   // periodic keepalive
   const tickInterval = setInterval(() => {
@@ -109,6 +139,9 @@ export function startGatewayMaintenanceTimers(params: {
   const dedupeCleanup = setInterval(() => {
     const AGENT_RUN_SEQ_MAX = 10_000;
     const now = Date.now();
+    void tickPrivateDependencies({ ports: dependencyPorts }).catch((error) =>
+      params.logHealth.error(`dependency recovery failed: ${formatError(error)}`),
+    );
     for (const [k, v] of params.dedupe) {
       if (now - v.ts > DEDUPE_TTL_MS) {
         params.dedupe.delete(k);

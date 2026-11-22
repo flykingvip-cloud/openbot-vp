@@ -832,6 +832,7 @@ const BASE_METHODS = [
   "browser.request",
   // WebChat WebSocket-native chat methods
   "chat.history",
+  "task.activity.get",
   "chat.abort",
   "chat.restore",
   "chat.send",

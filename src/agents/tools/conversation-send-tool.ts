@@ -15,6 +15,11 @@ import {
   resolveConversationPeer,
   resolveConversationSessionExists,
 } from "../../conversation-task/conversation-handoff.js";
+import { settleDependency } from "../../conversation-task/private-dependency-state.js";
+import {
+  reservePrivateDependency,
+  updatePrivateDependency,
+} from "../../conversation-task/private-dependency-store.js";
 import {
   evaluateCurrentTaskSend,
   readSessionTaskBoard,
@@ -33,7 +38,11 @@ import {
 import { resolveSessionAgentId } from "../agent-scope.js";
 import { isBuiltinStewardAgent, BUILTIN_STEWARD_NAME } from "../builtin-steward/identity.js";
 import { asToolParams, jsonResult, type AnyAgentTool } from "./common.js";
-import { validateConversationDispatch } from "./conversation-send-dispatch.js";
+import {
+  looksLikeDispatchTicket,
+  isCurrentConversationDispatch,
+  validateConversationDispatch,
+} from "./conversation-send-dispatch.js";
 
 function readInboundInterSessionSource(sessionFile: string | undefined): string | undefined {
   if (!sessionFile) {
@@ -137,7 +146,7 @@ export function createConversationSendTool(options?: {
     description:
       "把一句话发给另一个已有主会话的数字人，并等待对方回复。对用户只说有没有发出去。delivered 为真就是已发出；reply 为空只表示还没读到回复，不要说没送到。answerInChat 为真表示对方的原话已经在本会话里，这时 reply 为空也不要说没送到，不要复述，不要请用户转达。posted 为真表示这句话已经写进对方会话，本会话不要再把这句话写一遍。to 是对方是谁。想继续讨论就再调用本工具，target 用 to 里的名字，message 写下一句。不限轮次，像两个人接着说。只有必须问用户时才问用户一句。不要把会话编号、角色、闭环或交接过程写进对话。当前任务直接投送，重试沿用同一个 taskId。",
     parameters: ConversationSendSchema,
-    execute: async (_toolCallId, args) => {
+    execute: async (toolCallId, args) => {
       const params = asToolParams(args);
       const target = typeof params.target === "string" ? params.target.trim() : "";
       const message = typeof params.message === "string" ? params.message.trim() : "";
@@ -246,7 +255,16 @@ export function createConversationSendTool(options?: {
         : (peers.find((row) => row.agentId === callerAgentId)?.displayName ?? callerAgentId);
       const sessionFile = await resolveCallerSessionFile(options?.agentSessionKey, sessionClient);
       const requestedTaskId = requestedTaskIdEarly;
-      const currentTaskId = readSessionTaskBoard(sessionFile).current?.taskId;
+      const parentBoard = readSessionTaskBoard(sessionFile);
+      const currentTaskId = parentBoard.current?.taskId;
+      // A stale model-supplied id must not label a new dispatch as the parked task.
+      if (!isCurrentConversationDispatch(currentTaskId, requestedTaskId)) {
+        return jsonResult({
+          ok: false,
+          reason: "stale_task_binding",
+          hint: "派工任务与当前执行任务不一致，请恢复对应任务后再派发。",
+        });
+      }
       const taskSend = evaluateCurrentTaskSend({
         currentTaskId,
         taskId: requestedTaskId,
@@ -297,6 +315,57 @@ export function createConversationSendTool(options?: {
       }
       const senderSessionKey =
         options?.agentSessionKey?.trim() || defaultConversationSessionKey(callerAgentId);
+      const isDispatch =
+        Boolean(parentBoard.current?.unfinished && parentBoard.current.executionAttempt) ||
+        looksLikeDispatchTicket({
+          message,
+          taskId: requestedTaskId,
+          successCriteria:
+            typeof params.successCriteria === "string" ? params.successCriteria : undefined,
+        });
+      let dependency: Awaited<ReturnType<typeof reservePrivateDependency>> | undefined;
+      if (isDispatch) {
+        const parent = parentBoard.current;
+        if (
+          !sessionFile ||
+          !parent?.unfinished ||
+          parent.wakeSuppress ||
+          !parent.executionAttempt ||
+          !actor.tenantId ||
+          !senderSessionKey
+        ) {
+          return jsonResult({
+            ok: false,
+            reason: "unbound_dispatch",
+            hint: "当前派工没有可验证的执行任务，未启动子任务。",
+          });
+        }
+        dependency = await reservePrivateDependency({
+          toolCallId,
+          ownerId: actor.actorUserId,
+          tenantId: actor.tenantId,
+          parent: {
+            sessionKey: senderSessionKey,
+            sessionFile,
+            taskId: parent.taskId,
+            executionAttempt: parent.executionAttempt,
+            focusRevision: parentBoard.focusRevision,
+          },
+          child: { agentId: peer.agentId, sessionKey: peer.sessionKey, runId: "" },
+          successCriteria:
+            typeof params.successCriteria === "string" ? params.successCriteria : message,
+          deadlineAtMs: Date.now() + 120_000,
+        });
+        if (!dependency.created) {
+          return jsonResult({
+            ok: dependency.row.state !== "failed",
+            delivered: dependency.row.state !== "dispatching" && dependency.row.state !== "failed",
+            dependencyId: dependency.row.id,
+            state: dependency.row.state,
+            to: peer.displayName,
+          });
+        }
+      }
       const result = await dispatchConversationHandoff({
         title: `对话：${peer.displayName}`,
         message,
@@ -306,10 +375,22 @@ export function createConversationSendTool(options?: {
         tenantAdmin: actor.tenantAdmin,
         callerAgentId,
         fromDisplayName,
-        waitForReply: true,
+        idempotencyKey: dependency?.row.child.runId,
+        waitForReply: !dependency,
         injectReply: false,
         sessionExists,
       });
+      if (dependency) {
+        await updatePrivateDependency(dependency.row.id, (row) =>
+          result.ok
+            ? { ...row, state: "waiting" }
+            : settleDependency(
+                row,
+                "failed",
+                result.reason === "unauthorized" ? "permission" : undefined,
+              ),
+        );
+      }
       if (result.ok && senderSessionKey && senderSessionKey !== peer.sessionKey) {
         await postConversationOutboundLine({
           sessionKey: senderSessionKey,
@@ -330,6 +411,9 @@ export function createConversationSendTool(options?: {
           withDispatchMeta({
             ok: result.ok,
             delivered: result.ok,
+            ...(dependency
+              ? { dependencyId: dependency.row.id, state: result.ok ? "waiting" : "failed" }
+              : {}),
             to: peer.displayName,
             answerInChat: true,
             ...(taskSend.taskId ? { taskId: taskSend.taskId } : {}),
@@ -340,6 +424,9 @@ export function createConversationSendTool(options?: {
         withDispatchMeta({
           ok: result.ok,
           delivered: result.ok,
+          ...(dependency
+            ? { dependencyId: dependency.row.id, state: result.ok ? "waiting" : "failed" }
+            : {}),
           to: peer.displayName,
           ...(reply ? { reply } : {}),
           ...(taskSend.taskId ? { taskId: taskSend.taskId } : {}),

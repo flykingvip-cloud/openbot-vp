@@ -1,5 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { ref } from "lit/directives/ref.js";
+import "../chat/task-activity.ts";
 import { repeat } from "lit/directives/repeat.js";
 import type { MentionCandidate } from "../../../../src/organization/mention-types.js";
 import { isDaibaiGuideTranscriptMessage } from "../../../../src/shared/daibai-guide-card.ts";
@@ -2473,6 +2474,8 @@ export function renderChatCompose(props: ChatProps) {
 
   return html`
     <div class="chat-compose ${compactWorkbenchMode ? "chat-compose--workbench-compact" : ""}">
+      <chat-task-activity .sessionKey=${props.sessionKey} .client=${props.usageClient ?? null}
+        .connected=${props.connected} .runId=${props.chatRunId ?? null}></chat-task-activity>
       ${compactWorkbenchMode ? nothing : renderAttachmentPreview(props)}
       ${
         compactWorkbenchMode

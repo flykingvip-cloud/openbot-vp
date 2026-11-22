@@ -770,7 +770,11 @@ type ChatHistoryResponse = {
 
 const CHAT_HISTORY_PAGE_LIMIT = 200;
 
+const conversationProgressRequests = new WeakMap<object, number>();
+
 export async function refreshConversationTaskProgress(state: ChatHistoryState): Promise<void> {
+  const requestId = (conversationProgressRequests.get(state) ?? 0) + 1;
+  conversationProgressRequests.set(state, requestId);
   if (!state.client || !state.connected) {
     state.conversationTaskProgress = null;
     setConversationTaskProgressEntries([]);
@@ -787,9 +791,22 @@ export async function refreshConversationTaskProgress(state: ChatHistoryState): 
       progress?: import("../../../../src/progress-ledger/types.ts").ProgressView | null;
       tasks?: ConversationTaskProgressEntry[];
     }>("conversation-task.active.get", { conversationId });
+    if (
+      state.sessionKey.trim() !== conversationId ||
+      conversationProgressRequests.get(state) !== requestId ||
+      !state.connected
+    ) {
+      return;
+    }
     setConversationTaskProgressEntries(Array.isArray(res?.tasks) ? res.tasks : []);
     state.conversationTaskProgress = res?.progress ?? null;
   } catch {
+    if (
+      state.sessionKey.trim() !== conversationId ||
+      conversationProgressRequests.get(state) !== requestId
+    ) {
+      return;
+    }
     state.conversationTaskProgress = null;
     setConversationTaskProgressEntries([]);
   }
