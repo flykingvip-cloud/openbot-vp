@@ -68,6 +68,7 @@ export function publishPatternCandidateAsDraftSkill(params: {
     contextId: lineageId,
     ownerUserId: params.ownerUserId ?? null,
     lifecycle: "draft",
+    classificationPolicy: "approved-pattern-capability",
     autoInstallEnabled: false,
     profile: {
       name: candidate.suggestedName || "稳定工作模式",
