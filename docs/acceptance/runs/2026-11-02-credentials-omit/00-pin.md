@@ -8,21 +8,21 @@
 
 ## origin/main pin
 
-| Item | Value |
-| --- | --- |
-| Full SHA | `d42fbc3ca2b4041ee70bb1dfb9cd70f33678370c` |
-| Subject | `docs(memory): final closeout acceptance (draft) (#182)` |
-| Commit time (author) | 2026-11-01 23:34:27 +0800 Asia/Shanghai |
+| Item                 | Value                                                    |
+| -------------------- | -------------------------------------------------------- |
+| Full SHA             | `d42fbc3ca2b4041ee70bb1dfb9cd70f33678370c`               |
+| Subject              | `docs(memory): final closeout acceptance (draft) (#182)` |
+| Commit time (author) | 2026-11-01 23:34:27 +0800 Asia/Shanghai                  |
 
 ## Compare to prior evidence pins
 
-| Prior pin | Full SHA (abbrev ok in table) | Relation to current main | Reuse? |
-| --- | --- | --- | --- |
-| Prior coverage tip / dirty HEAD | `d42fbc3ca2…` | **identical** to current `origin/main` | Product tree unchanged vs last coverage tip |
-| PR #192 merge | `bc843c70ecdd3afdae0020403d4b4b22c8849371` | ancestor (−7) | P1 DEF-001/002/004 product fixes still on main — **reuse PASS** |
-| Old acceptance main WT | `3f7786f4aad2d439e499c42df9f8bcbd0480e313` | ancestor (−10) | Too old for Stage4 omit re-run claims |
-| PR192 review evidence batch | `1ce8f5ee4e8c852d45a9c6a30a623e0bed082587` | not on main lineage (docs/fix branch tip that merged) | Stage4 FAIL log reusable as **historical**; must re-run omit on main tip |
-| Coverage docs tip (PR #193 HEAD) | 见分支 tip（含后续口径提交） | ahead of main（`docs/acceptance/**` + `.loom/registry.yaml`） | Docs/evidence for N≈118 reusable as draft; **行数≠功能分母**；须硬化口径 |
+| Prior pin                        | Full SHA (abbrev ok in table)              | Relation to current main                                      | Reuse?                                                                   |
+| -------------------------------- | ------------------------------------------ | ------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Prior coverage tip / dirty HEAD  | `d42fbc3ca2…`                              | **identical** to current `origin/main`                        | Product tree unchanged vs last coverage tip                              |
+| PR #192 merge                    | `bc843c70ecdd3afdae0020403d4b4b22c8849371` | ancestor (−7)                                                 | P1 DEF-001/002/004 product fixes still on main — **reuse PASS**          |
+| Old acceptance main WT           | `3f7786f4aad2d439e499c42df9f8bcbd0480e313` | ancestor (−10)                                                | Too old for Stage4 omit re-run claims                                    |
+| PR192 review evidence batch      | `1ce8f5ee4e8c852d45a9c6a30a623e0bed082587` | not on main lineage (docs/fix branch tip that merged)         | Stage4 FAIL log reusable as **historical**; must re-run omit on main tip |
+| Coverage docs tip (PR #193 HEAD) | 见分支 tip（含后续口径提交）               | ahead of main（`docs/acceptance/**` + `.loom/registry.yaml`） | Docs/evidence for N≈118 reusable as draft; **行数≠功能分母**；须硬化口径 |
 
 ## What remains reusable vs must re-run
 

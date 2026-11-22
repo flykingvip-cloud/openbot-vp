@@ -8,12 +8,12 @@
 
 ## 证据分层（禁止把团队诊断写成「验收方已独立复现」）
 
-| 层级 | 内容 | 结论 |
-| --- | --- | --- |
-| A. 代码根因核对 | `src/infra/backup-create.ts:194`（`path.resolve` only）与 `:371`（tar filter 直接使用该判断） | 与归档证据**相互吻合** → **可接受为产品缺陷登记** |
-| B. 团队诊断脚本 | 调用产品 `createBackupArchive`，虚构载荷；输出同时显示 `includeCredentials=false`、`skipped.reason=excluded` 与归档内存在 `credentials/oauth.json` | 支持「排除承诺与实际归档不一致」；**属团队诊断证据** |
-| C. 验收方独立运行复现 | 独立重跑诊断时遇**双阻断**：(1) 缺 `node_modules/@openbot` 链接（工作区依赖解析）；(2) `packages/collaboration-core/dist` 不存在。不仅是缺构建产物；**单项恢复未必足够**（Stage4 导入见 `logs/01-stage4-credentials-omit-repro.log`） | **未完成** → 状态 **BLOCKED**；**不得**写成「验收方已独立复现」 |
-| D. tip WT 上既有 unit 日志 | `logs/02-backup-unit-omit-repro.log` 显示 omit 断言 FAIL（历史/同 pin 树证据） | 可作旁证；**仍不替代**独立复核者对本轮诊断脚本的独立复现 |
+| 层级                       | 内容                                                                                                                                                                                                                                  | 结论                                                            |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| A. 代码根因核对            | `src/infra/backup-create.ts:194`（`path.resolve` only）与 `:371`（tar filter 直接使用该判断）                                                                                                                                         | 与归档证据**相互吻合** → **可接受为产品缺陷登记**               |
+| B. 团队诊断脚本            | 调用产品 `createBackupArchive`，虚构载荷；输出同时显示 `includeCredentials=false`、`skipped.reason=excluded` 与归档内存在 `credentials/oauth.json`                                                                                    | 支持「排除承诺与实际归档不一致」；**属团队诊断证据**            |
+| C. 验收方独立运行复现      | 独立重跑诊断时遇**双阻断**：(1) 缺 `node_modules/@openbot` 链接（工作区依赖解析）；(2) `packages/collaboration-core/dist` 不存在。不仅是缺构建产物；**单项恢复未必足够**（Stage4 导入见 `logs/01-stage4-credentials-omit-repro.log`） | **未完成** → 状态 **BLOCKED**；**不得**写成「验收方已独立复现」 |
+| D. tip WT 上既有 unit 日志 | `logs/02-backup-unit-omit-repro.log` 显示 omit 断言 FAIL（历史/同 pin 树证据）                                                                                                                                                        | 可作旁证；**仍不替代**独立复核者对本轮诊断脚本的独立复现        |
 
 No live secrets were used. Diagnostic wrote only `FICTIONAL_PLACEHOLDER_NOT_A_SECRET`. Logs must not be extended with real OAuth material.
 
@@ -36,13 +36,13 @@ Diagnostic numbers (团队归档 / Asia/Shanghai；非验收方本轮独立复�
 
 ## Exact loci
 
-| Role | File:line |
-| --- | --- |
-| Non-canonical filter compare | `src/infra/backup-create.ts:194-198` (`isOauthPathExcluded`) |
-| Filter call site | `src/infra/backup-create.ts:371-379` |
-| Plan returns logical `oauthDir` | `src/commands/backup-shared.ts:271` (resolve ~120; skip list **does** canonicalize ~253) |
-| Failing product unit assert | `src/commands/backup.test.ts:451-452` |
-| Failing Stage4 acceptance assert | `docs/acceptance/stage4-store-evidence.test.ts:279-280` |
+| Role                             | File:line                                                                                |
+| -------------------------------- | ---------------------------------------------------------------------------------------- |
+| Non-canonical filter compare     | `src/infra/backup-create.ts:194-198` (`isOauthPathExcluded`)                             |
+| Filter call site                 | `src/infra/backup-create.ts:371-379`                                                     |
+| Plan returns logical `oauthDir`  | `src/commands/backup-shared.ts:271` (resolve ~120; skip list **does** canonicalize ~253) |
+| Failing product unit assert      | `src/commands/backup.test.ts:451-452`                                                    |
+| Failing Stage4 acceptance assert | `docs/acceptance/stage4-store-evidence.test.ts:279-280`                                  |
 
 ## Impact（措辞收紧）
 

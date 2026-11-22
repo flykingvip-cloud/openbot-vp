@@ -20,13 +20,13 @@
 
 ## 核准范围（本轮独立复核 / 用户确认）
 
-| 项 | 结论 |
-| --- | --- |
-| 文档口径整改（含第 2 轮两处偏差修正） | **接受** |
-| DEF-008 缺陷登记 | **接受** |
-| Stage4 FAIL | **接受** |
-| 全栈通过 | **不核准** |
-| 以本轮材料批准 #193 合并 | **不核准** |
+| 项                                    | 结论       |
+| ------------------------------------- | ---------- |
+| 文档口径整改（含第 2 轮两处偏差修正） | **接受**   |
+| DEF-008 缺陷登记                      | **接受**   |
+| Stage4 FAIL                           | **接受**   |
+| 全栈通过                              | **不核准** |
+| 以本轮材料批准 #193 合并              | **不核准** |
 
 ## BLOCKED list (current)
 
@@ -34,8 +34,8 @@
 2. 验收方独立复现 omit — **双阻断**：缺 `node_modules/@openbot` 链接 **且** 无 `packages/collaboration-core/dist`；单项恢复未必够（本轮**不安依赖、不构建**）。
 3. Stage4 full suite execution in isolated worktree — same resolve / dist flap。
 4. Control UI interactive ↔ local gateway。
-5. Live channel I/O（all CH-*）。
-6. ME-* compiles（SwiftPM / SDK / hvigor；未授权安装）。
+5. Live channel I/O（all CH-\*）。
+6. ME-\* compiles（SwiftPM / SDK / hvigor；未授权安装）。
 7. SBOM regen / dependency audit。
 8. 公开入口穷尽性补齐（CLI 逐命令、UI 路由、非 channel extensions、packages…）。
 9. **Merge of PR #193 — 本轮验收不批准；禁止 bot `gh pr merge`。**
