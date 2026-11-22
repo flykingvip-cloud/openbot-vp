@@ -11,6 +11,7 @@ import { execFileSync } from "node:child_process";
  */
 import { createHash } from "node:crypto";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -56,7 +57,6 @@ const RUN_ID = `t22-diagnosis-rpc-${Date.now()}`;
 const EVIDENCE_DIR =
   process.env.OPENBOT_T22_DIAGNOSIS_EVIDENCE_DIR ??
   path.join(BATCH1_EVIDENCE_ROOT, "t22-diagnosis");
-const T20_RPC_JSONL = path.join(BATCH1_EVIDENCE_ROOT, "t20-rpc", "rpc.jsonl");
 const TEST_TOKEN = "test-gateway-token-1234567890";
 const OTHER_SESSION_KEY = "agent:other:t20";
 const INHERITED_ENV_KEYS = [
@@ -425,36 +425,93 @@ describe("t22 diagnosis isolated RPC honesty run", () => {
     };
   }
 
-  it("re-evaluates the t20 rpc.jsonl so failed original calls are not pass", () => {
-    const records = withCombinedConcurrency(
-      recordsFromJsonl(fs.readFileSync(T20_RPC_JSONL, "utf8")),
-    );
-    const t20 = deriveSummaryCases(
-      records,
-      T20_DIAGNOSIS_RPC_SPECS.map((spec) =>
-        spec.caseName === "timeout-fallback" || spec.caseName.startsWith("concurrency")
-          ? { ...spec, officialOutcome: "accepted" }
-          : spec,
+  it("re-evaluates an isolated synthetic RPC fixture without relabelling failed calls", () => {
+    const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), "t22-synthetic-rpc-fixture-"));
+    const fixturePath = path.join(fixtureDir, "rpc.jsonl");
+    const noGrowth = { diff: { beforeCount: 0, afterCount: 0, added: [] } };
+    const fixture: RpcRecord[] = [
+      {
+        phase: "under_test",
+        caseName: "timeout-fallback",
+        method: "chat.send",
+        ok: false,
+        error: "FAKE unit timeout",
+        messages: noGrowth,
+      },
+      {
+        phase: "under_test",
+        caseName: "timeout-fallback",
+        method: "chat.inject",
+        ok: true,
+        error: null,
+        messages: noGrowth,
+      },
+      ...["concurrency-a", "concurrency-b"].map(
+        (caseName): RpcRecord => ({
+          phase: "under_test",
+          caseName,
+          method: "chat.send",
+          ok: false,
+          error: "FAKE unit failure",
+          messages: noGrowth,
+        }),
       ),
+      {
+        phase: "under_test",
+        caseName: "duplicate-delivery",
+        method: "chat.send",
+        ok: true,
+        messages: {
+          diff: {
+            beforeCount: 0,
+            afterCount: 1,
+            added: [{ role: "assistant", fingerprint: "fake-unit-result" }],
+          },
+        },
+      },
+    ];
+    fs.writeFileSync(
+      fixturePath,
+      fixture.map((record) => JSON.stringify(record)).join("\n") + "\n",
     );
-    writeJson("t20-revaluation.json", {
-      at: new Date().toISOString(),
-      zone: "Asia/Shanghai",
-      source: T20_RPC_JSONL,
-      cases: Object.fromEntries(
-        Object.entries(t20).map(([name, value]) => [
-          name,
-          (value as { result?: unknown; honesty?: unknown }).honesty ?? value,
-        ]),
-      ),
-    });
-    expect(t20["timeout-fallback"]?.result).toBe("fail");
-    expect(t20["concurrency"]?.result).toBe("fail");
-    expect(t20["concurrency-a"]?.result).toBe("fail");
-    cases["t20-revaluation"] = {
-      timeoutFallback: t20["timeout-fallback"]?.result,
-      concurrency: t20["concurrency"]?.result,
-    };
+    try {
+      const records = withCombinedConcurrency(
+        recordsFromJsonl(fs.readFileSync(fixturePath, "utf8")),
+      );
+      const t20 = deriveSummaryCases(
+        records,
+        T20_DIAGNOSIS_RPC_SPECS.map((spec) =>
+          spec.caseName === "timeout-fallback" || spec.caseName.startsWith("concurrency")
+            ? { ...spec, officialOutcome: "accepted" }
+            : spec,
+        ),
+      );
+      writeJson("t20-revaluation.json", {
+        at: new Date().toISOString(),
+        zone: "Asia/Shanghai",
+        source: fixturePath,
+        evidenceKind: "synthetic-unit-fixture",
+        isLiveEvidence: false,
+        cases: Object.fromEntries(
+          Object.entries(t20).map(([name, value]) => [
+            name,
+            (value as { result?: unknown; honesty?: unknown }).honesty ?? value,
+          ]),
+        ),
+      });
+      expect(t20["duplicate-delivery"]?.result).toBe("pass");
+      expect(t20["timeout-fallback"]?.result).toBe("fail");
+      expect(t20["concurrency"]?.result).toBe("fail");
+      expect(t20["concurrency-a"]?.result).toBe("fail");
+      cases["t20-revaluation"] = {
+        evidenceKind: "synthetic-unit-fixture",
+        isLiveEvidence: false,
+        timeoutFallback: t20["timeout-fallback"]?.result,
+        concurrency: t20["concurrency"]?.result,
+      };
+    } finally {
+      fs.rmSync(fixtureDir, { recursive: true, force: true });
+    }
   });
 
   it("explains timeout-fallback accepted-with-zero-writes against both clients and stores", async () => {
