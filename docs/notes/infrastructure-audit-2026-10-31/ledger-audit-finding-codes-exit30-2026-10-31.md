@@ -10,12 +10,12 @@
 
 离线权威当前口径见同目录 `p1-current-classification-2026-10-31.json`（145 forward-only + 1 incomplete_graph_unknown；完整 146 本轮未重遍历）。
 
-| 运行时 `LedgerFinding.code` | 离线 P1 类（近似） | 何时发出 | 默认 severity |
-|---|---|---|---|
-| （无 finding） | `forward_only` | `classifyAncestry` → forward | — |
-| `missing-object` | `missing_object` | tip `cat-file -t` 失败 | error（不可用 `regressionAcknowledged` 降级） |
-| `incomplete-graph` | `incomplete_graph_unknown` | tip 存在但父对象缺失，或 **shallow（不论 merge-base 是否成功）**，或 is-ancestor 非 0/1 | error（同上） |
-| `regression` | `proven_dag_break`（仅当图足够完整） | tip 与父对象齐全、非 shallow 截断未决，且非祖先 | error；仅此项可被 `regressionAcknowledged` → warning |
+| 运行时 `LedgerFinding.code` | 离线 P1 类（近似）                   | 何时发出                                                                                | 默认 severity                                        |
+| --------------------------- | ------------------------------------ | --------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| （无 finding）              | `forward_only`                       | `classifyAncestry` → forward                                                            | —                                                    |
+| `missing-object`            | `missing_object`                     | tip `cat-file -t` 失败                                                                  | error（不可用 `regressionAcknowledged` 降级）        |
+| `incomplete-graph`          | `incomplete_graph_unknown`           | tip 存在但父对象缺失，或 **shallow（不论 merge-base 是否成功）**，或 is-ancestor 非 0/1 | error（同上）                                        |
+| `regression`                | `proven_dag_break`（仅当图足够完整） | tip 与父对象齐全、非 shallow 截断未决，且非祖先                                         | error；仅此项可被 `regressionAcknowledged` → warning |
 
 用语：消息使用 **「under the current object graph」** / 等价中文「当前对象图下」；**禁止**写「联合完整图」。
 

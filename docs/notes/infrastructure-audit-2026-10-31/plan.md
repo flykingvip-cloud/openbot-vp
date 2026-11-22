@@ -45,6 +45,7 @@ D. 日志链：API响应、权限、重试后是否补齐，run_attempt正确性
 对照实验分级：先读现有run；若仍无法定因，准备可review的最小workflow（单job、托管ubuntu、无checkout/secret/dependency、只输出固定字符串和运行标识、短timeout）。新增或触发workflow须遵循仓库PR权限及可能计费边界，在明确授权后进行，不在本轮擅自触发。依次加checkout、setup、frozen install、类型门禁；每次只加一层。避免无限retry消耗额度。成功控制run与失败目标run对齐HEAD/权限/时间窗。
 
 假设结论须有证伪条件：
+
 - 配额耗尽：明确账单/annotation + 无runner分配，恢复额度后同控制任务完成；单BlobNotFound不够。
 - runner标签缺资源：job持续queued且label无可用pool；改到已在线pool的受控实验通过。当前实际标签已变，旧Blacksmith解释需废止或重新证明。
 - workflow/action权限：annotation明确拒绝项；最小job可跑、加特定action失败。
@@ -88,6 +89,7 @@ D. 日志链：API响应、权限、重试后是否补齐，run_attempt正确性
 建议审计owner单一负责，平台配置/CI/部署/数据owner各有签名；执行agent实施，独立验收方核实before/after与失败注入。用户未要求多agent，本轮不另派agent或新聊天。每批完成后产出问题台账：severity/证明/根因/影响/owner/PR/SHA/验收/残余；状态可追踪，不能用几页架构图替代修复。
 
 验收硬线：
+
 1. 能解释真实失败及可证伪假设；未知项有原因与下一证据，不伪造根因。
 2. 从PR到main的必要gate可执行且可读；本地替代器不在错误SHA上判PASS，故意失败必红。
 3. clean build产物与实际部署identity一致，配置来源唯一可解释，权限/tenant边界负向测试通过。

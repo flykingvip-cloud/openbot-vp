@@ -1,10 +1,10 @@
+import type { EventLoopYielder } from "./event-loop-yield.js";
 import type { KnowledgeFeedItem } from "./feed/types.js";
 import {
   applyDocumentGovernanceOverlay,
   suppressResolvedConflictEdges,
   type DocumentGovernanceOverlay,
 } from "./governance/runtime/object-writeback.js";
-import type { EventLoopYielder } from "./event-loop-yield.js";
 import {
   buildRelationshipGraphCached,
   buildRelationshipGraphCachedAsync,

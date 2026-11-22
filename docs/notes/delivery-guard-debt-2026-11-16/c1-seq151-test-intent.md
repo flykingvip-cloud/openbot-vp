@@ -20,10 +20,10 @@ it("production releases.jsonl Path B SoT reaches seq151 tip d37bed5117d6", () =>
 Git history shows this was **a moving snapshot of the then-current tip**, not a
 permanent ceiling on the Path B SoT:
 
-| When | Commit | What the test pinned |
-| --- | --- | --- |
-| #76 `dd129a28` | Restore Path B `releases.jsonl` as openbot-vp machine SoT | max seq **144**, dual-open `[127, 144]`, `open-interval` expected |
-| `c3a40259` (#89 era) | Tip advanced | max seq **145**, dual-open `[127, 145]` |
+| When                                      | Commit                                                                               | What the test pinned                                                          |
+| ----------------------------------------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| #76 `dd129a28`                            | Restore Path B `releases.jsonl` as openbot-vp machine SoT                            | max seq **144**, dual-open `[127, 144]`, `open-interval` expected             |
+| `c3a40259` (#89 era)                      | Tip advanced                                                                         | max seq **145**, dual-open `[127, 145]`                                       |
 | `6fc389f8` / `38686dc1` / #176 `282c2635` | After [#172](https://github.com/flykingvip-cloud/openbot-vp/pull/172) closed seq 127 | max seq **151**, **sole** open tip `[151]`, `open-interval` must be **false** |
 
 #172's own intent (commit `f79e3e2a`, 2026-11-01 08:07 CST Asia/Shanghai) was
@@ -44,13 +44,13 @@ the tip at the moment those PRs landed.
 
 Later approved ledger writes advanced the tip without updating the snapshot:
 
-| seq | Commit / PR | Tip SHA prefix |
-| --- | --- | --- |
-| 152 | `fde7444f` #194 | `d42fbc3ca2b4` — this close set seq 151 `liveTo` = seq 152 `liveFrom` `2026-11-01T23:04:06.294Z` |
-| 153 | `56c7a5ca` #203 | `e037fed74758` |
-| 154 | `10b9f044` #208 | `a17b60872cb6` |
-| 155–164 | #221, #227, #229, and later ledger commits | see `releases.jsonl` |
-| 165 | `322db390` #267 | `342de3076099` (current ledger open tip) |
+| seq     | Commit / PR                                | Tip SHA prefix                                                                                   |
+| ------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| 152     | `fde7444f` #194                            | `d42fbc3ca2b4` — this close set seq 151 `liveTo` = seq 152 `liveFrom` `2026-11-01T23:04:06.294Z` |
+| 153     | `56c7a5ca` #203                            | `e037fed74758`                                                                                   |
+| 154     | `10b9f044` #208                            | `a17b60872cb6`                                                                                   |
+| 155–164 | #221, #227, #229, and later ledger commits | see `releases.jsonl`                                                                             |
+| 165     | `322db390` #267                            | `342de3076099` (current ledger open tip)                                                         |
 
 `RELEASE_RECORD.md` was last generated at seq 154 (see C3). The unit test was
 left at 151. Rewriting the pin to `toBe(165)` would only reproduce the same

@@ -12,16 +12,16 @@ This is a **human-readable proposal**. This PR does **not** run
 block (the only surface the check compares) still describes seq **154**
 as the open tip; the machine ledger's unique open tip is seq **165**.
 
-| Field | RELEASE_RECORD generated block (stale) | Ledger open tip (seq 165) |
-| --- | --- | --- |
-| seq | 154 | 165 |
-| gatewaySha / uiSha | `a17b60872cb62122449a170a24b2f4e150cf9557` | `342de3076099e23004944916422f42d2d44ea186` |
-| artifactDigest | `sha256:32b20f638067923bb21fdfede7130a34c6199042fc77dee07271436429f6a54e` | `sha256:c0234ea2c8908e4068fd26004ac24b8b4945cf032bd097537fbc1df0e707845b` |
-| imageTag / artifactId | `rc-amd64-provenance-a17b60872cb6` | `rc-amd64-provenance-342de3076099` |
-| tag | `provenance/sha-a17b60872cb6` | `provenance/sha-342de3076099` |
-| liveFrom | `2026-11-02T05:24:45.706Z` | `2026-11-09T23:59:48.486Z` |
-| liveTo | _(open)_ — **incorrect**: seq 154 is closed | _(open)_ — correct for seq 165 |
-| liveVerified | `true` | `true` |
+| Field                 | RELEASE_RECORD generated block (stale)                                    | Ledger open tip (seq 165)                                                 |
+| --------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| seq                   | 154                                                                       | 165                                                                       |
+| gatewaySha / uiSha    | `a17b60872cb62122449a170a24b2f4e150cf9557`                                | `342de3076099e23004944916422f42d2d44ea186`                                |
+| artifactDigest        | `sha256:32b20f638067923bb21fdfede7130a34c6199042fc77dee07271436429f6a54e` | `sha256:c0234ea2c8908e4068fd26004ac24b8b4945cf032bd097537fbc1df0e707845b` |
+| imageTag / artifactId | `rc-amd64-provenance-a17b60872cb6`                                        | `rc-amd64-provenance-342de3076099`                                        |
+| tag                   | `provenance/sha-a17b60872cb6`                                             | `provenance/sha-342de3076099`                                             |
+| liveFrom              | `2026-11-02T05:24:45.706Z`                                                | `2026-11-09T23:59:48.486Z`                                                |
+| liveTo                | _(open)_ — **incorrect**: seq 154 is closed                               | _(open)_ — correct for seq 165                                            |
+| liveVerified          | `true`                                                                    | `true`                                                                    |
 
 Seq 154 was closed in the ledger at seq 155 `liveFrom`
 `2026-11-02T06:12:06.377Z`. Intermediate LIVE rows seq **155–164** are in

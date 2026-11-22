@@ -12,28 +12,30 @@
 
 文件：`src/gateway/server-methods/chat.owner-pause-abort.test.ts`
 
-1. 准备 transcript + 任务板 current=task-a，focusRevision=4  
-2. 注入活动 `chatAbortControllers[run-a-active]` + buffer  
-3. 调用 `chatHandlers["chat.send"]({ message: "暂停", … })`  
-4. 期望：`signal.aborted`；controller map 移除；`abortEmbeddedPiRun(sessionId)`；`clearSessionQueues`；`dispatchInboundMessage` **未**调用；respond ack 含暂停 statusLine；`broadcastChat` final 含暂停文案；板 `wakeSuppress`；`claimTaskBoardContinue` → `wake_suppress`  
+1. 准备 transcript + 任务板 current=task-a，focusRevision=4
+2. 注入活动 `chatAbortControllers[run-a-active]` + buffer
+3. 调用 `chatHandlers["chat.send"]({ message: "暂停", … })`
+4. 期望：`signal.aborted`；controller map 移除；`abortEmbeddedPiRun(sessionId)`；`clearSessionQueues`；`dispatchInboundMessage` **未**调用；respond ack 含暂停 statusLine；`broadcastChat` final 含暂停文案；板 `wakeSuppress`；`claimTaskBoardContinue` → `wake_suppress`
 5. 对称测「取消当前」：abort、无 dispatch、current 空、tombstone
 
 ## B. 约束任务身份
 
-文件：`src/conversation-task/session-task-board.constraint-identity.test.ts`  
-- match → 写入 effectiveConstraints  
-- 切换为 task-b 后仍用 expectedTaskId=task-a → false，B 无 A 约束  
-- 空 id / 无 current / writeFileSync throw → false  
+文件：`src/conversation-task/session-task-board.constraint-identity.test.ts`
 
-文件：`src/auto-reply/reply/agent-runner.collect-amend-steer.test.ts`  
-- mid-steer 切 B：steer 1 次、无 followup、文案「不视为完整成功」、B 无约束  
+- match → 写入 effectiveConstraints
+- 切换为 task-b 后仍用 expectedTaskId=task-a → false，B 无 A 约束
+- 空 id / 无 current / writeFileSync throw → false
+
+文件：`src/auto-reply/reply/agent-runner.collect-amend-steer.test.ts`
+
+- mid-steer 切 B：steer 1 次、无 followup、文案「不视为完整成功」、B 无约束
 
 ## C. board_readonly 局部检查点
 
-- `src/auto-reply/reply/mid-task-aside.ts` + `.test.ts`  
-- `agent-runner`：active 时 disposition；`board_readonly` 立即 return 文本  
-- 读问句优先于 turn-relation（「有效约束有哪些」即使被标 amend 也不 steer）  
-- reply_lane **本轮已落地**（见文末「普通插问落地实证」）  
+- `src/auto-reply/reply/mid-task-aside.ts` + `.test.ts`
+- `agent-runner`：active 时 disposition；`board_readonly` 立即 return 文本
+- 读问句优先于 turn-relation（「有效约束有哪些」即使被标 amend 也不 steer）
+- reply_lane **本轮已落地**（见文末「普通插问落地实证」）
 
 ## 定向测试结果
 
@@ -44,7 +46,6 @@
 消息送达与进度/板只读问句即时答已具备；一般普通插问 reply_lane 本轮已落地（ephemeral disableTools）；四项阻塞已针对性修复；Gateway 停止与约束身份交叉验证保留。
 
 ---
-
 
 ## 既有证据（保留）
 
@@ -57,15 +58,15 @@
 
 ## 0. 切片 1 核对（阶段 0）
 
-| 项 | 结论 |
-|---|---|
-| UI 净差 | `origin/main...HEAD` **无** `ui/**`；PR files 7 个，无 UI |
-| `shouldApplyShoppingPauseCta` | 全树无匹配（已删） |
-| partial/block 出口测试 | `src/agents/pi-embedded-subscribe.plan-speak-outlet.test.ts` 存在 |
-| 本机定向测试 | 4 files / 43 passed（outlet 5 + plan-speak 12 + payloads 10 + stall-continue 16） |
-| 文档两句 | box `slice1-decision-to-reply-path.md`：block≠partial 路径；结构化结果「仅发现具体传递缺口时补充最小参数」 |
-| 祖先门禁 | `origin/main` (`02f6b099…`) 为 HEAD 祖先 |
-| HEAD | `5305c883e296e3e141b3d390ee11e7e3f5f8135f` |
+| 项                            | 结论                                                                                                       |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| UI 净差                       | `origin/main...HEAD` **无** `ui/**`；PR files 7 个，无 UI                                                  |
+| `shouldApplyShoppingPauseCta` | 全树无匹配（已删）                                                                                         |
+| partial/block 出口测试        | `src/agents/pi-embedded-subscribe.plan-speak-outlet.test.ts` 存在                                          |
+| 本机定向测试                  | 4 files / 43 passed（outlet 5 + plan-speak 12 + payloads 10 + stall-continue 16）                          |
+| 文档两句                      | box `slice1-decision-to-reply-path.md`：block≠partial 路径；结构化结果「仅发现具体传递缺口时补充最小参数」 |
+| 祖先门禁                      | `origin/main` (`02f6b099…`) 为 HEAD 祖先                                                                   |
+| HEAD                          | `5305c883e296e3e141b3d390ee11e7e3f5f8135f`                                                                 |
 
 **结论：切片 1 交付齐** → 进入切片 2 取证/实施。
 
@@ -147,21 +148,21 @@ function defaultQueueModeForChannel(_channel?: string): QueueMode {
 
 ### 2.3 Steering vs 独立回复
 
-| 能力 | 触发 | 效果 | 是否算「即时对话」 |
-|---|---|---|---|
-| Steering | `queueMode` 为 steer / steer-backlog，且 run 正在 streaming | `session.steer(text)` 注入约束/插话到**同一** active run | 可能影响后续工具；**不保证**对插问消息产生归属清晰的独立回复；失败必须 `false`，不得伪装已生效 |
-| Followup / collect | 默认 | 入队，等 A 结束后再跑新 turn | 有完整回复，但**非及时**；A 不被取消 |
-| Interrupt | 显式 interrupt 模式 | 打断当前 run | 与「暂停/取消」不同，不可混用 |
+| 能力               | 触发                                                        | 效果                                                     | 是否算「即时对话」                                                                             |
+| ------------------ | ----------------------------------------------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Steering           | `queueMode` 为 steer / steer-backlog，且 run 正在 streaming | `session.steer(text)` 注入约束/插话到**同一** active run | 可能影响后续工具；**不保证**对插问消息产生归属清晰的独立回复；失败必须 `false`，不得伪装已生效 |
+| Followup / collect | 默认                                                        | 入队，等 A 结束后再跑新 turn                             | 有完整回复，但**非及时**；A 不被取消                                                           |
+| Interrupt          | 显式 interrupt 模式                                         | 打断当前 run                                             | 与「暂停/取消」不同，不可混用                                                                  |
 
 `queueEmbeddedPiMessage` 失败原因（`runs.ts`）：`no_active_run` / `not_streaming` / `compacting` → 返回 `false`。
 
 ### 2.4 状态归属（问题点）
 
-| 标记 | 含义（现状） | 问题 |
-|---|---|---|
-| `chatSending` | 本条 `chat.send` RPC 进行中 | 与后台任务占用纠缠进 `isChatBusy` |
-| `chatRunId` | 当前 UI 认领的流式 run | 长程 A 的 runId 使整个会话「忙碌」；若简单并发新 send 会**覆盖** `chatRunId`，短回复终局可能清掉 A 的占用 → 串流/错误清理（场景 E 风险） |
-| 后台任务 / 任务板 | `SessionTaskBoard` + embedded active run | 未单独暴露给 composer；与对话回复状态共用忙碌门 |
+| 标记              | 含义（现状）                             | 问题                                                                                                                                     |
+| ----------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `chatSending`     | 本条 `chat.send` RPC 进行中              | 与后台任务占用纠缠进 `isChatBusy`                                                                                                        |
+| `chatRunId`       | 当前 UI 认领的流式 run                   | 长程 A 的 runId 使整个会话「忙碌」；若简单并发新 send 会**覆盖** `chatRunId`，短回复终局可能清掉 A 的占用 → 串流/错误清理（场景 E 风险） |
+| 后台任务 / 任务板 | `SessionTaskBoard` + embedded active run | 未单独暴露给 composer；与对话回复状态共用忙碌门                                                                                          |
 
 结论：**发送状态、对话回复状态、后台任务状态目前共用 `isChatBusy` 门闩**；禁止「只删 busy」——必须先拆占用，再谈送达。
 
@@ -173,12 +174,12 @@ function defaultQueueModeForChannel(_channel?: string): QueueMode {
 
 ### 2.6 停止保护相关原能力（切片 2 原范围）
 
-| 场景 | 原机制 | 位置 |
-|---|---|---|
-| 暂停后不应再业务续跑 | `wakeSuppress`；continue decide/claim 跳过 | `session-task-board` park；`task-board-continue` |
+| 场景                              | 原机制                                                                                                                           | 位置                                               |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| 暂停后不应再业务续跑              | `wakeSuppress`；continue decide/claim 跳过                                                                                       | `session-task-board` park；`task-board-continue`   |
 | 续醒入队后、领取前主人暂停/改焦点 | `claimTaskBoardContinue` / `revalidateContinueTicket`：`revision_mismatch` / `wake_suppress` / `tombstoned` / `task_id_mismatch` | `task-board-continue.ts`；测试含 AC13 stale ticket |
-| 取消后旧结果/旧唤醒 | tombstone + claim 拒绝；finishCurrentTask taskId 绑定 | board + continue |
-| 同任务要求修改后旧唤醒 | `focusRevision` 不匹配 → claim 拒绝；**不扩大** revision 语义、不自动补造替代唤醒 | 同上 |
+| 取消后旧结果/旧唤醒               | tombstone + claim 拒绝；finishCurrentTask taskId 绑定                                                                            | board + continue                                   |
+| 同任务要求修改后旧唤醒            | `focusRevision` 不匹配 → claim 拒绝；**不扩大** revision 语义、不自动补造替代唤醒                                                | 同上                                               |
 
 ---
 
@@ -194,25 +195,25 @@ function defaultQueueModeForChannel(_channel?: string): QueueMode {
 
 最小调整候选位置（实施阶段，按检查点拆）：
 
-| 优先级 | 位置 | 意图 |
-|---|---|---|
-| P0 | `ui/.../app-chat.ts` + `controllers/chat.ts` | 拆「本条发送/短回复占用」与「后台 run 占用」；busy 时仍可 `chat.send`（保留 idempotency / stop 特例），避免覆盖/误清 A 的 run |
-| P1 | `agent-runner` / queue 策略调用点 | 在**不**新造引擎前提下，区分：补充约束 → 复用 steer（失败如实）；插问需回复 → 走原 followup 或经设计的隔离回复；禁止伪装 |
-| P2 | 任务板 claim/decide | 补/锁暂停与旧唤醒拒绝的事件序列测试；复用 `revalidateContinueTicket`，不多套规则 |
+| 优先级 | 位置                                         | 意图                                                                                                                          |
+| ------ | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| P0     | `ui/.../app-chat.ts` + `controllers/chat.ts` | 拆「本条发送/短回复占用」与「后台 run 占用」；busy 时仍可 `chat.send`（保留 idempotency / stop 特例），避免覆盖/误清 A 的 run |
+| P1     | `agent-runner` / queue 策略调用点            | 在**不**新造引擎前提下，区分：补充约束 → 复用 steer（失败如实）；插问需回复 → 走原 followup 或经设计的隔离回复；禁止伪装      |
+| P2     | 任务板 claim/decide                          | 补/锁暂停与旧唤醒拒绝的事件序列测试；复用 `revalidateContinueTicket`，不多套规则                                              |
 
 ---
 
 ## 4. 验收场景 ↔ 改前预期
 
-| 场景 | 改前 |
-|---|---|
-| A 执行中查进度 | 卡在前端队列；无及时回答 |
-| A 执行中补约束 | 同上；到不了 steer/任务上下文 |
-| A 执行中插问 B | 同上 |
-| 暂停 A，回答 B | stop/abort 可走原入口；但 B 仍可能被 busy 队列拖延 |
+| 场景            | 改前                                                                  |
+| --------------- | --------------------------------------------------------------------- |
+| A 执行中查进度  | 卡在前端队列；无及时回答                                              |
+| A 执行中补约束  | 同上；到不了 steer/任务上下文                                         |
+| A 执行中插问 B  | 同上                                                                  |
+| 暂停 A，回答 B  | stop/abort 可走原入口；但 B 仍可能被 busy 队列拖延                    |
 | 插问期间 A 完成 | 若强行双 send 覆盖 chatRunId → 高风险串流；当前靠 busy 回避但牺牲对话 |
-| 修改 A 后旧唤醒 | claim 侧已有 revision/tombstone 拒绝（需回归锁） |
-| 多条连续到达 | 前端队列保序；服务端 collect 保序；但都不是即时处理 |
+| 修改 A 后旧唤醒 | claim 侧已有 revision/tombstone 拒绝（需回归锁）                      |
+| 多条连续到达    | 前端队列保序；服务端 collect 保序；但都不是即时处理                   |
 
 ---
 
@@ -245,7 +246,6 @@ function defaultQueueModeForChannel(_channel?: string): QueueMode {
 
 - HEAD: `b46ca89f2c614f6e7c42b7b1d35f91f2122d923a`
 - Vitest: chat.test preserve/P0 + mid-task-dialogue + collect-amend-steer + event-sequence + inbound-stop → 150+3 passed on WT openbot-pr216-slice2.
-
 
 ## 四项阻塞回炉取证（Asia/Shanghai 2026-11-02）
 
@@ -297,14 +297,14 @@ session-task-board.seed-audit.test.ts
 
 ### 诚实边界
 
-| 项 | 状态 |
-|---|---|
-| 及时独立回复（不跟 A followup 串行） | 已落地 |
-| 不写任务板 / disableTools | 已落地 |
-| 暂停取消覆盖 aside | 已落地 |
-| B 写入 A 的 jsonl 共址 | **仍缺口**（有意：避免会话锁争用） |
-| Gateway A/B final/cancel 隔离交叉测 | **本轮已补**（`server-chat.aside-ab-run-isolation.test.ts`） |
-| 第二任务控制者 / 关键词特例堆叠 | **不做** |
+| 项                                   | 状态                                                         |
+| ------------------------------------ | ------------------------------------------------------------ |
+| 及时独立回复（不跟 A followup 串行） | 已落地                                                       |
+| 不写任务板 / disableTools            | 已落地                                                       |
+| 暂停取消覆盖 aside                   | 已落地                                                       |
+| B 写入 A 的 jsonl 共址               | **仍缺口**（有意：避免会话锁争用）                           |
+| Gateway A/B final/cancel 隔离交叉测  | **本轮已补**（`server-chat.aside-ab-run-isolation.test.ts`） |
+| 第二任务控制者 / 关键词特例堆叠      | **不做**                                                     |
 
 ## SHA binding（reply_lane harden + typed routing）
 

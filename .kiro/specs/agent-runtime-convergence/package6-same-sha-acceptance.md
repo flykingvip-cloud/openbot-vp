@@ -11,34 +11,35 @@
 
 ## Freeze
 
-| Field | Value |
-| --- | --- |
-| Freeze source SHA (clean tree tests) | `a1b14f80c0de6483ab3a9659c090eb6881912ffe` (= Package5 remelt tip) |
-| `origin/main` ancestor | `658bb327ef7470433f092b50dd122d8d6bc5262b` — **PASS** (`merge-base --is-ancestor`) |
-| Clean test worktree | `/tmp/openbot-p6-freeze-a1b14f80c` (detached HEAD, status clean; `node_modules` + `ui/node_modules` symlinked from primary) |
-| Primary worktree | `/Users/daniel/.codex/worktrees/runtime-convergence/openbot` — foreign WIP preserved (`.loom/registry.yaml`, `context-component-plan.md`, `materials-manifest.md`, `out/`, `executor-evidence/`, task-outcome/model-call closeout, etc.) — **not staged** |
-| Commits since Package5 tip | docs-only Package6 acceptance pack (this file + tasks.md); **no src/** changes |
-| Source edits for continuity defects | **none** |
+| Field                                | Value                                                                                                                                                                                                                                                     |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Freeze source SHA (clean tree tests) | `a1b14f80c0de6483ab3a9659c090eb6881912ffe` (= Package5 remelt tip)                                                                                                                                                                                        |
+| `origin/main` ancestor               | `658bb327ef7470433f092b50dd122d8d6bc5262b` — **PASS** (`merge-base --is-ancestor`)                                                                                                                                                                        |
+| Clean test worktree                  | `/tmp/openbot-p6-freeze-a1b14f80c` (detached HEAD, status clean; `node_modules` + `ui/node_modules` symlinked from primary)                                                                                                                               |
+| Primary worktree                     | `/Users/daniel/.codex/worktrees/runtime-convergence/openbot` — foreign WIP preserved (`.loom/registry.yaml`, `context-component-plan.md`, `materials-manifest.md`, `out/`, `executor-evidence/`, task-outcome/model-call closeout, etc.) — **not staged** |
+| Commits since Package5 tip           | docs-only Package6 acceptance pack (this file + tasks.md); **no src/** changes                                                                                                                                                                            |
+| Source edits for continuity defects  | **none**                                                                                                                                                                                                                                                  |
 
 ## Evidence class ledger (do not splice across SHAs)
 
 All PASS/FAIL/GAP below were collected on freeze source `a1b14f80c…` in the clean worktree. Historical Package2–5 PASS are cited only as prior charter context, not as this SHA’s proof.
 
-| Class | What ran this turn |
-| --- | --- |
-| **unit** | delivery dispatch/acceptance/artifacts; catalog/assembly; interpret-interaction; explicit-task-control; admission; admitted-turn/candidate; turn-outcome; package5-retire; claim-fence; four-defects; stale-callback; recovery enqueue; PPT wiring (save/edit/preview node); preview-artifact hash/envelope; office-pptx text/isolated |
-| **integration** | organization collab-dispatch lifecycle/broadcast/confirmation/delivery; collaboration-board tool (most paths); discuss-to-task turn/injection; trusted-locator; collab-dialogue regressions; task-outcome collab entry wiring; collab continuity memory; controlled-collab P1/P3 loops; P4 gate repros (7/8) |
-| **stub-channel** | production-path followup runner (stub returns drive acceptance/delivery); channel-fail → delivery-only retry |
-| **real-process** | `async-wait-recovery.cross-process` (4); `pending-delivery.restart` rehydrate active/paused/cancelled (3) |
-| **static** | retired alias absence; sole `armAsyncWaitRecoveryContinuation` export; entry call graph from source; kept façades inventory |
-| **real-model** | **GAP** — not run (charter: no production restart / no live model acceptance this package) |
-| **real-channel outbound** | **GAP** — not run (charter: do not send external messages for acceptance) |
-| **PPT physical preview / real-render env** | **runtime GAP** — conversion-stub + UI isolation unit ≠ physical Office render pass |
+| Class                                      | What ran this turn                                                                                                                                                                                                                                                                                                                     |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **unit**                                   | delivery dispatch/acceptance/artifacts; catalog/assembly; interpret-interaction; explicit-task-control; admission; admitted-turn/candidate; turn-outcome; package5-retire; claim-fence; four-defects; stale-callback; recovery enqueue; PPT wiring (save/edit/preview node); preview-artifact hash/envelope; office-pptx text/isolated |
+| **integration**                            | organization collab-dispatch lifecycle/broadcast/confirmation/delivery; collaboration-board tool (most paths); discuss-to-task turn/injection; trusted-locator; collab-dialogue regressions; task-outcome collab entry wiring; collab continuity memory; controlled-collab P1/P3 loops; P4 gate repros (7/8)                           |
+| **stub-channel**                           | production-path followup runner (stub returns drive acceptance/delivery); channel-fail → delivery-only retry                                                                                                                                                                                                                           |
+| **real-process**                           | `async-wait-recovery.cross-process` (4); `pending-delivery.restart` rehydrate active/paused/cancelled (3)                                                                                                                                                                                                                              |
+| **static**                                 | retired alias absence; sole `armAsyncWaitRecoveryContinuation` export; entry call graph from source; kept façades inventory                                                                                                                                                                                                            |
+| **real-model**                             | **GAP** — not run (charter: no production restart / no live model acceptance this package)                                                                                                                                                                                                                                             |
+| **real-channel outbound**                  | **GAP** — not run (charter: do not send external messages for acceptance)                                                                                                                                                                                                                                                              |
+| **PPT physical preview / real-render env** | **runtime GAP** — conversion-stub + UI isolation unit ≠ physical Office render pass                                                                                                                                                                                                                                                    |
 
 ---
 
 ## Personal main-chain matrix (same SHA)
 
+<!-- prettier-ignore -->
 | Scenario | Verdict | Evidence class | Evidence |
 | --- | --- | --- | --- |
 | Ordinary chat / interpret → reply|clarify (no task writer) | **PASS** | unit | `interpret-interaction` 20 PASS — reply/clarify/execution_request/task_control parsing; no task writer exposed |
@@ -52,45 +53,45 @@ All PASS/FAIL/GAP below were collected on freeze source `a1b14f80c…` in the cl
 
 ## Collab main-chain matrix (same SHA)
 
-| Scenario | Verdict | Evidence class | Evidence |
-| --- | --- | --- | --- |
-| Collaboration entry / mission context | **PASS** | unit | collaboration-entry 3; collaboration-mission 2 |
-| Claim actor fence (no proxy claim) | **PASS** | unit/integration | collaboration-board-tool claim/proxy refusals + self claim |
-| Claim → mark_in_progress → list | **PASS** | unit | board tool success paths |
-| Submit → review → return → revise → accept (Mode B) | **PASS** | integration | controlled-collab **P3** two-member MD loop 1 PASS; **P1** combo closed-loop 1 PASS |
-| Group / roster delivery helpers | **PASS** | integration | collab-dispatch-delivery 7; broadcast 12; confirmation 2; lifecycle 13 |
-| Collab dialogue regressions | **PASS** | integration | 27 PASS |
-| Member turn / shared executor ≠ close group contract | **PASS** | static + integration | `admitted-turn-ownership.md` + `scenario-architecture.md`: shared executor cannot close group contract; formal team delivery is `submit_team_deliverable` (separate from member `submit_for_review`); P3 accept is board accept after review, not member-turn auto-close |
-| Board tool success-detail mocks (`item` shape) | **PENDING test-contract fix** (3 FAIL) | unit mock drift | Mocks return bare item; production entry returns `{ item, eventRelay }` — tool forwards `result.item` correctly against real entry. Independent review: does **not** prove prod main-chain break; **must remain visible** — not “all green” |
-| P4 post-cap heartbeat terminal class | **PENDING test-contract fix** (1 FAIL) | integration assert | After escalate exhaustion, `human_todo:…` appears; revise-to-claimant remains 0. Assert too narrow (escalate\|skip only). Independent review: not a Package6 continuity blocker; **must remain visible** |
+| Scenario                                             | Verdict                                | Evidence class       | Evidence                                                                                                                                                                                                                                                                 |
+| ---------------------------------------------------- | -------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Collaboration entry / mission context                | **PASS**                               | unit                 | collaboration-entry 3; collaboration-mission 2                                                                                                                                                                                                                           |
+| Claim actor fence (no proxy claim)                   | **PASS**                               | unit/integration     | collaboration-board-tool claim/proxy refusals + self claim                                                                                                                                                                                                               |
+| Claim → mark_in_progress → list                      | **PASS**                               | unit                 | board tool success paths                                                                                                                                                                                                                                                 |
+| Submit → review → return → revise → accept (Mode B)  | **PASS**                               | integration          | controlled-collab **P3** two-member MD loop 1 PASS; **P1** combo closed-loop 1 PASS                                                                                                                                                                                      |
+| Group / roster delivery helpers                      | **PASS**                               | integration          | collab-dispatch-delivery 7; broadcast 12; confirmation 2; lifecycle 13                                                                                                                                                                                                   |
+| Collab dialogue regressions                          | **PASS**                               | integration          | 27 PASS                                                                                                                                                                                                                                                                  |
+| Member turn / shared executor ≠ close group contract | **PASS**                               | static + integration | `admitted-turn-ownership.md` + `scenario-architecture.md`: shared executor cannot close group contract; formal team delivery is `submit_team_deliverable` (separate from member `submit_for_review`); P3 accept is board accept after review, not member-turn auto-close |
+| Board tool success-detail mocks (`item` shape)       | **PENDING test-contract fix** (3 FAIL) | unit mock drift      | Mocks return bare item; production entry returns `{ item, eventRelay }` — tool forwards `result.item` correctly against real entry. Independent review: does **not** prove prod main-chain break; **must remain visible** — not “all green”                              |
+| P4 post-cap heartbeat terminal class                 | **PENDING test-contract fix** (1 FAIL) | integration assert   | After escalate exhaustion, `human_todo:…` appears; revise-to-claimant remains 0. Assert too narrow (escalate\|skip only). Independent review: not a Package6 continuity blocker; **must remain visible**                                                                 |
 
 ## Async / recovery / cancel / claim / delivery-only matrix (same SHA)
 
-| Scenario | Verdict | Evidence class | Evidence |
-| --- | --- | --- | --- |
-| Four defects (bind/release/CAS/delivery-only) | **PASS** | unit | four-defects 9 |
-| Production path: followup runner (controlled lifecycle + queued candidate) → acceptance/delivery; channel fail ≠ re-run | **PASS** | stub-channel | production-path 3 (incl. delivery-only original payloads); not chat `runAdmittedTurn` |
-| Claim fence | **PASS** | unit | claim-fence 5 |
-| Stale callback after pause/cancel | **PASS** | unit | stale-callback 3 |
-| Recovery arm / enqueue | **PASS** | unit | async-wait-job-recovery 8; recovery-enqueue 2 |
-| Package5 retired aliases unreachable | **PASS** | unit/static | package5-retire 3 |
-| Cross-process recovery / claim race / crash-before-enqueue | **PASS** | real-process | cross-process 4 |
-| Pending delivery rehydrate across process (active/paused/cancelled) | **PASS** | real-process | pending-delivery.restart 3 |
-| Session recovery / claimed recovery prompt | **PASS** | unit | session-recovery 4; claim-queued recovery-prompt 2 |
+| Scenario                                                                                                                | Verdict  | Evidence class | Evidence                                                                              |
+| ----------------------------------------------------------------------------------------------------------------------- | -------- | -------------- | ------------------------------------------------------------------------------------- |
+| Four defects (bind/release/CAS/delivery-only)                                                                           | **PASS** | unit           | four-defects 9                                                                        |
+| Production path: followup runner (controlled lifecycle + queued candidate) → acceptance/delivery; channel fail ≠ re-run | **PASS** | stub-channel   | production-path 3 (incl. delivery-only original payloads); not chat `runAdmittedTurn` |
+| Claim fence                                                                                                             | **PASS** | unit           | claim-fence 5                                                                         |
+| Stale callback after pause/cancel                                                                                       | **PASS** | unit           | stale-callback 3                                                                      |
+| Recovery arm / enqueue                                                                                                  | **PASS** | unit           | async-wait-job-recovery 8; recovery-enqueue 2                                         |
+| Package5 retired aliases unreachable                                                                                    | **PASS** | unit/static    | package5-retire 3                                                                     |
+| Cross-process recovery / claim race / crash-before-enqueue                                                              | **PASS** | real-process   | cross-process 4                                                                       |
+| Pending delivery rehydrate across process (active/paused/cancelled)                                                     | **PASS** | real-process   | pending-delivery.restart 3                                                            |
+| Session recovery / claimed recovery prompt                                                                              | **PASS** | unit           | session-recovery 4; claim-queued recovery-prompt 2                                    |
 
 ## Artifacts / PPT (PASS vs runtime GAP)
 
-| Scenario | Verdict | Evidence class | Evidence |
-| --- | --- | --- | --- |
-| PPTX patch CAS / version bind | **PASS** | unit | patch-pptx 1; criteria/validation as above |
-| Preview vs download isolation (sidebar) | **PASS** | unit | download-lane 9; html-preview 6 |
-| Deliverable save refuses preview-as-original | **PASS** | unit | deliverable-save 24 |
-| Workspace file preview wiring | **PASS** | unit | workspace-file-preview.node 21 |
-| PPTX preview-edit wiring | **PASS** | unit | pptx-preview-edit 4 |
-| Preview artifact hash / envelope | **PASS** | unit | artifact-hash 4; deliverable-envelope 10 |
-| Office PPTX text / isolated conversion stubs | **PASS** | unit (stub) | office-pptx-text 3; office-pptx-isolated 3 |
-| **Physical PPT render env + human visual preview** | **runtime GAP** | — | No `openbot-pptx-renderer` production image / physical preview this turn. Conversion-stub + UI isolation **≠** physical pass (charter). |
-| Real-channel download of original bytes end-to-end | **runtime GAP** | — | No outbound/real channel send |
+| Scenario                                           | Verdict         | Evidence class | Evidence                                                                                                                                |
+| -------------------------------------------------- | --------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| PPTX patch CAS / version bind                      | **PASS**        | unit           | patch-pptx 1; criteria/validation as above                                                                                              |
+| Preview vs download isolation (sidebar)            | **PASS**        | unit           | download-lane 9; html-preview 6                                                                                                         |
+| Deliverable save refuses preview-as-original       | **PASS**        | unit           | deliverable-save 24                                                                                                                     |
+| Workspace file preview wiring                      | **PASS**        | unit           | workspace-file-preview.node 21                                                                                                          |
+| PPTX preview-edit wiring                           | **PASS**        | unit           | pptx-preview-edit 4                                                                                                                     |
+| Preview artifact hash / envelope                   | **PASS**        | unit           | artifact-hash 4; deliverable-envelope 10                                                                                                |
+| Office PPTX text / isolated conversion stubs       | **PASS**        | unit (stub)    | office-pptx-text 3; office-pptx-isolated 3                                                                                              |
+| **Physical PPT render env + human visual preview** | **runtime GAP** | —              | No `openbot-pptx-renderer` production image / physical preview this turn. Conversion-stub + UI isolation **≠** physical pass (charter). |
+| Real-channel download of original bytes end-to-end | **runtime GAP** | —              | No outbound/real channel send                                                                                                           |
 
 ---
 
@@ -157,26 +158,26 @@ Chat `runAdmittedTurn` / shared lifecycle does **not** close a group ClaimContra
 
 ### Retired this migration window (unreachable on this SHA)
 
-| Path | Proof |
-| --- | --- |
-| `claimAsyncWaitJobIntent` | Removed from prod implementation and public `state/index` export; archive comment only; package5-retire 3 PASS; delete found **no break** |
-| `deliverRecoveredAsyncWaitCompletion` | Same — name implied delivery; only armed continue; **no break** on removal |
-| Prior shells (`untrusted-context`, `execution-stall-continue-loop`, `agent-runner-payloads`, eager mention `tool.execute`) | Already archived in `safe-retirements.md` / prior packages — no live import |
+| Path                                                                                                                       | Proof                                                                                                                                     |
+| -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `claimAsyncWaitJobIntent`                                                                                                  | Removed from prod implementation and public `state/index` export; archive comment only; package5-retire 3 PASS; delete found **no break** |
+| `deliverRecoveredAsyncWaitCompletion`                                                                                      | Same — name implied delivery; only armed continue; **no break** on removal                                                                |
+| Prior shells (`untrusted-context`, `execution-stall-continue-loop`, `agent-runner-payloads`, eager mention `tool.execute`) | Already archived in `safe-retirements.md` / prior packages — no live import                                                               |
 
 ### Kept (duties retained — not “full config audit complete”)
 
-| Item | Reason kept |
-| --- | --- |
-| `agents/cli-runner.ts` façade | Needed façade; forward-only to `execution/runner/cli-run`; consumers still import |
-| `agents/pi-embedded.ts` / `pi-embedded-runner.ts` | Needed façades; live Gateway/cron/commands/auto-reply consumers |
-| Embedded / CLI execution backends | **Retain duties** as model/tool loop providers under chat / cron / followup scene adapters |
-| BOOT / cron / followup triggers | Legitimate scene adapters onto controlled execution lifecycle — **retain duties** |
-| Independent collab contracts (ClaimContract / board / dispatch) | **Retain duties**; not collapsed into chat `runAdmittedTurn` |
-| Thin usage / abort / preflight / session-usage façades | Needed forward-only façades; do not force-delete for zero count |
-| Lobster (`extensions/lobster`) | **Insufficient evidence** to delete (resumeToken / pipeline assets / install surface unknown) — **kept; not a completed full config audit** |
-| OpenProse (`extensions/open-prose`) | **Insufficient evidence** (`.prose` assets / VM / child sessions unknown) — **kept; not a completed full config audit** |
-| `task-orchestration` | Shadow observe / dormant (`LIVE_INVOKE` frozen false) — not bulk-delete by name |
-| Unknown external workflows / recovery assets | Not inventoried to deletion — leave; evidence gap, not “audited clear” |
+| Item                                                            | Reason kept                                                                                                                                 |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `agents/cli-runner.ts` façade                                   | Needed façade; forward-only to `execution/runner/cli-run`; consumers still import                                                           |
+| `agents/pi-embedded.ts` / `pi-embedded-runner.ts`               | Needed façades; live Gateway/cron/commands/auto-reply consumers                                                                             |
+| Embedded / CLI execution backends                               | **Retain duties** as model/tool loop providers under chat / cron / followup scene adapters                                                  |
+| BOOT / cron / followup triggers                                 | Legitimate scene adapters onto controlled execution lifecycle — **retain duties**                                                           |
+| Independent collab contracts (ClaimContract / board / dispatch) | **Retain duties**; not collapsed into chat `runAdmittedTurn`                                                                                |
+| Thin usage / abort / preflight / session-usage façades          | Needed forward-only façades; do not force-delete for zero count                                                                             |
+| Lobster (`extensions/lobster`)                                  | **Insufficient evidence** to delete (resumeToken / pipeline assets / install surface unknown) — **kept; not a completed full config audit** |
+| OpenProse (`extensions/open-prose`)                             | **Insufficient evidence** (`.prose` assets / VM / child sessions unknown) — **kept; not a completed full config audit**                     |
+| `task-orchestration`                                            | Shadow observe / dormant (`LIVE_INVOKE` frozen false) — not bulk-delete by name                                                             |
+| Unknown external workflows / recovery assets                    | Not inventoried to deletion — leave; evidence gap, not “audited clear”                                                                      |
 
 ---
 
@@ -184,16 +185,16 @@ Chat `runAdmittedTurn` / shared lifecycle does **not** close a group ClaimContra
 
 **Not an all-green pack.** Four failures remain **pending test-contract fixes** (3 board-tool mock shape + 1 P4 assert). They stay listed; independent review found no prod main-chain break from them, so they are not Package6 continuity blockers.
 
-| Batch | Result (this SHA) |
-| --- | --- |
-| A delivery/async/context (unit) | 14 files / **90 PASS** |
-| B admission/collab-entry/restart/cross-process | 14 files / **56 PASS** (incl. real-process 7) |
-| C interpret/explicit/PPT wiring/org dispatch | 9 files / **114 PASS** (+ 2 UI sidebar re-run **15 PASS** after linking `ui/node_modules`) |
-| D collab board / dialogue / continuity | **63 PASS / 3 FAIL** — board-tool success-path mocks (**pending test-contract**) |
-| E controlled collab + PPT stubs | **29 PASS / 1 FAIL** — P4 `human_todo` assert (**pending test-contract**) |
-| package5-retire recheck | **3 PASS** |
-| Continuity/state/delivery defect fixes | **none** (no re-freeze of src) |
-| Total visible failures kept in pack | **4** (do not describe this acceptance as all green) |
+| Batch                                          | Result (this SHA)                                                                          |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| A delivery/async/context (unit)                | 14 files / **90 PASS**                                                                     |
+| B admission/collab-entry/restart/cross-process | 14 files / **56 PASS** (incl. real-process 7)                                              |
+| C interpret/explicit/PPT wiring/org dispatch   | 9 files / **114 PASS** (+ 2 UI sidebar re-run **15 PASS** after linking `ui/node_modules`) |
+| D collab board / dialogue / continuity         | **63 PASS / 3 FAIL** — board-tool success-path mocks (**pending test-contract**)           |
+| E controlled collab + PPT stubs                | **29 PASS / 1 FAIL** — P4 `human_todo` assert (**pending test-contract**)                  |
+| package5-retire recheck                        | **3 PASS**                                                                                 |
+| Continuity/state/delivery defect fixes         | **none** (no re-freeze of src)                                                             |
+| Total visible failures kept in pack            | **4** (do not describe this acceptance as all green)                                       |
 
 ---
 
@@ -224,8 +225,9 @@ These gaps do **not** negate source-level evidence; stub/unit tests do **not** s
 
 ## Hand-off
 
-**Conditional PASS** after independent review + these doc corrections.  
-- **Source-code migration phase (Packages 1–6):** closable.  
-- **Runtime final acceptance:** separate checklist (real-model / real-channel / PPT physical) — **not** closed; **not** deploy-ready.  
+**Conditional PASS** after independent review + these doc corrections.
+
+- **Source-code migration phase (Packages 1–6):** closable.
+- **Runtime final acceptance:** separate checklist (real-model / real-channel / PPT physical) — **not** closed; **not** deploy-ready.
 - **Do not** claim all old executors retired, all tests green, or production restart authorization.  
-Freeze source `a1b14f80c…`. **No push / merge / deploy / production restart.**
+  Freeze source `a1b14f80c…`. **No push / merge / deploy / production restart.**

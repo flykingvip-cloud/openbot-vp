@@ -9,12 +9,12 @@ and GitHub docs:
 
 ## STOP — scheme acceptance ≠ authorization
 
-| Gate | Meaning |
-|---|---|
-| Pack / PR review green | Documents + proposed YAML are reviewable |
-| Owner explicit merge auth | Required before landing YAML on **default branch** |
-| Owner explicit run auth | Required before any `gh workflow run` / UI dispatch |
-| Exp-2 | Default **off**; needs a **separate** explicit owner instruction after Exp-1 got a runner |
+| Gate                      | Meaning                                                                                   |
+| ------------------------- | ----------------------------------------------------------------------------------------- |
+| Pack / PR review green    | Documents + proposed YAML are reviewable                                                  |
+| Owner explicit merge auth | Required before landing YAML on **default branch**                                        |
+| Owner explicit run auth   | Required before any `gh workflow run` / UI dispatch                                       |
+| Exp-2                     | Default **off**; needs a **separate** explicit owner instruction after Exp-1 got a runner |
 
 - **Do not merge this PR (or the YAML) without owner go-ahead.**
 - **Do not treat feature-branch-only YAML as dispatchable.** `workflow_dispatch` requires the workflow file on the repository **default branch** for registration; `--ref` only pins the run checkout and **does not** replace registration.
@@ -24,16 +24,16 @@ and GitHub docs:
 
 Path: `.github/workflows/audit-a3-runner-probe.yml`
 
-| Field | Value |
-|---|---|
-| Trigger | `workflow_dispatch` **only** (no `push` / `pull_request` / schedule) |
-| Permissions | `contents: read` |
-| `runs-on` | `ubuntu-latest` |
-| `timeout-minutes` | `5` |
-| Exp-1 body | single step `run: echo ok && uname -a && date -u` |
-| Secrets | **none** |
-| Production / DIGEST / SSH / billing / ruleset / runner-group | **none** |
-| Exp-2 in this YAML | **not included** (default off; separate auth if ever added) |
+| Field                                                        | Value                                                                |
+| ------------------------------------------------------------ | -------------------------------------------------------------------- |
+| Trigger                                                      | `workflow_dispatch` **only** (no `push` / `pull_request` / schedule) |
+| Permissions                                                  | `contents: read`                                                     |
+| `runs-on`                                                    | `ubuntu-latest`                                                      |
+| `timeout-minutes`                                            | `5`                                                                  |
+| Exp-1 body                                                   | single step `run: echo ok && uname -a && date -u`                    |
+| Secrets                                                      | **none**                                                             |
+| Production / DIGEST / SSH / billing / ruleset / runner-group | **none**                                                             |
+| Exp-2 in this YAML                                           | **not included** (default off; separate auth if ever added)          |
 
 Full proposed file is committed on this feature branch for review. Merging it to `main` is a **separate authorization**.
 
@@ -81,21 +81,22 @@ After **explicit owner authorization to land YAML on default**:
 
 ## Merge registration vs actual run (keep separate ledgers)
 
-| Record | When | Must include | Must NOT include |
-|---|---|---|---|
-| `merge-registration.txt` | Immediately after YAML lands on default and `gh workflow list` shows it | merge commit SHA; Contents API **Git blob SHA** (`.sha`); workflow list snippet; merge-auth quote; Asia/Shanghai timestamp | any `workflow_dispatch` / run id / job conclusion |
-| `dispatch-ref.txt` + `a3-evidence/<run_id>/` | Only after **separate** owner **run** auth | `--ref` full SHA; blob SHA at dispatch; run id; classification | rewriting merge-registration as if a run happened |
+| Record                                       | When                                                                    | Must include                                                                                                               | Must NOT include                                  |
+| -------------------------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| `merge-registration.txt`                     | Immediately after YAML lands on default and `gh workflow list` shows it | merge commit SHA; Contents API **Git blob SHA** (`.sha`); workflow list snippet; merge-auth quote; Asia/Shanghai timestamp | any `workflow_dispatch` / run id / job conclusion |
+| `dispatch-ref.txt` + `a3-evidence/<run_id>/` | Only after **separate** owner **run** auth                              | `--ref` full SHA; blob SHA at dispatch; run id; classification                                                             | rewriting merge-registration as if a run happened |
 
 Merging this PR **registers** `workflow_dispatch` on default; it does **not** start a run. Treat “landed on main” and “probe executed” as different events with different evidence files.
-
 
 ## Expected permissions, pinned ref, evidence fields
 
 ### Permissions
+
 - Workflow: `contents: read` only.
 - Operator: repo Actions read + workflow dispatch capability; no org billing write; no ruleset change; no production SSH.
 
 ### Pinned ref procedure
+
 1. `REF=$(git rev-parse <chosen-commit>)` — full 40-char SHA.
 2. Confirm tree contains the intended probe YAML content (or accept that checkout SHA is independent of registration SHA — record both).
 3. `gh workflow run audit-a3-runner-probe.yml --ref "$REF"`
@@ -105,30 +106,33 @@ Merging this PR **registers** `workflow_dispatch` on default; it does **not** st
 
 `docs/notes/infrastructure-audit-2026-10-31/a3-evidence/<run_id>/`
 
-| File | Source |
-|---|---|
-| `run.json` | `gh api repos/flykingvip-cloud/openbot-vp/actions/runs/<id>` |
-| `jobs.json` | jobs + steps (`runner_name` / `runner_id`) |
-| `attempt-log.txt` | `gh run view --log` or note of log 404 |
-| `merge-registration.txt` | **merge-only:** merge commit SHA, Contents API Git **blob** SHA (`.sha`), `gh workflow list` proof, Asia/Shanghai time, merge-auth quote — **no run id** |
-| `dispatch-ref.txt` | **run-only (after separate run auth):** full `--ref` SHA + Contents API Git blob SHA + operator + run-auth quote |
-| `content-sha256.txt` (optional) | file bytes SHA256 via `sha256sum` / `git hash-object` — **must not** be labeled as Contents API `.sha` |
-| `classification.txt` | one of the failure/success classes below |
+| File                            | Source                                                                                                                                                   |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `run.json`                      | `gh api repos/flykingvip-cloud/openbot-vp/actions/runs/<id>`                                                                                             |
+| `jobs.json`                     | jobs + steps (`runner_name` / `runner_id`)                                                                                                               |
+| `attempt-log.txt`               | `gh run view --log` or note of log 404                                                                                                                   |
+| `merge-registration.txt`        | **merge-only:** merge commit SHA, Contents API Git **blob** SHA (`.sha`), `gh workflow list` proof, Asia/Shanghai time, merge-auth quote — **no run id** |
+| `dispatch-ref.txt`              | **run-only (after separate run auth):** full `--ref` SHA + Contents API Git blob SHA + operator + run-auth quote                                         |
+| `content-sha256.txt` (optional) | file bytes SHA256 via `sha256sum` / `git hash-object` — **must not** be labeled as Contents API `.sha`                                                   |
+| `classification.txt`            | one of the failure/success classes below                                                                                                                 |
 
 ## Cost ceiling and stop conditions
 
 ### Budget
+
 - Max **2** `workflow_dispatch` attempts in the whole A3 series (Exp-1 + optional Exp-2).
 - Each job `timeout-minutes: 5` ⇒ **at most ~10 minutes of billed job execution budget** combined.
 - **Queue / pending wait is separate** from that ~10-minute job budget.
 - Wall-clock queue stop: if Exp-1 remains `queued`/`pending` with `runner_id=0` / empty steps for **10 minutes** wall clock → capture JSON and **stop** (no retry-spam). This stop is **not** extra job-minute budget.
 
 ### Exp-1 stop outcomes
+
 1. `success` with `runner_id≠0` and downloadable logs → **stop by default**; report “runner obtainable”; **H1 still open**.
 2. Terminal `startup_failure` / failure with `steps=[]` / `runner_id=0` / log 404 → **stop**; Batch A class reproduced; **H1 still 待验证**; **skip Exp-2**.
 3. Any unexpected write to `main`, ruleset, billing, runner groups, or production host → **abort immediately**.
 
 ### Exp-2 policy (default not run)
+
 - Exp-2 runs **only if** Exp-1 obtained a runner **and** the owner gives a **separate explicit** instruction to spend the second ≤5 minutes.
 - Default after Exp-1 success: **do not** run Exp-2.
 - If Exp-1 reproduces Batch A class → **do not** run Exp-2.
@@ -144,13 +148,13 @@ After owner confirms evidence is retained:
 
 ## Failure classification (for an authorized run)
 
-| Class | Signals | H1 impact |
-|---|---|---|
-| `runner-obtained` | `success`, `runner_id≠0`, non-empty steps, logs downloadable | Does **not** close H1; only shows capacity path works |
-| `batch-a-class` | `startup_failure` / `steps=[]` / `runner_id=0` / log 404 | Consistent with prior Batch A; H1 still 待验证 |
-| `queued-timeout` | wall-clock ≥10 min pending/queued, no runner | Stop; H1 still 待验证 |
-| `authz-or-disabled` | workflow missing on default / Actions disabled / 403-class | Environment limit; not minutes proof |
-| `unexpected` | any other terminal state | Capture raw JSON; do not reinterpret as H1 close |
+| Class               | Signals                                                      | H1 impact                                             |
+| ------------------- | ------------------------------------------------------------ | ----------------------------------------------------- |
+| `runner-obtained`   | `success`, `runner_id≠0`, non-empty steps, logs downloadable | Does **not** close H1; only shows capacity path works |
+| `batch-a-class`     | `startup_failure` / `steps=[]` / `runner_id=0` / log 404     | Consistent with prior Batch A; H1 still 待验证        |
+| `queued-timeout`    | wall-clock ≥10 min pending/queued, no runner                 | Stop; H1 still 待验证                                 |
+| `authz-or-disabled` | workflow missing on default / Actions disabled / 403-class   | Environment limit; not minutes proof                  |
+| `unexpected`        | any other terminal state                                     | Capture raw JSON; do not reinterpret as H1 close      |
 
 ## Non-goals (unchanged)
 
@@ -162,14 +166,14 @@ After owner confirms evidence is retained:
 
 ## Baseline for this pack PR
 
-| Item | Value |
-|---|---|
-| Base | `origin/main` |
-| Base SHA at branch creation | `0e4d269615e26909bbac606f1dfb755b3511400c` |
-| Branch | `audit/a3-implementation-pack-PENDING-AUTH-20261031` |
-| Related open PRs (do not stack) | #171, #172, #173, #174 |
-| Executed? | **No** |
-| Merged to default? | **No yet** (merge-prep ready; merge auth ≠ run auth) |
+| Item                            | Value                                                |
+| ------------------------------- | ---------------------------------------------------- |
+| Base                            | `origin/main`                                        |
+| Base SHA at branch creation     | `0e4d269615e26909bbac606f1dfb755b3511400c`           |
+| Branch                          | `audit/a3-implementation-pack-PENDING-AUTH-20261031` |
+| Related open PRs (do not stack) | #171, #172, #173, #174                               |
+| Executed?                       | **No**                                               |
+| Merged to default?              | **No yet** (merge-prep ready; merge auth ≠ run auth) |
 
 ## Files in this pack
 

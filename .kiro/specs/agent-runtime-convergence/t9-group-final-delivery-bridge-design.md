@@ -17,12 +17,12 @@ Draft PR：https://github.com/flykingvip-cloud/openbot-vp/pull/263
 
 ## 2. 断点证据（当前 tip／受测同源）
 
-| 断点 | 证据 |
-| --- | --- |
-| 验收写入版本 | `acceptBoardItemSubmission`（`claim-contract.ts`）在 status→`accepted` 时写入 `acceptedArtifactVersion`（及 `acceptedSubmissionId`／criteria／proxy 字段），并清空 `pendingEventRelay` |
-| 接受后不再调度执行 | `triggerPostSubmissionEventAdvance`：若 `item.status === "accepted"`，清 stale pending 后返回 `accepted_no_further_exec_schedule`，**不**进入 dispatcher／wake 执行 |
-| 无组终稿 outbound 消费者 | 生产路径中，board 上 `acceptedArtifactVersion` 的读者仅为成员桥模块（policy／command／state／delivery）；**没有**「组终稿确定后自动集成→投递→回执」的消费者 |
-| 成员桥显式拒绝组终稿 scope | `accepted-artifact-delivery.ts`：`group_final` → deny |
+| 断点                       | 证据                                                                                                                                                                                   |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 验收写入版本               | `acceptBoardItemSubmission`（`claim-contract.ts`）在 status→`accepted` 时写入 `acceptedArtifactVersion`（及 `acceptedSubmissionId`／criteria／proxy 字段），并清空 `pendingEventRelay` |
+| 接受后不再调度执行         | `triggerPostSubmissionEventAdvance`：若 `item.status === "accepted"`，清 stale pending 后返回 `accepted_no_further_exec_schedule`，**不**进入 dispatcher／wake 执行                    |
+| 无组终稿 outbound 消费者   | 生产路径中，board 上 `acceptedArtifactVersion` 的读者仅为成员桥模块（policy／command／state／delivery）；**没有**「组终稿确定后自动集成→投递→回执」的消费者                            |
+| 成员桥显式拒绝组终稿 scope | `accepted-artifact-delivery.ts`：`group_final` → deny                                                                                                                                  |
 
 结论：验收态与版本钉存在；**组终稿对象的授权交付与回执链缺失**。这是主链断点，不是文档问题。
 
@@ -36,25 +36,25 @@ Draft PR：https://github.com/flykingvip-cloud/openbot-vp/pull/263
 
 ## 4. 与成员桥的差异
 
-| 维 | 成员桥（M1–M3） | 组终稿桥（拟） |
-| --- | --- | --- |
-| Scope | `member_artifact` | `group_final` |
-| 触发 | 显式 `requestAcceptedArtifactDelivery` | 组终稿**确定＋整体验收通过**后的授权步骤（仍须显式授权命令，禁止 accept 副作用里静默外发） |
-| 客体 | 单 board item 已接受成员产物 | 组级终稿对象（可由多项 accepted 聚合或单独 team deliverable／终稿版本钉；首切片钉**单一终稿版本**） |
-| Eligibility | 已实现；拒绝 `group_final` | 新增 `evaluateGroupFinalDeliveryEligibility`（或扩展现函数的 group_final 分支），**不**复用成员 deny 当通过 |
-| 授权主体 | trusted issuer + channel account outbound scope | 同上端口，另要求：整体验收 actor、组终稿版本、未撤销的组终稿授权 |
-| 发送 | `sendAcceptedArtifactBridge`／queue | **复用**同一 delivery 发送／recover 端口，intent 带 `scope=group_final` |
-| Accept 副作用 | 无外发 | **保持** `accepted_no_further_exec_schedule`；外发不挂在 accept 自动路径 |
+| 维            | 成员桥（M1–M3）                                 | 组终稿桥（拟）                                                                                              |
+| ------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Scope         | `member_artifact`                               | `group_final`                                                                                               |
+| 触发          | 显式 `requestAcceptedArtifactDelivery`          | 组终稿**确定＋整体验收通过**后的授权步骤（仍须显式授权命令，禁止 accept 副作用里静默外发）                  |
+| 客体          | 单 board item 已接受成员产物                    | 组级终稿对象（可由多项 accepted 聚合或单独 team deliverable／终稿版本钉；首切片钉**单一终稿版本**）         |
+| Eligibility   | 已实现；拒绝 `group_final`                      | 新增 `evaluateGroupFinalDeliveryEligibility`（或扩展现函数的 group_final 分支），**不**复用成员 deny 当通过 |
+| 授权主体      | trusted issuer + channel account outbound scope | 同上端口，另要求：整体验收 actor、组终稿版本、未撤销的组终稿授权                                            |
+| 发送          | `sendAcceptedArtifactBridge`／queue             | **复用**同一 delivery 发送／recover 端口，intent 带 `scope=group_final`                                     |
+| Accept 副作用 | 无外发                                          | **保持** `accepted_no_further_exec_schedule`；外发不挂在 accept 自动路径                                    |
 
 ## 5. 步骤 → 现有端口映射
 
-| 链步骤 | 拟议行为 | 端口／落点 |
-| --- | --- | --- |
-| 组终稿确定 | 钉组终稿版本（artifactVersion／deliverable 链接／content hash）；写 state，不 send | **state**：组终稿记录（可挂 task／board 汇总或独立 `group_final` intent 预备行）；只读 claim-contract 已接受字段作输入 |
-| 整体验收 | 校验：所需成员／终稿条款已 checked；版本匹配；拒绝裸聊天「完成」 | **policy**：整体验收纯函数；**command**：验收命令（可薄封装现有 accept 结果聚合，不替代 `acceptBoardItemSubmission`） |
-| 授权交付 | trusted issuer + `evaluateChannelAccountOutboundScope` + 签发 `group_final` grant；association 先于 send | **policy** grant／eligibility；**state** txn（仿 `accepted-artifact-delivery-txn`）；**command** `requestGroupFinalDelivery`（新命令名，内部调既有 delivery 端口） |
-| 实际回执 | 渠道 send double／实渠（实渠非本切片）；写 delivered／receipt | **delivery**：复用 `writeAcceptedArtifactQueueFile`／`sendAcceptedArtifactBridge` 模式，intent 区分 scope |
-| 同版本恢复／重投 | 进程重启后按 grant+intent 恢复；版本漂移拒绝；撤销拒绝 | **delivery** `recoverAcceptedArtifact*` 扩展识别 `group_final`；撤销走既有 revoke 路径 |
+| 链步骤           | 拟议行为                                                                                                 | 端口／落点                                                                                                                                                         |
+| ---------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 组终稿确定       | 钉组终稿版本（artifactVersion／deliverable 链接／content hash）；写 state，不 send                       | **state**：组终稿记录（可挂 task／board 汇总或独立 `group_final` intent 预备行）；只读 claim-contract 已接受字段作输入                                             |
+| 整体验收         | 校验：所需成员／终稿条款已 checked；版本匹配；拒绝裸聊天「完成」                                         | **policy**：整体验收纯函数；**command**：验收命令（可薄封装现有 accept 结果聚合，不替代 `acceptBoardItemSubmission`）                                              |
+| 授权交付         | trusted issuer + `evaluateChannelAccountOutboundScope` + 签发 `group_final` grant；association 先于 send | **policy** grant／eligibility；**state** txn（仿 `accepted-artifact-delivery-txn`）；**command** `requestGroupFinalDelivery`（新命令名，内部调既有 delivery 端口） |
+| 实际回执         | 渠道 send double／实渠（实渠非本切片）；写 delivered／receipt                                            | **delivery**：复用 `writeAcceptedArtifactQueueFile`／`sendAcceptedArtifactBridge` 模式，intent 区分 scope                                                          |
+| 同版本恢复／重投 | 进程重启后按 grant+intent 恢复；版本漂移拒绝；撤销拒绝                                                   | **delivery** `recoverAcceptedArtifact*` 扩展识别 `group_final`；撤销走既有 revoke 路径                                                                             |
 
 **禁止**：新 executor；在 `triggerPostSubmissionEventAdvance` 的 accepted 分支里直接 send；用成员 `requestAcceptedArtifactDelivery` 偷偷传 `group_final`。
 
@@ -70,15 +70,15 @@ Draft PR：https://github.com/flykingvip-cloud/openbot-vp/pull/263
 
 ## 7. 测试计划（doubles）
 
-| 场景 | 期望 |
-| --- | --- |
-| 未整体验收请求组终稿交付 | deny |
-| `scope=member_artifact` API 传入组终稿版本 | 不升格为 group_final |
-| 版本钉漂移／错误 hash | deny；无 send |
-| 授权后撤销再 send／recover | refuse；无重复外发 |
-| association 后进程重启 | 同版本 recover；无 grant 不 send |
-| channel double 失败 | intent=unknown／blocked 可重试策略与成员桥一致；不盲重放 |
-| accept 路径 | 仍只得 `accepted_no_further_exec_schedule`；send 计数 0 |
+| 场景                                       | 期望                                                     |
+| ------------------------------------------ | -------------------------------------------------------- |
+| 未整体验收请求组终稿交付                   | deny                                                     |
+| `scope=member_artifact` API 传入组终稿版本 | 不升格为 group_final                                     |
+| 版本钉漂移／错误 hash                      | deny；无 send                                            |
+| 授权后撤销再 send／recover                 | refuse；无重复外发                                       |
+| association 后进程重启                     | 同版本 recover；无 grant 不 send                         |
+| channel double 失败                        | intent=unknown／blocked 可重试策略与成员桥一致；不盲重放 |
+| accept 路径                                | 仍只得 `accepted_no_further_exec_schedule`；send 计数 0  |
 
 边界：模型与渠道用 doubles；不接真实模型、不接真实渠道。
 
@@ -93,23 +93,22 @@ Draft PR：https://github.com/flykingvip-cloud/openbot-vp/pull/263
 
 ## 9. Non-goals
 
-- 真实外发／真实模型／生产重启验收／实物 PPT GAP  
-- 合并、部署、DIGEST、切 LIVE  
-- D0–D5／S0–S7 委派补充  
-- 关闭「真实运行 GAP」清单  
-- 另建执行器或 Gateway 旁路调度  
-- 把成员桥验收算作组终稿完成  
+- 真实外发／真实模型／生产重启验收／实物 PPT GAP
+- 合并、部署、DIGEST、切 LIVE
+- D0–D5／S0–S7 委派补充
+- 关闭「真实运行 GAP」清单
+- 另建执行器或 Gateway 旁路调度
+- 把成员桥验收算作组终稿完成
 
 ## 10. 设计评审接受标准
 
-1. 审阅方确认断点证据表成立，且同意成员桥 ≠ 组终稿链。  
-2. 确认补链只走 command／policy／state／delivery，无新执行器。  
-3. 确认首切片范围（eligibility＋association＋授权命令＋doubles 测试）可独立验收，且不修改 accept→no_further_exec 语义。  
-4. 确认失败／撤销／重启窗口与成员桥同构、scope 隔离。  
-5. 确认 Non-goals；本设计通过 **不** 等于实施放行，更不等于 T9 最终验收通过。  
+1. 审阅方确认断点证据表成立，且同意成员桥 ≠ 组终稿链。
+2. 确认补链只走 command／policy／state／delivery，无新执行器。
+3. 确认首切片范围（eligibility＋association＋授权命令＋doubles 测试）可独立验收，且不修改 accept→no_further_exec 语义。
+4. 确认失败／撤销／重启窗口与成员桥同构、scope 隔离。
+5. 确认 Non-goals；本设计通过 **不** 等于实施放行，更不等于 T9 最终验收通过。
 
 **设计已批准并完成最小首切片实施。** 后续切片（真实渠道回执、多成员聚合、UI／RPC）未做。
-
 
 ## 11. 实施记录（最小首切片）
 

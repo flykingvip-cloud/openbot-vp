@@ -5,13 +5,13 @@
 
 ## 1. 目标与诚实边界
 
-| 能力 | 状态 |
-|---|---|
-| 进度查询（板投影） | 已实现 |
-| amend 约束一次注入 | 已实现 |
-| 主人暂停/取消打断活动执行 | 已实现（gateway + agent-runner） |
+| 能力                            | 状态                                                                             |
+| ------------------------------- | -------------------------------------------------------------------------------- |
+| 进度查询（板投影）              | 已实现                                                                           |
+| amend 约束一次注入              | 已实现                                                                           |
+| 主人暂停/取消打断活动执行       | 已实现（gateway + agent-runner）                                                 |
 | **普通 aside 插问及时独立回复** | **本轮已落地**（`mid-task-aside-reply-lane`：ephemeral `disableTools` embedded） |
-| 第二执行器并行改同一任务资源 | **不做** |
+| 第二执行器并行改同一任务资源    | **不做**                                                                         |
 
 “消息已入队 / 已收到”≠完成。必须有实际处理与可见回复，且消息归属不与 A 的流串线。
 
@@ -35,18 +35,17 @@ steering 把插问注入 A 会混流、并可能驱动 A 的工具动作 — 不
 
 插话分流（看板跟任务变化，不跟每条聊天堆待办）：
 
-| 插话类型 | 立即回应 | 后续处理 |
-|---|---|---|
-| 普通插问（aside） | **reply_lane** 及时答 | 通常不改看板 |
-| 查询进度 | progress 投影 | 不新增待办 |
-| 目标/约束只读问 | **board_readonly** | 不写板 |
-| 补充/纠正（amend） | 简述理解（收到/已注入） | **原任务板入口** `commitSameTaskConstraint` |
-| 安全限制（先别发布/不要付款） | **先写板屏障** 再 ack | 原 amend 路径；不得只走 reply_lane |
-| 切换优先级（new_work） | 确认焦点/停点 | 原 focus 路径 |
-| 暂停/取消 | **立即确认** | **立即** abort A + aside lanes |
+| 插话类型                      | 立即回应                | 后续处理                                    |
+| ----------------------------- | ----------------------- | ------------------------------------------- |
+| 普通插问（aside）             | **reply_lane** 及时答   | 通常不改看板                                |
+| 查询进度                      | progress 投影           | 不新增待办                                  |
+| 目标/约束只读问               | **board_readonly**      | 不写板                                      |
+| 补充/纠正（amend）            | 简述理解（收到/已注入） | **原任务板入口** `commitSameTaskConstraint` |
+| 安全限制（先别发布/不要付款） | **先写板屏障** 再 ack   | 原 amend 路径；不得只走 reply_lane          |
+| 切换优先级（new_work）        | 确认焦点/停点           | 原 focus 路径                               |
+| 暂停/取消                     | **立即确认**            | **立即** abort A + aside lanes              |
 
 对 `isActive`：`resolveMidTaskAsideDisposition` 仅在 turn-relation 为 **aside** 时进入 reply_lane；amend/new_work → `not_aside`。
-
 
 ### 3.1.1 读问句与 turn-relation
 
@@ -70,10 +69,10 @@ steering 把插问注入 A 会混流、并可能驱动 A 的工具动作 — 不
 
 ### 3.3 消息与状态归属
 
-| 状态 | 归属键 | 清理规则 |
-|---|---|---|
-| B 发送中 | B 的 idempotencyKey | 失败不恢复 A 的占用快照（已修） |
-| B 回复流 | B 的 runId | A final 不得 `removeChatRun(B)` |
+| 状态       | 归属键                    | 清理规则                           |
+| ---------- | ------------------------- | ---------------------------------- |
+| B 发送中   | B 的 idempotencyKey       | 失败不恢复 A 的占用快照（已修）    |
+| B 回复流   | B 的 runId                | A final 不得 `removeChatRun(B)`    |
 | A 后台任务 | A 的 session run / taskId | B 结束不得清 A 的 abort controller |
 
 ## 4. 本回合检查点（可绿）
@@ -83,13 +82,13 @@ steering 把插问注入 A 会混流、并可能驱动 A 的工具动作 — 不
 
 ## 5. 验收场景映射
 
-| 场景 | 本设计对应 |
-|---|---|
-| A 中查询进度 | 已有 progress 短路 |
-| A 中补充约束 | 已有 amend 一次 |
-| A 中临时插问 B | board_readonly 可即时；一般 B → reply_lane（ephemeral disableTools） |
-| 暂停 A 后答 B | 暂停 abort 已贯通；B 再走正常入口 |
-| 插问期间 A 完成 | 归属键分离（aside 用独立 session/runId；A 板不动） |
+| 场景            | 本设计对应                                                           |
+| --------------- | -------------------------------------------------------------------- |
+| A 中查询进度    | 已有 progress 短路                                                   |
+| A 中补充约束    | 已有 amend 一次                                                      |
+| A 中临时插问 B  | board_readonly 可即时；一般 B → reply_lane（ephemeral disableTools） |
+| 暂停 A 后答 B   | 暂停 abort 已贯通；B 再走正常入口                                    |
+| 插问期间 A 完成 | 归属键分离（aside 用独立 session/runId；A 板不动）                   |
 
 ## 6. 本轮落地与诚实缺口（Asia/Shanghai）
 

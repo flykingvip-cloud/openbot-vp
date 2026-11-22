@@ -38,6 +38,7 @@ setting `enforcement=disabled` via the API, which is itself auditable.
 
 - **Port 18789 is owned by the container, exclusively.** Never run a host-level gateway (`openbot gateway run`, `systemctl start openbot-gateway`, `pm2 start ... gateway run`) on the production host. A host gateway started with `--force` seizes the port, crash-loops the container, and silently serves a different build **with a different session-storage layout** — see the 2026-07-26 incident below. The host unit is masked and the host npm-global CLI is uninstalled to make this fail loudly.
 <!-- BEGIN GENERATED: current-identity -->
+
 ### Current LIVE identity (generated from `releases.jsonl`)
 
 > **Scope:** This block asserts **ledger ↔ human-doc consistency** only.
@@ -46,17 +47,18 @@ setting `enforcement=disabled` via the API, which is itself auditable.
 
 <!-- identity: seq=154 gatewaySha=a17b60872cb62122449a170a24b2f4e150cf9557 uiSha=a17b60872cb62122449a170a24b2f4e150cf9557 digest=sha256:32b20f638067923bb21fdfede7130a34c6199042fc77dee07271436429f6a54e imageTag=rc-amd64-provenance-a17b60872cb6 tag=provenance/sha-a17b60872cb6 liveFrom=2026-11-02T05:24:45.706Z liveTo= liveVerified=true -->
 
-| Field | Value |
-| --- | --- |
-| seq | 154 |
-| gatewaySha | `a17b60872cb62122449a170a24b2f4e150cf9557` |
-| uiSha | `a17b60872cb62122449a170a24b2f4e150cf9557` |
-| artifactDigest | `sha256:32b20f638067923bb21fdfede7130a34c6199042fc77dee07271436429f6a54e` |
-| imageTag / artifactId | `rc-amd64-provenance-a17b60872cb6` |
-| tag | `provenance/sha-a17b60872cb6` |
-| liveFrom | `2026-11-02T05:24:45.706Z` |
-| liveTo | _(open)_ |
-| liveVerified | `true` |
+| Field                 | Value                                                                     |
+| --------------------- | ------------------------------------------------------------------------- |
+| seq                   | 154                                                                       |
+| gatewaySha            | `a17b60872cb62122449a170a24b2f4e150cf9557`                                |
+| uiSha                 | `a17b60872cb62122449a170a24b2f4e150cf9557`                                |
+| artifactDigest        | `sha256:32b20f638067923bb21fdfede7130a34c6199042fc77dee07271436429f6a54e` |
+| imageTag / artifactId | `rc-amd64-provenance-a17b60872cb6`                                        |
+| tag                   | `provenance/sha-a17b60872cb6`                                             |
+| liveFrom              | `2026-11-02T05:24:45.706Z`                                                |
+| liveTo                | _(open)_                                                                  |
+| liveVerified          | `true`                                                                    |
+
 <!-- END GENERATED: current-identity -->
 
 - **Historical L3 identity (seq 107; superseded by generated block above):** Was recorded as `bb72d03402847f7a51d2a425e55e74e5b53fc837` / image `rc-amd64-provenance-bb72d03402` / digest `sha256:173c2e029601788145fd5df598205750c993b6369035ea7491902ad073376ace` / tag `provenance/sha-bb72d0340284`, live from `2026-09-30T07:30:37.254Z` (seq 104 same image from `2026-09-29T14:21:24.723Z`; seq 105 adds the governance shadow env; seq 106 turns Fabric off; seq 107 mounts the data root). `verify-live` passed, R9 passed. Production remains `OPENBOT_EVOLUTION_GOVERNANCE_MODE=assist`; no `OPENBOT_GOVERNANCE_*_MODE` is set; Fabric is off (env and config). The data root `/root/OpenBot` is the bind mount `/var/lib/openbot/data-root`. Rollback `openbot-gateway-rc-prev-bb72d03402-nofabric-safety` (no data-root mount), then `openbot-gateway-rc-prev-bb72d03402-shadow-safety` plus config backup `openbot.json.bak-pre-fabric-off-20260930T023405Z` (Fabric on), then `openbot-gateway-rc-prev-bb72d03402-safety` (no shadow env), then `openbot-gateway-rc-prev-ca0c3765ba-safety` (pre-release LIVE).
@@ -77,7 +79,6 @@ Source of truth: open row in `deploy/production/releases.jsonl` (do not invent a
 Human narrative sections below are historical; prefer the JSONL for LIVE identity.
 
 ## Previous cutover block (human archive) — seq 104–107 / bb72d0340284 manual amd64 GHCR
-
 
 User-authorized forward-only full-dist recreate from freshly fetched `upbeyond/openbot` main `bb72d03402847f7a51d2a425e55e74e5b53fc837` (#220; contains the governance closure through #217 `0ffd38804893`). Release owner kiro-governance-closure. GitHub Actions is at `startup_failure` for every workflow, so the image was built manually (linux/amd64, pinned node:22-bookworm amd64 manifest `sha256:6d735b4d33660225271fda0a412802746658c3a1b975507b2803ed299609760a`, `GIT_COMMIT` build-arg, OCI revision label) and pushed to `ghcr.io/upbeyond/openbot:provenance-sha-bb72d0340284-amd64`. `cutover-from-ghcr.sh --stage --digest` passed forward-only (LIVE read from the container: `ca0c3765bae2`), the revision-label gate and the build-info gate on the host.
 

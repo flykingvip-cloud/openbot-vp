@@ -5,23 +5,23 @@
 
 ## 远端坐标（已用 `gh` 核实）
 
-| 项 | 值 |
-| --- | --- |
-| URL | https://github.com/flykingvip-cloud/openbot-vp/pull/194 |
-| 状态 | **MERGED**（`mergedAt` `2026-11-02T00:16:06Z` ≈ `2026-11-02 08:16:06 Asia/Shanghai`） |
-| title | `chore(ledger): Path B LIVE seq152 tip d42fbc3ca2b4` |
-| head branch | `chore/ledger-seq152-d42fbc3ca2b4` |
-| head OID | `7ecc3edb8c324d08f2bab352bc983ece6f0c67d6` |
-| mergeCommit | `fde7444fba79cb74569c59e40e36106eeed29dc8` |
-| 变更文件 | 仅 2 个（**ledger-only**）：`deploy/production/RELEASE_RECORD.md`、`deploy/production/releases.jsonl` |
+| 项          | 值                                                                                                    |
+| ----------- | ----------------------------------------------------------------------------------------------------- |
+| URL         | https://github.com/flykingvip-cloud/openbot-vp/pull/194                                               |
+| 状态        | **MERGED**（`mergedAt` `2026-11-02T00:16:06Z` ≈ `2026-11-02 08:16:06 Asia/Shanghai`）                 |
+| title       | `chore(ledger): Path B LIVE seq152 tip d42fbc3ca2b4`                                                  |
+| head branch | `chore/ledger-seq152-d42fbc3ca2b4`                                                                    |
+| head OID    | `7ecc3edb8c324d08f2bab352bc983ece6f0c67d6`                                                            |
+| mergeCommit | `fde7444fba79cb74569c59e40e36106eeed29dc8`                                                            |
+| 变更文件    | 仅 2 个（**ledger-only**）：`deploy/production/RELEASE_RECORD.md`、`deploy/production/releases.jsonl` |
 
 机器可读摘要：同目录 [`pr194-meta.json`](./pr194-meta.json)。
 
 ## 本机 worktree
 
-| 项 | 值 |
-| --- | --- |
-| path | `/Users/daniel/AI VP/openbot-pr194-ledger-seq152-accept` |
+| 项   | 值                                                                          |
+| ---- | --------------------------------------------------------------------------- |
+| path | `/Users/daniel/AI VP/openbot-pr194-ledger-seq152-accept`                    |
 | HEAD | `7ecc3edb8c324d08f2bab352bc983ece6f0c67d6`（与 PR head OID 一致；detached） |
 
 ## 可读 diff

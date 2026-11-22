@@ -7,17 +7,17 @@ Goal: see whether a trivial GitHub-hosted job obtains a runner (`runner_id≠0`,
 
 ## Defaults / registration
 
-| Item | Value |
-|---|---|
-| Workflow file (proposed) | `.github/workflows/audit-a3-runner-probe.yml` |
-| Trigger | `workflow_dispatch` only (no `push`/`pull_request`) |
+| Item                                       | Value                                                                                                                                                                                                                                                                                                                                             |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Workflow file (proposed)                   | `.github/workflows/audit-a3-runner-probe.yml`                                                                                                                                                                                                                                                                                                     |
+| Trigger                                    | `workflow_dispatch` only (no `push`/`pull_request`)                                                                                                                                                                                                                                                                                               |
 | **Default-branch registration (required)** | GitHub requires the workflow file to exist on the repository **default branch** before `workflow_dispatch` can be triggered. See [Manually running a workflow](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow): “To trigger the `workflow_dispatch` event, your workflow must be in the default branch.” |
-| `--ref` / Branch dropdown | Selects which branch/SHA the **run** checks out / executes against. **`--ref` does not replace default-branch registration.** A workflow that exists *only* on a feature branch is **not** reliably dispatchable via `gh workflow run … --ref <branch>`. |
-| Authorized path (still PENDING AUTH) | (1) Owner-authorized minimal change that lands **only** the probe workflow YAML on `main` (default), then (2) `gh workflow run audit-a3-runner-probe.yml --ref <exact-full-SHA>` to pin the run checkout. Do not treat feature-branch presence alone as enough. |
-| Exact ref SHA | Record the full SHA used with `--ref` (and workflow file SHA256) in evidence before run; never “latest main” loosely |
-| `runs-on` | `ubuntu-latest` |
-| Job body Exp-1 | single step `run: echo ok && uname -a && date -u` |
-| Permissions | `contents: read` |
+| `--ref` / Branch dropdown                  | Selects which branch/SHA the **run** checks out / executes against. **`--ref` does not replace default-branch registration.** A workflow that exists _only_ on a feature branch is **not** reliably dispatchable via `gh workflow run … --ref <branch>`.                                                                                          |
+| Authorized path (still PENDING AUTH)       | (1) Owner-authorized minimal change that lands **only** the probe workflow YAML on `main` (default), then (2) `gh workflow run audit-a3-runner-probe.yml --ref <exact-full-SHA>` to pin the run checkout. Do not treat feature-branch presence alone as enough.                                                                                   |
+| Exact ref SHA                              | Record the full SHA used with `--ref` (and workflow file SHA256) in evidence before run; never “latest main” loosely                                                                                                                                                                                                                              |
+| `runs-on`                                  | `ubuntu-latest`                                                                                                                                                                                                                                                                                                                                   |
+| Job body Exp-1                             | single step `run: echo ok && uname -a && date -u`                                                                                                                                                                                                                                                                                                 |
+| Permissions                                | `contents: read`                                                                                                                                                                                                                                                                                                                                  |
 
 ## Cost ceiling
 

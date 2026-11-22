@@ -338,6 +338,8 @@ export type SaveSkillAssetParams = {
   /** Owning user for personal knowledge ACL. */
   ownerUserId?: string | null;
   profile: unknown;
+  /** Host-only pattern publisher hint; concrete tool/MCP bindings still take precedence. */
+  classificationPolicy?: "approved-pattern-capability";
   runtimeDefinition?: unknown;
   targetGroupId?: string | null;
   enterpriseConsumers?: unknown;
@@ -1137,10 +1139,17 @@ export function saveSkillAsset(params: SaveSkillAssetParams): {
           contextId: params.contextId,
           runtimeDefinition: sanitizedRuntime,
         });
+  const classifiedAssetType =
+    params.classificationPolicy === "approved-pattern-capability" &&
+    rawProfile.assetType === "capability" &&
+    classified?.assetType !== "tool" &&
+    classified?.assetType !== "mcp"
+      ? "capability"
+      : classified?.assetType;
   const profile = {
     ...rawProfile,
     id: skillId,
-    ...(classified ? { assetType: classified.assetType } : {}),
+    ...(classifiedAssetType ? { assetType: classifiedAssetType } : {}),
   };
   if (!profile.name || !profile.summary) {
     throw new SkillAssetStoreError("skill name and summary are required");

@@ -23,7 +23,9 @@ function sessionFile() {
 
 describe("visible async wait identity", () => {
   it("does not invent a job when none exists", () => {
-    expect(visibleAsyncWaitIdentity({ sessionFile: sessionFile(), taskId: "task-a" })).toBeUndefined();
+    expect(
+      visibleAsyncWaitIdentity({ sessionFile: sessionFile(), taskId: "task-a" }),
+    ).toBeUndefined();
   });
 
   it("returns the waiting job identity only for a real recorded job", () => {

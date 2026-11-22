@@ -28,9 +28,11 @@ vi.mock("../config/sessions.js", () => ({
   resolveSessionFilePathOptions: vi.fn().mockReturnValue({}),
   updateSessionStore: vi.fn(),
 }));
-vi.mock("../gateway/agent-growth/working-style-store.js", () => ({
-  resolveWorkingStyleInstructions: vi.fn().mockResolvedValue(undefined),
-}));
+vi.mock("../gateway/agent-growth/working-style-store.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../gateway/agent-growth/working-style-store.js")>();
+  return { ...actual, resolveWorkingStyleInstructions: vi.fn().mockResolvedValue(undefined) };
+});
 vi.mock("../gateway/knowledge/agent-run-gateway-client.js", () => ({
   resolveKnowledgeGatewayClientForAgentRun: vi.fn().mockResolvedValue(undefined),
 }));

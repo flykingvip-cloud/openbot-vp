@@ -16,7 +16,7 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { SESSION_TASK_BOARD_LOCK_OPTIONS, withFileLockSync } from "../../../infra/file-lock.js";
-import { CONTEXT_WINDOW_HARD_MIN_TOKENS } from "../../policy/context-window.js";
+import { CONTEXT_WINDOW_HARD_MIN_TOKENS } from "../../policy/index.js";
 
 export const RULE_LIBRARY_SCHEMA = "rule-library/v1" as const;
 export const RULE_LIBRARY_RULE_ID = "model.context_window.guard" as const;

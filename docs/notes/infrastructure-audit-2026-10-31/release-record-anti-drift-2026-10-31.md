@@ -26,13 +26,13 @@ node --import tsx scripts/delivery/release-record.ts generate
 
 ## Fail-closed cases
 
-| Condition | Result |
-|---|---|
-| cannot parse `releases.jsonl` | exit 20 `parse-error` |
-| zero open intervals | exit 20 `zero-open` |
-| multiple open intervals | exit 20 `multi-open` |
-| missing markers / field drift vs open tip | exit 20 |
-| check + `--write` | refused |
+| Condition                                 | Result                |
+| ----------------------------------------- | --------------------- |
+| cannot parse `releases.jsonl`             | exit 20 `parse-error` |
+| zero open intervals                       | exit 20 `zero-open`   |
+| multiple open intervals                   | exit 20 `multi-open`  |
+| missing markers / field drift vs open tip | exit 20               |
+| check + `--write`                         | refused               |
 
 ## Baseline note (this PR)
 

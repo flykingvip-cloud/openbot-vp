@@ -192,11 +192,99 @@ describe("paths cleanup: evolution bypass skips when tip already bridged", () =>
 });
 
 describe("paths cleanup: honest inventory still holds", () => {
-  it("subagent lane opens TaskOutcome and gates the next model call", () => {
+  it("subagent lane opens TaskOutcome and gates the next model call", async () => {
     const src = fs.readFileSync(path.join(root, "src/commands/agent.ts"), "utf8");
-    expect(src).toMatch(/ensureSubagentTurnTaskOutcome/);
-    expect(src).toMatch(/assertRunnerTurnBudgetAllowsModelCall/);
+    expect(src).toMatch(/openCommandOutcomeEntry/);
+    expect(src).toMatch(/commandBudget\.runCandidate/);
     expect(src).not.toMatch(/skip nested subagent lane/);
+    const { openCommandOutcomeEntry } = await import("../agent-runtime/command/index.js");
+    const { createCommandBudget } = await import("../agent-runtime/execution/index.js");
+    const { DurableTaskOutcomeStore } = await import("./store.js");
+    const { TaskOutcomeResultService } = await import("./result-service.js");
+    const { TASK_OUTCOME_STORE_DIRNAME, TaskBudgetExceededError } =
+      await import("./runtime-from-runner.js");
+    const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "paths-subagent-budget-"));
+    try {
+      const cfg = { agents: { list: [{ id: "bot", agentDir }] } };
+      const parent = ensureChatTurnTaskOutcome(cfg, {
+        agentId: "bot",
+        runId: "parent-fixture",
+        subjectRef: "subject:paths",
+      });
+      expect(parent.ok).toBe(true);
+      if (!parent.ok) {
+        throw new Error("Parent fixture could not be admitted");
+      }
+      const child = openCommandOutcomeEntry({
+        config: cfg,
+        agentId: "bot",
+        runId: "child-fixture",
+        isSubagentLane: true,
+        platformUserId: "subject:paths",
+        parentTaskId: parent.taskId,
+      });
+      expect(child.entrypoint).toBe("subagent");
+      if (!child.taskId || !child.scope) {
+        throw new Error("Subagent outcome was not opened");
+      }
+      const store = new DurableTaskOutcomeStore(path.join(agentDir, TASK_OUTCOME_STORE_DIRNAME));
+      expect(store.loadTask(child.taskId)?.entrypoint).toBe("subagent");
+      expect(store.loadTask(child.taskId)?.parentTaskId).toBe(parent.taskId);
+      const parentRecord = store.loadTask(parent.taskId);
+      if (!parentRecord?.budget) {
+        throw new Error("Parent budget missing");
+      }
+      const service = new TaskOutcomeResultService({ store, submittedBy: "test" });
+      expect(
+        service.submit(
+          parent.taskId,
+          {
+            type: "set_budget",
+            budget: { ...parentRecord.budget, maxIterations: 1 },
+            expectedVersion: parentRecord.outcomeVersion,
+            fencingToken: parent.fencingToken,
+          },
+          { requiredScope: parent.scope },
+        ).ok,
+      ).toBe(true);
+      const budget = createCommandBudget({
+        config: cfg,
+        agentId: "bot",
+        runId: "child-fixture",
+        startedAtMs: Date.now(),
+        taskId: child.taskId,
+        scope: child.scope,
+        parentTaskId: parent.taskId,
+        parentAgentId: "bot",
+      });
+      let calls = 0;
+      const candidate = {
+        provider: "openai",
+        model: "no-price",
+        run: async () => {
+          calls++;
+          return {
+            payloads: [{ text: "unit fixture" }],
+            meta: {
+              durationMs: 1,
+              agentMeta: {
+                sessionId: "fixture",
+                provider: "openai",
+                model: "no-price",
+                usage: { input: 1, output: 1 },
+              },
+            },
+          };
+        },
+      };
+      await budget.runCandidate(candidate);
+      expect(store.loadTask(child.taskId)?.budget?.iterationCount).toBe(1);
+      expect(store.loadTask(parent.taskId)?.budget?.childAttributedIterations).toBe(1);
+      await expect(budget.runCandidate(candidate)).rejects.toThrow(TaskBudgetExceededError);
+      expect(calls).toBe(1);
+    } finally {
+      fs.rmSync(agentDir, { recursive: true, force: true });
+    }
   });
 
   it("attachAdoptedLearningAssetsToTask remains the only explicit adopted API", () => {

@@ -13,17 +13,17 @@
 
 ## 实质缺口的处置
 
-| 职责 | 唯一现有归属 | 已处理 / 待完成 |
-| --- | --- | --- |
-| 执行准入数据 | contracts/execution.ts | 已移动真实契约；等待条件与标准执行结果尚未统一，不能称完整 execution contract |
-| 状态公开边界 | state/index.ts → repository/session-task.ts → 原任务板 | 已替换现有宿主消费者，并以 manifest 禁止 repository/mutations 深导入 |
-| 当前任务恢复 | state/mutations/resume-current.ts | 原实现直接移动，旧文件删除；不是双实现 |
-| 指挥编排 | command 现有语义理解、准入与事务用例 | planning 尚缺完整目标/验收/待办骨架，不建空 planning 或强制前置细步骤模型 |
-| 步骤选择/核验 | 原 Pi 循环、协作计划及既有 preflight | selection/verification 尚未形成独立契约；先明确原个人/协作不同权威，不复制待办状态机 |
-| 成果验收/复用 | delivery 现有校验回执和投递出口 | 用户验收条件逐项核实、来源/视觉质量、reuse 完整链仍未完成 |
-| 上下文来源 | context 纯投影/编译 + 原宿主读取/审计 | 维持 resolve/read/render/audit 及调用次数，后续按完整领域来源迁移，不能硬搬混合 builder |
-| 能力与策略 | capabilities 调用边界 + 原权限/预算服务 | 完整适配契约、动作限制策略、合法转移规则尚未全收敛；不把元数据当强制授权 |
-| 扩展退役 | 已核实的原 hooks/services/workflow 适配 | 有真实消费者及资产，未核实生产配置前不删除；已删除的 eager mention 路径不得恢复 |
+| 职责          | 唯一现有归属                                           | 已处理 / 待完成                                                                         |
+| ------------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| 执行准入数据  | contracts/execution.ts                                 | 已移动真实契约；等待条件与标准执行结果尚未统一，不能称完整 execution contract           |
+| 状态公开边界  | state/index.ts → repository/session-task.ts → 原任务板 | 已替换现有宿主消费者，并以 manifest 禁止 repository/mutations 深导入                    |
+| 当前任务恢复  | state/mutations/resume-current.ts                      | 原实现直接移动，旧文件删除；不是双实现                                                  |
+| 指挥编排      | command 现有语义理解、准入与事务用例                   | planning 尚缺完整目标/验收/待办骨架，不建空 planning 或强制前置细步骤模型               |
+| 步骤选择/核验 | 原 Pi 循环、协作计划及既有 preflight                   | selection/verification 尚未形成独立契约；先明确原个人/协作不同权威，不复制待办状态机    |
+| 成果验收/复用 | delivery 现有校验回执和投递出口                        | 用户验收条件逐项核实、来源/视觉质量、reuse 完整链仍未完成                               |
+| 上下文来源    | context 纯投影/编译 + 原宿主读取/审计                  | 维持 resolve/read/render/audit 及调用次数，后续按完整领域来源迁移，不能硬搬混合 builder |
+| 能力与策略    | capabilities 调用边界 + 原权限/预算服务                | 完整适配契约、动作限制策略、合法转移规则尚未全收敛；不把元数据当强制授权                |
+| 扩展退役      | 已核实的原 hooks/services/workflow 适配                | 有真实消费者及资产，未核实生产配置前不删除；已删除的 eager mention 路径不得恢复         |
 
 缺少 message/events 契约时不造无人消费的 DTO。每个后续切片必须同时提供原职责、新 owner、真实消费者替换、旧路径退出及行为回归。
 

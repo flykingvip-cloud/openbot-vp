@@ -12,23 +12,23 @@ Missing objects → code ≠ 0 → **ERROR**, same as a real non-ancestor.
 
 ## Counts (this worktree after deepen; still shallow-ish / incomplete object graph)
 
-| severity | code | n | Class |
-|---|---|---:|---|
-| ERROR | open-interval | 1 | **Interval integrity** — seq 127 and 151 both omit `liveTo` |
-| ERROR | regression | 146 | split below |
-| warn | regression | 11 | **Acknowledged historical** (`regressionAcknowledged` set) |
-| warn | overlay-debt | 15 | **Overlay** — scoped-UI rows owing full-dist rebase |
-| warn | timeline-gap | 9 | **Timeline** — holes / unclosed predecessor (includes seq 127) |
-| warn | missing-tag | 1 | **Missing tag** — seq 1 |
+| severity | code          |   n | Class                                                          |
+| -------- | ------------- | --: | -------------------------------------------------------------- |
+| ERROR    | open-interval |   1 | **Interval integrity** — seq 127 and 151 both omit `liveTo`    |
+| ERROR    | regression    | 146 | split below                                                    |
+| warn     | regression    |  11 | **Acknowledged historical** (`regressionAcknowledged` set)     |
+| warn     | overlay-debt  |  15 | **Overlay** — scoped-UI rows owing full-dist rebase            |
+| warn     | timeline-gap  |   9 | **Timeline** — holes / unclosed predecessor (includes seq 127) |
+| warn     | missing-tag   |   1 | **Missing tag** — seq 1                                        |
 
 ## ERROR regression split (evidence)
 
 Local classifier (`git cat-file` + `merge-base --is-ancestor`) on each ERROR regression:
 
-| Subclass | n | Meaning | Treat as |
-|---|---:|---|---|
+| Subclass                        |   n | Meaning                                                                                                              | Treat as                                                                                                                                  |
+| ------------------------------- | --: | -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | object-missing (clone-relative) | 145 | Prior and/or current SHA **not in the audit clone** used for bulk classify (may exist in a deeper clone / elsewhere) | **Inconclusive in that clone** — cannot prove content rollback; **must not** auto-`regressionAcknowledged`; restore objects then re-audit |
-| true-non-ancestor | 1 | Both objects present locally; prior ∉ ancestors(current) | **Proven ancestry break** at seq **145** (`9a8e91d19e89` ↛ `065840dfba12`) |
+| true-non-ancestor               |   1 | Both objects present locally; prior ∉ ancestors(current)                                                             | **Proven ancestry break** at seq **145** (`9a8e91d19e89` ↛ `065840dfba12`)                                                                |
 
 ### Seq 145 (only proven non-ancestor with local objects)
 
@@ -48,14 +48,14 @@ Many earlier Path B tips (including seq 127/128 tips `5ea7e2b7…`, `0024d162…
 
 ## Interval error — seq 127 (priority fix)
 
-| Fact | Evidence |
-|---|---|
-| seq 127 omits `liveTo` | `releases.jsonl` row |
-| seq 128 follows with `liveFrom` `2026-10-14T16:31:38Z` | same file; evidence text quotes HK StartedAt `2026-10-15 00:31:38 +0800` |
-| seq 128 notes name rollback `openbot-gateway-rc-prev-5ea7e2b7bd33-safety` | ledger notes |
-| That safety container / image **absent** on HK today | `podman ps -a` / `podman images` 2026-10-31 |
-| Host `/root/openbot-cutover-history.log` stops ~seq 86–92; **no** 5ea7e2/0024d162 lines | grep on host |
-| `journalctl` retention begins `2026-10-31` | no Oct 14 events |
+| Fact                                                                                    | Evidence                                                                 |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| seq 127 omits `liveTo`                                                                  | `releases.jsonl` row                                                     |
+| seq 128 follows with `liveFrom` `2026-10-14T16:31:38Z`                                  | same file; evidence text quotes HK StartedAt `2026-10-15 00:31:38 +0800` |
+| seq 128 notes name rollback `openbot-gateway-rc-prev-5ea7e2b7bd33-safety`               | ledger notes                                                             |
+| That safety container / image **absent** on HK today                                    | `podman ps -a` / `podman images` 2026-10-31                              |
+| Host `/root/openbot-cutover-history.log` stops ~seq 86–92; **no** 5ea7e2/0024d162 lines | grep on host                                                             |
+| `journalctl` retention begins `2026-10-31`                                              | no Oct 14 events                                                         |
 
 **Conclusion:** host **FinishedAt for seq 127 is not independently recoverable** now. Closing must not pretend a container inspect was read. Path B writer convention (`closeLiveInterval` / README) closes prior `liveTo` at **successor cutover `liveFrom`**. Proposed close value = seq 128 `liveFrom`, with an explicit attestation that the clock source is **successor StartedAt in ledger evidence**, not host FinishedAt.
 

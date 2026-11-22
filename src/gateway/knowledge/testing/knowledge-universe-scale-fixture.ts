@@ -45,7 +45,12 @@ function indexByteSize(dbPath: string): number {
   return total;
 }
 
-function writeBasesJson(params: { basesPath: string; spaceCount: number; docsPerSpace: number; now: number }) {
+function writeBasesJson(params: {
+  basesPath: string;
+  spaceCount: number;
+  docsPerSpace: number;
+  now: number;
+}) {
   const bases = Array.from({ length: params.spaceCount }, (_, index) => {
     const serial = String(index + 1).padStart(2, "0");
     const id = `kb-${serial}`;
@@ -133,7 +138,9 @@ export async function ensureKnowledgeUniverseScaleFixture(params?: {
       `INSERT INTO document_versions (version_id, doc_id, version_label, raw_hash, semantic_hash, published_at, created_at)
        VALUES (?, ?, 'v1', ?, ?, ?, ?)`,
     );
-    const insertChunk = index.db.prepare(`INSERT INTO chunks (id, text, model) VALUES (?, ?, 'none')`);
+    const insertChunk = index.db.prepare(
+      `INSERT INTO chunks (id, text, model) VALUES (?, ?, 'none')`,
+    );
     const insertMeta = index.db.prepare(
       `INSERT INTO chunk_meta (chunk_id, kb_id, doc_id, version_id, heading, section, start_line, end_line, visibility, source)
        VALUES (?, ?, ?, ?, NULL, NULL, 1, 1, 'internal', 'synthetic')`,
@@ -173,7 +180,9 @@ export async function ensureKnowledgeUniverseScaleFixture(params?: {
       const doc = docIds[chunkIndex % docIds.length];
       const chunkId = `chunk-${String(chunkIndex + 1).padStart(6, "0")}`;
       const shared = chunkIndex % 50 === 0;
-      const semanticHash = shared ? `shared-hash-${String((chunkIndex / 50) % 20)}` : `uniq-${chunkId}`;
+      const semanticHash = shared
+        ? `shared-hash-${String((chunkIndex / 50) % 20)}`
+        : `uniq-${chunkId}`;
       insertChunk.run(chunkId, payload);
       insertMeta.run(chunkId, doc.kbId, doc.docId, doc.versionId);
       insertGov.run(chunkId, doc.kbId, semanticHash, chunkIndex % 7, now);

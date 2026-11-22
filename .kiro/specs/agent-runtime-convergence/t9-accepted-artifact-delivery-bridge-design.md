@@ -13,18 +13,18 @@
 
 ## 1. 现状映射表
 
-| 职责 | 符号 | 文件 | 读写的状态 |
-| --- | --- | --- | --- |
-| 工作项接受 | `acceptBoardItemSubmission` | `src/gateway/collaboration-dispatch/claim-contract.ts` | 写 `status=accepted`、`acceptedSubmissionId`、`acceptedArtifactVersion`、`acceptedBy`、`acceptanceReason`。清空 `pendingEventRelay`。不写投递回执，不改协作任务完成态。 |
-| 接受前的链接校验 | `verifyLinkedTeamDeliverableForAuthority` | `src/gateway/collaboration-learning/verify-linked-team-deliverable.ts` | 读 `linkedDeliverableId`、`linkedDeliverableVersion`、`linkedContentSha256`，对照团队存储。不投递。 |
-| 工作项持久化 | `mutateBoardClaimLog` | `src/agent-runtime/state/collaboration/round-txn.ts` | 锁内读改写 board claim 日志。接受行在这里落盘。 |
-| 审查/退回派发 | `triggerPostSubmissionEventAdvance`、`recoverPendingBoardEventRelays` | `src/gateway/collaboration-learning/post-submission-event-advance.ts` | 读写 `pendingEventRelay`。`status===accepted` 时返回 `accepted_no_further_exec_schedule`，不派发。`roundDispatcher` 是审查回合，不是成果回执。 |
-| 成员成果入库 | `finalizeMemberRunTeamDeliverable`、`submitTeamDeliverable`、`readTeamDeliverable` | `src/gateway/collaboration-learning/chat-deliverable-team-submit.ts`、`team-deliverable-submit.ts` | 评审前写入团队存储。回执字段是 `deliverableId`、`version`、`contentSha256`、`locator`。这是存储回执，不是接受后的渠道回执。接受路径不调用它们。 |
-| 个体回合待投递 | `prepareVisibleDelivery`、`confirmPendingTurnDeliveryWithPorts` | `src/agent-runtime/delivery/dispatch/prepare-visible.ts`、`confirm-pending.ts`；登记在 `src/task-outcome/pending-delivery.ts` | 按 `runId` / `deliveryId` / 会话任务绑定。确认路径可以关闭会话任务。不读 `acceptedArtifactVersion`。 |
-| 排队回复发送 | `deliverQueuedReply` | `src/agent-runtime/delivery/dispatch/queued-reply.ts` | 发送已有 `ReplyPayload`。依赖当次排队上下文，不是接受落盘后的可恢复意图。 |
-| 渠道写前队列 | `enqueueDelivery`、`deliverOutboundPayloads`、`recoverPendingDeliveries`、`ackDelivery`、`failDelivery`、`confirmedDeliveryMessageIds` | `src/infra/outbound/delivery-queue.ts`、`src/infra/outbound/deliver.ts`、`src/shared/delivery-receipt.ts` | `deliverOutboundPayloads` 在未传 `skipQueue` 时自己调用 `enqueueDelivery`，成功后 `ackDelivery`。恢复路径必须传 `skipQueue: true`。`ackDelivery` 把 `{id}.json` 改名为 `{id}.delivered` 再删除；`loadPendingDeliveries` 会清掉残留的 `.delivered`，这只表示不要重放，不是给补链的送达证明。没有可信 `messageId` 时，恢复把条目移到 `failed/` 并写 `delivery_unknown`，不自动再发。 |
-| 个体等待恢复 | `delivery_only` 分支 | `src/agent-runtime/state/repository/async-wait-job-recovery.ts` | 只重投已绑定载荷，不重跑业务。没有接到 board 接受字段。 |
-| 自进不代替终局 | `selfAdvanceDoesNotBypassHumanRequiredOutbound`、条件 `outbound_final_human_required` | `src/gateway/collaboration-dispatch/self-advance.ts` | 明确不代替 outbound/final。不发送已接受成果。 |
+| 职责             | 符号                                                                                                                                   | 文件                                                                                                                          | 读写的状态                                                                                                                                                                                                                                                                                                                                                                         |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 工作项接受       | `acceptBoardItemSubmission`                                                                                                            | `src/gateway/collaboration-dispatch/claim-contract.ts`                                                                        | 写 `status=accepted`、`acceptedSubmissionId`、`acceptedArtifactVersion`、`acceptedBy`、`acceptanceReason`。清空 `pendingEventRelay`。不写投递回执，不改协作任务完成态。                                                                                                                                                                                                            |
+| 接受前的链接校验 | `verifyLinkedTeamDeliverableForAuthority`                                                                                              | `src/gateway/collaboration-learning/verify-linked-team-deliverable.ts`                                                        | 读 `linkedDeliverableId`、`linkedDeliverableVersion`、`linkedContentSha256`，对照团队存储。不投递。                                                                                                                                                                                                                                                                                |
+| 工作项持久化     | `mutateBoardClaimLog`                                                                                                                  | `src/agent-runtime/state/collaboration/round-txn.ts`                                                                          | 锁内读改写 board claim 日志。接受行在这里落盘。                                                                                                                                                                                                                                                                                                                                    |
+| 审查/退回派发    | `triggerPostSubmissionEventAdvance`、`recoverPendingBoardEventRelays`                                                                  | `src/gateway/collaboration-learning/post-submission-event-advance.ts`                                                         | 读写 `pendingEventRelay`。`status===accepted` 时返回 `accepted_no_further_exec_schedule`，不派发。`roundDispatcher` 是审查回合，不是成果回执。                                                                                                                                                                                                                                     |
+| 成员成果入库     | `finalizeMemberRunTeamDeliverable`、`submitTeamDeliverable`、`readTeamDeliverable`                                                     | `src/gateway/collaboration-learning/chat-deliverable-team-submit.ts`、`team-deliverable-submit.ts`                            | 评审前写入团队存储。回执字段是 `deliverableId`、`version`、`contentSha256`、`locator`。这是存储回执，不是接受后的渠道回执。接受路径不调用它们。                                                                                                                                                                                                                                    |
+| 个体回合待投递   | `prepareVisibleDelivery`、`confirmPendingTurnDeliveryWithPorts`                                                                        | `src/agent-runtime/delivery/dispatch/prepare-visible.ts`、`confirm-pending.ts`；登记在 `src/task-outcome/pending-delivery.ts` | 按 `runId` / `deliveryId` / 会话任务绑定。确认路径可以关闭会话任务。不读 `acceptedArtifactVersion`。                                                                                                                                                                                                                                                                               |
+| 排队回复发送     | `deliverQueuedReply`                                                                                                                   | `src/agent-runtime/delivery/dispatch/queued-reply.ts`                                                                         | 发送已有 `ReplyPayload`。依赖当次排队上下文，不是接受落盘后的可恢复意图。                                                                                                                                                                                                                                                                                                          |
+| 渠道写前队列     | `enqueueDelivery`、`deliverOutboundPayloads`、`recoverPendingDeliveries`、`ackDelivery`、`failDelivery`、`confirmedDeliveryMessageIds` | `src/infra/outbound/delivery-queue.ts`、`src/infra/outbound/deliver.ts`、`src/shared/delivery-receipt.ts`                     | `deliverOutboundPayloads` 在未传 `skipQueue` 时自己调用 `enqueueDelivery`，成功后 `ackDelivery`。恢复路径必须传 `skipQueue: true`。`ackDelivery` 把 `{id}.json` 改名为 `{id}.delivered` 再删除；`loadPendingDeliveries` 会清掉残留的 `.delivered`，这只表示不要重放，不是给补链的送达证明。没有可信 `messageId` 时，恢复把条目移到 `failed/` 并写 `delivery_unknown`，不自动再发。 |
+| 个体等待恢复     | `delivery_only` 分支                                                                                                                   | `src/agent-runtime/state/repository/async-wait-job-recovery.ts`                                                               | 只重投已绑定载荷，不重跑业务。没有接到 board 接受字段。                                                                                                                                                                                                                                                                                                                            |
+| 自进不代替终局   | `selfAdvanceDoesNotBypassHumanRequiredOutbound`、条件 `outbound_final_human_required`                                                  | `src/gateway/collaboration-dispatch/self-advance.ts`                                                                          | 明确不代替 outbound/final。不发送已接受成果。                                                                                                                                                                                                                                                                                                                                      |
 
 `acceptedArtifactVersion` 的生产写入点只有 `acceptBoardItemSubmission` 内部那一次赋值。测试文件里的读取不能算消费者。
 
@@ -93,12 +93,12 @@ M3 把请求挂到现有 `collaborationLearningHandlers`，名字是 `collaborat
 
 现有符号里，没有「这个可信 actor 可以把这份已接受成员成果发到这个规范化目标」的授权能力。盘点如下，都不能假装成授权：
 
-| 符号 | 实际作用 | 为什么不是这条授权 |
-| --- | --- | --- |
-| `resolveOutboundTarget` | 解析渠道和 `to`，并可读插件的 `resolveAllowFrom` | 目标形状和渠道 allowFrom，不绑定本次 actor 与已接受成果 |
-| `operator.write` | Gateway 方法作用域 | 连接权限，不是这份成果的外发决定 |
-| `checkTaskActionBoundary` | 暂停、取消、替换时拒绝工具 | 任务边界，不是 outbound |
-| `authorizeTeamGroupResourceAccess` | 群读/写 ACL | 能写群资源，不等于能外发这份成果 |
+| 符号                               | 实际作用                                         | 为什么不是这条授权                                      |
+| ---------------------------------- | ------------------------------------------------ | ------------------------------------------------------- |
+| `resolveOutboundTarget`            | 解析渠道和 `to`，并可读插件的 `resolveAllowFrom` | 目标形状和渠道 allowFrom，不绑定本次 actor 与已接受成果 |
+| `operator.write`                   | Gateway 方法作用域                               | 连接权限，不是这份成果的外发决定                        |
+| `checkTaskActionBoundary`          | 暂停、取消、替换时拒绝工具                       | 任务边界，不是 outbound                                 |
+| `authorizeTeamGroupResourceAccess` | 群读/写 ACL                                      | 能写群资源，不等于能外发这份成果                        |
 
 因此后来要加的是一条窄的 policy 能力，拟名 `evaluateAcceptedArtifactOutboundAuthorization`。输入是可信 actor、tenant、groupId、规范化目标、冻结的 version 和 hash。输出是 allow 或 deny 加原因。调用方不得写入一个 `granted` 布尔来代替它。这个函数还不存在。在它落地之前，独立请求可以记为 `authorization_pending`，但不得把 `.bridge-staged` 改名为 `.json`，也不得发送。
 
@@ -135,12 +135,12 @@ M1 只落请求和关联。存储用已有的 `withDirectoryLock` 和 `writeJson
 
 四类发送结果分开，不能把 `unknown` 扫出来再自动重发：
 
-| 类 | 现有机制 | 意图状态 | 是否再发 |
-| --- | --- | --- | --- |
-| 未发出，或可重试失败 | `recoverPendingDeliveries` 在抛出且不是 `isPermanentDeliveryError` 时 `failDelivery`，`retryCount` 增加，`.json` 仍留在队列。下次按 `isEntryEligibleForRecoveryRetry` 和 `computeBackoffMs` 退避。 | `failed`，`retryable=true` | 同一 `queueId`、同一版本、同一 target。不新入队。 |
-| 已发出且有可信回执 | `confirmedDeliveryMessageIds` 要求每条都有非空 `messageId`，且不是 `"unknown"`。先把这些 id 写入意图。写入成功才 `ackDelivery`。写入失败则停止 ack，意图改为 `unknown`，并 `moveToFailed`。不得先删队列文件再靠恢复去推断成功。 | `delivered` 仅当 `receiptMessageIds` 已落盘 | 不再发送，不再第二次写成成功。 |
-| 发送效果不明 | 恢复里已有两条：无可信 `messageId` 时 `lastError=delivery_unknown: transport acknowledgement missing` 并 `moveToFailed`；部分 payload 已有回执时 `partial_delivery: held for reconciliation` 并 `moveToFailed`。两条都明确不再重放整批。 | `unknown` | 不入新队，不调用 `deliverOutboundPayloads`。留作待查。渠道没有幂等或对账能力时，不准把 `unknown` 扫回可重试。 |
-| 版本或 hash 不符 | 入队前 `readTeamDeliverable` 的 version、`contentSha256` 必须等于冻结的链接。不符。 | `blocked`，原因 `content_hash_mismatch` | 不入队。不准改去发送存储里较新的正文。 |
+| 类                   | 现有机制                                                                                                                                                                                                                                 | 意图状态                                    | 是否再发                                                                                                      |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| 未发出，或可重试失败 | `recoverPendingDeliveries` 在抛出且不是 `isPermanentDeliveryError` 时 `failDelivery`，`retryCount` 增加，`.json` 仍留在队列。下次按 `isEntryEligibleForRecoveryRetry` 和 `computeBackoffMs` 退避。                                       | `failed`，`retryable=true`                  | 同一 `queueId`、同一版本、同一 target。不新入队。                                                             |
+| 已发出且有可信回执   | `confirmedDeliveryMessageIds` 要求每条都有非空 `messageId`，且不是 `"unknown"`。先把这些 id 写入意图。写入成功才 `ackDelivery`。写入失败则停止 ack，意图改为 `unknown`，并 `moveToFailed`。不得先删队列文件再靠恢复去推断成功。          | `delivered` 仅当 `receiptMessageIds` 已落盘 | 不再发送，不再第二次写成成功。                                                                                |
+| 发送效果不明         | 恢复里已有两条：无可信 `messageId` 时 `lastError=delivery_unknown: transport acknowledgement missing` 并 `moveToFailed`；部分 payload 已有回执时 `partial_delivery: held for reconciliation` 并 `moveToFailed`。两条都明确不再重放整批。 | `unknown`                                   | 不入新队，不调用 `deliverOutboundPayloads`。留作待查。渠道没有幂等或对账能力时，不准把 `unknown` 扫回可重试。 |
+| 版本或 hash 不符     | 入队前 `readTeamDeliverable` 的 version、`contentSha256` 必须等于冻结的链接。不符。                                                                                                                                                      | `blocked`，原因 `content_hash_mismatch`     | 不入队。不准改去发送存储里较新的正文。                                                                        |
 
 队列项消失不是送达。`ackDelivery` 先把 `{id}.json` 改名为 `{id}.delivered`，再删除标记。`loadPendingDeliveries` 删除残留 `.delivered` 只是为了不再重放。补链看不到 `receiptMessageIds` 时，不得把「文件没了」推成 `delivered`，也不得立刻 `enqueueDelivery` 一条新的。意图停在 `unknown`。
 
@@ -157,31 +157,31 @@ M1 只落请求和关联。存储用已有的 `withDirectoryLock` 和 `writeJson
 
 尚未实施。将来的测试只桩渠道发送的最外层返回值（可信 `messageId`、失败、或没有 `messageId`）。`enqueueDelivery`、`recoverPendingDeliveries`、`ackDelivery`、`failDelivery` 和意图写入走真实逻辑。不得替换整个 `deliverOutboundPayloads` 再声称队列闭环已测到。不得手写一个已送达的意图来跳过队列。
 
-| 断言 | 拟议观察 |
-| --- | --- |
-| 未接受成果不投递 | 没有独立请求记录时，不创建 `.bridge-staged`。`acceptedArtifactVersion` 仍为空。授权仍是 `authorization_pending` 时，文件不得变成 `.json`。 |
-| 成员接受不提前关闭组任务 | 接受后工作项为 `accepted`，协作任务完成态不变。不调用 `confirmPendingTurnDeliveryWithPorts`。`scope=group_final` 被拒绝。组终稿格保持打开。 |
+| 断言                                   | 拟议观察                                                                                                                                                                                                                                                                |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 未接受成果不投递                       | 没有独立请求记录时，不创建 `.bridge-staged`。`acceptedArtifactVersion` 仍为空。授权仍是 `authorization_pending` 时，文件不得变成 `.json`。                                                                                                                              |
+| 成员接受不提前关闭组任务               | 接受后工作项为 `accepted`，协作任务完成态不变。不调用 `confirmPendingTurnDeliveryWithPorts`。`scope=group_final` 被拒绝。组终稿格保持打开。                                                                                                                             |
 | 首次可重试失败后再成功，版本与正文一致 | 第一次发送抛出可重试错误。意图为 `failed` 且 `retryable=true`，board 仍为 `accepted`。退避后的下一次仍是同一个 `queueId`。发出的正文 sha256 等于 `linkedContentSha256`。成功时 `receiptMessageIds` 来自 `confirmedDeliveryMessageIds`，之后才 ack。成员执行次数不增加。 |
-| 重复通知和重启不重跑业务、不重复结算 | 已是 `delivered` 时再跑恢复，`enqueueDelivery` 不增加，`receiptMessageIds` 不追加第二组。接受不能再成功一次。 |
+| 重复通知和重启不重跑业务、不重复结算   | 已是 `delivered` 时再跑恢复，`enqueueDelivery` 不增加，`receiptMessageIds` 不追加第二组。接受不能再成功一次。                                                                                                                                                           |
 
 ## 5.1 崩溃窗与双发测试计划
 
 同样尚未实施。
 
-| 场景 | 必须看到 |
-| --- | --- |
-| 双入队 | 补链入队之后，若有代码路径调用不带 `skipQueue` 的 `deliverOutboundPayloads`，测试失败。同一意图键只存在一个 `{id}.json`。`recoverPendingDeliveries` 的调用参数包含 `skipQueue: true`。 |
-| 关联尚未可见 | `.bridge-staged` 还在、意图尚无 `queueId` 时，并发跑 `recoverPendingDeliveries`。`deliverOutboundPayloads` 不被调用。恢复后仍只有这一条暂存文件。 |
-| 独占创建 | 两个并发请求用同一租户和同一规范化目标。只有一个 `bridge-{keyHash}.bridge-staged`。另一个得到 `EEXIST` 并沿用同一 `id`。不得先查再写。 |
-| 唯一认领 | 文件已是带 `bridgeMarker` 的 `.json`。两次重叠的 `recoverPendingDeliveries` 只进入一次 `deliverOutboundPayloads`。`bridgeSendStarted` 已真且没有回执时，第二次不发送，意图为 `unknown`。 |
-| 窗 A | 暂存文件已在，意图没有 `queueId`，然后中断。恢复写下原来的 `queueId`。在改名为 `.json` 之前发送次数为 0。 |
-| 窗 B | 渠道已返回可信 `messageId`，但回执写入失败。`ackDelivery` 不被调用，`.json` 不被删。意图为 `unknown`。不得新建队列项。 |
-| 回执失败不清理 | 上一条里 `moveToFailed` 之后文件在 `failed/`，发送扫描不再捡起它。若 `moveToFailed` 也失败，`.json` 上有 `bridgeHold: "unknown"`，判断式跳过发送。 |
-| 普通队列不受影响 | 没有 `bridgeMarker` 的 `{id}.json` 仍由现有 `ackDelivery` 从 `{id}.json` 改名。补链逻辑不改它的后缀，也不给它加 `withDirectoryLock`。 |
-| 文件消失 | 删掉 `{id}.json` 且没有 `receiptMessageIds`。意图不得变成 `delivered`，不得出现新的队列文件。 |
-| 恢复时权限撤销 | 请求曾经 allow。恢复时 `evaluateAcceptedArtifactOutboundAuthorization` 改为 deny。`moveToFailed` 发生，意图为 `blocked`，原因 `outbound_authorization_revoked`。`deliverOutboundPayloads` 不被调用。board 仍是 `accepted`。不得用上次写下的布尔放行。 |
-| unknown 不盲重发 | 发送返回值没有通过 `confirmedDeliveryMessageIds`。意图为 `unknown`，条目在 `failed/`，`lastError` 含 `delivery_unknown`。再次扫描不入队、不再调用发送。部分回执走 `partial_delivery`，同样不再发整批。 |
-| hash 不符 | 存储正文 sha 与 `linkedContentSha256` 不同。意图为 `blocked`，原因 `content_hash_mismatch`。不入队，不发送较新正文。 |
+| 场景             | 必须看到                                                                                                                                                                                                                                              |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 双入队           | 补链入队之后，若有代码路径调用不带 `skipQueue` 的 `deliverOutboundPayloads`，测试失败。同一意图键只存在一个 `{id}.json`。`recoverPendingDeliveries` 的调用参数包含 `skipQueue: true`。                                                                |
+| 关联尚未可见     | `.bridge-staged` 还在、意图尚无 `queueId` 时，并发跑 `recoverPendingDeliveries`。`deliverOutboundPayloads` 不被调用。恢复后仍只有这一条暂存文件。                                                                                                     |
+| 独占创建         | 两个并发请求用同一租户和同一规范化目标。只有一个 `bridge-{keyHash}.bridge-staged`。另一个得到 `EEXIST` 并沿用同一 `id`。不得先查再写。                                                                                                                |
+| 唯一认领         | 文件已是带 `bridgeMarker` 的 `.json`。两次重叠的 `recoverPendingDeliveries` 只进入一次 `deliverOutboundPayloads`。`bridgeSendStarted` 已真且没有回执时，第二次不发送，意图为 `unknown`。                                                              |
+| 窗 A             | 暂存文件已在，意图没有 `queueId`，然后中断。恢复写下原来的 `queueId`。在改名为 `.json` 之前发送次数为 0。                                                                                                                                             |
+| 窗 B             | 渠道已返回可信 `messageId`，但回执写入失败。`ackDelivery` 不被调用，`.json` 不被删。意图为 `unknown`。不得新建队列项。                                                                                                                                |
+| 回执失败不清理   | 上一条里 `moveToFailed` 之后文件在 `failed/`，发送扫描不再捡起它。若 `moveToFailed` 也失败，`.json` 上有 `bridgeHold: "unknown"`，判断式跳过发送。                                                                                                    |
+| 普通队列不受影响 | 没有 `bridgeMarker` 的 `{id}.json` 仍由现有 `ackDelivery` 从 `{id}.json` 改名。补链逻辑不改它的后缀，也不给它加 `withDirectoryLock`。                                                                                                                 |
+| 文件消失         | 删掉 `{id}.json` 且没有 `receiptMessageIds`。意图不得变成 `delivered`，不得出现新的队列文件。                                                                                                                                                         |
+| 恢复时权限撤销   | 请求曾经 allow。恢复时 `evaluateAcceptedArtifactOutboundAuthorization` 改为 deny。`moveToFailed` 发生，意图为 `blocked`，原因 `outbound_authorization_revoked`。`deliverOutboundPayloads` 不被调用。board 仍是 `accepted`。不得用上次写下的布尔放行。 |
+| unknown 不盲重发 | 发送返回值没有通过 `confirmedDeliveryMessageIds`。意图为 `unknown`，条目在 `failed/`，`lastError` 含 `delivery_unknown`。再次扫描不入队、不再调用发送。部分回执走 `partial_delivery`，同样不再发整批。                                                |
+| hash 不符        | 存储正文 sha 与 `linkedContentSha256` 不同。意图为 `blocked`，原因 `content_hash_mismatch`。不入队，不发送较新正文。                                                                                                                                  |
 
 ## 6. 非目标
 

@@ -116,23 +116,17 @@ async function main() {
   const { ensureKnowledgeUniverseScaleFixture, SCALE_OWNER_ID, SCALE_TENANT_ID, SCALE_SEAT_ID } =
     await import("../src/gateway/knowledge/testing/knowledge-universe-scale-fixture.js");
   const fixture = await ensureKnowledgeUniverseScaleFixture({ root: fixtureRoot });
-  const {
-    listKnowledgeBases,
-  } = await import("../src/gateway/knowledge/knowledge-base-store.js");
-  const { loadKnowledgeSourceBundleFromContext } = await import(
-    "../src/gateway/knowledge/source-bundle.js"
-  );
+  const { listKnowledgeBases } = await import("../src/gateway/knowledge/knowledge-base-store.js");
+  const { loadKnowledgeSourceBundleFromContext } =
+    await import("../src/gateway/knowledge/source-bundle.js");
   const { resetKnowledgeSourceBundleCacheForTests, getKnowledgeSourceBundleCacheStats } =
     await import("../src/gateway/knowledge/source-bundle-cache.js");
-  const { clearRelationshipRuntimeCache } = await import(
-    "../src/gateway/knowledge/runtime/relationship-runtime.js"
-  );
-  const { invalidateRelationshipGraphCache } = await import(
-    "../src/gateway/knowledge/runtime/relationship-runtime-cache.js"
-  );
-  const { resetKnowledgeIndexReadPoolForTests, getKnowledgeIndexReadPoolStats } = await import(
-    "../src/gateway/knowledge/kb-index-read-pool.js"
-  );
+  const { clearRelationshipRuntimeCache } =
+    await import("../src/gateway/knowledge/runtime/relationship-runtime.js");
+  const { invalidateRelationshipGraphCache } =
+    await import("../src/gateway/knowledge/runtime/relationship-runtime-cache.js");
+  const { resetKnowledgeIndexReadPoolForTests, getKnowledgeIndexReadPoolStats } =
+    await import("../src/gateway/knowledge/kb-index-read-pool.js");
 
   const context = {
     userId: SCALE_OWNER_ID,
