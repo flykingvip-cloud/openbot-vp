@@ -11,9 +11,11 @@
   (`resolveDeliveryAclActor` mock); observer case split from dual-principal same-group isolation.
 
 ## Step 3 contracts (2026-10-31 Asia/Shanghai)
+
 Closed and locked via `discuss-to-task-contracts.lock.test.ts` + prior suites:
 
 ## Confirm bind (2026-10-31 Asia/Shanghai final hardening)
+
 - Confirm must reuse first-persisted activationKey (message/goal/constraints/candidates).
 - Drift on confirm → `activation_contract_conflict` (no silent replace).
 - Lock: `discuss-to-task-confirm-bind.test.ts`; combo confirm uses same contract fields.
@@ -23,5 +25,5 @@ Closed and locked via `discuss-to-task-contracts.lock.test.ts` + prior suites:
 3. Source idempotency (same sourceMessageId)
 4. Failure visible (persist-fail fixed suffix via existing egress; client assert)
 5. Status receipt does not end main run (`state:"status"`)
-Historical R4/R5: chat egress client-receive + `createOpenClawTools`→`collaboration_board` execute (injection.test).
-Dual-principal WS timeout left for Step 4 combo loop — not expanded here.
+   Historical R4/R5: chat egress client-receive + `createOpenClawTools`→`collaboration_board` execute (injection.test).
+   Dual-principal WS timeout left for Step 4 combo loop — not expanded here.
