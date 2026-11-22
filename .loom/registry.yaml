@@ -1,5 +1,62 @@
 version: 1
 tasks:
+  - id: arch-remediation-wp-b-slice3-credits-reservation
+    owner: codex-wpb-successor
+    intent: []
+    paths:
+      - src/gateway/billing/chat-reply-credit-reservation.slice3.test.ts
+    state: active
+    sessions:
+      - id: b5ea7693-7a69-4b91-8c77-c283635f25f1
+        taskId: arch-remediation-wp-b-slice3-credits-reservation
+        ide: grok-bot
+        agent: grok-daibai
+        status: active
+        lastSignalAt: 2026-11-20T16:03:42.406Z
+        metadata: {}
+      - id: b04f22d4-3190-44bb-9fd1-8dfd81af6ecd
+        taskId: arch-remediation-wp-b-slice3-credits-reservation
+        ide: codex
+        agent: codex-wpb-successor
+        status: active
+        metadata:
+          purpose: Human-authorized successor review and landing preparation of test-only
+            PR328
+        lastSignalAt: 2026-11-22T02:37:18.990Z
+    ownerHistory:
+      - fromOwner: grok-daibai
+        toOwner: codex-wpb-successor
+        at: 2026-11-22T02:37:18.990Z
+        via: verified
+    since: 2026-11-20
+    metadata:
+      predecessorPlannedPaths:
+        - src/gateway/billing/credit-reservation-store.ts
+        - src/gateway/billing/credit-reservation-store.test.ts
+        - src/gateway/billing/credit-reservation-atomic.test.ts
+        - src/gateway/billing/usage-outbox-drain.ts
+        - src/gateway/billing/usage-outbox-hold-lifecycle.test.ts
+        - src/gateway/billing/authorize-commercial-run.ts
+        - src/gateway/billing/authorize-commercial-run.test.ts
+        - src/gateway/billing/agent-run-governance.ts
+        - src/gateway/billing/record-credit-usage.ts
+        - src/agent-runtime/execution/runner/admitted-turn.ts
+        - src/agent-runtime/model/authorized-session.ts
+        - src/agent-runtime/model/admission-lease.ts
+        - src/auto-reply/reply/followup-runner.ts
+        - src/auto-reply/reply/agent-run-credit-usage.ts
+        - src/gateway/billing/chat-reply-credit-reservation.slice3.test.ts
+      scopeDecision: Only the original PR328 test file is transferred; other
+        predecessor planned paths are not claimed or modified
+      verifiedCommits:
+        - fe1330aa72665c7bd050351d0d2bbf748abc25c5
+        - c0ec8b3282ce8ef2de53827ea5aa4d0f8051198f
+      takeover:
+        authorizedBy: human
+        predecessorOwner: grok-daibai
+        verification: Original test clean; exact content hash and commit trailers
+          verified; predecessor session preserved byte-for-value
+        testFileScopeOnly: true
   - id: baseline-gates-repair-20261122:codex-wpb-successor
     owner: codex-wpb-successor
     intent:
@@ -30810,6 +30867,10 @@ landingStreams:
       reason: Only seven previously unmatched exact paths; preserve all prior stream
         order/classification
 sharedPaths:
+  - glob: src/gateway/billing/chat-reply-credit-reservation.slice3.test.ts
+    landerTask: arch-remediation-wp-b-slice3-credits-reservation
+    reason: Human-authorized successor of test-only PR328; original owner session
+      and task history retained.
   - glob: CHANGELOG.md
     landerTask: runtime-changelog-332:codex-runtime
     reason: Human-authorized single PR332 compatibility release note; preserve all
