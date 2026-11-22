@@ -4,10 +4,10 @@ Tip before: `cd031bc90c1314e8cf4313ee8ca31185b2dac48a` (branch `cursor/memory-fi
 
 ## Offenders (trunk-identical; not introduced by closeout)
 
-| Path | Before (`split("\n").length`) | Budget | After |
-| --- | ---: | ---: | ---: |
-| `src/gateway/collaboration-learning.ts` | 166 | 150 | 150 |
-| `ui/src/ui/app.ts` | 4890 | 4845 | 4844 |
+| Path                                    | Before (`split("\n").length`) | Budget | After |
+| --------------------------------------- | ----------------------------: | -----: | ----: |
+| `src/gateway/collaboration-learning.ts` |                           166 |    150 |   150 |
+| `ui/src/ui/app.ts`                      |                          4890 |   4845 |  4844 |
 
 Budgets unchanged (no raise). No `.loom/registry.yaml` in this fix.
 

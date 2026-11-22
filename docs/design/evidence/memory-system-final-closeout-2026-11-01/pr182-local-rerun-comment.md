@@ -4,34 +4,35 @@ Worktree: `openbot-memory-final-closeout-182` · branch `cursor/memory-final-clo
 
 ### Gate exits
 
-| Command | Exit | Note |
-| --- | --- | --- |
-| `CI=true pnpm install --frozen-lockfile` | **0** | |
-| `pnpm tsgo` | **0** | after tip contract/type fixes |
-| `pnpm format:check` | **0** | after oxfmt |
-| `pnpm check` | **1** | stops at `lint:core:composition-root-loc` |
+| Command                                  | Exit  | Note                                      |
+| ---------------------------------------- | ----- | ----------------------------------------- |
+| `CI=true pnpm install --frozen-lockfile` | **0** |                                           |
+| `pnpm tsgo`                              | **0** | after tip contract/type fixes             |
+| `pnpm format:check`                      | **0** | after oxfmt                               |
+| `pnpm check`                             | **1** | stops at `lint:core:composition-root-loc` |
 
 **Trunk LOC blocker (pre-existing; budgets not raised; files untouched by this closeout):**
+
 - `src/gateway/collaboration-learning.ts` 166 / budget 150
 - `ui/src/ui/app.ts` 4890 / budget 4845
 - Same exceed on `origin/main` tip
 
 ### Isolation vitest (cloud matrix re-run)
 
-| Suite | Exit |
-| --- | --- |
-| memory unit 19 files / 79 tests | **0** |
-| gateway memory 6 files / 31 tests | **0** |
-| UI memory-center-page 12 tests | **0** |
+| Suite                                | Exit  |
+| ------------------------------------ | ----- |
+| memory unit 19 files / 79 tests      | **0** |
+| gateway memory 6 files / 31 tests    | **0** |
+| UI memory-center-page 12 tests       | **0** |
 | e2e memory-continuity-gateway 1 test | **0** |
 
 ### Gateway identity (read-only)
 
-| Port | PID | Identity | Health |
-| --- | --- | --- | --- |
-| 18789 | 77060 | HEAD/`build-info`/UI `beb0ee226ab6…` (#180 tree) | live |
-| 18790 | 71854 | detached `02c26fab…`; UI `02c26fa`; no dist/build-info | live |
-| 19001 | 11204 | no `.git`; no build-info.json; UI 404 | live |
+| Port  | PID   | Identity                                               | Health |
+| ----- | ----- | ------------------------------------------------------ | ------ |
+| 18789 | 77060 | HEAD/`build-info`/UI `beb0ee226ab6…` (#180 tree)       | live   |
+| 18790 | 71854 | detached `02c26fab…`; UI `02c26fa`; no dist/build-info | live   |
+| 19001 | 11204 | no `.git`; no build-info.json; UI 404                  | live   |
 
 None is tip-of-main memory closeout SHA. STATE dirs noted read-only in `local-gateway-identity.json`. No memory search APIs; no state mutation.
 
