@@ -15392,7 +15392,34 @@ tasks:
     ownerHistory: []
     since: 2026-11-22
     metadata: {}
+  - id: arch-remediation-wp-g-acceptance-delivery
+    owner: codex-delivery-verifier
+    intent:
+      - User-authorized exact acceptance delivery composition test only.
+    paths:
+      - src/agent-runtime/wiring/reply-turn.acceptance-delivery.integration.test.ts
+    state: active
+    sessions:
+      - id: delivery-verifier-20261122
+        taskId: arch-remediation-wp-g-acceptance-delivery
+        ide: codex
+        agent: codex-delivery-verifier
+        status: active
+        lastSignalAt: 2026-11-22T07:42:18.235692+00:00
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-22
+    metadata: {}
 landingStreams:
+  - id: delivery-acceptance-integration-20261122
+    landingPolicy: serial
+    paths:
+      - src/agent-runtime/wiring/reply-turn.acceptance-delivery.integration.test.ts
+    canLandWith: []
+    metadata:
+      task: arch-remediation-wp-g-acceptance-delivery
+      agent: codex-delivery-verifier
+      purpose: User-authorized exact test landing; no directory takeover.
   - id: cron-fire-budget-reviewed-integration
     landingPolicy: serial
     paths:
@@ -30867,6 +30894,10 @@ landingStreams:
       reason: Only seven previously unmatched exact paths; preserve all prior stream
         order/classification
 sharedPaths:
+  - glob: src/agent-runtime/wiring/reply-turn.acceptance-delivery.integration.test.ts
+    landerTask: arch-remediation-wp-g-acceptance-delivery
+    reason: User-authorized exact composition test; broad directory ownership preserved.
+    reviewAfter: 2026-12-31
   - glob: src/gateway/billing/chat-reply-credit-reservation.slice3.test.ts
     landerTask: arch-remediation-wp-b-slice3-credits-reservation
     reason: Human-authorized successor of test-only PR328; original owner session
