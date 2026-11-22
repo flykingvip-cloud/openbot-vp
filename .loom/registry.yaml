@@ -1,5 +1,298 @@
 version: 1
 tasks:
+  - id: baseline-gates-repair-20261122:codex-wpb-successor
+    owner: codex-wpb-successor
+    intent:
+      - Human-authorized exact-path baseline gate repair; predecessor histories
+        and live WIP preserved
+    paths:
+      - .kiro/specs/agent-runtime-convergence/acceptance-479f9ba14c10e27446e6444e82a9a92c9b546013.md
+      - .kiro/specs/agent-runtime-convergence/acceptance-t9-final-62f62063e.md
+      - .kiro/specs/agent-runtime-convergence/acceptance-t9-final-bc120f691.md
+      - .kiro/specs/agent-runtime-convergence/archive/interaction-retirement-2026-11-05.md
+      - .kiro/specs/agent-runtime-convergence/batch-b-acceptance-rejection-fix-2026-11-09.md
+      - .kiro/specs/agent-runtime-convergence/batch-c-collab-ownership-2026-11-09.md
+      - .kiro/specs/agent-runtime-convergence/batch-c-compile-txn-2026-11-09.md
+      - .kiro/specs/agent-runtime-convergence/batch-d-evidence-supplement-2026-11-09.md
+      - .kiro/specs/agent-runtime-convergence/collab-policy-state-migration-boundary-2026-11-09.md
+      - .kiro/specs/agent-runtime-convergence/component-migration-matrix.md
+      - .kiro/specs/agent-runtime-convergence/current-mainline-review-2026-11-06.md
+      - .kiro/specs/agent-runtime-convergence/execution-authority-closure-plan-2026-11-09.md
+      - .kiro/specs/agent-runtime-convergence/execution-authority-inventory.md
+      - .kiro/specs/agent-runtime-convergence/execution-authority-t0-baseline-2026-11-09.md
+      - .kiro/specs/agent-runtime-convergence/expert-1-architecture-acceptance-2026-11-06.md
+      - .kiro/specs/agent-runtime-convergence/expert-2-mainline-acceptance-2026-11-06.md
+      - .kiro/specs/agent-runtime-convergence/individual-policy-state-closure-slices-2026-11-09.md
+      - .kiro/specs/agent-runtime-convergence/limited-review-b92d96340-20261108.md
+      - .kiro/specs/agent-runtime-convergence/onboarding-and-rule-retirement.md
+      - .kiro/specs/agent-runtime-convergence/package6-same-sha-acceptance.md
+      - .kiro/specs/agent-runtime-convergence/phase-split-repair-20261109.md
+      - .kiro/specs/agent-runtime-convergence/real-runtime-acceptance-20261109.md
+      - .kiro/specs/agent-runtime-convergence/retirement-disposition.md
+      - .kiro/specs/agent-runtime-convergence/rule-catalog-coverage.md
+      - .kiro/specs/agent-runtime-convergence/structure-alignment.md
+      - .kiro/specs/agent-runtime-convergence/t4-completion-window-2026-11-09.md
+      - .kiro/specs/agent-runtime-convergence/t9-accepted-artifact-delivery-bridge-design.md
+      - .kiro/specs/agent-runtime-convergence/t9-ext-gateway-17-fail-attribution.md
+      - .kiro/specs/agent-runtime-convergence/t9-ext-gateway-17-fail-release-disposition.md
+      - .kiro/specs/agent-runtime-convergence/t9-group-final-delivery-bridge-design.md
+      - .kiro/specs/agent-runtime-convergence/tasks.md
+      - .kiro/specs/local-ui-seams/s0-failure-injection-test-list.md
+      - .kiro/specs/local-ui-seams/s0-legacy-rules-retirement-candidates.md
+      - .kiro/specs/local-ui-seams/s0-limited-approval-map-2026-11-13.md
+      - .kiro/specs/local-ui-seams/s0-scene-entry-and-consumer-map.md
+      - .kiro/specs/local-ui-seams/s0-sha-and-anchor-inventory.md
+      - .kiro/specs/local-ui-seams/s0-three-role-contract-map.md
+      - .kiro/specs/watchdog-task-closure/tasks.md
+      - .loom/registry.yaml
+      - deploy/production/RELEASE_RECORD.md
+      - docs/OPENBOT_OPENCLAW_COMPAT.md
+      - docs/PR143-MERGE-NOTES.md
+      - docs/acceptance/fullstack-2026-11-01/09-coverage-progress.md
+      - docs/acceptance/fullstack-2026-11-01/10-acceptance-conclusion.md
+      - docs/acceptance/fullstack-2026-11-01/10-control-ui-credential-free.md
+      - docs/acceptance/fullstack-2026-11-01/10-coverage-inventory-tracked.md
+      - docs/acceptance/fullstack-2026-11-01/10-pr193-review.md
+      - docs/acceptance/p1-fix-2026-11-01/defect-status.md
+      - docs/acceptance/runs/2026-11-02-credentials-omit/00-pin.md
+      - docs/acceptance/runs/2026-11-02-credentials-omit/01-credentials-omit-root-cause.md
+      - docs/acceptance/runs/2026-11-02-independent-reviewer-corrections/00-exhaustiveness-note.md
+      - docs/acceptance/runs/2026-11-02-independent-reviewer-corrections/00-reviewer-corrections.md
+      - docs/acceptance/runs/2026-11-02-independent-reviewer-corrections/01-owner-confirm-round2.md
+      - docs/acceptance/runs/2026-11-02-pr194-locate/README.md
+      - docs/audits/2026-11-01-closed-loop-demand-diagnosis-notify.md
+      - docs/design/collab-context-p3-private-memory-promote-2026-10-14.md
+      - docs/design/evidence/memory-system-final-closeout-2026-11-01/composition-root-loc-fix-2026-11-01.md
+      - docs/design/evidence/memory-system-final-closeout-2026-11-01/pr182-local-rerun-comment.md
+      - docs/design/memory-continuity-acceptance.md
+      - docs/design/tri-platform-unification-2026-07-05.md
+      - docs/exec-protocol/v1-two-node-change-ticket.md
+      - docs/exec-protocol/v1-two-node-isolation-plan.md
+      - docs/notes/controlled-collab-formal-chain-breakpoints-2026-11-01.md
+      - docs/notes/controlled-discuss-to-task-p1-2026-10-31.md
+      - docs/notes/delivery-guard-debt-2026-11-16/README.md
+      - docs/notes/delivery-guard-debt-2026-11-16/c1-seq151-test-intent.md
+      - docs/notes/delivery-guard-debt-2026-11-16/c2-missing-object-restore-plan.md
+      - docs/notes/delivery-guard-debt-2026-11-16/c3-current-generated-block.md
+      - docs/notes/delivery-guard-debt-2026-11-16/c3-proposed-generated-block.md
+      - docs/notes/delivery-guard-debt-2026-11-16/c3-release-record-correction-proposal.md
+      - docs/notes/delivery-guard-debt-2026-11-16/local-substitute-ci-coverage.md
+      - docs/notes/fix-ab-ghost-confirm-chat-history-20261029.md
+      - docs/notes/fix-member-governance-owner-identity-20261029.md
+      - docs/notes/infrastructure-audit-2026-10-31.md
+      - docs/notes/infrastructure-audit-2026-10-31/a3-control-experiment-plan-PENDING-AUTH.md
+      - docs/notes/infrastructure-audit-2026-10-31/a3-implementation-pack-PENDING-AUTH.md
+      - docs/notes/infrastructure-audit-2026-10-31/batch-b-local-gate-2026-10-31.md
+      - docs/notes/infrastructure-audit-2026-10-31/batch-c-provenance-staging-2026-10-31.md
+      - docs/notes/infrastructure-audit-2026-10-31/billing-h1-blocked-2026-10-31.md
+      - docs/notes/infrastructure-audit-2026-10-31/closeout-2026-11-01.md
+      - docs/notes/infrastructure-audit-2026-10-31/closeout-evidence-index-2026-11-01.md
+      - docs/notes/infrastructure-audit-2026-10-31/closeout-residual-handoff-2026-11-01.md
+      - docs/notes/infrastructure-audit-2026-10-31/disk-inventory-2026-10-31.md
+      - docs/notes/infrastructure-audit-2026-10-31/ledger-audit-2026-10-31.md
+      - docs/notes/infrastructure-audit-2026-10-31/ledger-audit-finding-codes-exit30-2026-10-31.md
+      - docs/notes/infrastructure-audit-2026-10-31/ledger-error-classification-2026-10-31.md
+      - docs/notes/infrastructure-audit-2026-10-31/p1-dag-break-evidence-closure-2026-10-31.md
+      - docs/notes/infrastructure-audit-2026-10-31/p1-object-recovery-reclassification-2026-10-31.md
+      - docs/notes/infrastructure-audit-2026-10-31/plan.md
+      - docs/notes/infrastructure-audit-2026-10-31/release-record-anti-drift-2026-10-31.md
+      - docs/notes/team-real-f4-board-confirmer-chain-2026-10-28.md
+      - docs/reference/ci-local-merge-gate.md
+      - docs/repo-split/G1-inventory.md
+      - docs/repo-split/README.md
+      - docs/repo-split/decisions.md
+      - docs/slice1-decision-to-reply-path.md
+      - docs/slice2-aside-reply-concurrency-design.md
+      - docs/slice2-aside-reply-design.md
+      - docs/slice2-chat-during-task-delivery.md
+      - docs/slice2-chat-during-task-evidence.md
+      - docs/slice2-e2e-real-model-acceptance.md
+      - docs/slice2-reply-lane-joint-verification.md
+      - docs/slice3-context-enhancement-delivery.md
+      - evidence/watchdog-task-closure-acceptance-2026-11-01.md
+      - out/agent-runtime-observability-optimization-plan.md
+      - scripts/knowledge-universe-scale-measure.ts
+      - src/agent-runtime/state/mutations/session-reset-focus.ts
+      - src/agent-runtime/state/repository/async-wait-visible-identity.test.ts
+      - src/agents/sandbox/ACCOUNT_WORKER_SANDBOX_IMAGES.md
+      - src/gateway/chat-attachment-kind.ts
+      - src/gateway/chat-attachments.ts
+      - src/gateway/collaboration-dispatch/executor-private-todolist.test.ts
+      - src/gateway/enterprise-data/projection-template-engine.ts
+      - src/gateway/knowledge/empty-bundle.ts
+      - src/gateway/knowledge/governance/chunk-governance-store.ts
+      - src/gateway/knowledge/governance/runtime/object-writeback.ts
+      - src/gateway/knowledge/kb-index-read-pool.test.ts
+      - src/gateway/knowledge/runtime/relationship-builder.ts
+      - src/gateway/knowledge/runtime/relationship-runtime-async.test.ts
+      - src/gateway/knowledge/runtime/relationship-runtime.ts
+      - src/gateway/knowledge/testing/knowledge-universe-scale-fixture.ts
+      - ui/src/ui/ports/employee/views/workbench-robot-operational-identity-panel.ts
+      - src/gateway/skill-lifecycle-store.ts
+      - src/gateway/pattern-detection/publish.ts
+      - src/gateway/pattern-detection/pattern-detection.test.ts
+      - .oxfmtrc.jsonc
+      - src/discord/send.outbound.ts
+      - src/discord/send.webhook-activity.test.ts
+      - src/infra/net/fetch-guard.ts
+      - src/infra/net/fetch-guard.ssrf.test.ts
+      - src/gateway/collaboration-learning.ts
+      - src/gateway/collaboration-learning/shared.ts
+      - src/gateway/platform-auth/auth-helpers.ts
+      - src/gateway/platform-auth/routes-enterprise.ts
+      - ui/src/ui/app.ts
+      - src/agent-runtime/command/rule-adaptation/library-feedback.ts
+      - src/agent-runtime/command/interaction-terminal.s1.test.ts
+      - src/agent-runtime/command/rule-adaptation/official-deepseek-complete.ts
+      - src/agent-runtime/model/interaction-resource-wait.test.ts
+      - src/gateway/chat-interaction-failure.ts
+      - src/gateway/collaboration-learning/group-interaction-understanding.ts
+      - src/agent-runtime/wiring/dynamic-rule-constraints.test.ts
+      - src/agent-runtime/wiring/dynamic-rule-constraints.ts
+      - src/gateway/collaboration-dispatch/round-store-io.ts
+      - src/agent-runtime/command/rule-adaptation/index.ts
+      - src/agent-runtime/state/index.ts
+      - src/agent-runtime/model/index.ts
+      - src/gateway/collaboration-learning/member-governance.ts
+      - src/gateway/platform-auth/session-cookie-headers.ts
+      - src/gateway/platform-auth/enterprise-activation-url.ts
+      - ui/src/ui/account-computer/preview-request.ts
+      - src/gateway/collaboration-learning/wake-contract-entry.ts
+      - src/agent-runtime/state/durable-json.ts
+    state: active
+    sessions:
+      - id: baseline-gates-repair-20261122-wpb-successor
+        taskId: baseline-gates-repair-20261122:codex-wpb-successor
+        ide: codex
+        agent: codex-wpb-successor
+        status: active
+        metadata: {}
+        lastSignalAt: 2026-11-22T00:12:16.118Z
+    ownerHistory: []
+    since: 2026-11-21
+    metadata:
+      limitedTakeover:
+        authorizedBy: human
+        date: 2026-11-22
+        previousSharedPaths:
+          - glob: docs/exec-protocol/v1-two-node-isolation-plan.md
+            landerTask: exec-protocol-v1-min-loop
+            reason: Human-authorized isolated PR-B execution protocol v1 minimal loop.
+              Exact-path lander is exec-protocol-v1-min-loop
+              (cursor-shuanggui-publish). Does not take over
+              pi-sdk-family-migration-v3 or other broad globs; their declarations
+              remain.
+            reviewAfter: 2026-12-31
+          - glob: docs/exec-protocol/v1-two-node-change-ticket.md
+            landerTask: exec-protocol-v1-min-loop
+            reason: Human-authorized isolated PR-B execution protocol v1 minimal loop.
+              Exact-path lander is exec-protocol-v1-min-loop
+              (cursor-shuanggui-publish). Does not take over
+              pi-sdk-family-migration-v3 or other broad globs; their declarations
+              remain.
+            reviewAfter: 2026-12-31
+          - glob: docs/design/collab-context-p3-private-memory-promote-2026-10-14.md
+            landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+            reason: "P1-C note: production RPC entry; flag default still OFF."
+            reviewAfter: 2026-11-30
+          - glob: .loom/registry.yaml
+            landerTask: loom-workspace-orchestrator:kiro-loom
+            reason: Global loom registry. WS-C only appended session
+              memory-workspace-platform-remediation:cursor-memory-wsc; kiro-loom
+              lands.
+          - glob: src/gateway/skill-lifecycle-store.ts
+            landerTask: capability-lifecycle-closure:kiro-daibai
+            reason: Existing skill lifecycle SoT lander. Evolution adapter is a reader.
+            reviewAfter: 2026-10-07
+          - glob: .loom/registry.yaml
+            landerTask: loom-workspace-orchestrator:kiro-loom
+            reason: Global loom registry. RC only appended cursor-evolution task and path
+              landers.
+        priorTaskHistoriesPreserved: true
+        liveWipPreserved: true
+      configTakeover:
+        authorizedBy: human
+        date: 2026-11-22
+        previousOwners:
+          - cursor-data-governance
+        liveWip: clean
+        scope: five frozen exact ignores; six table local repair preferred; preserve all
+          other rules
+      discordTakeover:
+        authorizedBy: human
+        date: 2026-11-22
+        previousLander: agent-runtime-convergence / 双规发布
+        previousTestOwner: pi-sdk-family-migration-v3:cursor
+        liveWip: both exact files clean at verification
+        scope:
+          - src/discord/send.outbound.ts
+          - src/discord/send.webhook-activity.test.ts
+      guardTakeover:
+        authorizedBy: human
+        previousOwner: pi-sdk-family-migration-v3:cursor / cursor
+        liveWip: clean
+        date: 2026-11-22
+        scope:
+          - src/infra/net/fetch-guard.ts
+          - src/infra/net/fetch-guard.ssrf.test.ts
+      residualTakeover:
+        authorizedBy: human
+        date: 2026-11-22
+        previousSharedPaths:
+          - glob: ui/src/ui/app.ts
+            landerTask: agent-runtime-convergence
+            reason: Human-authorized bounded autonomous artifact lifecycle closure; retain
+              other declarations and history.
+            reviewAfter: 2026-11-30
+          - glob: src/agent-runtime/state/index.ts
+            landerTask: agent-runtime-convergence
+            reason: User-authorized public state boundary remediation; preserve predecessor
+              scopes.
+            reviewAfter: 2026-11-30
+        liveWip: shared.ts archived only; no source WIP copied
+        scope:
+          - src/gateway/collaboration-learning.ts
+          - src/gateway/collaboration-learning/shared.ts
+          - src/gateway/platform-auth/auth-helpers.ts
+          - src/gateway/platform-auth/routes-enterprise.ts
+          - ui/src/ui/app.ts
+          - src/agent-runtime/command/rule-adaptation/library-feedback.ts
+          - src/agent-runtime/command/interaction-terminal.s1.test.ts
+          - src/agent-runtime/command/rule-adaptation/official-deepseek-complete.ts
+          - src/agent-runtime/model/interaction-resource-wait.test.ts
+          - src/gateway/chat-interaction-failure.ts
+          - src/gateway/collaboration-learning/group-interaction-understanding.ts
+          - src/agent-runtime/wiring/dynamic-rule-constraints.test.ts
+          - src/agent-runtime/wiring/dynamic-rule-constraints.ts
+          - src/gateway/collaboration-dispatch/round-store-io.ts
+          - src/agent-runtime/command/rule-adaptation/index.ts
+          - src/agent-runtime/state/index.ts
+      modelPublicEntryTakeover:
+        authorizedBy: human
+        previousOwner: pi-sdk-family-migration-v3:cursor / cursor
+        liveWip: clean
+        date: 2026-11-22
+        scope:
+          - src/agent-runtime/model/index.ts
+      locHelperTakeover:
+        authorizedBy: human
+        previousOwner: pi-sdk-family-migration-v3:cursor / cursor
+        liveWip: clean
+        date: 2026-11-22
+        scope:
+          - src/gateway/collaboration-learning/member-governance.ts
+          - src/gateway/platform-auth/session-cookie-headers.ts
+          - src/gateway/platform-auth/enterprise-activation-url.ts
+          - ui/src/ui/account-computer/preview-request.ts
+          - src/gateway/collaboration-learning/wake-contract-entry.ts
+      durablePublicEntryTakeover:
+        authorizedBy: human
+        previousOwner: cursor / 双规发布; live file absent; frozen327 thin port reviewed but
+          reconstructed independently
+        liveWip: clean
+        date: 2026-11-22
+        scope:
+          - src/agent-runtime/state/durable-json.ts
   - id: local-ui-seams
     owner: codex-runtime-manager
     intent: []
@@ -30293,6 +30586,587 @@ landingStreams:
       agent: codex-runtime-manager
       purpose: Three-way registry merge preserving tasks, sessions and landing history.
 sharedPaths:
+  - glob: src/agent-runtime/state/durable-json.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact audit path redaction; previous task history retained.
+  - glob: src/gateway/collaboration-learning/member-governance.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact audit path redaction; previous task history retained.
+  - glob: src/gateway/platform-auth/session-cookie-headers.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact audit path redaction; previous task history retained.
+  - glob: src/gateway/platform-auth/enterprise-activation-url.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact audit path redaction; previous task history retained.
+  - glob: ui/src/ui/account-computer/preview-request.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact audit path redaction; previous task history retained.
+  - glob: src/gateway/collaboration-learning/wake-contract-entry.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact audit path redaction; previous task history retained.
+  - glob: src/agent-runtime/model/index.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact audit path redaction; previous task history retained.
+  - glob: src/gateway/collaboration-learning.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact LOC and public-entry baseline repair; predecessor history retained.
+  - glob: src/gateway/collaboration-learning/shared.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact LOC and public-entry baseline repair; predecessor history retained.
+  - glob: src/gateway/platform-auth/auth-helpers.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact LOC and public-entry baseline repair; predecessor history retained.
+  - glob: src/gateway/platform-auth/routes-enterprise.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact LOC and public-entry baseline repair; predecessor history retained.
+  - glob: ui/src/ui/app.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact LOC and public-entry baseline repair; predecessor history retained.
+  - glob: src/agent-runtime/command/rule-adaptation/library-feedback.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact LOC and public-entry baseline repair; predecessor history retained.
+  - glob: src/agent-runtime/command/interaction-terminal.s1.test.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact LOC and public-entry baseline repair; predecessor history retained.
+  - glob: src/agent-runtime/command/rule-adaptation/official-deepseek-complete.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact LOC and public-entry baseline repair; predecessor history retained.
+  - glob: src/agent-runtime/model/interaction-resource-wait.test.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact LOC and public-entry baseline repair; predecessor history retained.
+  - glob: src/gateway/chat-interaction-failure.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact LOC and public-entry baseline repair; predecessor history retained.
+  - glob: src/gateway/collaboration-learning/group-interaction-understanding.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact LOC and public-entry baseline repair; predecessor history retained.
+  - glob: src/agent-runtime/wiring/dynamic-rule-constraints.test.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact LOC and public-entry baseline repair; predecessor history retained.
+  - glob: src/agent-runtime/wiring/dynamic-rule-constraints.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact LOC and public-entry baseline repair; predecessor history retained.
+  - glob: src/gateway/collaboration-dispatch/round-store-io.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact LOC and public-entry baseline repair; predecessor history retained.
+  - glob: src/agent-runtime/command/rule-adaptation/index.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact LOC and public-entry baseline repair; predecessor history retained.
+  - glob: src/agent-runtime/state/index.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact LOC and public-entry baseline repair; predecessor history retained.
+  - glob: src/infra/net/fetch-guard.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact audit path redaction; previous task history retained.
+  - glob: src/infra/net/fetch-guard.ssrf.test.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact audit path redaction; previous task history retained.
+  - glob: src/discord/send.webhook-activity.test.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized minimal Discord webhook guard repair.
+  - glob: .oxfmtrc.jsonc
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact configuration repair; previous tasks and histories retained.
+  - glob: .kiro/specs/agent-runtime-convergence/acceptance-479f9ba14c10e27446e6444e82a9a92c9b546013.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/agent-runtime-convergence/acceptance-t9-final-62f62063e.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/agent-runtime-convergence/acceptance-t9-final-bc120f691.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/agent-runtime-convergence/archive/interaction-retirement-2026-11-05.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/agent-runtime-convergence/batch-b-acceptance-rejection-fix-2026-11-09.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/agent-runtime-convergence/batch-c-collab-ownership-2026-11-09.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/agent-runtime-convergence/batch-c-compile-txn-2026-11-09.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/agent-runtime-convergence/batch-d-evidence-supplement-2026-11-09.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/agent-runtime-convergence/collab-policy-state-migration-boundary-2026-11-09.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/agent-runtime-convergence/component-migration-matrix.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/agent-runtime-convergence/current-mainline-review-2026-11-06.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/agent-runtime-convergence/execution-authority-closure-plan-2026-11-09.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/agent-runtime-convergence/execution-authority-inventory.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/agent-runtime-convergence/execution-authority-t0-baseline-2026-11-09.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/agent-runtime-convergence/expert-1-architecture-acceptance-2026-11-06.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/agent-runtime-convergence/expert-2-mainline-acceptance-2026-11-06.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/agent-runtime-convergence/individual-policy-state-closure-slices-2026-11-09.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/agent-runtime-convergence/limited-review-b92d96340-20261108.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/agent-runtime-convergence/onboarding-and-rule-retirement.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/agent-runtime-convergence/package6-same-sha-acceptance.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/agent-runtime-convergence/phase-split-repair-20261109.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/agent-runtime-convergence/real-runtime-acceptance-20261109.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/agent-runtime-convergence/retirement-disposition.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/agent-runtime-convergence/rule-catalog-coverage.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/agent-runtime-convergence/structure-alignment.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/agent-runtime-convergence/t4-completion-window-2026-11-09.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/agent-runtime-convergence/t9-accepted-artifact-delivery-bridge-design.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/agent-runtime-convergence/t9-ext-gateway-17-fail-attribution.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/agent-runtime-convergence/t9-ext-gateway-17-fail-release-disposition.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/agent-runtime-convergence/t9-group-final-delivery-bridge-design.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/agent-runtime-convergence/tasks.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/local-ui-seams/s0-failure-injection-test-list.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/local-ui-seams/s0-legacy-rules-retirement-candidates.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/local-ui-seams/s0-limited-approval-map-2026-11-13.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/local-ui-seams/s0-scene-entry-and-consumer-map.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/local-ui-seams/s0-sha-and-anchor-inventory.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/local-ui-seams/s0-three-role-contract-map.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .kiro/specs/watchdog-task-closure/tasks.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: .loom/registry.yaml
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: deploy/production/RELEASE_RECORD.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/OPENBOT_OPENCLAW_COMPAT.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/PR143-MERGE-NOTES.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/acceptance/fullstack-2026-11-01/09-coverage-progress.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/acceptance/fullstack-2026-11-01/10-acceptance-conclusion.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/acceptance/fullstack-2026-11-01/10-control-ui-credential-free.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/acceptance/fullstack-2026-11-01/10-coverage-inventory-tracked.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/acceptance/fullstack-2026-11-01/10-pr193-review.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/acceptance/p1-fix-2026-11-01/defect-status.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/acceptance/runs/2026-11-02-credentials-omit/00-pin.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/acceptance/runs/2026-11-02-credentials-omit/01-credentials-omit-root-cause.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/acceptance/runs/2026-11-02-independent-reviewer-corrections/00-exhaustiveness-note.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/acceptance/runs/2026-11-02-independent-reviewer-corrections/00-reviewer-corrections.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/acceptance/runs/2026-11-02-independent-reviewer-corrections/01-owner-confirm-round2.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/acceptance/runs/2026-11-02-pr194-locate/README.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/audits/2026-11-01-closed-loop-demand-diagnosis-notify.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/design/collab-context-p3-private-memory-promote-2026-10-14.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/design/evidence/memory-system-final-closeout-2026-11-01/composition-root-loc-fix-2026-11-01.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/design/evidence/memory-system-final-closeout-2026-11-01/pr182-local-rerun-comment.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/design/memory-continuity-acceptance.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/design/tri-platform-unification-2026-07-05.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/exec-protocol/v1-two-node-change-ticket.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/exec-protocol/v1-two-node-isolation-plan.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/notes/controlled-collab-formal-chain-breakpoints-2026-11-01.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/notes/controlled-discuss-to-task-p1-2026-10-31.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/notes/delivery-guard-debt-2026-11-16/README.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/notes/delivery-guard-debt-2026-11-16/c1-seq151-test-intent.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/notes/delivery-guard-debt-2026-11-16/c2-missing-object-restore-plan.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/notes/delivery-guard-debt-2026-11-16/c3-current-generated-block.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/notes/delivery-guard-debt-2026-11-16/c3-proposed-generated-block.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/notes/delivery-guard-debt-2026-11-16/c3-release-record-correction-proposal.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/notes/delivery-guard-debt-2026-11-16/local-substitute-ci-coverage.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/notes/fix-ab-ghost-confirm-chat-history-20261029.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/notes/fix-member-governance-owner-identity-20261029.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/notes/infrastructure-audit-2026-10-31.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/notes/infrastructure-audit-2026-10-31/a3-control-experiment-plan-PENDING-AUTH.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/notes/infrastructure-audit-2026-10-31/a3-implementation-pack-PENDING-AUTH.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/notes/infrastructure-audit-2026-10-31/batch-b-local-gate-2026-10-31.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/notes/infrastructure-audit-2026-10-31/batch-c-provenance-staging-2026-10-31.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/notes/infrastructure-audit-2026-10-31/billing-h1-blocked-2026-10-31.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/notes/infrastructure-audit-2026-10-31/closeout-2026-11-01.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/notes/infrastructure-audit-2026-10-31/closeout-evidence-index-2026-11-01.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/notes/infrastructure-audit-2026-10-31/closeout-residual-handoff-2026-11-01.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/notes/infrastructure-audit-2026-10-31/disk-inventory-2026-10-31.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/notes/infrastructure-audit-2026-10-31/ledger-audit-2026-10-31.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/notes/infrastructure-audit-2026-10-31/ledger-audit-finding-codes-exit30-2026-10-31.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/notes/infrastructure-audit-2026-10-31/ledger-error-classification-2026-10-31.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/notes/infrastructure-audit-2026-10-31/p1-dag-break-evidence-closure-2026-10-31.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/notes/infrastructure-audit-2026-10-31/p1-object-recovery-reclassification-2026-10-31.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/notes/infrastructure-audit-2026-10-31/plan.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/notes/infrastructure-audit-2026-10-31/release-record-anti-drift-2026-10-31.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/notes/team-real-f4-board-confirmer-chain-2026-10-28.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/reference/ci-local-merge-gate.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/repo-split/G1-inventory.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/repo-split/README.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/repo-split/decisions.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/slice1-decision-to-reply-path.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/slice2-aside-reply-concurrency-design.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/slice2-aside-reply-design.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/slice2-chat-during-task-delivery.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/slice2-chat-during-task-evidence.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/slice2-e2e-real-model-acceptance.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/slice2-reply-lane-joint-verification.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: docs/slice3-context-enhancement-delivery.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: evidence/watchdog-task-closure-acceptance-2026-11-01.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: out/agent-runtime-observability-optimization-plan.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: scripts/knowledge-universe-scale-measure.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: src/agent-runtime/state/mutations/session-reset-focus.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: src/agent-runtime/state/repository/async-wait-visible-identity.test.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: src/agents/sandbox/ACCOUNT_WORKER_SANDBOX_IMAGES.md
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: src/gateway/chat-attachment-kind.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: src/gateway/chat-attachments.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: src/gateway/collaboration-dispatch/executor-private-todolist.test.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: src/gateway/enterprise-data/projection-template-engine.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: src/gateway/knowledge/empty-bundle.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: src/gateway/knowledge/governance/chunk-governance-store.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: src/gateway/knowledge/governance/runtime/object-writeback.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: src/gateway/knowledge/kb-index-read-pool.test.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: src/gateway/knowledge/runtime/relationship-builder.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: src/gateway/knowledge/runtime/relationship-runtime-async.test.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: src/gateway/knowledge/runtime/relationship-runtime.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: src/gateway/knowledge/testing/knowledge-universe-scale-fixture.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: ui/src/ui/ports/employee/views/workbench-robot-operational-identity-panel.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: src/gateway/skill-lifecycle-store.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: src/gateway/pattern-detection/publish.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
+  - glob: src/gateway/pattern-detection/pattern-detection.test.ts
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    reason: Human-authorized exact-path baseline gate repair; original tasks and
+      sessions retained.
   - glob: src/exec-protocol/**
     landerTask: exec-protocol-v1-min-loop
     reason: Human-authorized isolated PR-B execution protocol v1 minimal loop. Exact-path lander is
@@ -30306,18 +31180,6 @@ sharedPaths:
       pi-sdk-family-migration-v3 or other broad globs; their declarations remain.
     reviewAfter: 2026-12-31
   - glob: docs/exec-protocol/v1-reconcile-and-retry-freeze.md
-    landerTask: exec-protocol-v1-min-loop
-    reason: Human-authorized isolated PR-B execution protocol v1 minimal loop. Exact-path lander is
-      exec-protocol-v1-min-loop (cursor-shuanggui-publish). Does not take over
-      pi-sdk-family-migration-v3 or other broad globs; their declarations remain.
-    reviewAfter: 2026-12-31
-  - glob: docs/exec-protocol/v1-two-node-isolation-plan.md
-    landerTask: exec-protocol-v1-min-loop
-    reason: Human-authorized isolated PR-B execution protocol v1 minimal loop. Exact-path lander is
-      exec-protocol-v1-min-loop (cursor-shuanggui-publish). Does not take over
-      pi-sdk-family-migration-v3 or other broad globs; their declarations remain.
-    reviewAfter: 2026-12-31
-  - glob: docs/exec-protocol/v1-two-node-change-ticket.md
     landerTask: exec-protocol-v1-min-loop
     reason: Human-authorized isolated PR-B execution protocol v1 minimal loop. Exact-path lander is
       exec-protocol-v1-min-loop (cursor-shuanggui-publish). Does not take over
@@ -30775,7 +31637,7 @@ sharedPaths:
     reason: Human-authorized bounded runtime transport migration; retain predecessor scopes and history.
     reviewAfter: 2026-11-30
   - glob: src/discord/send.outbound.ts
-    landerTask: agent-runtime-convergence
+    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
     reason: Human-authorized bounded runtime transport migration; retain predecessor scopes and history.
     reviewAfter: 2026-11-30
   - glob: src/discord/send.task-boundary.test.ts
@@ -31225,10 +32087,6 @@ sharedPaths:
   - glob: scripts/evidence/prove-loopback-http.ts
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability
     reason: Eight-capability matrix and P0 evidence for this batch.
-    reviewAfter: 2026-11-30
-  - glob: docs/design/collab-context-p3-private-memory-promote-2026-10-14.md
-    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
-    reason: "P1-C note: production RPC entry; flag default still OFF."
     reviewAfter: 2026-11-30
   - glob: src/gateway/server-methods/collaboration-learning.ts
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability
@@ -31695,10 +32553,6 @@ sharedPaths:
     landerTask: tenant-context-propagation:cursor-fable
     reason: "Proxy wrap-up 2026-08-06: enterprise admin action noop stubs (tenant-ia + opsd);
       human-approved batch land."
-  - glob: .loom/registry.yaml
-    landerTask: loom-workspace-orchestrator:kiro-loom
-    reason: Global loom registry. WS-C only appended session
-      memory-workspace-platform-remediation:cursor-memory-wsc; kiro-loom lands.
   - glob: docs/design/evidence/memory-workspace-phase0-section141-signoff-matrix.json
     landerTask: memory-workspace-platform-remediation:codex-workspace-architecture
     reason:
@@ -32432,10 +33286,6 @@ sharedPaths:
     landerTask: evolution-runtime-closure
     reason: Existing binding lander grok-evolution-closure. RC integration only.
     reviewAfter: 2026-10-07
-  - glob: src/gateway/skill-lifecycle-store.ts
-    landerTask: capability-lifecycle-closure:kiro-daibai
-    reason: Existing skill lifecycle SoT lander. Evolution adapter is a reader.
-    reviewAfter: 2026-10-07
   - glob: src/gateway/server-methods/packs/manifest.ts
     landerTask: data-governance-v2-p0:cursor-data-governance
     reason: Existing pack manifest lander. Evolution pack append is review-only.
@@ -32494,9 +33344,6 @@ sharedPaths:
     landerTask: openbot-evolution-unification:cursor-evolution
     reason: Working DNA observation metric tests.
     reviewAfter: 2026-10-07
-  - glob: .loom/registry.yaml
-    landerTask: loom-workspace-orchestrator:kiro-loom
-    reason: Global loom registry. RC only appended cursor-evolution task and path landers.
   - glob: src/gateway/pattern-detection/working-dna-proposal.ts
     landerTask: openbot-evolution-unification:cursor-evolution
     reason: Working DNA proposal production path from operational observations.
@@ -32865,12 +33712,6 @@ sharedPaths:
       and history.
     reviewAfter: 2026-11-30
   - glob: src/gateway/server-methods/steward-workspace-file.ts
-    landerTask: agent-runtime-convergence
-    reason:
-      Human-authorized bounded autonomous artifact lifecycle closure; retain other declarations
-      and history.
-    reviewAfter: 2026-11-30
-  - glob: ui/src/ui/app.ts
     landerTask: agent-runtime-convergence
     reason:
       Human-authorized bounded autonomous artifact lifecycle closure; retain other declarations
@@ -33261,10 +34102,6 @@ sharedPaths:
   - glob: test/fixtures/runtime-convergence/pending-delivery.restart-child.ts
     landerTask: agent-runtime-convergence
     reason: User-authorized isolated restart acceptance fixture.
-    reviewAfter: 2026-11-30
-  - glob: src/agent-runtime/state/index.ts
-    landerTask: agent-runtime-convergence
-    reason: User-authorized public state boundary remediation; preserve predecessor scopes.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/command/command-outcome-entry.ts
     landerTask: agent-runtime-convergence
