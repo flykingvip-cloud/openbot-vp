@@ -13,14 +13,14 @@
 - 环境：`env.txt`（Node v22.23.4，pnpm 10.23.0，shallow=false，Linux 6.12.94+）
 - 安装：`pnpm install --frozen-lockfile` 退出码 0，2026-11-01T12:59:06Z。lockfile 未提交变更
 
-| 记录 | 命令 | 退出码 | UTC | 原始输出 |
-|---|---|---:|---|---|
-| 汇总 | 见各行 | 见 `summary.txt` | 12:59:16 起 | `summary.txt` |
-| 本地门禁单测 | `pnpm exec vitest run scripts/ci-local-merge-gate.test.ts` | 0 | 12:59:16–12:59:18 | `raw-command-outputs.tar.gz` → `vitest-ci-local-merge-gate.out` / `.err` |
-| 防漂移单测 | `pnpm exec vitest run scripts/delivery/release-record.test.ts` | 0 | 12:59:18–12:59:19 | `raw-command-outputs.tar.gz` → `vitest-release-record.out` / `.err` |
-| 账本与 forward-guard 单测 | `pnpm exec vitest run scripts/delivery/ledger.test.ts scripts/delivery/forward-guard.test.ts` | 0 | 12:59:19–12:59:21 | `raw-command-outputs.tar.gz` → `vitest-ledger-forward.out` / `.err` |
-| 人类记录检查 | `pnpm delivery:release-record:check` | 0 | 12:59:21 | `raw-command-outputs.tar.gz` → `release-record-check.out` / `.err` |
-| 账本审计 | `pnpm delivery:ledger:audit` | 30 | 12:59:28–12:59:29 | `raw-command-outputs.tar.gz` → `ledger-audit.out`（warn）/ `ledger-audit.err`（ERROR）；计数旁路：`ledger-audit-code-counts.json` |
+| 记录                      | 命令                                                                                          |           退出码 | UTC               | 原始输出                                                                                                                          |
+| ------------------------- | --------------------------------------------------------------------------------------------- | ---------------: | ----------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| 汇总                      | 见各行                                                                                        | 见 `summary.txt` | 12:59:16 起       | `summary.txt`                                                                                                                     |
+| 本地门禁单测              | `pnpm exec vitest run scripts/ci-local-merge-gate.test.ts`                                    |                0 | 12:59:16–12:59:18 | `raw-command-outputs.tar.gz` → `vitest-ci-local-merge-gate.out` / `.err`                                                          |
+| 防漂移单测                | `pnpm exec vitest run scripts/delivery/release-record.test.ts`                                |                0 | 12:59:18–12:59:19 | `raw-command-outputs.tar.gz` → `vitest-release-record.out` / `.err`                                                               |
+| 账本与 forward-guard 单测 | `pnpm exec vitest run scripts/delivery/ledger.test.ts scripts/delivery/forward-guard.test.ts` |                0 | 12:59:19–12:59:21 | `raw-command-outputs.tar.gz` → `vitest-ledger-forward.out` / `.err`                                                               |
+| 人类记录检查              | `pnpm delivery:release-record:check`                                                          |                0 | 12:59:21          | `raw-command-outputs.tar.gz` → `release-record-check.out` / `.err`                                                                |
+| 账本审计                  | `pnpm delivery:ledger:audit`                                                                  |               30 | 12:59:28–12:59:29 | `raw-command-outputs.tar.gz` → `ledger-audit.out`（warn）/ `ledger-audit.err`（ERROR）；计数旁路：`ledger-audit-code-counts.json` |
 
 本轮 audit 计数（从上述原始文件解析，不是历史 146 表）：ERROR missing-object 157；warn timeline-gap 8；warn overlay-debt 15；warn missing-tag 1。无 regression、incomplete-graph、open-interval 行。
 

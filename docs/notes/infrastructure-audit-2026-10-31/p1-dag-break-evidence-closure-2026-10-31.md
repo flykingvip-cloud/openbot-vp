@@ -10,10 +10,10 @@
 
 Both object stores used for classification are **shallow**:
 
-| repo | path | shallow | boundaries |
-|---|---|---|---|
-| audit (openbot-vp worktree) | `/Users/daniel/AI VP/openbot-infrastructure-audit` | true | `9a8e91d19e89…` (seq144 tip) |
-| donor | `/Users/daniel/AI项目/openbot` | true | 6 boundaries (see provenance JSON) |
+| repo                        | path                                               | shallow | boundaries                         |
+| --------------------------- | -------------------------------------------------- | ------- | ---------------------------------- |
+| audit (openbot-vp worktree) | `/Users/daniel/AI VP/openbot-infrastructure-audit` | true    | `9a8e91d19e89…` (seq144 tip)       |
+| donor                       | `/Users/daniel/AI项目/openbot`                     | true    | 6 boundaries (see provenance JSON) |
 
 `#173` tip `3b16dc781` used **donor_primary**. That is unsafe as adjudication authority:
 donor shallow boundaries can yield empty `merge-base` / false non-ancestor.
@@ -22,13 +22,13 @@ Also: **tip objects present ≠ parent chain complete**.
 
 ## Per-seq closure table
 
-| seq | prior | current | solo audit | solo donor | joint alternate | **after closure** |
-|---:|---|---|---|---|---|---|
-| 52 | `59be50660d8e` | `756a577ec77e` | cmd fail (missing mid `cdd67eab` in audit-only) | non-ancestor + shallow hit on current walk | audit+donor objects → **anc=0**, mb=`59be5066…` | **forward-only** |
-| 100 | `28ef650e0f97` | `6628f4bf364b` | **anc=0**, mb=`28ef650e…` | non-ancestor + shallow hits | (positive already) | **forward-only** |
-| 121 | `0411972cd38c` | `13ff093d281b` | **anc=0**, mb=`0411972c…` | non-ancestor + shallow hits | (positive already) | **forward-only** |
-| 140 | `d95f332d39c8` | `c33c140167bf` | **anc=0**, mb=`d95f332d…` | non-ancestor + shallow hits | (positive already) | **forward-only** |
-| 145 | `9a8e91d19e89` | `065840dfba12` | anc=1/rev=1; prior **is** shallow boundary; parent `b9be3ec5` missing in audit | current tip missing in donor | tips both visible; still anc=1/rev=1; prior `rev-list --count=1` on audit (shallow marker) | **incomplete_graph_unknown** — label **「当前联合对象图下非祖先」**; **not** 「历史无共同祖先」 |
+| seq | prior          | current        | solo audit                                                                     | solo donor                                 | joint alternate                                                                            | **after closure**                                                                               |
+| --: | -------------- | -------------- | ------------------------------------------------------------------------------ | ------------------------------------------ | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+|  52 | `59be50660d8e` | `756a577ec77e` | cmd fail (missing mid `cdd67eab` in audit-only)                                | non-ancestor + shallow hit on current walk | audit+donor objects → **anc=0**, mb=`59be5066…`                                            | **forward-only**                                                                                |
+| 100 | `28ef650e0f97` | `6628f4bf364b` | **anc=0**, mb=`28ef650e…`                                                      | non-ancestor + shallow hits                | (positive already)                                                                         | **forward-only**                                                                                |
+| 121 | `0411972cd38c` | `13ff093d281b` | **anc=0**, mb=`0411972c…`                                                      | non-ancestor + shallow hits                | (positive already)                                                                         | **forward-only**                                                                                |
+| 140 | `d95f332d39c8` | `c33c140167bf` | **anc=0**, mb=`d95f332d…`                                                      | non-ancestor + shallow hits                | (positive already)                                                                         | **forward-only**                                                                                |
+| 145 | `9a8e91d19e89` | `065840dfba12` | anc=1/rev=1; prior **is** shallow boundary; parent `b9be3ec5` missing in audit | current tip missing in donor               | tips both visible; still anc=1/rev=1; prior `rev-list --count=1` on audit (shallow marker) | **incomplete_graph_unknown** — label **「当前联合对象图下非祖先」**; **not** 「历史无共同祖先」 |
 
 Machine-readable: `p1-dag-break-evidence-closure-2026-10-31.json`, `p1-dag-break-graph-closure-raw-2026-10-31.json`.
 
@@ -57,11 +57,11 @@ Machine-readable: `p1-dag-break-evidence-closure-2026-10-31.json`, `p1-dag-break
 
 ## Recovery counts（三项必须区分，禁止混写）
 
-| 项 | 数量 | 来源 |
-|---|---:|---|
-| 恢复 tip **对象/清单**（inventory） | **137** | `p1-donor-provenance-2026-10-31.json` · `recovered_tips_into_audit_refs_count`；对象现均 `cat-file` 可读 |
-| `recovered-shas.txt` **行数** | **137** | 同目录清单文件 |
-| 捕获时仍存在的 `refs/audit-recovery/*` **refs 数** | **5** | `p1-dag-break-graph-closure-raw-2026-10-31.json` → `provenance.audit.audit_recovery_ref_count` |
+| 项                                                 |    数量 | 来源                                                                                                     |
+| -------------------------------------------------- | ------: | -------------------------------------------------------------------------------------------------------- |
+| 恢复 tip **对象/清单**（inventory）                | **137** | `p1-donor-provenance-2026-10-31.json` · `recovered_tips_into_audit_refs_count`；对象现均 `cat-file` 可读 |
+| `recovered-shas.txt` **行数**                      | **137** | 同目录清单文件                                                                                           |
+| 捕获时仍存在的 `refs/audit-recovery/*` **refs 数** |   **5** | `p1-dag-break-graph-closure-raw-2026-10-31.json` → `provenance.audit.audit_recovery_ref_count`           |
 
 **不得**把 refs=5（或误写 0）写成「恢复 tip = 0」，也不得把 inventory=137 说成「当前仍有 137 条 recovery refs」。
 

@@ -1,11 +1,13 @@
 # Batch B — local merge gate fail-closed (2026-10-31)
 
 ## Intent
+
 Make the local CI Gate substitute honest: never PASS on a stale/unreachable
 `origin/main`, never let an older `--base` bypass trunk ancestry, and never self-report
 `passed` when absolute gates were skipped.
 
 ## Changes
+
 1. `scripts/ci-local-merge-gate.sh`
    - Fail closed on `git fetch origin main`
    - Always require freshly fetched `origin/main` ∈ ancestors(candidate)
@@ -17,6 +19,7 @@ Make the local CI Gate substitute honest: never PASS on a stale/unreachable
 4. `.github/workflows/ci-gate.yml` — comment-only; empty-steps observed, billing not asserted
 
 ## Verification
+
 - `bash -n scripts/ci-local-merge-gate.sh`
 - `pnpm vitest run scripts/ci-local-merge-gate.test.ts`
 - Codex independent acceptance (this agent does not declare PASS)
