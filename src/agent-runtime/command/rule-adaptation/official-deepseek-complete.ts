@@ -11,4 +11,4 @@ export {
   resolveOfficialDeepSeekCredential,
   createOfficialDeepSeekShadowCompletion,
   type OfficialDeepSeekCredential,
-} from "../../model/rule-adaptation/official-deepseek-complete.js";
+} from "../../model/rule-adaptation/index.js";
