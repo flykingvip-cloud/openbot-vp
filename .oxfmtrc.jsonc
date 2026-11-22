@@ -9,6 +9,16 @@
   "tabWidth": 2,
   "useTabs": false,
   "ignorePatterns": [
+    // Exact formatter regressions: table syntax changes; original bytes retained.
+    "docs/acceptance/fullstack-2026-11-01/09-coverage-progress.md",
+    "docs/acceptance/fullstack-2026-11-01/10-coverage-inventory-tracked.md",
+    "docs/acceptance/fullstack-2026-11-01/10-pr193-review.md",
+    // Existing S0 frozen evidence; see local-ui-seams/s0-limited-approval-map.
+    ".kiro/specs/local-ui-seams/s0-failure-injection-test-list.md",
+    ".kiro/specs/local-ui-seams/s0-legacy-rules-retirement-candidates.md",
+    ".kiro/specs/local-ui-seams/s0-scene-entry-and-consumer-map.md",
+    ".kiro/specs/local-ui-seams/s0-sha-and-anchor-inventory.md",
+    ".kiro/specs/local-ui-seams/s0-three-role-contract-map.md",
     // Frozen / governance-protected records: must not be rewritten, not even whitespace.
     ".kiro/specs/constitutional-governance-discovery/",
     "packages/constitutional-contracts/",
