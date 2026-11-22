@@ -6,7 +6,7 @@
 ## 主路径顺序（attempt.ts，未重排）
 
 1. 模型执行（tool / assistant stop）
-2. `runExecutionStallContinueLoop` ≈2675：有限续跑  
+2. `runExecutionStallContinueLoop` ≈2675：有限续跑
    - 判定：`executionContinueKind` / `shouldContinueAfterEmptyToolFinal`
 3. `dropSupersededStallTexts` ≈2772：清掉已被续跑越过的停滞文案
 4. `rewriteAttemptVisibleReply` ≈2781：终局可见改写（语言 / plan-speak 透传 / OGUI / `settleTurnCompletion`）
@@ -14,13 +14,13 @@
 
 ## 谁判断什么（单一负责位置）
 
-| 决定 | 负责位置 | 传到出口的内容 | 缺口（改前） |
-|---|---|---|---|
-| 是否续跑（推进中） | `executionContinueKind` → stall loop | 隐式：续跑成功则停笔文案被 drop；**无结构化「正在推进」传给 partial/block** | 回复层用关键词自造「请确认/购物暂停」 |
-| 需要主人输入 | stall 内 `HARD_DECISION_RE` / waiting_confirmation / missing choice；OGUI；模型原文问句 | 主要靠**助手原文**；turn-completion `true_fork` 可改写终局 | 回复层可能覆盖成购物 CTA |
-| 等待外部条件 | 模型 progress / short holding；`isExecutionStallFinal` 触发续跑 | 进度原文；续跑后可被清除 | 流式阶段可能被改写成暂停原因 |
-| 已完成 | `settleTurnCompletion` → delivered | 终局 `visibleText` | 正文含价格等词时曾被 plan-speak 规则误伤（若仍像 plan-speak） |
-| 取消 / 超时 / 协议终止 | attempt 循环 `isAbortedOrTimedOut` / protocol boundary | 停止续跑；不经 reply 改写制造新状态 | 切片 2 贯通校验（本期不扩） |
+| 决定                   | 负责位置                                                                                | 传到出口的内容                                                              | 缺口（改前）                                                  |
+| ---------------------- | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| 是否续跑（推进中）     | `executionContinueKind` → stall loop                                                    | 隐式：续跑成功则停笔文案被 drop；**无结构化「正在推进」传给 partial/block** | 回复层用关键词自造「请确认/购物暂停」                         |
+| 需要主人输入           | stall 内 `HARD_DECISION_RE` / waiting_confirmation / missing choice；OGUI；模型原文问句 | 主要靠**助手原文**；turn-completion `true_fork` 可改写终局                  | 回复层可能覆盖成购物 CTA                                      |
+| 等待外部条件           | 模型 progress / short holding；`isExecutionStallFinal` 触发续跑                         | 进度原文；续跑后可被清除                                                    | 流式阶段可能被改写成暂停原因                                  |
+| 已完成                 | `settleTurnCompletion` → delivered                                                      | 终局 `visibleText`                                                          | 正文含价格等词时曾被 plan-speak 规则误伤（若仍像 plan-speak） |
+| 取消 / 超时 / 协议终止 | attempt 循环 `isAbortedOrTimedOut` / protocol boundary                                  | 停止续跑；不经 reply 改写制造新状态                                         | 切片 2 贯通校验（本期不扩）                                   |
 
 ## 各出口实际拿到什么
 
@@ -48,12 +48,12 @@
 
 ## 规则表（实施约束）
 
-| 规则 | 实现位置 | 调用入口 |
-|---|---|---|
+| 规则                   | 实现位置                                | 调用入口                                                      |
+| ---------------------- | --------------------------------------- | ------------------------------------------------------------- |
 | 是否改写计划话术为暂停 | `rewritePlanSpeakFinal`（现为恒等透传） | 终局 rewrite-visible-reply、流式/block `parseReplyDirectives` |
-| 是否续跑 | `executionContinueKind` 等 | `runExecutionStallContinueLoop` |
-| 终局交付/阻塞/分叉 | `settleTurnCompletion` | `rewriteAttemptVisibleReply` 末尾 |
-| 是否允许恢复任务 | 任务板校验（切片 2） | 入队/领取 |
+| 是否续跑               | `executionContinueKind` 等              | `runExecutionStallContinueLoop`                               |
+| 终局交付/阻塞/分叉     | `settleTurnCompletion`                  | `rewriteAttemptVisibleReply` 末尾                             |
+| 是否允许恢复任务       | 任务板校验（切片 2）                    | 入队/领取                                                     |
 
 同一规则可多入口调用；不得多处各写一套互斥语义。
 
