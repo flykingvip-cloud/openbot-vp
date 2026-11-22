@@ -94,3 +94,34 @@ it("rejects a stale interpreted resume after a concurrent state change without w
   );
   expect(fs.readFileSync(sessionTaskBoardPath(file), "utf8")).toBe(before);
 });
+
+it.each(["paused", "finished", "stale", "unauthorized"] as const)(
+  "does not continue a %s task or alter its board",
+  (condition) => {
+    const { file, request } = fixture();
+    if (condition !== "paused") {
+      mutateSessionTaskBoard(file, (board) => ({
+        board: {
+          ...board,
+          current: { ...board.current!, wakeSuppress: false, unfinished: condition !== "finished" },
+        },
+        value: undefined,
+      }));
+    }
+    const board = readSessionTaskBoard(file);
+    const before = fs.readFileSync(sessionTaskBoardPath(file), "utf8");
+    expect(
+      resumePausedCurrentTask(
+        file,
+        {
+          ...request,
+          action: "continue",
+          expectedWriteEpoch:
+            condition === "stale" ? request.expectedWriteEpoch : (board.writeEpoch ?? 0),
+        },
+        { authOk: condition !== "unauthorized", stopActive: false },
+      ).kind,
+    ).toBe("rejected");
+    expect(fs.readFileSync(sessionTaskBoardPath(file), "utf8")).toBe(before);
+  },
+);

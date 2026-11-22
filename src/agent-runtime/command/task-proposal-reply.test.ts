@@ -29,3 +29,17 @@ it("does not treat an unconfirmed drain as an already-effective revision", () =>
   expect(reply).not.toContain(decision.answer);
   expect(reply).not.toContain("已生效");
 });
+
+it("reports bound status using only host board facts", () => {
+  expect(
+    formatTaskProposalReply(
+      {
+        kind: "task_control",
+        action: "status",
+        target: { taskId: "a", revision: "1" },
+        answer: "Everything is completed and delivered",
+      },
+      { kind: "applied", text: "Task board: unfinished" },
+    ),
+  ).toBe("Task board: unfinished");
+});
