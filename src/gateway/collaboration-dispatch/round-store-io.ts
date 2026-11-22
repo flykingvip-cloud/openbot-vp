@@ -5,7 +5,7 @@ import {
   appendJsonlDurable,
   withDirectoryLock,
   writeJsonDurable,
-} from "../../agent-runtime/state/repository/durable-json.js";
+} from "../../agent-runtime/state/durable-json.js";
 import type { PersistedRound, RoundRuntimeEvent } from "./round-state.js";
 
 /** Stale lock age before withRoundLock unlinks and retries (ms). */

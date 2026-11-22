@@ -124,7 +124,7 @@ it("releases deadline timers and abort listeners after successful output", async
   vi.useFakeTimers();
   const controller = new AbortController();
   const remove = vi.spyOn(controller.signal, "removeEventListener");
-  const { raceVisibleInteraction } = await import("./interaction-resource-wait.js");
+  const { raceVisibleInteraction } = await import("./index.js");
   await expect(
     raceVisibleInteraction(Promise.resolve("answer"), {
       signal: controller.signal,
@@ -145,7 +145,7 @@ it("releases deadline timers and abort listeners after model failure", async () 
   vi.useFakeTimers();
   const controller = new AbortController();
   const remove = vi.spyOn(controller.signal, "removeEventListener");
-  const { raceVisibleInteraction } = await import("./interaction-resource-wait.js");
+  const { raceVisibleInteraction } = await import("./index.js");
   await expect(
     raceVisibleInteraction(Promise.reject(new Error("provider failed")), {
       signal: controller.signal,
@@ -159,7 +159,7 @@ it("releases deadline timers and abort listeners after model failure", async () 
 it("removes the pending deadline after an explicit user cancellation", async () => {
   vi.useFakeTimers();
   const controller = new AbortController();
-  const { raceVisibleInteraction } = await import("./interaction-resource-wait.js");
+  const { raceVisibleInteraction } = await import("./index.js");
   const pending = raceVisibleInteraction(new Promise<never>(() => {}), {
     signal: controller.signal,
     remainingMs: 15_000,

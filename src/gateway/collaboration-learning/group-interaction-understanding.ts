@@ -5,7 +5,7 @@ import {
   createInteractionResourceBudget,
   raceVisibleInteraction,
   interactionTimeoutError,
-} from "../../agent-runtime/model/interaction-resource-wait.js";
+} from "../../agent-runtime/model/index.js";
 /** Group host adapter: read authorized context, then use the shared governed interpretation. */
 import { resolveAgentDir } from "../../agents/agent-scope.js";
 import { resolveBootstrapContextForRun } from "../../agents/bootstrap-files.js";
