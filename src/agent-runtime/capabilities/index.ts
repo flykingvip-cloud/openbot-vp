@@ -1,5 +1,6 @@
 /** One capability invocation boundary. Existing adapters retain tool implementations. */
 export {
+  assertToolResultReplayAllowed,
   runBeforeToolCallHook,
   wrapToolWithBeforeToolCallHook,
   isToolWrappedWithBeforeToolCallHook,

@@ -15,10 +15,13 @@ import {
   inheritExecutionIdentityRunFields,
   type ExecutionIdentityContext,
 } from "../gateway/execution-identity-context.js";
+import type { GatewayClient } from "../gateway/server-methods/types.js";
 import {
   createLifecycleSkillIdentityTools,
   wrapToolsWithUniqueOwnerSkillInjection,
 } from "../gateway/skill-execution-binding/skill-tool-wrappers.js";
+import { canonicalizeTenantId } from "../gateway/tenant-canonicalization.js";
+import { resolveAuthoritativeMembership } from "../gateway/tenant-context.js";
 import { resolveMergedSafeBinProfileFixtures } from "../infra/exec-safe-bin-runtime-policy.js";
 import { logWarn } from "../logger.js";
 import { getPluginToolMeta } from "../plugins/tools.js";
@@ -26,6 +29,11 @@ import { isSubagentSessionKey } from "../routing/session-key.js";
 import { resolveGatewayMessageChannel } from "../utils/message-channel.js";
 import { resolveAgentConfig } from "./agent-scope.js";
 import { createApplyPatchTool } from "./apply-patch.js";
+import {
+  isBoundTenantAuthorityStillGranted,
+  isExternalWriteTool,
+  wrapToolWithAuthoritativeWriteRecheck,
+} from "./authoritative-write-recheck.js";
 import {
   createExecTool,
   createProcessTool,
@@ -90,6 +98,7 @@ import {
   mergeMentionedPluginToolAllowlist,
   resolveToolProfilePolicy,
 } from "./tool-policy.js";
+import { ToolAuthorizationError } from "./tools/common.js";
 import { createLocalFileToolsIfAvailable } from "./tools/local-file-tool-registration.js";
 import { resolveWorkspaceRoot } from "./workspace-dir.js";
 
@@ -229,6 +238,39 @@ export const __testing = {
   assertRequiredParams,
   applyModelProviderToolPolicy,
 } as const;
+
+function createChatSendWriteAuthorityRecheck(options?: {
+  executionIdentity?: ExecutionIdentityContext;
+  gatewayClientUser?: string;
+  gatewayClientSessionDomain?: GatewayClient["sessionDomain"];
+  gatewayClientPlatformUserId?: string;
+  gatewayClientSessionEnterpriseId?: string;
+  gatewayClientSessionMembershipId?: string;
+}): { isAuthorityStillGranted: () => Promise<boolean> } | undefined {
+  const boundEnterpriseId = canonicalizeTenantId(
+    options?.executionIdentity?.enterpriseId ?? options?.gatewayClientSessionEnterpriseId ?? null,
+  );
+  if (!boundEnterpriseId) {
+    return undefined;
+  }
+  const client = {
+    user: options?.executionIdentity?.user ?? options?.gatewayClientUser,
+    platformUserId:
+      options?.executionIdentity?.platformUserId ?? options?.gatewayClientPlatformUserId,
+    sessionDomain: options?.executionIdentity?.sessionDomain ?? options?.gatewayClientSessionDomain,
+    sessionEnterpriseId:
+      options?.executionIdentity?.enterpriseId ?? options?.gatewayClientSessionEnterpriseId,
+    sessionMembershipId:
+      options?.executionIdentity?.membershipId ?? options?.gatewayClientSessionMembershipId,
+  } as GatewayClient;
+  return {
+    isAuthorityStillGranted: () =>
+      isBoundTenantAuthorityStillGranted({
+        boundEnterpriseId,
+        resolveAuthority: () => resolveAuthoritativeMembership(client),
+      }),
+  };
+}
 
 export function createOpenClawCodingTools(options?: {
   sessionFile?: string;
@@ -836,8 +878,17 @@ export function createOpenClawCodingTools(options?: {
   // Record the list the model actually receives, after per-turn strips such as
   // hiding browser on a public-fetch turn.
   const policyFilteredCapabilities = withProviderSafeNames.map((tool) => tool.name);
+  const effectAuthority = createChatSendWriteAuthorityRecheck(options);
   const withHooks = withProviderSafeNames.map((tool) =>
     wrapToolWithBeforeToolCallHook(tool, {
+      beforeEffect:
+        effectAuthority && isExternalWriteTool(tool.name)
+          ? async () => {
+              if (!(await effectAuthority.isAuthorityStillGranted())) {
+                throw new ToolAuthorizationError("Tool execution denied (authority_revoked).");
+              }
+            }
+          : undefined,
       agentId,
       sessionKey: options?.sessionKey,
       sessionId: options?.sessionId,
@@ -858,10 +909,13 @@ export function createOpenClawCodingTools(options?: {
   // NOTE: Keep canonical (lowercase) tool names here.
   // pi-ai's Anthropic OAuth transport remaps tool names to Claude Code-style names
   // on the wire and maps them back for tool dispatch.
+  const withAuthority = withAbort.map((tool) =>
+    wrapToolWithAuthoritativeWriteRecheck(tool, createChatSendWriteAuthorityRecheck(options)),
+  );
   const afterInbound = !options?.inboundToolCeiling
-    ? withAbort
+    ? withAuthority
     : applyInboundToolCeiling({
-        tools: withAbort,
+        tools: withAuthority,
         ceiling: options.inboundToolCeiling,
         isStillAllowed: (toolName) => isToolAllowedByPolicies(toolName, inboundAclPolicies),
       });
