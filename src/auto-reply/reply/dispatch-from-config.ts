@@ -154,6 +154,8 @@ export async function dispatchReplyFromConfig(params: {
   const gatewayClient = buildKnowledgeReplyGatewayClient({
     gatewayClientUser: ctx.GatewayClientUser,
     gatewayClientSessionDomain: ctx.GatewayClientSessionDomain,
+    gatewayClientSessionEnterpriseId: ctx.GatewayClientSessionEnterpriseId,
+    gatewayClientSessionMembershipId: ctx.GatewayClientSessionMembershipId,
     gatewayClientPlatformUserId: ctx.GatewayClientPlatformUserId,
   });
   const sourceContext = await resolveKnowledgeSourceContext(gatewayClient);

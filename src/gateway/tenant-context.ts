@@ -417,6 +417,8 @@ export type TenantSessionClientHint = {
   platformUserId?: string;
   sessionDomain?: TenantContextDomain;
   sessionTenantId?: string;
+  sessionEnterpriseId?: string;
+  sessionMembershipId?: string;
 };
 
 export function toGatewayClientFromSessionHint(
@@ -436,6 +438,8 @@ export function toGatewayClientFromSessionHint(
     platformUserId,
     sessionDomain: hint.sessionDomain,
     sessionTenantId: hint.sessionTenantId,
+    sessionEnterpriseId: hint.sessionEnterpriseId,
+    sessionMembershipId: hint.sessionMembershipId,
   };
 }
 
@@ -596,6 +600,8 @@ export async function resolveSessionStorePathForInboundMessage(params: {
   gatewayClientUser?: string | null;
   gatewayClientPlatformUserId?: string | null;
   gatewayClientSessionDomain?: string | null;
+  gatewayClientSessionEnterpriseId?: string | null;
+  gatewayClientSessionMembershipId?: string | null;
 }): Promise<string> {
   const resolvedCfg = params.cfg ?? loadConfig();
   const conversationPath = () =>
@@ -625,6 +631,8 @@ export async function resolveSessionStorePathForInboundMessage(params: {
         user,
         platformUserId,
         sessionDomain,
+        sessionEnterpriseId: params.gatewayClientSessionEnterpriseId ?? undefined,
+        sessionMembershipId: params.gatewayClientSessionMembershipId ?? undefined,
       });
       await requireTenantContextForSessionStore(client);
     } catch (err) {

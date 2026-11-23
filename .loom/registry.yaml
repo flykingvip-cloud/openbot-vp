@@ -15553,7 +15553,42 @@ tasks:
         via: verified
     since: 2026-11-22
     metadata: {}
+  - id: login-scope-propagation:codex-kb-review
+    owner: codex-kb-review
+    intent: []
+    paths:
+      - src/gateway/tenant-context.ts
+      - src/gateway/tenant-context.test.ts
+      - src/auto-reply/reply/dispatch-from-config.ts
+      - src/auto-reply/reply/session.ts
+      - .kiro/specs/login-scope-propagation/**
+    state: active
+    sessions:
+      - id: login-scope-20261123
+        taskId: login-scope-propagation:codex-kb-review
+        ide: codex
+        agent: codex-kb-review
+        status: active
+        lastSignalAt: 2026-11-23T02:21:13.562Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-23
+    metadata: {}
 landingStreams:
+  - id: login-scope-propagation:codex-kb-review
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - .kiro/specs/login-scope-propagation/**
+      - src/gateway/tenant-context.ts
+      - src/gateway/tenant-context.test.ts
+      - src/auto-reply/reply/dispatch-from-config.ts
+      - src/auto-reply/reply/session.ts
+    canLandWith: []
+    metadata:
+      owner: codex-kb-review
+      task: login-scope-propagation
+      reason: Scoped fix for login identity propagation; historical streams preserved.
   - id: stale-owner-decision:codex-kb-review
     landingPolicy: serial
     paths:
