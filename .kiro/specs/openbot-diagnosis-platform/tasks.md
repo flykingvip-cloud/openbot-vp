@@ -340,3 +340,40 @@
 - [x] A4 Skill 安装回流：`DiagnosisRecheckPort` 登记 `agent.working-dna` 与 `capability.skill-installation`；无 skillId / skill-spec 拒绝。确认提交同 A2。伪造验证且 store 未变 → STILL_OPEN。不 Apply。 — cursor-grok
 - [x] A4 close：WDNA/Skill 对照领域 SoT 与 Application `targetVersionAfter`；VerificationRef/target/findingRefs/tenant 绑定；P26.1/P26.2 保持历史 No-Go 夹具。不 Promote/Apply。 — cursor-grok
 - [x] A5 platform trusted context：platform actor 的 trusted.tenantId 必须为 null；enterprise-scoped raw request 抛 tenant_mismatch 且零写入。wrapper 仍把 platform issuer 转成 {tenantId:null}。重放不能跳过校验。 — cursor-grok
+
+## t383 本地发布前门控修复（未发布）
+
+- 本轮独立分支修复归属：src/diagnosis/production-cutover.ts, src/diagnosis/diagnose-professional-protocol.ts, src/diagnosis/diagnose-daibai-inbox.ts, src/diagnosis/write-policy.ts, src/diagnosis/write-policy.test.ts, src/diagnosis/diagnose-daibai-inbox-live.ts；历史诊断测试用显式 policy mock 保留已授权正路径，真实默认拒绝由 write-policy.test.ts 验证。— grok-t383
+
+本轮显式启用的历史测试文件（仅测试注入，不改变生产默认）：
+
+- src/diagnosis/diagnose-daibai-inbox.test.ts — grok-t383
+- src/diagnosis/diagnose-evolution-prescription-auth.test.ts — grok-t383
+- src/diagnosis/diagnose-evolution-recheck.test.ts — grok-t383
+- src/diagnosis/diagnose-policy.test.ts — grok-t383
+- src/diagnosis/diagnose.test.ts — grok-t383
+- src/diagnosis/diagnosis-issue-queue.test.ts — grok-t383
+- src/diagnosis/diagnosis-job.test.ts — grok-t383
+- src/diagnosis/intervention-daibai-canary.test.ts — grok-t383
+- src/diagnosis/intervention-dispatch.test.ts — grok-t383
+- src/diagnosis/intervention-gateway.test.ts — grok-t383
+- src/diagnosis/production-admission.test.ts — grok-t383
+- src/diagnosis/production-approval-freeze.test.ts — grok-t383
+- src/diagnosis/production-cutover.test.ts — grok-t383
+- src/diagnosis/production-enablement-sequence.test.ts — grok-t383
+- src/diagnosis/production-p21.test.ts — grok-t383
+- src/diagnosis/production-p22.test.ts — grok-t383
+- src/diagnosis/production-p23.test.ts — grok-t383
+- src/diagnosis/production-p24.5.test.ts — grok-t383
+- src/diagnosis/production-p24.6.test.ts — grok-t383
+- src/diagnosis/production-p24.7.test.ts — grok-t383
+- src/diagnosis/production-p24.8.test.ts — grok-t383
+- src/diagnosis/production-p24.test.ts — grok-t383
+- src/diagnosis/production-p25.test.ts — grok-t383
+- src/diagnosis/production-p26.test.ts — grok-t383
+- src/diagnosis/production-post-cutover.test.ts — grok-t383
+- src/diagnosis/production-preflight.test.ts — grok-t383
+- src/diagnosis/production-trunk-convergence.test.ts — grok-t383
+- src/diagnosis/production-unified-deploy.test.ts — grok-t383
+- src/diagnosis/production-unified-deps.test.ts — grok-t383
+- src/diagnosis/production-unified-lock.test.ts — grok-t383
