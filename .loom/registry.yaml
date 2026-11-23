@@ -15631,6 +15631,33 @@ tasks:
     ownerHistory: []
     since: 2026-11-23
     metadata: {}
+  - id: main-six-doc-format-20261123:codex-wpb-successor
+    owner: codex-wpb-successor
+    intent:
+      - Human-authorized six exact Markdown formatting only; no code or rule
+        changes
+    paths:
+      - .kiro/specs/autonomous-task-closure-audit/findings.md
+      - .kiro/specs/dynamic-task-activity/tasks.md
+      - .kiro/specs/knowledge-retrieval-summary/design.md
+      - .kiro/specs/knowledge-retrieval-summary/tasks.md
+      - .kiro/specs/same-task-continuation/tasks.md
+      - .kiro/specs/stale-owner-decision/tasks.md
+    state: active
+    sessions:
+      - id: main-six-doc-format-20261123
+        taskId: main-six-doc-format-20261123:codex-wpb-successor
+        ide: codex
+        agent: codex-wpb-successor
+        status: active
+        metadata:
+          authorization: Direct user approval for exact six document pure-format repair
+          predecessor: live six paths UNATTRIBUTED/clean; content authors retained in Git
+            history
+        lastSignalAt: 2026-11-23T02:49:03.007Z
+    ownerHistory: []
+    since: 2026-11-23
+    metadata: {}
 landingStreams:
   - id: artifact-evidence-closeout:codex-kb-review
     landingPolicy: serial
@@ -31293,6 +31320,30 @@ landingStreams:
       reason: Only seven previously unmatched exact paths; preserve all prior stream
         order/classification
 sharedPaths:
+  - glob: .kiro/specs/autonomous-task-closure-audit/findings.md
+    landerTask: main-six-doc-format-20261123:codex-wpb-successor
+    reason: Human-authorized exact pure-document formatting only; content and prior
+      histories retained.
+  - glob: .kiro/specs/dynamic-task-activity/tasks.md
+    landerTask: main-six-doc-format-20261123:codex-wpb-successor
+    reason: Human-authorized exact pure-document formatting only; content and prior
+      histories retained.
+  - glob: .kiro/specs/knowledge-retrieval-summary/design.md
+    landerTask: main-six-doc-format-20261123:codex-wpb-successor
+    reason: Human-authorized exact pure-document formatting only; content and prior
+      histories retained.
+  - glob: .kiro/specs/knowledge-retrieval-summary/tasks.md
+    landerTask: main-six-doc-format-20261123:codex-wpb-successor
+    reason: Human-authorized exact pure-document formatting only; content and prior
+      histories retained.
+  - glob: .kiro/specs/same-task-continuation/tasks.md
+    landerTask: main-six-doc-format-20261123:codex-wpb-successor
+    reason: Human-authorized exact pure-document formatting only; content and prior
+      histories retained.
+  - glob: .kiro/specs/stale-owner-decision/tasks.md
+    landerTask: main-six-doc-format-20261123:codex-wpb-successor
+    reason: Human-authorized exact pure-document formatting only; content and prior
+      histories retained.
   - glob: src/gateway/billing/chat-reply-credit-reservation.slice3.test.ts
     landerTask: arch-remediation-wp-b-slice3-credits-reservation
     reason: Human-authorized successor of test-only PR328; original owner session
