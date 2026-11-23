@@ -236,3 +236,44 @@ describe("document version history", () => {
     }
   });
 });
+it("deletes manual summary and FTS rows without deleting another KB in the tenant index", async () => {
+  const { deleteKnowledgeDocumentFromIndex, deleteKnowledgeBaseRetrievalSummaries } =
+    await import("./kb-index.js");
+  const { queueRetrievalSummary } = await import("./retrieval-summary-store.js");
+  const index = await openKnowledgeIndex({
+    dbPath: resolveKnowledgeIndexDbPath({ ownerId: "owner", tenantId: "tenant", indexRoot }),
+    vectorEnabled: false,
+  });
+  try {
+    for (const [docId, kbId] of [
+      ["doc-a", "kb-a"],
+      ["doc-b", "kb-b"],
+    ]) {
+      upsertKnowledgeDocument({
+        db: index.db,
+        docId,
+        kbId,
+        title: docId,
+        contentType: "markdown",
+        now: 0,
+      });
+      queueRetrievalSummary(index.db, { docId, kbId, versionId: "v", contentHash: "h" });
+    }
+    deleteKnowledgeDocumentFromIndex({ db: index.db, index, docId: "doc-a" });
+    expect(
+      index.db.prepare("SELECT count(*) AS n FROM retrieval_summaries WHERE doc_id='doc-a'").get()
+        ?.n,
+    ).toBe(0);
+    expect(
+      index.db.prepare("SELECT count(*) AS n FROM retrieval_summaries WHERE doc_id='doc-b'").get()
+        ?.n,
+    ).toBe(1);
+    deleteKnowledgeBaseRetrievalSummaries(index.db, "kb-b");
+    expect(index.db.prepare("SELECT count(*) AS n FROM retrieval_summaries").get()?.n).toBe(0);
+    if (index.db.prepare("SELECT 1 FROM sqlite_master WHERE name='retrieval_summary_fts'").get()) {
+      expect(index.db.prepare("SELECT count(*) AS n FROM retrieval_summary_fts").get()?.n).toBe(0);
+    }
+  } finally {
+    index.close();
+  }
+});
