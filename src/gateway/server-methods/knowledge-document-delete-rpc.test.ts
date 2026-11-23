@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EmbeddingProvider } from "../../memory/embeddings.js";
+import { knowledgeDocumentIdFromSkillRef } from "../knowledge/document-display-title.js";
 import type { KnowledgeSourceContext } from "../knowledge/sources/types.js";
 import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "./types.js";
 
@@ -113,7 +114,7 @@ function extractKnowledgeBaseId(payload: Record<string, unknown> | undefined): s
   return id;
 }
 
-describe("knowledge.base.documents.delete rollback", () => {
+describe("knowledge.base.documents.delete retry state", () => {
   beforeEach(() => {
     cleanStore();
     contextState.current = {
@@ -128,7 +129,7 @@ describe("knowledge.base.documents.delete rollback", () => {
     cleanStore();
   });
 
-  it("restores the knowledge-base binding when index deletion fails", async () => {
+  it("preserves bindings and unrelated concurrent writes on index failure, then retries", async () => {
     const created = await invoke("knowledge.base.create", { title: "Delete rollback KB" });
     const kbId = extractKnowledgeBaseId(created.payload);
 
@@ -146,9 +147,23 @@ describe("knowledge.base.documents.delete rollback", () => {
     const skillId = (uploaded.payload?.skillId as string | undefined) ?? "";
     expect(skillId).toBeTruthy();
 
+    const documentId = knowledgeDocumentIdFromSkillRef(kbId, skillId);
+    const index = await import("../knowledge/kb-index.js");
+    const actualIndex = await vi.importActual<typeof import("../knowledge/kb-index.js")>(
+      "../knowledge/kb-index.js",
+    );
+    const bases = await import("../knowledge/knowledge-base-store.js");
+    let unrelatedId = "";
+    vi.mocked(index.deleteKnowledgeDocumentFromIndex).mockImplementationOnce(() => {
+      unrelatedId = bases.createKnowledgeBase({
+        title: "Concurrent unrelated KB",
+        ownerId: "user-a",
+      }).id;
+      throw new Error("index delete failed");
+    });
     const deleted = await invoke("knowledge.base.documents.delete", {
       knowledgeBaseId: kbId,
-      documentId: skillId,
+      documentId,
     });
     expect(deleted.ok).toBe(false);
     expect(deleted.error?.message).toContain("index delete failed");
@@ -156,6 +171,21 @@ describe("knowledge.base.documents.delete rollback", () => {
     const sources = await invoke("knowledge.base.sources.list", { knowledgeBaseId: kbId });
     expect(sources.ok).toBe(true);
     const items = sources.payload?.sources as Array<{ documentId?: string }> | undefined;
-    expect(items?.some((item) => item.documentId === skillId)).toBe(true);
+    expect(items?.some((item) => item.documentId === documentId)).toBe(true);
+    expect(bases.getKnowledgeBase(unrelatedId)?.title).toBe("Concurrent unrelated KB");
+    expect(bases.getKnowledgeBase(kbId)?.documentIds).toContain(documentId);
+    expect(
+      (await invoke("knowledge.document.preview", { knowledgeBaseId: kbId, documentId })).ok,
+    ).toBe(false);
+    vi.mocked(index.deleteKnowledgeDocumentFromIndex).mockImplementation(
+      actualIndex.deleteKnowledgeDocumentFromIndex,
+    );
+    const retried = await invoke("knowledge.base.documents.delete", {
+      knowledgeBaseId: kbId,
+      documentId,
+    });
+    expect(retried.ok).toBe(true);
+    expect(bases.getKnowledgeBase(unrelatedId)?.title).toBe("Concurrent unrelated KB");
+    expect(bases.getKnowledgeBase(kbId)?.documentIds).not.toContain(documentId);
   });
 });

@@ -2,6 +2,7 @@
  * Persist original knowledge-document bytes for sidebar preview.
  * Indexed chunks remain in SQLite; this store keeps the upload/sync payload on disk.
  */
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { CONFIG_DIR } from "../../utils.js";
@@ -79,11 +80,49 @@ function manifestPath(params: { kbId: string; docId: string; originalsRoot?: str
   return path.join(documentDir(params), "manifest.json");
 }
 
+/** Durable terminal deletion intent, separate from blobs so retries never erase it.
+ * Readers of a legacy root must also check the authoritative per-base root.
+ */
+function deletionMarkerPath(params: ReadKnowledgeOriginalParams): string {
+  const key = createHash("sha256")
+    .update(JSON.stringify([params.kbId, params.docId]))
+    .digest("hex");
+  return path.join(resolveKnowledgeOriginalsRoot(params.originalsRoot), ".deletions", key);
+}
+
+export function isKnowledgeOriginalDeleted(params: ReadKnowledgeOriginalParams): boolean {
+  try {
+    fs.statSync(deletionMarkerPath(params));
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return false;
+    }
+    // An unreadable deletion state must never reopen a retained original.
+    throw error;
+  }
+}
+
+export function markKnowledgeOriginalDeleted(params: ReadKnowledgeOriginalParams): void {
+  const marker = deletionMarkerPath(params);
+  fs.mkdirSync(path.dirname(marker), { recursive: true });
+  try {
+    fs.writeFileSync(marker, "deleted\n", { flag: "wx", mode: 0o600 });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
+      throw error;
+    }
+  }
+}
+
 function readManifest(params: {
   kbId: string;
   docId: string;
   originalsRoot?: string;
 }): KnowledgeOriginalManifest | null {
+  if (isKnowledgeOriginalDeleted(params)) {
+    return null;
+  }
   const filePath = manifestPath(params);
   try {
     if (!fs.existsSync(filePath)) {
@@ -153,6 +192,9 @@ export function persistKnowledgeOriginal(
     return null;
   }
 
+  if (isKnowledgeOriginalDeleted(params)) {
+    throw new Error("knowledge_original_deleted: use a new document identity");
+  }
   const safeName = sanitizeKnowledgeOriginalFileName(params.fileName);
   const dir = documentDir({ kbId, docId, originalsRoot: params.originalsRoot });
   fs.mkdirSync(dir, { recursive: true });
@@ -168,6 +210,11 @@ export function persistKnowledgeOriginal(
   const absolutePath = path.join(dir, safeName);
   fs.writeFileSync(absolutePath, params.buffer);
 
+  // Another process may have started deletion while the blob was being written.
+  if (isKnowledgeOriginalDeleted(params)) {
+    deleteKnowledgeOriginal(params);
+    throw new Error("knowledge_original_deleted: concurrent deletion");
+  }
   const manifest: KnowledgeOriginalManifest = {
     docId,
     kbId,
@@ -231,7 +278,8 @@ export function deleteKnowledgeOriginal(params: ReadKnowledgeOriginalParams): vo
   const kbDir = path.dirname(dir);
   try {
     if (fs.existsSync(kbDir) && fs.readdirSync(kbDir).length === 0) {
-      fs.rmSync(kbDir, { recursive: true, force: true });
+      // Atomic empty-directory removal cannot race into deleting a new sibling.
+      fs.rmdirSync(kbDir);
     }
   } catch {
     // best-effort cleanup
