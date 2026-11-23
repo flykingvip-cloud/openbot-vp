@@ -96,9 +96,8 @@ describe("auth home", () => {
 
     render(renderAuthHome(baseProps()), container);
 
-    const pricingLink = Array.from(container.querySelectorAll("a")).find(
-      (node) => node.textContent?.trim() === "定价",
-    );
+    const pricingLink = container.querySelector<HTMLAnchorElement>('a[href="/pricing"]');
+    expect(pricingLink?.textContent).toContain("定价");
     expect(pricingLink?.getAttribute("href")).toBe("/pricing");
   });
 
