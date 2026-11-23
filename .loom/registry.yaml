@@ -15800,6 +15800,61 @@ tasks:
     ownerHistory: []
     since: 2026-11-23
     metadata: {}
+  - id: knowledge-summary-manual-closeout:codex-kb-repair
+    owner: codex-integration
+    intent: []
+    paths:
+      - src/gateway/knowledge/retrieval-summary-authority.ts
+      - src/gateway/knowledge/retrieval-summary-authority.test.ts
+      - src/gateway/knowledge/retrieval-summary-runtime.ts
+      - src/gateway/knowledge/retrieval-summary-runtime.test.ts
+      - src/gateway/knowledge/retrieval-summary-hierarchy.ts
+      - src/gateway/knowledge/retrieval-summary-hierarchy.test.ts
+      - src/gateway/knowledge/retrieval-summary-worker.ts
+      - src/gateway/knowledge/retrieval-summary-worker.test.ts
+      - src/gateway/server-maintenance.ts
+      - src/gateway/knowledge/retrieval-summary-store.ts
+      - src/gateway/knowledge/retrieval-summary-store.test.ts
+      - src/gateway/knowledge/retrieval-summary-document.ts
+      - src/gateway/knowledge/retrieval-summary-recall.ts
+      - src/gateway/knowledge/retrieval-summary-recall.test.ts
+      - src/gateway/server-methods/knowledge.ts
+      - src/gateway/server-methods/knowledge-base-search-rpc.test.ts
+      - src/gateway/knowledge/kb-index.ts
+      - src/gateway/knowledge/kb-index.test.ts
+      - ui/src/ui/ports/employee/views/my-bot-data-surface.ts
+      - ui/src/ui/ports/employee/views/my-bot-data-surface.node.test.ts
+      - ui/src/ui/ports/employee/views/my-bot-workspace-panel.ts
+      - .kiro/specs/knowledge-retrieval-summary/design.md
+      - .kiro/specs/knowledge-retrieval-summary/tasks.md
+    state: active
+    sessions:
+      - id: knowledge-summary-manual-closeout-20261123
+        taskId: knowledge-summary-manual-closeout:codex-kb-repair
+        ide: codex
+        agent: codex-kb-repair
+        status: active
+        lastSignalAt: 2026-11-23T22:18:35.580Z
+        metadata:
+          predecessorOwners:
+            - cursor-knowledge-consume
+            - cursor
+          authorization: human-approved exact scope reduction on a137; automatic paid
+            summary removed
+      - id: knowledge-manual-integration-20261124
+        taskId: knowledge-summary-manual-closeout:codex-kb-repair
+        ide: codex
+        agent: codex-integration
+        status: active
+        metadata: {}
+        lastSignalAt: 2026-11-23T22:18:35.580Z
+    ownerHistory:
+      - fromOwner: codex-kb-repair
+        toOwner: codex-integration
+        at: 2026-11-23T22:18:35.580Z
+        via: verified
+    since: 2026-11-23
+    metadata: {}
 landingStreams:
   - id: delivery-acceptance-integration-20261122
     landingPolicy: serial
@@ -31472,6 +31527,75 @@ landingStreams:
       reason: Only seven previously unmatched exact paths; preserve all prior stream
         order/classification
 sharedPaths:
+  - glob: src/gateway/knowledge/retrieval-summary-authority.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: src/gateway/knowledge/retrieval-summary-authority.test.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: src/gateway/knowledge/retrieval-summary-runtime.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: src/gateway/knowledge/retrieval-summary-runtime.test.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: src/gateway/knowledge/retrieval-summary-hierarchy.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: src/gateway/knowledge/retrieval-summary-hierarchy.test.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: src/gateway/knowledge/retrieval-summary-worker.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: src/gateway/knowledge/retrieval-summary-worker.test.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: src/gateway/server-maintenance.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: src/gateway/knowledge/retrieval-summary-store.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: src/gateway/knowledge/retrieval-summary-store.test.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: src/gateway/knowledge/retrieval-summary-document.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: src/gateway/knowledge/retrieval-summary-recall.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: src/gateway/knowledge/retrieval-summary-recall.test.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: src/gateway/server-methods/knowledge.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: src/gateway/server-methods/knowledge-base-search-rpc.test.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: src/gateway/knowledge/kb-index.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: src/gateway/knowledge/kb-index.test.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: ui/src/ui/ports/employee/views/my-bot-data-surface.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: ui/src/ui/ports/employee/views/my-bot-data-surface.node.test.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: ui/src/ui/ports/employee/views/my-bot-workspace-panel.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: .kiro/specs/knowledge-retrieval-summary/design.md
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: .kiro/specs/knowledge-retrieval-summary/tasks.md
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
   - glob: src/gateway/tools-invoke-http.fabric-phase2.integration.test.ts
     landerTask: arch-remediation-wp-e-policy-composition
     reason: User-approved exact test takeover; original directory claims retained.
