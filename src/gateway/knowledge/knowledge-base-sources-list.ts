@@ -12,7 +12,10 @@ import {
   type KnowledgeBaseDocumentSummary,
 } from "./knowledge-base-library-content.js";
 import type { KnowledgeBase, KnowledgeBaseVisibility } from "./knowledge-base-store.js";
-import { resolveKnowledgeIndexRootForBase } from "./knowledge-directory.js";
+import {
+  resolveKnowledgeDirectoryLayoutForBase,
+  resolveKnowledgeIndexRootForBase,
+} from "./knowledge-directory.js";
 import { listKnowledgeOriginalDocumentIds } from "./knowledge-original-store.js";
 import { listReservedDeliverableDocuments } from "./reserved-deliverable-original.js";
 import { listOpenableLocalFolderDocumentIds } from "./sources/local-folder-open.js";
@@ -230,8 +233,18 @@ export async function listKnowledgeBaseSources(
   });
   const previewableOriginalDocIds = listKnowledgeOriginalDocumentIds({
     kbId,
-    originalsRoot: params.originalsRoot,
+    originalsRoot:
+      params.originalsRoot ??
+      resolveKnowledgeDirectoryLayoutForBase(params.knowledgeBase, {
+        tenantsRoot: params.tenantsRoot,
+        configDir: params.configDir,
+      }).originalsRoot,
   });
+  if (params.originalsRoot === undefined) {
+    for (const id of listKnowledgeOriginalDocumentIds({ kbId })) {
+      previewableOriginalDocIds.add(id);
+    }
+  }
   const canPreviewDoc = (docId: string) =>
     previewableOriginalDocIds.has(docId) || openableOriginalDocIds.has(docId);
   const items: KnowledgeBaseSourceListItem[] = [];

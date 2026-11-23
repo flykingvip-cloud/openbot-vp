@@ -708,7 +708,7 @@ const DATASET_IMPORT_MAX_RECORDS = 200;
 /**
  * Bulk-import a dataset (a batch of text records) into a personal knowledge base as
  * passive, chunk-indexed documents — the multi-source input path for "数据导入". Each
- * record becomes a stable per-dataset document (`dataset:<hash>:<index>`) so re-importing
+ * record becomes a stable per-dataset document (`dataset-<hash>-<index>`) so re-importing
  * the same dataset title updates the same documents instead of duplicating them. Records
  * are NOT turned into individual KnowledgeObjects (avoids object explosion); they are
  * attached to the KB and reachable by governance-aware retrieval, like uploaded docs.
@@ -734,7 +734,7 @@ export async function importDatasetPersonalKnowledge(params: {
       storePath: params.storePath,
     });
   const datasetTitle = params.datasetTitle.trim() || "数据集";
-  const datasetId = `dataset:${createHash("sha256")
+  const datasetId = `dataset-${createHash("sha256")
     .update(`${knowledgeBase.id}::${datasetTitle}`)
     .digest("hex")
     .slice(0, 20)}`;
@@ -753,7 +753,7 @@ export async function importDatasetPersonalKnowledge(params: {
       continue;
     }
     const title = params.records[index]?.title?.trim() || `${datasetTitle} #${index + 1}`;
-    const documentId = `${datasetId}:${index}`;
+    const documentId = `${datasetId}-${index}`;
     const result = await ingestKnowledgePayloadToBase({
       knowledgeBase,
       documentId,
