@@ -15742,6 +15742,28 @@ tasks:
           - seedSessionTaskBoard
           - readSessionTaskBoard
         scope: No implementation, no export*, no broad state/index
+  - id: main-two-doc-format-20261123:codex-wpb-successor
+    owner: codex-wpb-successor
+    intent:
+      - Human-authorized two exact Markdown formatting closeout only
+    paths:
+      - .kiro/specs/artifact-evidence-closeout/tasks.md
+      - .kiro/specs/login-scope-propagation/tasks.md
+    state: active
+    sessions:
+      - id: main-two-doc-format-20261123
+        taskId: main-two-doc-format-20261123:codex-wpb-successor
+        ide: codex
+        agent: codex-wpb-successor
+        status: active
+        metadata:
+          authorization: Direct user approval for exact artifact-evidence/login-scope
+            docs; content and original histories preserved
+          liveWip: both exact files clean/unattributed
+        lastSignalAt: 2026-11-23T07:41:01.137Z
+    ownerHistory: []
+    since: 2026-11-23
+    metadata: {}
 landingStreams:
   - id: artifact-evidence-closeout:codex-kb-review
     landingPolicy: serial
@@ -31404,6 +31426,12 @@ landingStreams:
       reason: Only seven previously unmatched exact paths; preserve all prior stream
         order/classification
 sharedPaths:
+  - glob: .kiro/specs/artifact-evidence-closeout/tasks.md
+    landerTask: main-two-doc-format-20261123:codex-wpb-successor
+    reason: Human-authorized exact two-document pure formatting; previous histories retained.
+  - glob: .kiro/specs/login-scope-propagation/tasks.md
+    landerTask: main-two-doc-format-20261123:codex-wpb-successor
+    reason: Human-authorized exact two-document pure formatting; previous histories retained.
   - glob: src/agent-runtime/policy/dependency-resolution.test.ts
     landerTask: main-five-public-entries-20261123:codex-wpb-successor
     reason: Human-authorized exact public-entry repair; predecessor histories retained.
