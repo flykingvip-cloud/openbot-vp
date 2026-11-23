@@ -35,3 +35,5 @@ No real group state, runtime flags, production build or service process changed.
 - The real 数字人测试 formal-task gate remains disabled. Do not report successful execution until a bounded authorized enablement and real-service task lifecycle test succeed. — codex-kb-review
 
 Final checkpoint: 159 receipt/controller tests, 4 new real-handler cases, scoped lint and full tsgo pass. Whole handler file: 19 older cases fail at missing-subscription fixture gate; 4 new cases pass with 22 older skipped in targeted run. Live-service verification pending. — codex-kb-review
+
+2026-11-23 final fixture repair: synthetic commercial admission supplied at model-session admission seam; production subscription logic unchanged. Entire 26-case handler suite plus 9 actual billing gate tests now pass (35 total), /tmp/s1b-final-gate.log. Earlier 19 missing-subscription failures resolved. Live service test remains pending. — codex-kb-review

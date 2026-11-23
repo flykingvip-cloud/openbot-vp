@@ -39,6 +39,21 @@ import { resolvePlatformAuthConfig } from "./platform-auth/config.js";
 import type { PlatformAuthStore } from "./platform-auth/store-types.js";
 import { saveStore } from "./platform-auth/store.js";
 
+// This suite tests chat lifecycle isolation, not billing persistence. Give the
+// synthetic model turn an explicit commercial admission; billing denial remains
+// covered by authorize-commercial-run.test.ts. Never touches live subscriptions.
+vi.mock("./billing/agent-run-governance.js", async (original) => ({
+  ...(await original<typeof import("./billing/agent-run-governance.js")>()),
+  tryAcquireEnterpriseAgentRun: vi.fn(async () => ({
+    acquired: true,
+    skipped: false,
+    enterpriseId: "ent-s1b",
+    authorizationDecisionId: "auth-s1b-fixture",
+    subscriptionId: "sub-s1b-fixture",
+  })),
+  releaseEnterpriseAgentRun: vi.fn(async () => {}),
+}));
+
 const completeMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@earendil-works/pi-ai/compat", async (original) => ({
