@@ -1377,25 +1377,28 @@ function appendChatMessage(
   ) {
     return;
   }
+  // Legacy persisted receipts lack the live event's id. Recover identity from
+  // the source request, never from equal body text across unrelated requests.
+  const key = typeof message.idempotencyKey === "string" ? message.idempotencyKey : "";
+  const suffix = ":discuss-to-task-receipt";
+  if (key.endsWith(suffix) && key.length > suffix.length) {
+    const receiptId = `discuss-to-task-receipt:${key.slice(0, -suffix.length)}`;
+    message = { ...message, id: receiptId, receiptId, discussToTaskReceipt: true };
+  }
   const messageId = typeof message.id === "string" ? message.id : "";
-  if (
-    messageId &&
-    state.chatMessages.some(
-      (existing) =>
-        existing &&
-        typeof existing === "object" &&
-        !Array.isArray(existing) &&
-        (existing as Record<string, unknown>).id === messageId,
-    )
-  ) {
+  const matchesMessage = (existing: unknown): boolean => {
+    if (!existing || typeof existing !== "object" || Array.isArray(existing)) {
+      return false;
+    }
+    const row = existing as Record<string, unknown>;
+    return isDiscussToTaskReceiptMessage(message)
+      ? resolveDiscussToTaskReceiptIdentity(row) === messageId
+      : row.id === messageId;
+  };
+  if (messageId && state.chatMessages.some(matchesMessage)) {
     const existingMessages = Array.isArray(state.chatMessages) ? state.chatMessages : [];
     state.chatMessages = existingMessages.map((existing) =>
-      existing &&
-      typeof existing === "object" &&
-      !Array.isArray(existing) &&
-      (existing as Record<string, unknown>).id === messageId
-        ? withGeneratedPreviewArtifact(message)
-        : existing,
+      matchesMessage(existing) ? withGeneratedPreviewArtifact(message) : existing,
     );
     return;
   }
@@ -1596,6 +1599,11 @@ function isDiscussToTaskReceiptMessage(message: unknown): boolean {
  * Never use body text — identical copy across distinct requests must both show.
  */
 function resolveDiscussToTaskReceiptIdentity(message: Record<string, unknown>): string {
+  const key = typeof message.idempotencyKey === "string" ? message.idempotencyKey : "";
+  const suffix = ":discuss-to-task-receipt";
+  if (key.endsWith(suffix) && key.length > suffix.length) {
+    return `discuss-to-task-receipt:${key.slice(0, -suffix.length)}`;
+  }
   const receiptId = typeof message.receiptId === "string" ? message.receiptId.trim() : "";
   if (receiptId) {
     return receiptId;

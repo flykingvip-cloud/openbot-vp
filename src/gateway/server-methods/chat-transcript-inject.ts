@@ -92,6 +92,16 @@ function buildInjectedTranscriptMessage(params: {
         };
 
   if (params.role === "assistant") {
+    const receiptSuffix = ":discuss-to-task-receipt";
+    if (params.idempotencyKey?.endsWith(receiptSuffix)) {
+      const runId = params.idempotencyKey.slice(0, -receiptSuffix.length);
+      if (runId) {
+        messageBody.id = `discuss-to-task-receipt:${runId}`;
+        messageBody.receiptId = messageBody.id;
+        messageBody.discussToTaskReceipt = true;
+        messageBody.collaborationRoundId = runId;
+      }
+    }
     if (params.abortMeta) {
       messageBody.openclawAbort = {
         aborted: true,

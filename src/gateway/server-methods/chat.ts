@@ -205,6 +205,7 @@ import {
 } from "../chat-session-interest.js";
 import * as chatCheckpointStore from "../checkpoint-store.js";
 import { resolveComposerQuoteSendLayers } from "../collaboration-dispatch/chat-send-composer-quote.js";
+import { listBoardClaimItems } from "../collaboration-dispatch/claim-contract.js";
 import {
   collabEdgeContributionRole,
   hasCollabEdgeDirective,
@@ -337,6 +338,10 @@ import {
   runControlledDiscussToTaskChatTurn,
 } from "../collaboration-learning/discuss-to-task-chat-turn.js";
 import type { ExecutionDeliverableBinding } from "../collaboration-learning/execution-deliverable-binding.js";
+import {
+  readGroupInteractionTarget,
+  groupTaskControlReply,
+} from "../collaboration-learning/group-interaction-host.js";
 import { understandGroupInteraction } from "../collaboration-learning/group-interaction-understanding.js";
 import {
   bindGroupPublicTranscript,
@@ -6156,12 +6161,56 @@ export const chatHandlers: GatewayRequestHandlers = {
             }
           };
 
+          if (!systemInputProvenance && groupRuleMode?.mode === "dynamic") {
+            await resolveDynamicGroupRules();
+            parentAbortController.signal.throwIfAborted();
+            const resolved = buildGroupRuntimeAuthority({
+              scope,
+              episodeId,
+              cfg: policySnapshotCfg,
+              tenantTrust: collabTenant.trust,
+              ...(flagSnapshot ? { snapshot: flagSnapshot } : {}),
+            });
+            authority = resolved.authority;
+            facts = resolved.facts;
+            policySnapshot = resolved.snapshot;
+            collaborationEventKey = policySnapshotEnabled ? eventKeyOf(authority, beatId) : null;
+            decision = decideParticipants(authority, facts, {
+              message: mentionMessage,
+              roundId: clientRunId,
+              explicitMentions: resolveExplicitMentionTokens(p.mentions),
+              explicitMentionRefs: resolveExplicitMentionRefs(p.mentions),
+              recentGroupMessages,
+              operatingState: scope.operatingState ?? null,
+            });
+            if (policySnapshotEnabled) {
+              await persistPolicySnapshotBody({
+                snapshot: policySnapshot,
+                groupId: scope.groupId,
+                tenantId: scope.tenantId ?? null,
+                cfg: policySnapshotCfg,
+              });
+            }
+          }
+
           // One human interpretation before formal writes; member execution never
           // reclassifies the original request or binds it to a personal board.
           if (!systemInputProvenance) {
+            const currentGroupTaskId = facts.activeContext.currentTaskId;
+            const groupTaskRead = await readGroupInteractionTarget({
+              groupId: scope.groupId,
+              taskId: currentGroupTaskId,
+              read: (taskId) => listBoardClaimItems(authority, { taskId }),
+              warn: (message) => context.logGateway.warn(message),
+            });
+            const groupTaskTarget = groupTaskRead.target;
             const interpreter =
               scope.bots.find((bot) => bot.agentId === decision.primaryQueue[0]) ??
-              scope.bots.find((bot) => bot.agentId === scope.coordinatorBotId);
+              scope.bots.find(
+                (bot) =>
+                  bot.agentId === scope.coordinatorBotId &&
+                  decision.primaryQueue.includes(bot.agentId),
+              );
             if (!interpreter) {
               throw new Error("当前没有可用的协作交互机器人，本轮未启动执行。");
             }
@@ -6197,6 +6246,8 @@ export const chatHandlers: GatewayRequestHandlers = {
               },
               message: transcriptMessage,
               history: recentGroupMessages,
+              taskTarget: groupTaskTarget,
+              taskTargetUnavailable: !groupTaskRead.available,
               groupContext: {
                 title: scope.title,
                 members: scope.members,
@@ -6254,39 +6305,66 @@ export const chatHandlers: GatewayRequestHandlers = {
               return;
             }
             if (understanding.decision.kind !== "execution_request") {
-              throw new Error("尚未取得有效的组任务关联，本轮没有修改任务。");
-            }
-          }
-
-          if (!systemInputProvenance && groupRuleMode?.mode === "dynamic") {
-            await resolveDynamicGroupRules();
-            parentAbortController.signal.throwIfAborted();
-            const resolved = buildGroupRuntimeAuthority({
-              scope,
-              episodeId,
-              cfg: policySnapshotCfg,
-              tenantTrust: collabTenant.trust,
-              ...(flagSnapshot ? { snapshot: flagSnapshot } : {}),
-            });
-            authority = resolved.authority;
-            facts = resolved.facts;
-            policySnapshot = resolved.snapshot;
-            collaborationEventKey = policySnapshotEnabled ? eventKeyOf(authority, beatId) : null;
-            decision = decideParticipants(authority, facts, {
-              message: mentionMessage,
-              roundId: clientRunId,
-              explicitMentions: resolveExplicitMentionTokens(p.mentions),
-              explicitMentionRefs: resolveExplicitMentionRefs(p.mentions),
-              recentGroupMessages,
-              operatingState: scope.operatingState ?? null,
-            });
-            if (policySnapshotEnabled) {
-              await persistPolicySnapshotBody({
-                snapshot: policySnapshot,
-                groupId: scope.groupId,
-                tenantId: scope.tenantId ?? null,
-                cfg: policySnapshotCfg,
+              let text =
+                "当前组任务关联暂无法核实，尚未修改任务。普通咨询仍可继续；请稍后刷新本组任务看板后再操作。";
+              if (groupTaskRead.available) {
+                try {
+                  const freshScope = await resolveGroupDiscussionScope(rawSessionKey, client, {
+                    logGateway: context.logGateway,
+                  });
+                  const freshId = freshScope.operatingState?.activeContext?.currentTaskId;
+                  const freshRead = await readGroupInteractionTarget({
+                    groupId: scope.groupId,
+                    taskId: freshId,
+                    read: (taskId) => listBoardClaimItems(authority, { taskId }),
+                    warn: (message) => context.logGateway.warn(message),
+                  });
+                  if (freshRead.available) {
+                    text = groupTaskControlReply(
+                      understanding.decision,
+                      groupTaskTarget,
+                      freshRead.target,
+                      freshRead.items,
+                    );
+                  }
+                } catch {
+                  context.logGateway.warn(
+                    "group interaction control scope unavailable; no task mutation attempted",
+                  );
+                }
+              }
+              const persisted = await appendAssistantTranscriptMessage({
+                message: text,
+                sessionId: groupSession.entry.sessionId,
+                storePath: groupSession.storePath,
+                sessionFile: groupSession.entry.sessionFile,
+                createIfMissing: true,
+                idempotencyKey: `${clientRunId}:group-control`,
+                senderLabel: interpreter.name,
               });
+              if (!persisted.ok) {
+                throw new Error("任务说明暂未保存，本轮没有修改任务。");
+              }
+              setGatewayDedupeEntry({
+                dedupe: context.dedupe,
+                key: `chat:${clientRunId}`,
+                entry: {
+                  ts: Date.now(),
+                  ok: true,
+                  payload: { runId: clientRunId, status: "ok" as const },
+                },
+              });
+              broadcastChatFinal({
+                context,
+                runId: clientRunId,
+                sessionKey: rawSessionKey,
+                message: {
+                  ...persisted.message,
+                  senderLabel: interpreter.name,
+                  collaborationRoundId: clientRunId,
+                },
+              });
+              return;
             }
           }
 
@@ -6415,7 +6493,6 @@ export const chatHandlers: GatewayRequestHandlers = {
                   : { d2tResult: null };
               const d2tApplied = applyDiscussToTaskChatTurnToChatHandler(d2tTurn);
               formalTaskBoardPublished = d2tTurn.d2tResult?.stages.boardPublished === true;
-              formalTaskReceiptMessage = d2tApplied.transcriptPersist?.message;
               if (d2tApplied.formalTaskEstablish) {
                 formalTaskEstablish = d2tApplied.formalTaskEstablish;
               }
@@ -6433,6 +6510,7 @@ export const chatHandlers: GatewayRequestHandlers = {
                 nodeSendToSession: context.nodeSendToSession,
                 tenantId: collabTenant?.tenantId ?? client?.sessionEnterpriseId ?? null,
               });
+              formalTaskReceiptMessage = d2tEgress.payload?.message;
               if (d2tApplied.transcriptPersist && !d2tApplied.transcriptPersist.ok) {
                 context.logGateway.warn(
                   `discuss-to-task receipt transcript persist failed: ${d2tApplied.transcriptPersist.error ?? "unknown"}`,
@@ -6494,22 +6572,13 @@ export const chatHandlers: GatewayRequestHandlers = {
                   payload: { runId: clientRunId, status: "ok" as const },
                 },
               });
+              // The terminal event closes the parent turn but reuses the exact status
+              // receipt identity; it is not a second assistant reply.
               broadcastChatFinal({
                 context,
                 runId: clientRunId,
                 sessionKey: rawSessionKey,
-                message: formalTaskReceiptMessage ?? {
-                  role: "assistant",
-                  content: [
-                    {
-                      type: "text",
-                      text:
-                        formalTaskEstablish?.userMessage ||
-                        "正式任务尚未获准启动，本轮没有派发成员执行。",
-                    },
-                  ],
-                  timestamp: Date.now(),
-                },
+                message: formalTaskReceiptMessage,
               });
               return;
             }

@@ -29,6 +29,8 @@ export type GroupUnderstandingInput = {
   message: string;
   history: readonly unknown[];
   groupContext: unknown;
+  taskTarget?: InteractionModelInput["taskTarget"];
+  taskTargetUnavailable?: boolean;
   images?: InteractionModelInput["images"];
   signal?: AbortSignal;
 };
@@ -76,6 +78,7 @@ export async function understandGroupInteraction(input: GroupUnderstandingInput)
     timeoutMs: remainingMs,
     input: {
       message: input.message,
+      taskTarget: input.taskTarget,
       images: input.images,
       abortSignal: input.signal,
       ...(availability ? { availability } : {}),
@@ -96,6 +99,11 @@ export async function understandGroupInteraction(input: GroupUnderstandingInput)
         {
           role: "system",
           content: [
+            ...(input.taskTargetUnavailable
+              ? [
+                  "Host formal task target is unavailable. Ordinary questions remain answerable. For task changes or controls, clarify that the formal group task/version cannot currently be verified; never invent an identity or claim any mutation.",
+                ]
+              : []),
             "Current-message intent boundary: interpret ONLY the latest live message. Historical pending work and blocked formal-task receipts do not make a new question an execution request.",
             "Questions about how to start, prerequisites, available capabilities, permissions or configuration are reply/clarify, even when they mention establishing a formal task. Explain the available host facts; do not retry admission or output execution_request merely to explain it. An explicit instruction to start/establish work, including confirmation of earlier agreed scope, remains execution_request and must still pass the host gate. Never turn a question into confirmation or claim to enable a feature.",
             `Host formal-task capability: ${isCollabTaskClaimContractEnabled(input.config, input.groupId, input.identity.executionIdentity?.enterpriseId ?? "_local") ? "enabled" : "disabled"}. This is capability availability, not authorization.`,
