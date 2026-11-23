@@ -589,9 +589,11 @@ export function deleteKnowledgeChunksByIds(params: {
 export function upsertKnowledgeChunks(params: {
   index: KnowledgeIndex;
   chunks: KnowledgeChunkInsert[];
-}): void {
+  /** Background embeddings may update existing current chunks, never recreate deleted identities. */
+  existingOnly?: boolean;
+}): number {
   if (params.chunks.length === 0) {
-    return;
+    return 0;
   }
   const embeddedChunks = params.chunks.filter(
     (chunk) => chunk.embedding && chunk.embedding.length > 0,
@@ -636,9 +638,20 @@ export function upsertKnowledgeChunks(params: {
       ? params.index.db.prepare(`INSERT INTO ${KB_VECTOR_TABLE} (id, embedding) VALUES (?, ?)`)
       : null;
 
+  const currentChunk = params.existingOnly
+    ? params.index.db.prepare(
+        `SELECT 1 FROM ${KB_CHUNK_META_TABLE} m JOIN documents d ON d.doc_id = m.doc_id
+     WHERE m.chunk_id = ? AND m.doc_id = ? AND m.version_id = ? AND m.kb_id = ? AND d.current_version_id = m.version_id`,
+      )
+    : null;
+  let written = 0;
   params.index.db.exec("BEGIN IMMEDIATE");
   try {
     for (const chunk of params.chunks) {
+      if (currentChunk && !currentChunk.get(chunk.id, chunk.docId, chunk.versionId, chunk.kbId)) {
+        continue;
+      }
+      written += 1;
       upsertChunk.run(chunk.id, chunk.text, chunk.model);
       upsertMeta.run(
         chunk.id,
@@ -673,6 +686,7 @@ export function upsertKnowledgeChunks(params: {
     throw error;
   }
   noteKnowledgeIndexMutation();
+  return written;
 }
 
 export function deleteKnowledgeDocumentFromIndex(params: {
