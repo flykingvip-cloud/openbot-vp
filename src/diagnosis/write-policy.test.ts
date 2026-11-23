@@ -128,3 +128,56 @@ describe("diagnosis writes default closed", () => {
     expect(row.daibaiReceipt).toMatchObject({ status: "skipped", skipReason: "gate_closed" });
   });
 });
+
+describe("diagnosis action receipt uses real startup write policy", () => {
+  it.each([
+    ["default", false, false, false],
+    ["master only", true, false, false],
+    ["capability only", false, true, false],
+    ["both gates", true, true, true],
+  ])("%s", async (_label, master, capability, allowed) => {
+    vi.resetModules();
+    vi.stubEnv("OPENBOT_DIAGNOSIS_WRITES_ENABLED", String(master));
+    vi.stubEnv("OPENBOT_DIAGNOSIS_CONVERSATION_DELIVERY_ENABLED", String(capability));
+    try {
+      const { dispatchDiagnoseConversationAction } = await import("./diagnose-action-dispatch.js");
+      const send = vi.fn(async () => ({ runId: "local-run" }));
+      const injectReceipt = vi.fn(async () => undefined);
+      const input = {
+        title: "Local diagnosis",
+        agentPrompt: "Local test",
+        targetAgentId: "local-agent",
+        targetSessionKey: "agent:local-agent:main",
+        requesterUserId: "local-owner",
+        tenantId: "local-tenant",
+        tenantAdmin: true,
+        sessionExists: () => true,
+        send,
+        injectReceipt,
+      };
+      const result = await dispatchDiagnoseConversationAction(input);
+      expect(result.ok).toBe(true);
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(injectReceipt).toHaveBeenCalledTimes(allowed ? 1 : 0);
+      expect(result.receipt).toEqual(
+        allowed
+          ? { delivered: true, reason: "delivered" }
+          : { delivered: false, reason: "conversation_delivery_gate_closed" },
+      );
+      // Generic conversation handoff omits diagnosis receipts and remains unaffected.
+      const generic = await dispatchDiagnoseConversationAction({ ...input, omitReceipt: true });
+      expect(generic.ok).toBe(true);
+      expect(generic.receipt).toBeUndefined();
+      expect(injectReceipt).toHaveBeenCalledTimes(allowed ? 1 : 0);
+      if (allowed) {
+        injectReceipt.mockRejectedValueOnce(new Error("local receipt failure"));
+        const failed = await dispatchDiagnoseConversationAction(input);
+        expect(failed.ok).toBe(true);
+        expect(failed.receipt).toEqual({ delivered: false, reason: "unavailable" });
+      }
+    } finally {
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    }
+  });
+});
