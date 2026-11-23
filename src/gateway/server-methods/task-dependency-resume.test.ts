@@ -108,8 +108,9 @@ vi.mock("../employee-workbench-actor-restore.js", async (original) => ({
 const { chatHandlers } = await import("./chat.js");
 const { reservePrivateDependency, updatePrivateDependency } =
   await import("../../conversation-task/private-dependency-store.js");
-const { seedSessionTaskBoard, readSessionTaskBoard } =
-  await import("../../agent-runtime/state/repository/task-board-file.js");
+// Fixture seeding remains test-only through the existing compatibility test entry.
+const { seedSessionTaskBoard } = await import("../../conversation-task/session-task-board.js");
+const { readSessionTaskBoard } = await import("../../agent-runtime/state/task-board.js");
 function createChatContext(): Pick<
   GatewayRequestContext,
   | "broadcast"

@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { expect, it, vi } from "vitest";
 import { resumeInterpretedCurrentTask } from "../../gateway/server-methods/chat-resume-parked-recheck.js";
-import { routeInteraction } from "../command/route-interaction.js";
+import { routeInteraction } from "../command/index.js";
 import { sessionTaskState } from "../state/index.js";
 import { admitSessionExecution } from "./execution-admission.js";
 

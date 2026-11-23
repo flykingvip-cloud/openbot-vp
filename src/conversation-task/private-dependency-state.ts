@@ -1,5 +1,5 @@
 import type { SessionTaskBoard } from "../agent-runtime/contracts/task.js";
-import { resolveDependencyBlock } from "../agent-runtime/policy/dependency-resolution.js";
+import { resolveDependencyBlock } from "../agent-runtime/policy/index.js";
 import { revalidateContinueTicket } from "../agent-runtime/state/continuation-ticket.js";
 import type { PrivateDependency } from "./private-dependency-store.js";
 export function isDependencyParentCurrent(

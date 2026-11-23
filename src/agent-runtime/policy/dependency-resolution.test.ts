@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { resolveDependencyBlock } from "./dependency-resolution.js";
+import { resolveDependencyBlock } from "./index.js";
 const fallback = {
   id: "use-authorized-local-material",
   authorized: true,

@@ -15631,6 +15631,139 @@ tasks:
     ownerHistory: []
     since: 2026-11-23
     metadata: {}
+  - id: main-six-doc-format-20261123:codex-wpb-successor
+    owner: codex-wpb-successor
+    intent:
+      - Human-authorized six exact Markdown formatting only; no code or rule
+        changes
+    paths:
+      - .kiro/specs/autonomous-task-closure-audit/findings.md
+      - .kiro/specs/dynamic-task-activity/tasks.md
+      - .kiro/specs/knowledge-retrieval-summary/design.md
+      - .kiro/specs/knowledge-retrieval-summary/tasks.md
+      - .kiro/specs/same-task-continuation/tasks.md
+      - .kiro/specs/stale-owner-decision/tasks.md
+    state: active
+    sessions:
+      - id: main-six-doc-format-20261123
+        taskId: main-six-doc-format-20261123:codex-wpb-successor
+        ide: codex
+        agent: codex-wpb-successor
+        status: active
+        metadata:
+          authorization: Direct user approval for exact six document pure-format repair
+          predecessor: live six paths UNATTRIBUTED/clean; content authors retained in Git
+            history
+        lastSignalAt: 2026-11-23T02:49:03.007Z
+    ownerHistory: []
+    since: 2026-11-23
+    metadata: {}
+  - id: main-five-public-entries-20261123:codex-wpb-successor
+    owner: codex-wpb-successor
+    intent:
+      - Human-authorized minimal existing public-entry imports; no
+        policy/manifest/behavior changes
+    paths:
+      - src/agent-runtime/policy/dependency-resolution.test.ts
+      - src/conversation-task/private-dependency-state.ts
+      - src/conversation-task/private-dependency-store.ts
+      - src/agent-runtime/wiring/same-task-continuation.test.ts
+      - src/gateway/server-methods/task-dependency-resume.test.ts
+      - src/agent-runtime/policy/index.ts
+      - src/agent-runtime/state/task-board.ts
+    state: active
+    sessions:
+      - id: main-five-public-entries-20261123
+        taskId: main-five-public-entries-20261123:codex-wpb-successor
+        ide: codex
+        agent: codex-wpb-successor
+        status: active
+        metadata:
+          authorization: Direct user exact five sources and necessary public exports
+        lastSignalAt: 2026-11-23T03:43:57.241Z
+    ownerHistory: []
+    since: 2026-11-23
+    metadata:
+      previousOwners:
+        - path: src/agent-runtime/policy/dependency-resolution.test.ts
+          owners: []
+        - path: src/conversation-task/private-dependency-state.ts
+          owners:
+            - taskId: private-dependency-closure:codex-kb-implement
+              owner: codex-kb-implement
+            - taskId: conversation-task-runtime:kiro-conversation-task-runtime
+              owner: kiro-conversation-task-runtime
+            - taskId: pi-sdk-family-migration-v3:cursor
+              owner: cursor
+        - path: src/conversation-task/private-dependency-store.ts
+          owners:
+            - taskId: private-dependency-closure:codex-kb-implement
+              owner: codex-kb-implement
+            - taskId: conversation-task-runtime:kiro-conversation-task-runtime
+              owner: kiro-conversation-task-runtime
+            - taskId: pi-sdk-family-migration-v3:cursor
+              owner: cursor
+        - path: src/agent-runtime/wiring/same-task-continuation.test.ts
+          owners:
+            - taskId: same-task-continuation:codex-kb-implement
+              owner: codex-kb-implement
+            - taskId: pi-sdk-family-migration-v3:cursor
+              owner: cursor
+            - taskId: agent-runtime-convergence
+              owner: 双规发布
+        - path: src/gateway/server-methods/task-dependency-resume.test.ts
+          owners:
+            - taskId: private-dependency-closure:codex-kb-implement
+              owner: codex-kb-implement
+            - taskId: pi-sdk-family-migration-v3:cursor
+              owner: cursor
+        - path: src/agent-runtime/policy/index.ts
+          owners:
+            - taskId: pi-sdk-family-migration-v3:cursor
+              owner: cursor
+            - taskId: agent-runtime-convergence
+              owner: 双规发布
+          shared:
+            shared:
+              glob: src/agent-runtime/policy/index.ts
+              landerTask: agent-runtime-convergence
+              reason: User-authorized bounded rule inventory implementation; preserve
+                predecessor scopes and history.
+              reviewAfter: 2026-11-30
+            lander: 双规发布
+      liveWip: all exact paths clean, source not copied
+      taskBoardPublicEntry:
+        authorizedBy: human
+        live: absent/no WIP
+        previousBroadOwners:
+          - cursor
+          - 双规发布
+        exports:
+          - seedSessionTaskBoard
+          - readSessionTaskBoard
+        scope: No implementation, no export*, no broad state/index
+  - id: main-two-doc-format-20261123:codex-wpb-successor
+    owner: codex-wpb-successor
+    intent:
+      - Human-authorized two exact Markdown formatting closeout only
+    paths:
+      - .kiro/specs/artifact-evidence-closeout/tasks.md
+      - .kiro/specs/login-scope-propagation/tasks.md
+    state: active
+    sessions:
+      - id: main-two-doc-format-20261123
+        taskId: main-two-doc-format-20261123:codex-wpb-successor
+        ide: codex
+        agent: codex-wpb-successor
+        status: active
+        metadata:
+          authorization: Direct user approval for exact artifact-evidence/login-scope
+            docs; content and original histories preserved
+          liveWip: both exact files clean/unattributed
+        lastSignalAt: 2026-11-23T07:41:01.137Z
+    ownerHistory: []
+    since: 2026-11-23
+    metadata: {}
 landingStreams:
   - id: artifact-evidence-closeout:codex-kb-review
     landingPolicy: serial
@@ -31293,6 +31426,57 @@ landingStreams:
       reason: Only seven previously unmatched exact paths; preserve all prior stream
         order/classification
 sharedPaths:
+  - glob: .kiro/specs/artifact-evidence-closeout/tasks.md
+    landerTask: main-two-doc-format-20261123:codex-wpb-successor
+    reason: Human-authorized exact two-document pure formatting; previous histories retained.
+  - glob: .kiro/specs/login-scope-propagation/tasks.md
+    landerTask: main-two-doc-format-20261123:codex-wpb-successor
+    reason: Human-authorized exact two-document pure formatting; previous histories retained.
+  - glob: src/agent-runtime/policy/dependency-resolution.test.ts
+    landerTask: main-five-public-entries-20261123:codex-wpb-successor
+    reason: Human-authorized exact public-entry repair; predecessor histories retained.
+  - glob: src/conversation-task/private-dependency-state.ts
+    landerTask: main-five-public-entries-20261123:codex-wpb-successor
+    reason: Human-authorized exact public-entry repair; predecessor histories retained.
+  - glob: src/conversation-task/private-dependency-store.ts
+    landerTask: main-five-public-entries-20261123:codex-wpb-successor
+    reason: Human-authorized exact public-entry repair; predecessor histories retained.
+  - glob: src/agent-runtime/wiring/same-task-continuation.test.ts
+    landerTask: main-five-public-entries-20261123:codex-wpb-successor
+    reason: Human-authorized exact public-entry repair; predecessor histories retained.
+  - glob: src/gateway/server-methods/task-dependency-resume.test.ts
+    landerTask: main-five-public-entries-20261123:codex-wpb-successor
+    reason: Human-authorized exact public-entry repair; predecessor histories retained.
+  - glob: src/agent-runtime/policy/index.ts
+    landerTask: main-five-public-entries-20261123:codex-wpb-successor
+    reason: Human-authorized exact public-entry repair; predecessor histories retained.
+  - glob: src/agent-runtime/state/task-board.ts
+    landerTask: main-five-public-entries-20261123:codex-wpb-successor
+    reason: Human-authorized exact public-entry repair; predecessor histories retained.
+  - glob: .kiro/specs/autonomous-task-closure-audit/findings.md
+    landerTask: main-six-doc-format-20261123:codex-wpb-successor
+    reason: Human-authorized exact pure-document formatting only; content and prior
+      histories retained.
+  - glob: .kiro/specs/dynamic-task-activity/tasks.md
+    landerTask: main-six-doc-format-20261123:codex-wpb-successor
+    reason: Human-authorized exact pure-document formatting only; content and prior
+      histories retained.
+  - glob: .kiro/specs/knowledge-retrieval-summary/design.md
+    landerTask: main-six-doc-format-20261123:codex-wpb-successor
+    reason: Human-authorized exact pure-document formatting only; content and prior
+      histories retained.
+  - glob: .kiro/specs/knowledge-retrieval-summary/tasks.md
+    landerTask: main-six-doc-format-20261123:codex-wpb-successor
+    reason: Human-authorized exact pure-document formatting only; content and prior
+      histories retained.
+  - glob: .kiro/specs/same-task-continuation/tasks.md
+    landerTask: main-six-doc-format-20261123:codex-wpb-successor
+    reason: Human-authorized exact pure-document formatting only; content and prior
+      histories retained.
+  - glob: .kiro/specs/stale-owner-decision/tasks.md
+    landerTask: main-six-doc-format-20261123:codex-wpb-successor
+    reason: Human-authorized exact pure-document formatting only; content and prior
+      histories retained.
   - glob: src/gateway/billing/chat-reply-credit-reservation.slice3.test.ts
     landerTask: arch-remediation-wp-b-slice3-credits-reservation
     reason: Human-authorized successor of test-only PR328; original owner session
@@ -35176,10 +35360,6 @@ sharedPaths:
     reason: User-authorized bounded rule inventory implementation; preserve predecessor scopes and history.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/policy/catalog.test.ts
-    landerTask: agent-runtime-convergence
-    reason: User-authorized bounded rule inventory implementation; preserve predecessor scopes and history.
-    reviewAfter: 2026-11-30
-  - glob: src/agent-runtime/policy/index.ts
     landerTask: agent-runtime-convergence
     reason: User-authorized bounded rule inventory implementation; preserve predecessor scopes and history.
     reviewAfter: 2026-11-30
