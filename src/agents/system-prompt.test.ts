@@ -595,6 +595,17 @@ describe("buildAgentSystemPrompt", () => {
     expect(routed).not.toContain("You are running in a sandboxed runtime");
   });
 
+  it("requires tool-derived byte equality and autonomous in-scope repair before artifact closeout", () => {
+    const prompt = buildAgentSystemPrompt({
+      workspaceDir: "/tmp/openbot-test",
+      toolNames: ["exec"],
+    });
+    expect(prompt).toContain("compare its bytes to the requested content");
+    expect(prompt).toContain("Do not infer a trailing newline from byte length alone");
+    expect(prompt).toContain("repair it and verify again within the same scope");
+    expect(prompt).toContain("deliver the verified result without inventing another repair");
+  });
+
   it("tells the model a wait sentence is not a finished turn", () => {
     const prompt = buildAgentSystemPrompt({
       workspaceDir: "/tmp/openclaw",
