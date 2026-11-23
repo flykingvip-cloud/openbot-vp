@@ -377,3 +377,8 @@
 - src/diagnosis/production-unified-deploy.test.ts — grok-t383
 - src/diagnosis/production-unified-deps.test.ts — grok-t383
 - src/diagnosis/production-unified-lock.test.ts — grok-t383
+
+## t394 PR #344 诊断回执补修（仅分支验证，未启用现网）
+
+- src/diagnosis/diagnose-action-dispatch.ts — grok-t394：回执归入 conversationDelivery 总闸与能力闸，分别报告目标交接和回执状态，不改变 omitReceipt 的普通会话交接。
+- src/diagnosis/diagnose-action-dispatch.test.ts — grok-t394：默认关闭时不调用回执注入；正向双闸与拒绝/异常路径由 src/diagnosis/write-policy.test.ts 使用真实启动策略验证。
