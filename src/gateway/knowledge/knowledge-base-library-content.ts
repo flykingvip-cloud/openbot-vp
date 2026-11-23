@@ -220,11 +220,11 @@ function resolveDatasetFormat(
   return contentType ?? "Dataset";
 }
 
-const DATASET_RECORD_ID_RE = /^(dataset:[0-9a-f]+):\d+$/;
+const DATASET_RECORD_ID_RE = /^(dataset[:-][0-9a-f]+)[:-]\d+$/;
 
-/** A doc is a dataset-import record/group when its id carries the `dataset:` prefix. */
+/** Recognize both safe canonical IDs and persisted legacy colon IDs (read only). */
 function isDatasetDocId(docId: string): boolean {
-  return docId.startsWith("dataset:");
+  return /^dataset[:-][0-9a-f]+(?:[:-]\d+)?$/.test(docId);
 }
 
 /**

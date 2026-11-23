@@ -128,7 +128,10 @@ import {
   resolvePersonalImportKnowledgeBase,
   type KnowledgeCompatWarning,
 } from "../knowledge/knowledge-compat.js";
-import { resolveKnowledgeIndexRootForBase } from "../knowledge/knowledge-directory.js";
+import {
+  resolveKnowledgeDirectoryLayoutForBase,
+  resolveKnowledgeIndexRootForBase,
+} from "../knowledge/knowledge-directory.js";
 import {
   KnowledgeDocumentPreviewUnavailableError,
   previewKnowledgeDocument,
@@ -746,6 +749,12 @@ async function hardDeleteKnowledgeBaseDocument(params: {
     }
     try {
       const { deleteKnowledgeOriginal } = await import("../knowledge/knowledge-original-store.js");
+      deleteKnowledgeOriginal({
+        kbId: params.knowledgeBase.id,
+        docId: params.documentId,
+        originalsRoot: resolveKnowledgeDirectoryLayoutForBase(params.knowledgeBase).originalsRoot,
+      });
+      // Also remove a retained legacy copy; hard delete must not resurrect it.
       deleteKnowledgeOriginal({
         kbId: params.knowledgeBase.id,
         docId: params.documentId,
@@ -1478,7 +1487,8 @@ export const knowledgeHandlers: GatewayRequestHandlers = {
       mimeType,
       size,
       kind,
-      textContent: stringParam(attachment.textContent),
+      // Preserve original bytes; stringParam trims source whitespace.
+      textContent: typeof attachment.textContent === "string" ? attachment.textContent : undefined,
       dataUrl: stringParam(attachment.dataUrl),
     } as const;
     const ingestParseOptions = parseKnowledgeIngestParseOptions(record.ingestOptions);
@@ -1661,7 +1671,7 @@ export const knowledgeHandlers: GatewayRequestHandlers = {
           mimeType,
           size,
           kind,
-          textContent: stringParam(entry.textContent),
+          textContent: typeof entry.textContent === "string" ? entry.textContent : undefined,
           dataUrl: stringParam(entry.dataUrl),
         } as const;
         try {

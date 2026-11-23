@@ -35,6 +35,7 @@ import {
   listKnowledgeBases,
   type KnowledgeBase,
 } from "./knowledge-base-store.js";
+import { resolveKnowledgeIndexRootForBase } from "./knowledge-directory.js";
 import { recallDocumentRetrievalSummaries } from "./retrieval-summary-document.js";
 import { loadKnowledgeSourceBundle } from "./source-bundle.js";
 import type { KnowledgeSourceContext } from "./sources/types.js";
@@ -77,7 +78,7 @@ export async function resolveKnowledgeBaseHasIndexedChunks(
   const dbPath = resolveKnowledgeIndexDbPath({
     ownerId: base.ownerId,
     tenantId: base.tenantId,
-    indexRoot,
+    indexRoot: resolveKnowledgeIndexRootForBase(base, { indexRoot }),
   });
   if (!fs.existsSync(dbPath)) {
     return false;
