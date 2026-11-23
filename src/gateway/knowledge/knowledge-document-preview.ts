@@ -6,6 +6,11 @@ import {
   readLocalIndexDocumentContent,
   resolveWorkspaceActorTenantId,
 } from "../workspace-resolver/index.js";
+import { getKnowledgeBase } from "./knowledge-base-store.js";
+import {
+  resolveKnowledgeDirectoryLayoutForBase,
+  resolveKnowledgeIndexRootForBase,
+} from "./knowledge-directory.js";
 import {
   findKnowledgeOriginalByFileName,
   persistKnowledgeOriginal,
@@ -232,11 +237,22 @@ export async function readKnowledgeDocumentContent(params: {
     return null;
   }
 
-  const stored = readKnowledgeOriginal({
-    kbId,
-    docId: documentId,
-    originalsRoot: params.originalsRoot,
-  });
+  const base = getKnowledgeBase(kbId, params.kbStorePath);
+  const originalsRoot =
+    params.originalsRoot ??
+    (base
+      ? resolveKnowledgeDirectoryLayoutForBase(base, {
+          tenantsRoot: params.tenantsRoot,
+          configDir: params.configDir,
+        }).originalsRoot
+      : undefined);
+  const stored =
+    readKnowledgeOriginal({ kbId, docId: documentId, originalsRoot }) ??
+    // Legacy originals were stored below CONFIG_DIR. Explicit injected roots
+    // remain authoritative; automatic layout resolution may read the old root.
+    (params.originalsRoot === undefined && originalsRoot
+      ? readKnowledgeOriginal({ kbId, docId: documentId })
+      : null);
   if (
     stored &&
     (!params.textOnly || isTextLikeContent(stored.manifest.fileName, stored.manifest.mimeType))
@@ -262,7 +278,7 @@ export async function readKnowledgeDocumentContent(params: {
       fileName: found.filename,
       mimeType: found.mimeTypeHint ?? "application/octet-stream",
       buffer: found.buffer,
-      ...(params.originalsRoot ? { originalsRoot: params.originalsRoot } : {}),
+      ...(originalsRoot ? { originalsRoot } : {}),
     });
     return found;
   };
@@ -329,7 +345,7 @@ export async function readKnowledgeDocumentContent(params: {
     const aliased = findKnowledgeOriginalByFileName({
       fileName: linkedName,
       preferKbId: kbId,
-      originalsRoot: params.originalsRoot,
+      originalsRoot,
     });
     if (
       aliased &&
@@ -379,7 +395,14 @@ export async function readKnowledgeDocumentContent(params: {
     documentId,
     userId: params.userId,
     tenantId: params.tenantId,
-    indexRoot: params.indexRoot,
+    indexRoot:
+      params.indexRoot ??
+      (base
+        ? resolveKnowledgeIndexRootForBase(base, {
+            tenantsRoot: params.tenantsRoot,
+            configDir: params.configDir,
+          })
+        : undefined),
   });
 }
 
