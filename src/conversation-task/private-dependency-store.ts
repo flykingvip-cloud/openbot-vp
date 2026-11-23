@@ -2,7 +2,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import type { DependencyResolution } from "../agent-runtime/policy/dependency-resolution.js";
+import type { DependencyResolution } from "../agent-runtime/policy/index.js";
 import { withDirectoryLock, writeJsonDurable } from "../agent-runtime/state/durable-json.js";
 import { resolveStateDir } from "../config/paths.js";
 export type PrivateDependency = {

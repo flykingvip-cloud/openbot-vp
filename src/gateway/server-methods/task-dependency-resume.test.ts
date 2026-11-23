@@ -109,7 +109,7 @@ const { chatHandlers } = await import("./chat.js");
 const { reservePrivateDependency, updatePrivateDependency } =
   await import("../../conversation-task/private-dependency-store.js");
 const { seedSessionTaskBoard, readSessionTaskBoard } =
-  await import("../../agent-runtime/state/repository/task-board-file.js");
+  await import("../../agent-runtime/state/task-board.js");
 function createChatContext(): Pick<
   GatewayRequestContext,
   | "broadcast"
