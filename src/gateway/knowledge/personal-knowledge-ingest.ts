@@ -31,6 +31,10 @@ import {
   resolveKnowledgeDirectoryLayoutForBase,
   resolveKnowledgeIndexRootForBase,
 } from "./knowledge-directory.js";
+import {
+  assertKnowledgeOriginalWritable,
+  withKnowledgeDocumentMutation,
+} from "./knowledge-original-store.js";
 import { persistKnowledgeOriginal } from "./knowledge-original-store.js";
 import {
   buildPersonalDocumentUploadDescription,
@@ -323,6 +327,8 @@ export async function ingestKnowledgePayloadToBase(params: {
   /** Trusted proof from authenticated call entry — required when knowledgeBase.tenantId is set. */
   governanceOwnershipProof?: GovernanceOwnershipProof;
   deferEmbedding?: boolean;
+  /** Synchronous membership/source-link commit inside the document mutation lock. */
+  onIndexed?: (outcome: PersonalKnowledgeIngestOutcome) => void;
 }): Promise<PersonalKnowledgeIngestOutcome> {
   if (params.buffer.length === 0) {
     return { attempted: true, skipped: true, reason: "empty content" };
@@ -337,83 +343,106 @@ export async function ingestKnowledgePayloadToBase(params: {
   const indexRoot = resolveKnowledgeIndexRootForBase(params.knowledgeBase, {
     indexRoot: params.indexRoot,
   });
-  try {
-    persistKnowledgeOriginal({
-      kbId: params.knowledgeBase.id,
-      docId: params.documentId,
-      fileName: params.fileName,
-      mimeType: params.mimeType,
-      buffer: params.buffer,
-      originalsRoot,
-    });
-  } catch {
-    // Preview store must not fail indexing.
-  }
-  try {
-    const embeddingProvider =
-      params.embeddingProvider !== undefined
-        ? params.embeddingProvider
-        : await resolveIngestEmbeddingProvider(params.cfg, params.client);
-    const tenantId = params.knowledgeBase.tenantId?.trim() || null;
-    const governanceOwnershipProof =
-      params.governanceOwnershipProof ??
-      (tenantId ? undefined : ownershipProofFromLocalUser({ userId: params.ownerId }));
-    if (tenantId && !governanceOwnershipProof) {
-      return {
-        attempted: true,
-        skipped: true,
-        error: "governance_write_denied:missing_ownership_proof",
-      };
-    }
-    const result = await ingestKnowledgeDocument({
-      kbId: params.knowledgeBase.id,
-      docId: params.documentId,
-      title: params.title,
-      fileName: params.fileName,
-      mimeType: params.mimeType,
-      buffer: params.buffer,
-      ownerId: params.ownerId,
-      tenantId: params.knowledgeBase.tenantId,
-      visibility: params.knowledgeBase.visibility,
-      source: params.sourceName ?? params.fileName,
-      indexRoot,
-      embeddingProvider,
-      chunking: resolveChunkingFromStrategy(params.parseOptions?.chunkingStrategy),
-      ocrEnabled: params.parseOptions?.ocrEnabled,
-      cfg: params.cfg,
-      governanceOwnershipProof,
-      deferEmbedding: params.deferEmbedding === true,
-    });
-    // Best-effort dataset schema extraction for tabular uploads (CSV/TSV/JSON). Returns
-    // without opening the index for non-tabular content, so free-text docs are untouched.
-    try {
-      await recordDatasetSchemaForDocument({
-        knowledgeBase: params.knowledgeBase,
-        docId: params.documentId,
-        text: params.buffer.toString("utf8"),
-        fileName: params.fileName,
-        mimeType: params.mimeType,
-        ...(indexRoot ? { indexRoot } : {}),
-      });
-    } catch {
-      // ignore schema-extraction failures
-    }
-    return {
-      attempted: true,
-      skipped: result.skipped,
-      reason: result.skipped ? result.delta : undefined,
-      chunkCount: result.chunkCount,
-      versionLabel: result.versionLabel,
-      delta: result.delta,
-      ...(result.vectorizeQueued ? { vectorizeQueued: true } : {}),
-    };
-  } catch (error) {
-    return {
-      attempted: true,
-      skipped: true,
-      error: error instanceof Error ? error.message : "ingest failed",
-    };
-  }
+  return withKnowledgeDocumentMutation(
+    { kbId: params.knowledgeBase.id, docId: params.documentId, originalsRoot },
+    async () => {
+      try {
+        assertKnowledgeOriginalWritable({
+          kbId: params.knowledgeBase.id,
+          docId: params.documentId,
+          originalsRoot,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const reason = message.startsWith("document_deleted:")
+          ? "document_deleted"
+          : "deletion_state_unavailable";
+        return { attempted: true, skipped: true, reason, error: message };
+      }
+      try {
+        persistKnowledgeOriginal({
+          kbId: params.knowledgeBase.id,
+          docId: params.documentId,
+          fileName: params.fileName,
+          mimeType: params.mimeType,
+          buffer: params.buffer,
+          originalsRoot,
+        });
+      } catch {
+        // Preview store must not fail indexing.
+      }
+      try {
+        const embeddingProvider =
+          params.embeddingProvider !== undefined
+            ? params.embeddingProvider
+            : await resolveIngestEmbeddingProvider(params.cfg, params.client);
+        const tenantId = params.knowledgeBase.tenantId?.trim() || null;
+        const governanceOwnershipProof =
+          params.governanceOwnershipProof ??
+          (tenantId ? undefined : ownershipProofFromLocalUser({ userId: params.ownerId }));
+        if (tenantId && !governanceOwnershipProof) {
+          return {
+            attempted: true,
+            skipped: true,
+            error: "governance_write_denied:missing_ownership_proof",
+          };
+        }
+        const result = await ingestKnowledgeDocument({
+          kbId: params.knowledgeBase.id,
+          docId: params.documentId,
+          title: params.title,
+          fileName: params.fileName,
+          mimeType: params.mimeType,
+          buffer: params.buffer,
+          ownerId: params.ownerId,
+          tenantId: params.knowledgeBase.tenantId,
+          visibility: params.knowledgeBase.visibility,
+          source: params.sourceName ?? params.fileName,
+          indexRoot,
+          embeddingProvider,
+          chunking: resolveChunkingFromStrategy(params.parseOptions?.chunkingStrategy),
+          ocrEnabled: params.parseOptions?.ocrEnabled,
+          cfg: params.cfg,
+          governanceOwnershipProof,
+          deferEmbedding: params.deferEmbedding === true,
+        });
+        // Best-effort dataset schema extraction for tabular uploads (CSV/TSV/JSON). Returns
+        // without opening the index for non-tabular content, so free-text docs are untouched.
+        try {
+          await recordDatasetSchemaForDocument({
+            knowledgeBase: params.knowledgeBase,
+            docId: params.documentId,
+            text: params.buffer.toString("utf8"),
+            fileName: params.fileName,
+            mimeType: params.mimeType,
+            ...(indexRoot ? { indexRoot } : {}),
+          });
+        } catch {
+          // ignore schema-extraction failures
+        }
+        params.onIndexed?.({
+          attempted: true,
+          skipped: result.skipped,
+          versionLabel: result.versionLabel,
+        });
+        return {
+          attempted: true,
+          skipped: result.skipped,
+          reason: result.skipped ? result.delta : undefined,
+          chunkCount: result.chunkCount,
+          versionLabel: result.versionLabel,
+          delta: result.delta,
+          ...(result.vectorizeQueued ? { vectorizeQueued: true } : {}),
+        };
+      } catch (error) {
+        return {
+          attempted: true,
+          skipped: true,
+          error: error instanceof Error ? error.message : "ingest failed",
+        };
+      }
+    },
+  );
 }
 
 export async function ingestUploadedPersonalKnowledge(params: {
@@ -533,6 +562,8 @@ export async function ingestAttachedPersonalKnowledgeDocument(params: {
   embeddingProvider?: EmbeddingProvider | null;
   governanceOwnershipProof?: GovernanceOwnershipProof;
   deferEmbedding?: boolean;
+  /** Synchronous membership/source-link commit inside the document mutation lock. */
+  onIndexed?: (outcome: PersonalKnowledgeIngestOutcome) => void;
 }): Promise<PersonalKnowledgeIngestOutcome> {
   const skillId = normalizePersonalDocumentId(params.documentId);
   if (!skillId) {
@@ -568,6 +599,7 @@ export async function ingestAttachedPersonalKnowledgeDocument(params: {
     embeddingProvider: params.embeddingProvider,
     governanceOwnershipProof: params.governanceOwnershipProof,
     deferEmbedding: params.deferEmbedding === true,
+    onIndexed: params.onIndexed,
   });
 }
 
@@ -696,6 +728,7 @@ export async function ingestWebReferencePersonalKnowledge(params: {
 export type DatasetImportRecord = { title?: string; text: string };
 
 export type DatasetImportOutcome = {
+  errors?: Array<{ documentId: string; reason: string; message?: string }>;
   attempted: boolean;
   imported: number;
   skipped: number;
@@ -725,6 +758,7 @@ export async function importDatasetPersonalKnowledge(params: {
   client?: GatewayClient | null;
   embeddingProvider?: EmbeddingProvider | null;
   maxRecords?: number;
+  governanceOwnershipProof?: GovernanceOwnershipProof;
 }): Promise<DatasetImportOutcome> {
   const knowledgeBase =
     params.knowledgeBase ??
@@ -765,8 +799,15 @@ export async function importDatasetPersonalKnowledge(params: {
       indexRoot: params.indexRoot,
       cfg: params.cfg,
       embeddingProvider: params.embeddingProvider,
+      governanceOwnershipProof: params.governanceOwnershipProof,
+      onIndexed: () =>
+        attachDocumentToKnowledgeBase(knowledgeBase.id, documentId, params.storePath),
     });
-    attachDocumentToKnowledgeBase(knowledgeBase.id, documentId, params.storePath);
+    if (result.error) {
+      outcome.skipped += 1;
+      (outcome.errors ??= []).push({ documentId, reason: result.reason ?? result.error });
+      continue;
+    }
     outcome.documentIds.push(documentId);
     if (result.skipped) {
       outcome.skipped += 1;
