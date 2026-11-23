@@ -90,7 +90,7 @@ const pluginSdkEntrypoints = [
   "keyed-async-queue",
 ] as const;
 
-export default [
+const configs = [
   nodeBuildConfig({
     entry: "src/index.ts",
   }),
@@ -132,3 +132,11 @@ export default [
     entry: ["src/hooks/bundled/*/handler.ts", "src/hooks/llm-slug-generator.ts"],
   }),
 ];
+
+// The official build launches each configuration in a fresh process so bundles
+// do not retain one another's module graphs. Direct tsdown invocation is unchanged.
+const index = process.env.OPENBOT_BUILD_ENTRY_INDEX;
+if (index !== undefined && (!/^\d+$/.test(index) || !configs[Number(index)])) {
+  throw new Error("Invalid OPENBOT_BUILD_ENTRY_INDEX");
+}
+export default index === undefined ? configs : [{ ...configs[Number(index)], clean: false }];
