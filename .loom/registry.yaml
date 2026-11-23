@@ -15612,7 +15612,38 @@ tasks:
         via: verified
     since: 2026-11-22
     metadata: {}
+  - id: artifact-evidence-closeout:codex-kb-review
+    owner: codex-kb-review
+    intent: []
+    paths:
+      - src/agent-runtime/context/system-prompt.ts
+      - src/agents/system-prompt.test.ts
+      - .kiro/specs/artifact-evidence-closeout/**
+    state: active
+    sessions:
+      - id: artifact-closeout-20261123
+        taskId: artifact-evidence-closeout:codex-kb-review
+        ide: codex
+        agent: codex-kb-review
+        status: active
+        lastSignalAt: 2026-11-23T05:06:32.396Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-23
+    metadata: {}
 landingStreams:
+  - id: artifact-evidence-closeout:codex-kb-review
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - .kiro/specs/artifact-evidence-closeout/**
+      - src/agent-runtime/context/system-prompt.ts
+      - src/agents/system-prompt.test.ts
+    canLandWith: []
+    metadata:
+      owner: codex-kb-review
+      task: artifact-evidence-closeout
+      reason: Shared exact-content evidence closeout fix.
   - id: group-interaction-separation:codex-kb-review
     landingPolicy: serial
     paths:
