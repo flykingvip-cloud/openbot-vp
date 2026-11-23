@@ -80,12 +80,22 @@ describe("workspace search step9b integration", () => {
   });
 
   it("recalls attached deliverable body via workspace search after ingest", async () => {
-    const collected = await invoke("knowledge.personal.collect", {
-      title: "Indexed Deliverable",
-      summary: "Unique workspace recall marker zeta-9b-body",
+    // A collected personal note is intentionally not a deliverable. Persist a
+    // genuine agent-output asset, with the marker ONLY in its indexed body.
+    const { saveSkillAsset } = await import("../skill-lifecycle-store.js");
+    const { skillId } = saveSkillAsset({
+      ownerUserId: "user-a",
+      sourceAgentId: "agent-test",
+      profile: {
+        name: "Indexed Deliverable",
+        summary: "Agent-produced analysis",
+        assetType: "knowledge",
+        category: "对话成果",
+        visibility: "private",
+        tags: [],
+        outputDescription: "Unique workspace recall marker zeta-9b-body",
+      },
     });
-    expect(collected.ok).toBe(true);
-    const skillId = collected.payload?.skillId as string;
 
     const created = await invoke("knowledge.base.create", { title: "Deliverable Archive KB" });
     const kbId = (created.payload?.knowledgeBase as { id?: string })?.id;
@@ -105,5 +115,8 @@ describe("workspace search step9b integration", () => {
     );
     const deliverables = result.groups.find((group) => group.group === "deliverables")?.hits ?? [];
     expect(deliverables.some((hit) => hit.deliverableId === `skill:${skillId}`)).toBe(true);
+    expect(
+      deliverables.find((hit) => hit.deliverableId === `skill:${skillId}`)?.score,
+    ).toBeGreaterThan(0);
   });
 });

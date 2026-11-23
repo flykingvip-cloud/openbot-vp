@@ -3,12 +3,13 @@ import {
   listEnterpriseKnowledgeProjectionBindings,
   upsertEnterpriseKnowledgeProjectionBinding,
 } from "../../enterprise-data/enterprise-knowledge-projection-binding-store.js";
+import { runProjectionMaterialization } from "../../enterprise-data/projection-materializer.js";
 import { seedEnterpriseDataCatalog } from "../../enterprise-data/seeds.js";
 import { normalizeEnterpriseDataStore } from "../../enterprise-data/store.js";
 import { loadEnterpriseKnowledgeBrowse } from "./enterprise-source.js";
 
 describe("enterprise knowledge browse", () => {
-  it("surfaces restricted projections separately from accessible objects", () => {
+  it("surfaces restricted projections separately from accessible objects", async () => {
     const store = normalizeEnterpriseDataStore({});
     seedEnterpriseDataCatalog({
       store,
@@ -55,6 +56,12 @@ describe("enterprise knowledge browse", () => {
       },
     });
 
+    await runProjectionMaterialization({
+      store,
+      tenantId: "tenant-acme",
+      bindingId: existingBinding.bindingId,
+      nowIso: new Date().toISOString(),
+    });
     const browse = loadEnterpriseKnowledgeBrowse({
       store,
       context: {

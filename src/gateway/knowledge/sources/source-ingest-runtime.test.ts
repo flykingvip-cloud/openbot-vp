@@ -99,7 +99,7 @@ describe("source-ingest-runtime", () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(result.documentId).toMatch(/^srcdir:/);
+    expect(result.documentId).toMatch(/^srcdir-/);
     expect(result.ingest?.skipped).toBe(false);
     expect(fetchApi).toHaveBeenCalledOnce();
 
@@ -174,7 +174,7 @@ describe("source-ingest-runtime", () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(result.documentId).toMatch(/^srcdir:/);
+    expect(result.documentId).toMatch(/^srcdir-/);
     expect(fetchExternal).toHaveBeenCalledWith(
       expect.objectContaining({
         endpoint: binding.endpoint,

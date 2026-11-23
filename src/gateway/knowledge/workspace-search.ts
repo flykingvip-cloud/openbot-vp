@@ -1,6 +1,7 @@
 import type { KnowledgeEvidence } from "../../retrieval/types.js";
 import type { GatewayClient } from "../server-methods/types.js";
 import { resolveKnowledgeSourceContext } from "./context.js";
+import { getDeliverableArchiveKnowledgeBaseId } from "./deliverables/archive-store.js";
 import { resolveDeliverableDocumentId } from "./deliverables/attach.js";
 import { applyRuntimeGovernanceToDeliverables } from "./deliverables/governance-runtime.js";
 import { listWorkspaceDeliverables } from "./deliverables/read-model.js";
@@ -184,6 +185,14 @@ function buildDeliverableDocLookup(
     const docId = resolveDeliverableDocumentId(item.deliverableId);
     if (docId) {
       map.set(docId, item);
+      const kbId =
+        item.relatedKnowledgeBaseId ?? getDeliverableArchiveKnowledgeBaseId(item.deliverableId);
+      if (kbId) {
+        const canonical = resolveDeliverableDocumentId(item.deliverableId, kbId);
+        if (canonical) {
+          map.set(canonical, item);
+        }
+      }
     }
   }
   return map;

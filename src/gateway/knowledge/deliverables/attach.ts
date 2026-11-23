@@ -53,18 +53,27 @@ export type ResolvedCollaborationDeliverable = {
   members: CollaborationMember[];
 };
 
-export function resolveDeliverableDocumentId(deliverableId: string): string | null {
+export function resolveDeliverableDocumentId(
+  deliverableId: string,
+  knowledgeBaseId?: string,
+): string | null {
   const trimmed = deliverableId.trim();
   if (!trimmed) {
     return null;
   }
   if (trimmed.startsWith("skill:")) {
     const skillId = trimmed.slice("skill:".length).trim();
-    return skillId || null;
+    return skillId
+      ? knowledgeBaseId
+        ? knowledgeDocumentIdFromSkillRef(knowledgeBaseId, skillId)
+        : skillId
+      : null;
   }
   const personalId = parsePersonalObjectId(trimmed);
   if (personalId) {
-    return personalId;
+    return knowledgeBaseId
+      ? knowledgeDocumentIdFromSkillRef(knowledgeBaseId, personalId)
+      : personalId;
   }
   return trimmed;
 }

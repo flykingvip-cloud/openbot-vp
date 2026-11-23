@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { listEnterpriseKnowledgeProjectionBindings } from "../enterprise-data/enterprise-knowledge-projection-binding-store.js";
+import { runProjectionMaterialization } from "../enterprise-data/projection-materializer.js";
 import { seedEnterpriseDataCatalog } from "../enterprise-data/seeds.js";
 import { normalizeEnterpriseDataStore } from "../enterprise-data/store.js";
 import { buildKnowledgeIndexCapabilityDescriptor } from "./feed/data-capability-feed-adapter.js";
@@ -20,13 +22,24 @@ describe("knowledge source bundle", () => {
     expect(bundle.objects.some((item) => item.id === "obj:project-a")).toBe(true);
   });
 
-  it("projects enterprise and data capabilities from seeded catalog", () => {
+  it("projects enterprise and data capabilities from seeded catalog", async () => {
     const store = normalizeEnterpriseDataStore({});
     seedEnterpriseDataCatalog({
       store,
       tenantId: "tenant-acme",
       nowIso: new Date().toISOString(),
     });
+    for (const binding of listEnterpriseKnowledgeProjectionBindings({
+      store,
+      tenantId: "tenant-acme",
+    })) {
+      await runProjectionMaterialization({
+        store,
+        tenantId: "tenant-acme",
+        bindingId: binding.bindingId,
+        nowIso: new Date().toISOString(),
+      });
+    }
     const context = {
       tenantId: "tenant-acme",
       seatId: "seat-sales-director",
@@ -46,7 +59,19 @@ describe("knowledge source bundle", () => {
     expect(dataCatalog.summary.grantedCount + dataCatalog.summary.requestableCount).toBeGreaterThan(
       0,
     );
-    expect(graph.edges.some((edge) => edge.relationType === "recommended-for")).toBe(true);
+    // Unmaterialized data capabilities remain descriptors, not invented nodes.
+    expect(dataCatalog.objects).toEqual([]);
+    for (const object of enterpriseObjects) {
+      expect(object.lineageId).toBeTruthy();
+      expect(graph.nodes.some((node) => node.objectId === object.id)).toBe(true);
+    }
+    expect(
+      graph.edges.every(
+        (edge) =>
+          graph.nodes.some((node) => node.id === edge.sourceId) &&
+          graph.nodes.some((node) => node.id === edge.targetId),
+      ),
+    ).toBe(true);
   });
 
   it("flags seeded demo capabilities as samples", () => {

@@ -1,5 +1,6 @@
 import { resolveKnowledgeIndexDbPath } from "./kb-index.js";
 import type { KnowledgeBase } from "./knowledge-base-store.js";
+import { resolveKnowledgeIndexRootForBase } from "./knowledge-directory.js";
 
 export type KnowledgeIndexDbGroup = {
   dbPath: string;
@@ -17,7 +18,7 @@ export function groupKnowledgeBasesByIndexDb(
     const dbPath = resolveKnowledgeIndexDbPath({
       ownerId: base.ownerId,
       tenantId: base.tenantId,
-      indexRoot,
+      indexRoot: resolveKnowledgeIndexRootForBase(base, { indexRoot }),
     });
     const existing = groups.get(dbPath);
     if (existing) {

@@ -56,7 +56,7 @@ export type SourceIngestResult = {
 
 function stableSourceDocumentId(sourceDescriptorId: string, relativePath: string): string {
   const key = `${sourceDescriptorId}::${relativePath}`;
-  return `srcdir:${createHash("sha256").update(key).digest("hex").slice(0, 32)}`;
+  return `srcdir-${createHash("sha256").update(key).digest("hex").slice(0, 32)}`;
 }
 
 function serializePayload(
