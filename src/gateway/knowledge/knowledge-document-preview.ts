@@ -13,6 +13,7 @@ import {
 } from "./knowledge-directory.js";
 import {
   findKnowledgeOriginalByFileName,
+  isKnowledgeOriginalDeleted,
   persistKnowledgeOriginal,
   readKnowledgeOriginal,
 } from "./knowledge-original-store.js";
@@ -246,6 +247,9 @@ export async function readKnowledgeDocumentContent(params: {
           configDir: params.configDir,
         }).originalsRoot
       : undefined);
+  if (isKnowledgeOriginalDeleted({ kbId, docId: documentId, originalsRoot })) {
+    return null;
+  }
   const stored =
     readKnowledgeOriginal({ kbId, docId: documentId, originalsRoot }) ??
     // Legacy originals were stored below CONFIG_DIR. Explicit injected roots

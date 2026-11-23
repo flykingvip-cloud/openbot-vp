@@ -317,4 +317,146 @@ describe("knowledge.document.preview", () => {
     expect(removedPreview.ok).toBe(false);
     expect(removedPreview.error?.details).toEqual({ reason: "original_not_retained" });
   });
+  it("fails closed durably when legacy cleanup fails, then retries without resurrecting either root", async () => {
+    contextState.current.tenantId = "tenant-delete-fault";
+    const created = await invoke("knowledge.base.create", {
+      title: "Fault",
+      visibility: "private",
+    });
+    const kbId = extractKnowledgeBaseId(created.payload);
+    const text = "# Legacy exact bytes\n\nKeep whitespace.\n";
+    const uploaded = await invoke("knowledge.personal.upload", {
+      knowledgeBaseId: kbId,
+      title: "Fault original",
+      attachment: {
+        fileName: "fault.md",
+        mimeType: "text/markdown",
+        size: Buffer.byteLength(text),
+        kind: "text",
+        textContent: text,
+      },
+    });
+    expect(uploaded.ok).toBe(true);
+    const docId = extractUploadedDocumentId(kbId, uploaded.payload);
+    const store = await import("../knowledge/knowledge-original-store.js");
+    const { getKnowledgeBase } = await import("../knowledge/knowledge-base-store.js");
+    const { resolveKnowledgeDirectoryLayoutForBase } =
+      await import("../knowledge/knowledge-directory.js");
+    const originalsRoot = resolveKnowledgeDirectoryLayoutForBase(
+      getKnowledgeBase(kbId)!,
+    ).originalsRoot;
+    store.persistKnowledgeOriginal({
+      kbId,
+      docId,
+      fileName: "legacy.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from(text),
+    });
+    // An unrevoked historical copy remains compatible with normal preview.
+    store.deleteKnowledgeOriginal({ kbId, docId, originalsRoot });
+    const legacy = await invoke("knowledge.document.preview", {
+      knowledgeBaseId: kbId,
+      documentId: docId,
+    });
+    expect(legacy.ok).toBe(true);
+    expect(Buffer.from(String(legacy.payload?.base64), "base64").toString()).toBe(text);
+    store.persistKnowledgeOriginal({
+      kbId,
+      docId,
+      originalsRoot,
+      fileName: "fault.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from(text),
+    });
+    const legacyDir = path.join(resolveKnowledgeOriginalsRoot(), kbId, docId);
+    const realRemove = fs.rmSync.bind(fs);
+    const remove = vi.spyOn(fs, "rmSync").mockImplementation((target, options) => {
+      if (String(target) === legacyDir) {
+        throw Object.assign(new Error("injected legacy cleanup denial"), { code: "EACCES" });
+      }
+      return realRemove(target, options);
+    });
+    try {
+      const failed = await invoke("knowledge.base.documents.delete", {
+        knowledgeBaseId: kbId,
+        documentId: docId,
+      });
+      expect(failed.ok).toBe(false);
+      expect(fs.existsSync(legacyDir)).toBe(true);
+      expect(getKnowledgeBase(kbId)?.documentIds).toContain(docId);
+      expect(store.isKnowledgeOriginalDeleted({ kbId, docId, originalsRoot })).toBe(true);
+      expect(
+        (await invoke("knowledge.document.preview", { knowledgeBaseId: kbId, documentId: docId }))
+          .ok,
+      ).toBe(false);
+      const sources = await invoke("knowledge.base.sources.list", { knowledgeBaseId: kbId });
+      expect(
+        (
+          (sources.payload?.sources ?? []) as Array<{
+            documentId: string;
+            canPreviewOriginal?: boolean;
+          }>
+        ).find((x) => x.documentId === docId)?.canPreviewOriginal,
+      ).not.toBe(true);
+      // Cross-tenant callers cannot use pending deletion to gain read or cleanup authority.
+      contextState.current = { ...contextState.current, userId: "user-b", tenantId: "tenant-b" };
+      expect(
+        (await invoke("knowledge.document.preview", { knowledgeBaseId: kbId, documentId: docId }))
+          .ok,
+      ).toBe(false);
+      expect(
+        (
+          await invoke("knowledge.base.documents.delete", {
+            knowledgeBaseId: kbId,
+            documentId: docId,
+          })
+        ).ok,
+      ).toBe(false);
+      contextState.current = {
+        ...contextState.current,
+        userId: "user-a",
+        tenantId: "tenant-delete-fault",
+      };
+      expect(() =>
+        store.persistKnowledgeOriginal({
+          kbId,
+          docId,
+          originalsRoot,
+          fileName: "race.md",
+          mimeType: "text/markdown",
+          buffer: Buffer.from("concurrent writer"),
+        }),
+      ).toThrow("knowledge_original_deleted");
+    } finally {
+      remove.mockRestore();
+    }
+    // Re-import uses disk state, not an in-memory revocation cache.
+    vi.resetModules();
+    const restarted = await import("../knowledge/knowledge-document-preview.js");
+    expect(
+      await restarted.readKnowledgeDocumentContent({ knowledgeBaseId: kbId, documentId: docId }),
+    ).toBeNull();
+    expect(
+      (
+        await invoke("knowledge.base.documents.delete", {
+          knowledgeBaseId: kbId,
+          documentId: docId,
+        })
+      ).ok,
+    ).toBe(true);
+    expect(fs.existsSync(legacyDir)).toBe(false);
+    expect(store.hasKnowledgeOriginal({ kbId, docId, originalsRoot })).toBe(false);
+    expect(
+      await restarted.readKnowledgeDocumentContent({ knowledgeBaseId: kbId, documentId: docId }),
+    ).toBeNull();
+    // Idempotent retry remains successful and does not remove the durable intent.
+    expect(
+      (
+        await invoke("knowledge.base.documents.delete", {
+          knowledgeBaseId: kbId,
+          documentId: docId,
+        })
+      ).ok,
+    ).toBe(true);
+  });
 });
