@@ -111,9 +111,6 @@ import {
   getKnowledgeBase,
   KnowledgeBaseStoreError,
   listKnowledgeBases,
-  readKnowledgeBaseStoreSnapshot,
-  resolveKnowledgeBaseStorePath,
-  restoreKnowledgeBaseStoreSnapshot,
   restoreDocumentToKnowledgeBase,
   updateKnowledgeBase,
   type KnowledgeBase,
@@ -709,76 +706,61 @@ async function hardDeleteKnowledgeBaseDocument(params: {
       (base.recycledDocumentIds ?? []).includes(params.documentId)
     );
   });
+  const { markKnowledgeOriginalDeleted, deleteKnowledgeOriginal } =
+    await import("../knowledge/knowledge-original-store.js");
+  const original = {
+    kbId: params.knowledgeBase.id,
+    docId: params.documentId,
+    originalsRoot: resolveKnowledgeDirectoryLayoutForBase(params.knowledgeBase).originalsRoot,
+  };
+  // Persist before any destructive work/await. This terminal intent survives a
+  // partial filesystem failure and blocks every preview fallback after restart.
+  markKnowledgeOriginalDeleted(original);
+  deleteKnowledgeOriginal(original);
+  deleteKnowledgeOriginal({ kbId: original.kbId, docId: original.docId });
   if (referencedElsewhere) {
+    // Other KBs keep their shared index/asset; only this KB's originals are revoked.
     return deleteDocumentFromKnowledgeBase(params.knowledgeBase.id, params.documentId);
   }
+  deleteReservedDeliverableOriginal({
+    knowledgeBase: params.knowledgeBase,
+    documentId: params.documentId,
+  });
 
-  const storePath = resolveKnowledgeBaseStorePath();
-  const storeSnapshot = readKnowledgeBaseStoreSnapshot(storePath);
-  const next = deleteDocumentFromKnowledgeBase(
-    params.knowledgeBase.id,
-    params.documentId,
-    storePath,
-  );
   const indexRoot = resolveKnowledgeIndexRootForBase(params.knowledgeBase);
   const dbPath = resolveKnowledgeIndexDbPath({
     ownerId: params.knowledgeBase.ownerId,
     tenantId: params.knowledgeBase.tenantId,
     indexRoot,
   });
-  try {
-    if (fs.existsSync(dbPath)) {
-      const index = await openKnowledgeIndex({ dbPath, vectorEnabled: false });
-      try {
-        deleteKnowledgeDocumentFromIndex({
-          db: index.db,
-          index,
-          docId: params.documentId,
-        });
-      } finally {
-        index.close();
-      }
-    }
-    // Drop Obsidian explicit metadata so removed docs cannot bleed into other graphs.
+  // Membership is changed only after successful cleanup/index deletion. Never
+  // restore a whole-store snapshot over unrelated writes while awaiting the index.
+  if (fs.existsSync(dbPath)) {
+    const index = await openKnowledgeIndex({ dbPath, vectorEnabled: false });
     try {
-      const { deleteExplicitDocumentMetadata } =
-        await import("../knowledge/explicit-metadata-store.js");
-      deleteExplicitDocumentMetadata(params.documentId);
-    } catch {
-      // best-effort
-    }
-    try {
-      const { deleteKnowledgeOriginal } = await import("../knowledge/knowledge-original-store.js");
-      deleteKnowledgeOriginal({
-        kbId: params.knowledgeBase.id,
-        docId: params.documentId,
-        originalsRoot: resolveKnowledgeDirectoryLayoutForBase(params.knowledgeBase).originalsRoot,
-      });
-      // Also remove a retained legacy copy; hard delete must not resurrect it.
-      deleteKnowledgeOriginal({
-        kbId: params.knowledgeBase.id,
+      deleteKnowledgeDocumentFromIndex({
+        db: index.db,
+        index,
         docId: params.documentId,
       });
-    } catch {
-      // best-effort
+    } finally {
+      index.close();
     }
-    try {
-      deleteReservedDeliverableOriginal({
-        knowledgeBase: params.knowledgeBase,
-        documentId: params.documentId,
-      });
-    } catch {
-      // best-effort
-    }
-    try {
-      deleteSourceDocumentLinksForDocId(params.documentId);
-    } catch {
-      // best-effort
-    }
-  } catch (error) {
-    restoreKnowledgeBaseStoreSnapshot(storeSnapshot, storePath);
-    throw error;
   }
+  // Drop Obsidian explicit metadata so removed docs cannot bleed into other graphs.
+  try {
+    const { deleteExplicitDocumentMetadata } =
+      await import("../knowledge/explicit-metadata-store.js");
+    deleteExplicitDocumentMetadata(params.documentId);
+  } catch {
+    // best-effort
+  }
+  try {
+    deleteSourceDocumentLinksForDocId(params.documentId);
+  } catch {
+    // best-effort
+  }
+  const next = deleteDocumentFromKnowledgeBase(params.knowledgeBase.id, params.documentId);
 
   const skillId = maybeSkillDocumentId(params.documentId);
   if (
