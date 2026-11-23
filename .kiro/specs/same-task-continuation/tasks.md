@@ -2,7 +2,7 @@
 
 ## Agents
 
-- codex-kb-implement · role: contributor · scope: interaction continue/status and host enforcement · paths: src/agent-runtime/contracts/interaction.ts, src/agent-runtime/contracts/task-binding.ts, src/agent-runtime/command/interpret-interaction*, src/agent-runtime/command/task-proposal-reply*, src/agent-runtime/model/interaction-completion.ts, src/agent-runtime/model/interaction-output-contract.ts, src/agent-runtime/state/mutations/interaction-proposal.ts, src/agent-runtime/state/mutations/resume-current*, src/agent-runtime/wiring/same-task-continuation.test.ts, src/auto-reply/reply/get-reply-run.ts · since: 2026-11-22
+- codex-kb-implement · role: contributor · scope: interaction continue/status and host enforcement · paths: src/agent-runtime/contracts/interaction.ts, src/agent-runtime/contracts/task-binding.ts, src/agent-runtime/command/interpret-interaction*, src/agent-runtime/command/task-proposal-reply*, src/agent-runtime/model/interaction-completion.ts, src/agent-runtime/model/interaction-output-contract.ts, src/agent-runtime/state/mutations/interaction-proposal.ts, src/agent-runtime/state/mutations/resume-current\*, src/agent-runtime/wiring/same-task-continuation.test.ts, src/auto-reply/reply/get-reply-run.ts · since: 2026-11-22
 
 - [x] Add semantic continue/status controls to interpreter schema and prompt; preserve independent execution requests. — codex-kb-implement
 - [x] Bind controls to host task ID/revision; status checks state under lock without mutation and reports host facts alone. — codex-kb-implement
