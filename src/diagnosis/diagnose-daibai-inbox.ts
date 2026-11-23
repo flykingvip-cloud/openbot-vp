@@ -1,9 +1,6 @@
-/**
- * Path A: system self-check delivery into the designated Da Bai conversation,
- * same write point as scheduled/cron workbench results (`chat.inject`).
- * Recipients are people; each maps to that person's steward conversation.
- * Does not open DIAGNOSIS_DAIBAI_DELIVERY_ENABLED and never calls
- * user.daibai.ask/execute or chat.send.
+/** Path A writes only to a designated steward conversation (chat.inject).
+ * The same default-closed write policy protects both this planner and its live
+ * injection seam. Historical Path B approval does not authorize Path A.
  */
 import { buildEmployeeBuiltinStewardSessionKey } from "../agents/builtin-steward/employee-isolation.js";
 import { isBuiltinStewardAgent } from "../agents/builtin-steward/identity.js";
@@ -13,6 +10,7 @@ import {
   type DiagnosisLocator,
   type ParsedDiagnoseRequest,
 } from "./diagnose-policy.js";
+import { DIAGNOSIS_WRITE_POLICY } from "./write-policy.js";
 
 export type DiagnoseConversationSend = (input: {
   sessionKey: string;
@@ -128,6 +126,9 @@ export async function deliverDiagnoseReportToConversation(input: {
   const planned = planDiagnosisDaibaiDelivery(input.request.deliverTo);
   if (planned.routes.length === 0) {
     return planned;
+  }
+  if (!DIAGNOSIS_WRITE_POLICY.conversationDelivery) {
+    return { ...planned, delivered: false, reason: "daibai_delivery_gate_closed" };
   }
   const tenantId = input.tenantId?.trim();
   const text = input.reportText.trim();

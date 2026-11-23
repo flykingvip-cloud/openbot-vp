@@ -5,6 +5,7 @@ import {
   assertDiagnosisRecheckBinding,
   type DiagnosisRecheckRequest,
 } from "@openbot/evolution-core";
+import { vi } from "vitest";
 import { describe, expect, it } from "vitest";
 import {
   createDiagnosisRecheckPort,
@@ -281,4 +282,19 @@ describe("createDiagnosisRecheckPort", () => {
   it("does not live in evolution-control", () => {
     expect(join(DIR, "diagnose-evolution-recheck.ts")).toContain(`${sep}src${sep}diagnosis${sep}`);
   });
+});
+
+// These historical cutover / functional rehearsals explicitly opt into writes
+// against injected local ports. Default-closed behavior is covered separately
+// in write-policy.test.ts; this is not production enablement.
+vi.mock("./write-policy.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./write-policy.js")>();
+  return {
+    ...actual,
+    DIAGNOSIS_WRITE_POLICY: {
+      selfEvolutionConfirm: true,
+      conversationDelivery: true,
+      daibaiDelivery: true,
+    },
+  };
 });

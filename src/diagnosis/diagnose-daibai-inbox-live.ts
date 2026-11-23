@@ -25,6 +25,7 @@ import {
   type DiagnoseConversationSend,
   type DiagnoseConversationTarget,
 } from "./diagnose-daibai-inbox.js";
+import { DIAGNOSIS_WRITE_POLICY } from "./write-policy.js";
 
 export type DiagnoseConversationInjectOptions = {
   inject?: typeof callGateway;
@@ -84,6 +85,9 @@ export function createDiagnoseConversationInject(
   const inject = options?.inject ?? callGateway;
   const ensure = options?.ensureSession ?? ensureStewardConversationSession;
   return async (input) => {
+    if (!DIAGNOSIS_WRITE_POLICY.conversationDelivery) {
+      return "unavailable";
+    }
     try {
       await ensure(input.sessionKey);
       await inject({
