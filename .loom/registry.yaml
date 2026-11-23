@@ -28908,6 +28908,7 @@ landingStreams:
       - scripts/release-check.ts
       - vitest.config.ts
       - tsdown.config.ts
+      - scripts/tsdown-build.mjs
       - tsconfig.plugin-sdk.dts.json
       - CHANGELOG.md
       - .kiro/specs/wecom-bundled-plugin-loading/**
