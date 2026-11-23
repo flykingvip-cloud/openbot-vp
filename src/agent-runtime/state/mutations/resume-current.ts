@@ -38,13 +38,17 @@ export function resumePausedCurrentTask(
       ) {
         throw new RejectedResume("revision_mismatch");
       }
-      if (task.wakeSuppress !== true) {
+      if (request.action === "continue" && task.wakeSuppress === true) {
+        throw new RejectedResume("task_paused_requires_resume");
+      }
+      if (request.action !== "continue" && task.wakeSuppress !== true) {
         throw new RejectedResume("not_paused");
       }
       return {
         board: {
           ...board,
-          focusRevision: board.focusRevision + 1,
+          focusRevision:
+            request.action === "continue" ? board.focusRevision : board.focusRevision + 1,
           current: {
             ...task,
             wakeSuppress: false,

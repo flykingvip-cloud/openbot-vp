@@ -18,6 +18,154 @@ tasks:
     ownerHistory: []
     since: 2026-11-22
     metadata: {}
+  - id: arch-remediation-wp-g-acceptance-delivery
+    owner: codex-delivery-verifier
+    intent:
+      - User-authorized exact acceptance delivery composition test only.
+    paths:
+      - src/agent-runtime/wiring/reply-turn.acceptance-delivery.integration.test.ts
+    state: active
+    sessions:
+      - id: delivery-verifier-20261122
+        taskId: arch-remediation-wp-g-acceptance-delivery
+        ide: codex
+        agent: codex-delivery-verifier
+        status: active
+        lastSignalAt: 2026-11-22T07:42:18.235692+00:00
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-22
+    metadata: {}
+  - id: private-dependency-closure:codex-kb-implement
+    owner: codex-kb-implement
+    intent: []
+    paths:
+      - src/conversation-task/private-dependency*
+      - src/agents/tools/conversation-send-tool.ts
+      - src/conversation-task/conversation-handoff.ts
+      - src/diagnosis/diagnose-action-dispatch.ts
+      - src/gateway/server-maintenance.ts
+      - src/gateway/server-methods/chat.ts
+      - src/gateway/protocol/schema/logs-chat.ts
+      - .kiro/specs/private-dependency-closure/**
+      - src/gateway/server-methods/task-dependency-resume.test.ts
+    state: active
+    sessions:
+      - id: dependency-20261122
+        taskId: private-dependency-closure:codex-kb-implement
+        ide: codex
+        agent: codex-kb-implement
+        status: active
+        lastSignalAt: 2026-11-22T10:53:45.845Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-22
+    metadata: {}
+  - id: dynamic-task-activity:codex-kb-implement
+    owner: codex-kb-implement
+    intent: []
+    paths:
+      - src/shared/task-activity.ts
+      - src/gateway/server-methods/task-activity*
+      - ui/src/ui/chat/task-activity*
+      - ui/src/ui/views/chat.ts
+      - ui/src/ui/controllers/chat.ts
+      - .kiro/specs/dynamic-task-activity/**
+      - ui/src/ui/controllers/chat-task-progress-race.node.test.ts
+      - src/gateway/server-methods/chat.ts
+      - src/gateway/method-scopes.ts
+      - src/gateway/server-methods-list.ts
+    state: active
+    sessions:
+      - id: task-activity-20261122
+        taskId: dynamic-task-activity:codex-kb-implement
+        ide: codex
+        agent: codex-kb-implement
+        status: active
+        lastSignalAt: 2026-11-22T09:31:48.833Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-22
+    metadata: {}
+  - id: same-task-continuation:codex-kb-implement
+    owner: codex-kb-implement
+    intent:
+      - Bound continue/status interaction preserving task identity
+    paths:
+      - .kiro/specs/same-task-continuation/**
+      - src/agent-runtime/contracts/interaction.ts
+      - src/agent-runtime/contracts/task-binding.ts
+      - src/agent-runtime/command/interpret-interaction*
+      - src/agent-runtime/model/interaction-completion.ts
+      - src/agent-runtime/model/interaction-output-contract.ts
+      - src/agent-runtime/state/mutations/interaction-proposal.ts
+      - src/agent-runtime/state/mutations/resume-current*
+      - src/agent-runtime/command/task-proposal-reply*
+      - src/auto-reply/reply/get-reply-run.ts
+      - src/auto-reply/types.ts
+      - src/gateway/server-methods/chat.ts
+      - src/agent-runtime/wiring/same-task-continuation.test.ts
+    state: active
+    sessions:
+      - id: same-task-20261122
+        taskId: same-task-continuation:codex-kb-implement
+        ide: codex
+        agent: codex-kb-implement
+        status: active
+        lastSignalAt: 2026-11-22T08:14:09.836Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-22
+    metadata: {}
+  - id: office-pdf-font:codex-kb-implement
+    owner: codex-kb-implement
+    intent:
+      - Correct CFF OpenType PDF embedding and portable CJK font discovery
+    paths:
+      - src/office-suite/ttf*
+      - src/office-suite/pdf*
+    state: active
+    sessions:
+      - id: pdf-font-cff-20261122
+        taskId: office-pdf-font:codex-kb-implement
+        ide: codex
+        agent: codex-kb-implement
+        status: active
+        lastSignalAt: 2026-11-22T07:48:36.237Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-22
+    metadata: {}
+  - id: knowledge-retrieval-summary:codex-kb-implement
+    owner: codex-kb-implement
+    intent: []
+    paths:
+      - src/gateway/knowledge/retrieval-summary*
+      - src/gateway/knowledge/kb-ingest.ts
+      - src/gateway/knowledge/knowledge-base-library-content.ts
+      - src/gateway/knowledge/knowledge-retrieval-runtime.ts
+      - src/gateway/knowledge/types.ts
+      - src/gateway/server-maintenance.ts
+      - src/gateway/server-methods-list.ts
+      - src/gateway/server-methods/knowledge*
+      - src/agents/tools/knowledge-consume-tool*
+      - ui/src/ui/ports/employee/views/my-bot-data-surface*
+      - ui/src/ui/ports/employee/views/my-bot-workspace-panel.ts
+      - .kiro/specs/knowledge-retrieval-summary/**
+      - ui/src/ui/ports/employee/views/my-bot-data-surface.node.test.ts
+      - src/gateway/knowledge/kb-index.ts
+    state: active
+    sessions:
+      - id: kb-summary-implementation-session
+        taskId: knowledge-retrieval-summary:codex-kb-implement
+        ide: codex
+        agent: codex-kb-implement
+        status: active
+        lastSignalAt: 2026-11-22T05:04:33.627Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-22
+    metadata: {}
   - id: arch-remediation-wp-b-slice3-credits-reservation
     owner: codex-wpb-successor
     intent: []
@@ -15410,7 +15558,445 @@ tasks:
     ownerHistory: []
     since: 2026-11-22
     metadata: {}
+  - id: stale-owner-decision:codex-kb-implement
+    owner: codex-kb-review
+    intent: []
+    paths:
+      - ui/src/ui/chat/owner-decision-card*
+      - src/gateway/collaboration-learning/owner-decision-delivery*
+      - src/gateway/collaboration-learning/claim-contract-entry.ts
+      - .kiro/specs/stale-owner-decision/**
+    state: active
+    sessions:
+      - id: stale-card-20261123
+        taskId: stale-owner-decision:codex-kb-implement
+        ide: codex
+        agent: codex-kb-implement
+        status: active
+        lastSignalAt: 2026-11-22T22:58:34.466Z
+        metadata: {}
+      - id: stale-review-20261123
+        taskId: stale-owner-decision:codex-kb-implement
+        ide: codex
+        agent: codex-kb-review
+        status: active
+        lastSignalAt: 2026-11-22T22:58:34.466Z
+        metadata: {}
+    ownerHistory:
+      - fromOwner: codex-kb-implement
+        toOwner: codex-kb-review
+        at: 2026-11-22T22:58:34.466Z
+        via: verified
+    since: 2026-11-22
+    metadata: {}
+  - id: login-scope-propagation:codex-kb-review
+    owner: codex-kb-review
+    intent: []
+    paths:
+      - src/gateway/tenant-context.ts
+      - src/gateway/tenant-context.test.ts
+      - src/auto-reply/reply/dispatch-from-config.ts
+      - src/auto-reply/reply/session.ts
+      - .kiro/specs/login-scope-propagation/**
+    state: active
+    sessions:
+      - id: login-scope-20261123
+        taskId: login-scope-propagation:codex-kb-review
+        ide: codex
+        agent: codex-kb-review
+        status: active
+        lastSignalAt: 2026-11-23T02:21:13.562Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-23
+    metadata: {}
+  - id: group-interaction-separation:codex-kb-implement
+    owner: codex-kb-review
+    intent: []
+    paths:
+      - src/gateway/collaboration-learning/group-interaction-understanding*
+      - src/gateway/collaboration-learning/group-interaction-host*
+      - src/gateway/server-methods/chat.ts
+      - .kiro/specs/group-interaction-separation/**
+      - src/gateway/chat-group-interaction-isolation.s1b.test.ts
+      - src/gateway/collaboration-learning/discuss-to-task-chat-turn.ts
+      - src/gateway/collaboration-learning/discuss-to-task-chat-turn.test.ts
+      - src/gateway/server-methods/chat-transcript-inject.ts
+      - src/gateway/server-methods/chat-transcript-inject.test.ts
+      - ui/src/ui/controllers/chat.ts
+      - ui/src/ui/controllers/chat.test.ts
+    state: active
+    sessions:
+      - id: group-separation-20261123
+        taskId: group-interaction-separation:codex-kb-implement
+        ide: codex
+        agent: codex-kb-implement
+        status: active
+        lastSignalAt: 2026-11-23T01:11:12.113Z
+        metadata: {}
+      - id: group-receipt-review-20261123
+        taskId: group-interaction-separation:codex-kb-implement
+        ide: codex
+        agent: codex-kb-review
+        status: active
+        lastSignalAt: 2026-11-23T01:11:12.113Z
+        metadata: {}
+    ownerHistory:
+      - fromOwner: codex-kb-implement
+        toOwner: codex-kb-review
+        at: 2026-11-23T01:11:12.113Z
+        via: verified
+    since: 2026-11-22
+    metadata: {}
+  - id: artifact-evidence-closeout:codex-kb-review
+    owner: codex-kb-review
+    intent: []
+    paths:
+      - src/agent-runtime/context/system-prompt.ts
+      - src/agents/system-prompt.test.ts
+      - .kiro/specs/artifact-evidence-closeout/**
+    state: active
+    sessions:
+      - id: artifact-closeout-20261123
+        taskId: artifact-evidence-closeout:codex-kb-review
+        ide: codex
+        agent: codex-kb-review
+        status: active
+        lastSignalAt: 2026-11-23T05:06:32.396Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-23
+    metadata: {}
+  - id: main-six-doc-format-20261123:codex-wpb-successor
+    owner: codex-wpb-successor
+    intent:
+      - Human-authorized six exact Markdown formatting only; no code or rule
+        changes
+    paths:
+      - .kiro/specs/autonomous-task-closure-audit/findings.md
+      - .kiro/specs/dynamic-task-activity/tasks.md
+      - .kiro/specs/knowledge-retrieval-summary/design.md
+      - .kiro/specs/knowledge-retrieval-summary/tasks.md
+      - .kiro/specs/same-task-continuation/tasks.md
+      - .kiro/specs/stale-owner-decision/tasks.md
+    state: active
+    sessions:
+      - id: main-six-doc-format-20261123
+        taskId: main-six-doc-format-20261123:codex-wpb-successor
+        ide: codex
+        agent: codex-wpb-successor
+        status: active
+        metadata:
+          authorization: Direct user approval for exact six document pure-format repair
+          predecessor: live six paths UNATTRIBUTED/clean; content authors retained in Git
+            history
+        lastSignalAt: 2026-11-23T02:49:03.007Z
+    ownerHistory: []
+    since: 2026-11-23
+    metadata: {}
+  - id: main-five-public-entries-20261123:codex-wpb-successor
+    owner: codex-wpb-successor
+    intent:
+      - Human-authorized minimal existing public-entry imports; no
+        policy/manifest/behavior changes
+    paths:
+      - src/agent-runtime/policy/dependency-resolution.test.ts
+      - src/conversation-task/private-dependency-state.ts
+      - src/conversation-task/private-dependency-store.ts
+      - src/agent-runtime/wiring/same-task-continuation.test.ts
+      - src/gateway/server-methods/task-dependency-resume.test.ts
+      - src/agent-runtime/policy/index.ts
+      - src/agent-runtime/state/task-board.ts
+    state: active
+    sessions:
+      - id: main-five-public-entries-20261123
+        taskId: main-five-public-entries-20261123:codex-wpb-successor
+        ide: codex
+        agent: codex-wpb-successor
+        status: active
+        metadata:
+          authorization: Direct user exact five sources and necessary public exports
+        lastSignalAt: 2026-11-23T03:43:57.241Z
+    ownerHistory: []
+    since: 2026-11-23
+    metadata:
+      previousOwners:
+        - path: src/agent-runtime/policy/dependency-resolution.test.ts
+          owners: []
+        - path: src/conversation-task/private-dependency-state.ts
+          owners:
+            - taskId: private-dependency-closure:codex-kb-implement
+              owner: codex-kb-implement
+            - taskId: conversation-task-runtime:kiro-conversation-task-runtime
+              owner: kiro-conversation-task-runtime
+            - taskId: pi-sdk-family-migration-v3:cursor
+              owner: cursor
+        - path: src/conversation-task/private-dependency-store.ts
+          owners:
+            - taskId: private-dependency-closure:codex-kb-implement
+              owner: codex-kb-implement
+            - taskId: conversation-task-runtime:kiro-conversation-task-runtime
+              owner: kiro-conversation-task-runtime
+            - taskId: pi-sdk-family-migration-v3:cursor
+              owner: cursor
+        - path: src/agent-runtime/wiring/same-task-continuation.test.ts
+          owners:
+            - taskId: same-task-continuation:codex-kb-implement
+              owner: codex-kb-implement
+            - taskId: pi-sdk-family-migration-v3:cursor
+              owner: cursor
+            - taskId: agent-runtime-convergence
+              owner: 双规发布
+        - path: src/gateway/server-methods/task-dependency-resume.test.ts
+          owners:
+            - taskId: private-dependency-closure:codex-kb-implement
+              owner: codex-kb-implement
+            - taskId: pi-sdk-family-migration-v3:cursor
+              owner: cursor
+        - path: src/agent-runtime/policy/index.ts
+          owners:
+            - taskId: pi-sdk-family-migration-v3:cursor
+              owner: cursor
+            - taskId: agent-runtime-convergence
+              owner: 双规发布
+          shared:
+            shared:
+              glob: src/agent-runtime/policy/index.ts
+              landerTask: agent-runtime-convergence
+              reason: User-authorized bounded rule inventory implementation; preserve
+                predecessor scopes and history.
+              reviewAfter: 2026-11-30
+            lander: 双规发布
+      liveWip: all exact paths clean, source not copied
+      taskBoardPublicEntry:
+        authorizedBy: human
+        live: absent/no WIP
+        previousBroadOwners:
+          - cursor
+          - 双规发布
+        exports:
+          - seedSessionTaskBoard
+          - readSessionTaskBoard
+        scope: No implementation, no export*, no broad state/index
+  - id: main-two-doc-format-20261123:codex-wpb-successor
+    owner: codex-wpb-successor
+    intent:
+      - Human-authorized two exact Markdown formatting closeout only
+    paths:
+      - .kiro/specs/artifact-evidence-closeout/tasks.md
+      - .kiro/specs/login-scope-propagation/tasks.md
+    state: active
+    sessions:
+      - id: main-two-doc-format-20261123
+        taskId: main-two-doc-format-20261123:codex-wpb-successor
+        ide: codex
+        agent: codex-wpb-successor
+        status: active
+        metadata:
+          authorization: Direct user approval for exact artifact-evidence/login-scope
+            docs; content and original histories preserved
+          liveWip: both exact files clean/unattributed
+        lastSignalAt: 2026-11-23T07:41:01.137Z
+    ownerHistory: []
+    since: 2026-11-23
+    metadata: {}
 landingStreams:
+  - id: delivery-acceptance-integration-20261122
+    landingPolicy: serial
+    paths:
+      - src/agent-runtime/wiring/reply-turn.acceptance-delivery.integration.test.ts
+    canLandWith: []
+    metadata:
+      task: arch-remediation-wp-g-acceptance-delivery
+      agent: codex-delivery-verifier
+      purpose: User-authorized exact test landing; no directory takeover.
+  - id: artifact-evidence-closeout:codex-kb-review
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - .kiro/specs/artifact-evidence-closeout/**
+      - src/agent-runtime/context/system-prompt.ts
+      - src/agents/system-prompt.test.ts
+    canLandWith: []
+    metadata:
+      owner: codex-kb-review
+      task: artifact-evidence-closeout
+      reason: Shared exact-content evidence closeout fix.
+  - id: group-interaction-separation:codex-kb-review
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - .kiro/specs/group-interaction-separation/**
+      - src/gateway/server-methods/chat.ts
+      - src/gateway/server-methods/chat-transcript-inject.ts
+      - src/gateway/collaboration-learning/discuss-to-task-chat-turn.ts
+      - src/gateway/collaboration-learning/group-interaction-understanding.ts
+      - src/gateway/collaboration-learning/group-interaction-host.ts
+      - src/gateway/collaboration-learning/group-interaction-host.test.ts
+      - src/gateway/chat-group-interaction-isolation.s1b.test.ts
+      - ui/src/ui/controllers/chat.ts
+      - ui/src/ui/controllers/chat.test.ts
+    canLandWith: []
+    metadata:
+      owner: codex-kb-review
+      task: group-interaction-separation
+      reason: Reviewed interaction and receipt integration only.
+  - id: login-scope-propagation:codex-kb-review
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - .kiro/specs/login-scope-propagation/**
+      - src/gateway/tenant-context.ts
+      - src/gateway/tenant-context.test.ts
+      - src/auto-reply/reply/dispatch-from-config.ts
+      - src/auto-reply/reply/session.ts
+    canLandWith: []
+    metadata:
+      owner: codex-kb-review
+      task: login-scope-propagation
+      reason: Scoped fix for login identity propagation; historical streams preserved.
+  - id: stale-owner-decision:codex-kb-review
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - .kiro/specs/stale-owner-decision/**
+      - src/gateway/collaboration-learning/claim-contract-entry.ts
+      - src/gateway/collaboration-learning/owner-decision-delivery.ts
+      - src/gateway/collaboration-learning/owner-decision-delivery.test.ts
+      - ui/src/ui/chat/owner-decision-card.ts
+      - ui/src/ui/chat/owner-decision-card.node.test.ts
+    canLandWith: []
+    metadata:
+      owner: codex-kb-review
+      task: stale-owner-decision
+      reason: Reviewed takeover of this fix only; historical stream records retained.
+  - id: knowledge-retrieval-summary:codex-kb-review
+    landingPolicy: serial
+    paths:
+      - .kiro/specs/knowledge-retrieval-summary/design.md
+      - .kiro/specs/knowledge-retrieval-summary/tasks.md
+      - src/agents/tools/knowledge-consume-tool.test.ts
+      - src/agents/tools/knowledge-consume-tool.ts
+      - src/gateway/knowledge/kb-index.ts
+      - src/gateway/knowledge/kb-ingest.ts
+      - src/gateway/knowledge/knowledge-base-library-content.ts
+      - src/gateway/knowledge/knowledge-retrieval-runtime.ts
+      - src/gateway/knowledge/retrieval-summary-authority.test.ts
+      - src/gateway/knowledge/retrieval-summary-authority.ts
+      - src/gateway/knowledge/retrieval-summary-document.ts
+      - src/gateway/knowledge/retrieval-summary-evaluation.test.ts
+      - src/gateway/knowledge/retrieval-summary-hierarchy.test.ts
+      - src/gateway/knowledge/retrieval-summary-hierarchy.ts
+      - src/gateway/knowledge/retrieval-summary-live-evidence.test.ts
+      - src/gateway/knowledge/retrieval-summary-recall.test.ts
+      - src/gateway/knowledge/retrieval-summary-recall.ts
+      - src/gateway/knowledge/retrieval-summary-runtime.test.ts
+      - src/gateway/knowledge/retrieval-summary-runtime.ts
+      - src/gateway/knowledge/retrieval-summary-store.test.ts
+      - src/gateway/knowledge/retrieval-summary-store.ts
+      - src/gateway/knowledge/retrieval-summary-validation.test.ts
+      - src/gateway/knowledge/retrieval-summary-validation.ts
+      - src/gateway/knowledge/retrieval-summary-worker.test.ts
+      - src/gateway/knowledge/retrieval-summary-worker.ts
+      - src/gateway/knowledge/retrieval-summary.test.ts
+      - src/gateway/knowledge/retrieval-summary.ts
+      - src/gateway/knowledge/types.ts
+      - src/gateway/server-maintenance.ts
+      - src/gateway/server-methods-list.ts
+      - src/gateway/server-methods/knowledge-base-search-rpc.test.ts
+      - src/gateway/server-methods/knowledge.ts
+      - ui/src/ui/ports/employee/views/my-bot-data-surface.node.test.ts
+      - ui/src/ui/ports/employee/views/my-bot-data-surface.ts
+      - ui/src/ui/ports/employee/views/my-bot-workspace-panel.ts
+    canLandWith: []
+    metadata:
+      owner: codex-kb-review
+      task: knowledge-retrieval-summary
+  - id: closure-transfer-activity:codex-cron
+    landingPolicy: serial
+    paths:
+      - .kiro/specs/dynamic-task-activity/tasks.md
+      - src/gateway/method-scopes.ts
+      - src/gateway/server-methods-list.ts
+      - src/gateway/server-methods/task-activity-rpc.test.ts
+      - src/gateway/server-methods/task-activity-view.test.ts
+      - src/gateway/server-methods/task-activity-view.ts
+      - src/shared/task-activity.ts
+      - ui/src/ui/chat/task-activity-state.node.test.ts
+      - ui/src/ui/chat/task-activity-state.ts
+      - ui/src/ui/chat/task-activity.browser.test.ts
+      - ui/src/ui/chat/task-activity.ts
+      - ui/src/ui/controllers/chat-task-progress-race.node.test.ts
+      - ui/src/ui/controllers/chat.ts
+      - ui/src/ui/views/chat.ts
+    canLandWith:
+      - closure-transfer-delegation:codex-cron
+    metadata:
+      owner: codex-cron
+      task: autonomous-task-closure
+      reason: Explicit user-authorized ownership transfer; historical stream records
+        preserved.
+  - id: closure-transfer-delegation:codex-cron
+    landingPolicy: serial
+    paths:
+      - .kiro/specs/autonomous-task-closure-audit/findings.md
+      - src/agent-runtime/policy/dependency-resolution.test.ts
+      - src/agent-runtime/policy/dependency-resolution.ts
+      - src/agents/tools/conversation-send-dispatch.test.ts
+      - src/agents/tools/conversation-send-dispatch.ts
+      - src/agents/tools/conversation-send-tool.ts
+      - src/conversation-task/conversation-handoff.ts
+      - src/conversation-task/private-dependency-entry.test.ts
+      - src/conversation-task/private-dependency-runtime.ts
+      - src/conversation-task/private-dependency-state.ts
+      - src/conversation-task/private-dependency-store.ts
+      - src/conversation-task/private-dependency.test.ts
+      - src/diagnosis/diagnose-action-dispatch.ts
+      - src/gateway/protocol/schema/logs-chat.ts
+      - src/gateway/server-maintenance.ts
+      - src/gateway/server-methods/chat.ts
+      - src/gateway/server-methods/task-dependency-resume.test.ts
+    canLandWith:
+      - closure-transfer-activity:codex-cron
+    metadata:
+      owner: codex-cron
+      task: autonomous-task-closure
+      reason: Explicit user-authorized ownership transfer; historical stream records
+        preserved.
+  - id: closure-transfer-continuation:codex-cron
+    landingPolicy: serial
+    paths:
+      - .kiro/specs/same-task-continuation/tasks.md
+      - src/agent-runtime/command/interpret-interaction.ts
+      - src/agent-runtime/command/task-proposal-reply.test.ts
+      - src/agent-runtime/command/task-proposal-reply.ts
+      - src/agent-runtime/contracts/interaction.ts
+      - src/agent-runtime/contracts/task-binding.ts
+      - src/agent-runtime/model/interaction-completion.ts
+      - src/agent-runtime/model/interaction-output-contract.ts
+      - src/agent-runtime/state/mutations/interaction-proposal.ts
+      - src/agent-runtime/state/mutations/resume-current.test.ts
+      - src/agent-runtime/state/mutations/resume-current.ts
+      - src/agent-runtime/wiring/same-task-continuation.test.ts
+      - src/auto-reply/reply/get-reply-run.ts
+    canLandWith: []
+    metadata:
+      owner: codex-cron
+      task: autonomous-task-closure
+      reason: Explicit user-authorized ownership transfer; historical stream records
+        preserved.
+  - id: closure-transfer-pdf:codex-cron
+    landingPolicy: serial
+    paths:
+      - src/office-suite/pdf-font.test.ts
+      - src/office-suite/pdf.ts
+      - src/office-suite/ttf.ts
+    canLandWith: []
+    metadata:
+      owner: codex-cron
+      task: autonomous-task-closure
+      reason: Explicit user-authorized ownership transfer; historical stream records
+        preserved.
   - id: cron-fire-budget-reviewed-integration
     landingPolicy: serial
     paths:
@@ -30889,6 +31475,61 @@ sharedPaths:
     landerTask: arch-remediation-wp-e-policy-composition
     reason: User-approved exact test takeover; original directory claims retained.
     reviewAfter: 2026-12-31
+  - glob: src/agent-runtime/wiring/reply-turn.acceptance-delivery.integration.test.ts
+    landerTask: arch-remediation-wp-g-acceptance-delivery
+    reason: User-authorized exact composition test; broad directory ownership preserved.
+    reviewAfter: 2026-12-31
+  - glob: .kiro/specs/artifact-evidence-closeout/tasks.md
+    landerTask: main-two-doc-format-20261123:codex-wpb-successor
+    reason: Human-authorized exact two-document pure formatting; previous histories retained.
+  - glob: .kiro/specs/login-scope-propagation/tasks.md
+    landerTask: main-two-doc-format-20261123:codex-wpb-successor
+    reason: Human-authorized exact two-document pure formatting; previous histories retained.
+  - glob: src/agent-runtime/policy/dependency-resolution.test.ts
+    landerTask: main-five-public-entries-20261123:codex-wpb-successor
+    reason: Human-authorized exact public-entry repair; predecessor histories retained.
+  - glob: src/conversation-task/private-dependency-state.ts
+    landerTask: main-five-public-entries-20261123:codex-wpb-successor
+    reason: Human-authorized exact public-entry repair; predecessor histories retained.
+  - glob: src/conversation-task/private-dependency-store.ts
+    landerTask: main-five-public-entries-20261123:codex-wpb-successor
+    reason: Human-authorized exact public-entry repair; predecessor histories retained.
+  - glob: src/agent-runtime/wiring/same-task-continuation.test.ts
+    landerTask: main-five-public-entries-20261123:codex-wpb-successor
+    reason: Human-authorized exact public-entry repair; predecessor histories retained.
+  - glob: src/gateway/server-methods/task-dependency-resume.test.ts
+    landerTask: main-five-public-entries-20261123:codex-wpb-successor
+    reason: Human-authorized exact public-entry repair; predecessor histories retained.
+  - glob: src/agent-runtime/policy/index.ts
+    landerTask: main-five-public-entries-20261123:codex-wpb-successor
+    reason: Human-authorized exact public-entry repair; predecessor histories retained.
+  - glob: src/agent-runtime/state/task-board.ts
+    landerTask: main-five-public-entries-20261123:codex-wpb-successor
+    reason: Human-authorized exact public-entry repair; predecessor histories retained.
+  - glob: .kiro/specs/autonomous-task-closure-audit/findings.md
+    landerTask: main-six-doc-format-20261123:codex-wpb-successor
+    reason: Human-authorized exact pure-document formatting only; content and prior
+      histories retained.
+  - glob: .kiro/specs/dynamic-task-activity/tasks.md
+    landerTask: main-six-doc-format-20261123:codex-wpb-successor
+    reason: Human-authorized exact pure-document formatting only; content and prior
+      histories retained.
+  - glob: .kiro/specs/knowledge-retrieval-summary/design.md
+    landerTask: main-six-doc-format-20261123:codex-wpb-successor
+    reason: Human-authorized exact pure-document formatting only; content and prior
+      histories retained.
+  - glob: .kiro/specs/knowledge-retrieval-summary/tasks.md
+    landerTask: main-six-doc-format-20261123:codex-wpb-successor
+    reason: Human-authorized exact pure-document formatting only; content and prior
+      histories retained.
+  - glob: .kiro/specs/same-task-continuation/tasks.md
+    landerTask: main-six-doc-format-20261123:codex-wpb-successor
+    reason: Human-authorized exact pure-document formatting only; content and prior
+      histories retained.
+  - glob: .kiro/specs/stale-owner-decision/tasks.md
+    landerTask: main-six-doc-format-20261123:codex-wpb-successor
+    reason: Human-authorized exact pure-document formatting only; content and prior
+      histories retained.
   - glob: src/gateway/billing/chat-reply-credit-reservation.slice3.test.ts
     landerTask: arch-remediation-wp-b-slice3-credits-reservation
     reason: Human-authorized successor of test-only PR328; original owner session
@@ -34772,10 +35413,6 @@ sharedPaths:
     reason: User-authorized bounded rule inventory implementation; preserve predecessor scopes and history.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/policy/catalog.test.ts
-    landerTask: agent-runtime-convergence
-    reason: User-authorized bounded rule inventory implementation; preserve predecessor scopes and history.
-    reviewAfter: 2026-11-30
-  - glob: src/agent-runtime/policy/index.ts
     landerTask: agent-runtime-convergence
     reason: User-authorized bounded rule inventory implementation; preserve predecessor scopes and history.
     reviewAfter: 2026-11-30

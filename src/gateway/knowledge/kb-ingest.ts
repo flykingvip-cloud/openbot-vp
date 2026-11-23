@@ -4,6 +4,7 @@ import { resolveAgentDir } from "../../agents/agent-scope.js";
 import { resolveMemorySearchConfig } from "../../agents/memory-search.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import { resolveStateDir } from "../../config/paths.js";
+import { createSubsystemLogger } from "../../logging/subsystem.js";
 import { enforceEmbeddingMaxInputTokens } from "../../memory/embedding-chunk-limits.js";
 import { classifyMemoryEmbeddingError } from "../../memory/embedding-error.js";
 import { createEmbeddingProvider, type EmbeddingProvider } from "../../memory/embeddings.js";
@@ -48,6 +49,7 @@ import {
 } from "./kb-index.js";
 import { assertChunkLineAnchors, assertIngestableExtract } from "./ke/ingest-gate.js";
 import { assertRawHash } from "./ke/integrity.js";
+import { queueRetrievalSummary } from "./retrieval-summary-store.js";
 import { enqueueKnowledgeVectorizeInIndex } from "./vectorize-queue-store.js";
 
 export const DEFAULT_KB_CHUNKING: HierarchicalChunking = {
@@ -371,6 +373,27 @@ export async function ingestKnowledgeDocument(
             versionId: latest.versionId,
           })
         : [];
+      // Stable current anchors are overwritten/deleted by the delta below.
+      // Preserve an immutable keyword-searchable snapshot for explicit historical reads.
+      if (latest && previousRows.length) {
+        upsertKnowledgeChunks({
+          index,
+          chunks: previousRows.map((row) => ({
+            id: `history:${latest.versionId}:${row.chunkId}`,
+            text: row.text,
+            model: row.model,
+            kbId: params.kbId,
+            docId: params.docId,
+            versionId: latest.versionId,
+            heading: row.heading,
+            section: row.section,
+            startLine: row.startLine,
+            endLine: row.endLine,
+            visibility: params.visibility ?? null,
+            source: params.source ?? null,
+          })),
+        });
+      }
       const previous = anchorPreviousChunkSnapshots({
         kbId: params.kbId,
         docId: params.docId,
@@ -508,6 +531,20 @@ export async function ingestKnowledgeDocument(
           versionId,
           chunkIds: governanceChunkIds,
         });
+      }
+
+      // Summary work is derivative and must never invalidate committed body chunks.
+      try {
+        queueRetrievalSummary(index.db, {
+          docId: params.docId,
+          kbId: params.kbId,
+          versionId,
+          contentHash: extracted.semanticHash,
+        });
+      } catch {
+        createSubsystemLogger("knowledge/retrieval-summary").warn(
+          "summary queue unavailable; body remains indexed",
+        );
       }
 
       const vectorizeQueued =

@@ -452,7 +452,7 @@ export function clearOwnerDecisionTodolistStatus(todolistId: string): void {
 
 /**
  * Confirmed human cards fold away after success (SoT stays confirmed — never
- * roll back to proposed). Stale/superseded stay visible with「旧版本已失效」.
+ * roll back to proposed). Stale/superseded cards collapse; their original transcript remains the audit.
  */
 export function shouldAutoCollapseOwnerDecisionStatus(
   status: string | null | undefined,
@@ -461,7 +461,10 @@ export function shouldAutoCollapseOwnerDecisionStatus(
   const key = String(status ?? "")
     .trim()
     .toLowerCase();
-  // Peer mutual-ack residuals stay visible as「收到，并确认」; human confirm folds away.
+  if (key === "superseded") {
+    return true;
+  }
+  // A valid peer mutual-ack receipt remains reviewable; invalid versions never do.
   if (opts?.peerConfirmed) {
     return false;
   }
@@ -586,6 +589,8 @@ export function noteOwnerDecisionVersionRefusal(decisionId: string): void {
   const id = decisionId.trim();
   if (id) {
     versionStaleDecisionIds.add(id);
+    // Presentation-only tombstone survives reload; never changes plan approval.
+    dismissOwnerDecisionCard(id);
   }
 }
 

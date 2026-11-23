@@ -147,6 +147,181 @@ describe("knowledge.base.search RPC integration", () => {
     expect(String(first?.sourceUri)).toMatch(/^ku:\/\/kb\//);
   });
 
+  it("maintains summaries through ACL and recalls a document without bundle projection", async () => {
+    const created = await invoke("knowledge.base.create", { title: "Summary KB" });
+    const kbId = extractKnowledgeBaseId(created.payload);
+    await ingestKnowledgeDocument({
+      kbId,
+      docId: "summary-only",
+      title: "Target",
+      fileName: "target.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("Unrelated original body."),
+      ownerId: "user-a",
+      tenantId: null,
+      indexRoot: path.join(tmpDir, "knowledge", "index"),
+      embeddingProvider: null,
+    });
+    const fields = {
+      purpose: "needle summary",
+      keyPoints: [],
+      coverage: [],
+      entities: [],
+      boundaries: [],
+    };
+    expect(
+      (
+        await invoke("knowledge.document.summary", {
+          knowledgeBaseId: kbId,
+          documentId: "summary-only",
+          fields,
+        })
+      ).ok,
+    ).toBe(true);
+    await ingestKnowledgeDocument({
+      kbId,
+      docId: "body-hit",
+      title: "Other body",
+      fileName: "other.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("needle unrelated body evidence"),
+      ownerId: "user-a",
+      tenantId: null,
+      indexRoot: path.join(tmpDir, "knowledge", "index"),
+      embeddingProvider: null,
+    });
+    const search = await invoke("knowledge.base.search", {
+      knowledgeBaseId: kbId,
+      query: "needle",
+    });
+    expect(
+      (
+        await invoke("knowledge.document.summary", {
+          knowledgeBaseId: kbId,
+          documentId: "summary-only",
+          metadata: {
+            editorialStatus: "final",
+            sourceRelations: [{ kind: "derived-from", documentId: "body-hit" }],
+          },
+        })
+      ).ok,
+    ).toBe(true);
+    const labeled = await invoke("knowledge.document.summary", {
+      knowledgeBaseId: kbId,
+      documentId: "summary-only",
+    });
+    expect(labeled.payload?.summary).toMatchObject({
+      editorialStatus: "final",
+      reviewedBy: "user-a",
+      sourceRelations: [{ kind: "derived-from", documentId: "body-hit" }],
+    });
+    expect(
+      (
+        await invoke("knowledge.document.summary", {
+          knowledgeBaseId: kbId,
+          documentId: "summary-only",
+          metadata: { sourceRelations: [{ kind: "supersedes", documentId: "foreign-hidden-doc" }] },
+        })
+      ).ok,
+    ).toBe(false);
+    expect(search.ok).toBe(true);
+    expect((search.payload?.evidence as unknown[] | undefined)?.length ?? 0).toBeGreaterThan(0);
+    expect(search.payload?.substringMatches).toMatchObject([
+      { id: "summary-only", title: "Target" },
+    ]);
+    const other = extractKnowledgeBaseId(
+      (await invoke("knowledge.base.create", { title: "Other" })).payload,
+    );
+    expect(
+      (
+        await invoke("knowledge.document.summary", {
+          knowledgeBaseId: other,
+          documentId: "summary-only",
+        })
+      ).payload?.summary,
+    ).toBeNull();
+    expect(
+      (
+        await invoke("knowledge.document.summary", {
+          knowledgeBaseId: kbId,
+          documentId: "summary-only",
+          fields: { ...fields, purpose: "x".repeat(4001) },
+        })
+      ).ok,
+    ).toBe(false);
+    expect(
+      (
+        await invoke("knowledge.document.summary", {
+          knowledgeBaseId: kbId,
+          documentId: "summary-only",
+          fields: { ...fields, purpose: " " },
+        })
+      ).ok,
+    ).toBe(false);
+    await ingestKnowledgeDocument({
+      kbId,
+      docId: "summary-only",
+      title: "Target updated",
+      fileName: "target.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("Updated original body."),
+      ownerId: "user-a",
+      tenantId: null,
+      indexRoot: path.join(tmpDir, "knowledge", "index"),
+      embeddingProvider: null,
+    });
+    const stale = await invoke("knowledge.document.summary", {
+      knowledgeBaseId: kbId,
+      documentId: "summary-only",
+    });
+    expect(stale.payload?.summary).toMatchObject({ state: "stale", method: "human" });
+    expect(
+      (
+        await invoke("knowledge.document.summary", {
+          knowledgeBaseId: kbId,
+          documentId: "summary-only",
+          fields: { ...fields, purpose: "revised" },
+        })
+      ).ok,
+    ).toBe(true);
+    expect(
+      (
+        await invoke("knowledge.document.summary", {
+          knowledgeBaseId: kbId,
+          documentId: "summary-only",
+          retry: true,
+        })
+      ).ok,
+    ).toBe(true);
+    setContext({ userId: "user-b" });
+    expect(
+      (
+        await invoke("knowledge.document.summary", {
+          knowledgeBaseId: kbId,
+          documentId: "summary-only",
+          retry: true,
+        })
+      ).ok,
+    ).toBe(false);
+    expect(
+      (
+        await invoke("knowledge.document.summary", {
+          knowledgeBaseId: kbId,
+          documentId: "summary-only",
+        })
+      ).ok,
+    ).toBe(false);
+    expect(
+      (
+        await invoke("knowledge.document.summary", {
+          knowledgeBaseId: kbId,
+          documentId: "summary-only",
+          fields,
+        })
+      ).ok,
+    ).toBe(false);
+  });
+
   it("hides knowledge base search from unauthorized user", async () => {
     const created = await invoke("knowledge.base.create", { title: "Hidden KB" });
     const kbId = extractKnowledgeBaseId(created.payload);
@@ -232,13 +407,13 @@ describe("knowledge.base.search RPC integration", () => {
       title: "Policy",
       fileName: "policy.txt",
       mimeType: "text/plain",
-      buffer: Buffer.from("Legacy onboarding refund escalation notes.", "utf8"),
+      buffer: Buffer.from("Legacy onboarding refund escalation notes. legacyonlymarker77.", "utf8"),
       ownerId: "user-a",
       tenantId: null,
       indexRoot,
       embeddingProvider: null,
     });
-    await ingestKnowledgeDocument({
+    const v2 = await ingestKnowledgeDocument({
       kbId,
       docId: "doc-version-rpc",
       title: "Policy",
@@ -253,14 +428,31 @@ describe("knowledge.base.search RPC integration", () => {
 
     const current = await invoke("knowledge.base.search", {
       knowledgeBaseId: kbId,
-      query: "legacy onboarding refund",
+      query: "legacyonlymarker77",
     });
     expect(current.ok).toBe(true);
     expect((current.payload?.evidence as unknown[] | undefined)?.length ?? 0).toBe(0);
 
+    // A broad multiword query intentionally falls back from AND to OR.
+    // Matching shared words must still return only the current revision.
+    const orFallback = await invoke("knowledge.base.search", {
+      knowledgeBaseId: kbId,
+      query: "legacyonlymarker77 onboarding refund",
+    });
+    expect(orFallback.ok).toBe(true);
+    const currentEvidence = orFallback.payload?.evidence as Array<{
+      versionId: string;
+      chunkText: string;
+    }>;
+    expect(currentEvidence.length).toBeGreaterThan(0);
+    expect(currentEvidence.every((item) => item.versionId === v2.versionId)).toBe(true);
+    expect(currentEvidence.every((item) => !item.chunkText.includes("legacyonlymarker77"))).toBe(
+      true,
+    );
+
     const historical = await invoke("knowledge.base.search", {
       knowledgeBaseId: kbId,
-      query: "legacy onboarding refund",
+      query: "legacyonlymarker77",
       versionId: v1.versionId,
     });
     expect(historical.ok).toBe(true);

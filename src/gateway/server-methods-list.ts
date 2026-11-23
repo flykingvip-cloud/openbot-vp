@@ -661,6 +661,7 @@ const BASE_METHODS = [
   "context.scope.audit.list",
   "knowledge.base.get",
   "knowledge.base.documents.list",
+  "knowledge.document.summary",
   "knowledge.document.preview",
   "knowledge.base.snippets.list",
   "knowledge.base.recycle.list",
@@ -831,6 +832,7 @@ const BASE_METHODS = [
   "browser.request",
   // WebChat WebSocket-native chat methods
   "chat.history",
+  "task.activity.get",
   "chat.abort",
   "chat.restore",
   "chat.send",

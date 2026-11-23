@@ -22,7 +22,7 @@ const decisionFields = {
   text: string,
   answer: string,
   mode: { type: "string", enum: ["supplement", "revise", "replace_all"] },
-  action: { type: "string", enum: ["pause", "cancel", "resume"] },
+  action: { type: "string", enum: ["pause", "cancel", "resume", "continue", "status"] },
   target: {
     type: "object",
     additionalProperties: false,

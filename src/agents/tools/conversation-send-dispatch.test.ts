@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { isCurrentConversationDispatch } from "./conversation-send-dispatch.js";
 import {
   detectSecondUserConfirmRisk,
   looksLikeDispatchTicket,
@@ -62,4 +63,11 @@ describe("conversation_send dispatch validation (P2)", () => {
     expect(result.ok).toBe(true);
     expect(result.secondUserConfirmWarning).toMatch(/single user-facing confirm/);
   });
+});
+
+it("rejects stale or unbound explicit dispatch references without changing focus", () => {
+  expect(isCurrentConversationDispatch("current", "parked")).toBe(false);
+  expect(isCurrentConversationDispatch(undefined, "archived")).toBe(false);
+  expect(isCurrentConversationDispatch("current", "current")).toBe(true);
+  expect(isCurrentConversationDispatch("current", undefined)).toBe(true);
 });

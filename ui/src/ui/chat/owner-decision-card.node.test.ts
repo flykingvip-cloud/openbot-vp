@@ -3,6 +3,8 @@ import { render } from "lit";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearOwnerDecisionDeliveryStateForTest,
+  noteOwnerDecisionVersionRefusal,
+  noteOwnerDecisionRecoveries,
   clearOwnerDecisionDismissalsForTest,
   collapseOwnerDecisionCardsForBoardItem,
   OWNER_DECISION_PEER_ACK_COPY,
@@ -1019,4 +1021,33 @@ it("retries failed hydration after backoff rather than trusting the historical c
   } finally {
     vi.useRealTimers();
   }
+});
+
+it("does not resurrect invalid historical card chrome across reload while new valid cards remain", () => {
+  const card = {
+    kind: "todolist_confirm" as const,
+    decisionId: "stale-restart",
+    groupId: "g",
+    taskId: "t",
+    boardItemId: "b",
+    todolistId: "td",
+    version: 1,
+    title: "Old plan",
+    summary: [],
+    options: [{ id: "confirm" as const, label: "Confirm", style: "primary" as const }],
+    mentionMemberIds: ["human:owner"],
+  };
+  noteOwnerDecisionVersionRefusal(card.decisionId);
+  clearOwnerDecisionDismissalsForTest(true);
+  noteOwnerDecisionRecoveries([
+    { card, todolistId: card.todolistId, version: 1, userFacing: "waiting_confirmation" },
+  ]);
+  const container = document.createElement("div");
+  render(renderOwnerDecisionCards([{ ownerDecision: card }]), container);
+  expect(container.querySelector("[data-owner-decision='stale-restart']")).toBeNull();
+  const next = { ...card, decisionId: "new-valid", version: 2, title: "New plan" };
+  setOwnerDecisionTodolistStatus("td", "proposed");
+  render(renderOwnerDecisionCards([{ ownerDecision: next }]), container);
+  expect(container.querySelector("[data-owner-decision='new-valid']")).not.toBeNull();
+  expect(container.querySelector("[data-owner-decision-action='confirm']")).not.toBeNull();
 });

@@ -416,3 +416,72 @@ export async function readLatestOwnerDecisionDelivery(params: {
   }
   return null;
 }
+
+/** Reconcile replay metadata against the authorized current plan, not its delivery history. */
+export function reconcileOwnerDecisionDelivery(
+  row: OwnerDecisionCardDelivery,
+  plan: Pick<ExecutorPrivateTodolist, "todolistId" | "version" | "status">,
+): OwnerDecisionCardDelivery {
+  if (plan.todolistId !== row.todolistId) {
+    throw new Error("delivery_plan_identity_mismatch");
+  }
+  if (plan.version !== row.version || plan.status === "superseded") {
+    return normalizeOwnerDecisionDelivery({
+      ...row,
+      stage: "skipped",
+      reason: "stale_version",
+      retryable: false,
+      card: undefined,
+    });
+  }
+  if (["confirmed", "accepted", "closed"].includes(plan.status)) {
+    if (row.stage === "peer_confirmation_consumed") {
+      return row;
+    }
+    return normalizeOwnerDecisionDelivery({
+      ...row,
+      stage: "confirmation_consumed",
+      reason: "plan_already_processed",
+      retryable: false,
+      card: undefined,
+    });
+  }
+  return row;
+}
+
+/** Explicit maintenance only. Append audit tombstones; never deletes or confirms a plan. */
+export async function archiveInvalidOwnerDecisionDeliveries(params: {
+  groupId: string;
+  cfg?: OpenBotConfig;
+  groupLocator: string;
+  readPlan: (
+    row: OwnerDecisionCardDelivery,
+  ) => Promise<Pick<ExecutorPrivateTodolist, "todolistId" | "version" | "status">>;
+  dryRun?: boolean;
+}): Promise<Array<{ todolistId: string; version: number; reason: string }>> {
+  const rows = await readOwnerDecisionDeliveries(params);
+  const latest = new Map<string, OwnerDecisionCardDelivery>();
+  for (const row of rows) {
+    latest.set(`${row.todolistId}:v${row.version}`, row);
+  }
+  const candidates: Array<{ todolistId: string; version: number; reason: string }> = [];
+  for (const row of latest.values()) {
+    const next = reconcileOwnerDecisionDelivery(row, await params.readPlan(row));
+    if (
+      next.stage === row.stage &&
+      next.reason === row.reason &&
+      next.retryable === row.retryable
+    ) {
+      continue;
+    }
+    candidates.push({
+      todolistId: row.todolistId,
+      version: row.version,
+      reason: next.reason ?? next.stage,
+    });
+    if (!params.dryRun) {
+      await recordOwnerDecisionDelivery({ ...params, delivery: next });
+    }
+  }
+  return candidates;
+}

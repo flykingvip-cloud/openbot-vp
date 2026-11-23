@@ -1638,11 +1638,31 @@ export async function runPreparedReply(
     }
     if (routed.kind === "task_proposal") {
       opts?.abortSignal?.throwIfAborted();
-      if (routed.decision.kind === "task_control" && routed.decision.action === "resume") {
+      if (
+        routed.decision.kind === "task_control" &&
+        (routed.decision.action === "resume" || routed.decision.action === "continue")
+      ) {
+        if (routed.decision.action === "continue" && isEmbeddedPiRunActive(sessionIdFinal)) {
+          const liveBoard = replyTurnRuntime.state.readForInteraction(sessionFile);
+          if (
+            !commandAuthorized ||
+            !command.isAuthorizedSender ||
+            liveBoard.current?.taskId !== routed.decision.target.taskId ||
+            liveBoard.focusRevision !== captured.expectedFocusRevision ||
+            (liveBoard.writeEpoch ?? 0) !== captured.expectedWriteEpoch ||
+            liveBoard.current?.wakeSuppress
+          ) {
+            typing.cleanup();
+            return persistOwnReply("当前任务状态已变化，本次未重复启动执行，请核对当前任务。");
+          }
+          typing.cleanup();
+          return persistOwnReply("当前任务已有执行在进行，继续沿用原任务；本次未重复启动。");
+        }
         const resumed =
           commandAuthorized && command.isAuthorizedSender && opts?.onInteractionTaskResume
             ? await opts.onInteractionTaskResume({
                 sessionFile,
+                action: routed.decision.action,
                 taskId: routed.decision.target.taskId,
                 expectedFocusRevision: captured.expectedFocusRevision,
                 expectedWriteEpoch: captured.expectedWriteEpoch,
@@ -1677,7 +1697,10 @@ export async function runPreparedReply(
           const stopTaskId =
             "target" in routed.decision ? routed.decision.target?.taskId : undefined;
           replyTurnRuntime.interrupt(sessionIdFinal, sessionKey, stopTaskId);
-          if (routed.decision.kind === "task_control" && routed.decision.action !== "resume") {
+          if (
+            routed.decision.kind === "task_control" &&
+            (routed.decision.action === "pause" || routed.decision.action === "cancel")
+          ) {
             await opts?.onInteractionTaskEffect?.({
               kind: routed.decision.action,
               taskId: routed.decision.target.taskId,

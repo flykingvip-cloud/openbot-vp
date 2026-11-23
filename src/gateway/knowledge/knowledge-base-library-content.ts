@@ -15,6 +15,8 @@ import {
 } from "./kb-index.js";
 import type { KnowledgeBase } from "./knowledge-base-store.js";
 import { resolveKnowledgeIndexRootForBase } from "./knowledge-directory.js";
+import { readRetrievalSummary } from "./retrieval-summary-store.js";
+import type { RetrievalSummary } from "./retrieval-summary.js";
 import {
   defaultSourceDocumentLinkStorePath,
   listSourceDocumentLinks,
@@ -35,6 +37,7 @@ export type KnowledgeBaseDocumentSummary = {
   sourceName?: string | null;
   updatedAtMs: number;
   indexed: boolean;
+  retrievalSummary?: RetrievalSummary;
   /** Number of indexed chunks belonging to this document (关联片段). */
   chunkCount?: number;
   /** Average governance trust_score (0..1) across the document's chunks (可信度); null when unscored. */
@@ -782,6 +785,7 @@ export function listKnowledgeBaseDocumentsInIndex(
         sourceName: row.source,
         updatedAtMs: row.updated_at,
         indexed: true,
+        retrievalSummary: readRetrievalSummary(db, row.doc_id, new Set([knowledgeBase.id])),
       } satisfies KnowledgeBaseDocumentSummary,
     ]),
   );
