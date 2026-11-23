@@ -1,5 +1,23 @@
 version: 1
 tasks:
+  - id: arch-remediation-wp-e-policy-composition
+    owner: codex-sdk-control-verifier
+    intent:
+      - User-authorized single-file policy composition regression.
+    paths:
+      - src/gateway/tools-invoke-http.fabric-phase2.integration.test.ts
+    state: active
+    sessions:
+      - id: sdk-policy-composition-20261122
+        taskId: arch-remediation-wp-e-policy-composition
+        ide: codex
+        agent: codex-sdk-control-verifier
+        status: active
+        lastSignalAt: 2026-11-22T07:44:18.661303+00:00
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-22
+    metadata: {}
   - id: arch-remediation-wp-g-acceptance-delivery
     owner: codex-delivery-verifier
     intent:
@@ -31453,6 +31471,10 @@ landingStreams:
       reason: Only seven previously unmatched exact paths; preserve all prior stream
         order/classification
 sharedPaths:
+  - glob: src/gateway/tools-invoke-http.fabric-phase2.integration.test.ts
+    landerTask: arch-remediation-wp-e-policy-composition
+    reason: User-approved exact test takeover; original directory claims retained.
+    reviewAfter: 2026-12-31
   - glob: src/agent-runtime/wiring/reply-turn.acceptance-delivery.integration.test.ts
     landerTask: arch-remediation-wp-g-acceptance-delivery
     reason: User-authorized exact composition test; broad directory ownership preserved.
