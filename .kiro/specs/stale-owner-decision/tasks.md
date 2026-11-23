@@ -2,7 +2,7 @@
 
 ## Agents
 
-- codex-kb-review · role: owner · scope: independent review, integration and deployment · paths: ui/src/ui/chat/owner-decision-card*, src/gateway/collaboration-learning/owner-decision-delivery*, src/gateway/collaboration-learning/claim-contract-entry.ts, .kiro/specs/stale-owner-decision/** · since: 2026-11-23
+- codex-kb-review · role: owner · scope: independent review, integration and deployment · paths: ui/src/ui/chat/owner-decision-card*, src/gateway/collaboration-learning/owner-decision-delivery*, src/gateway/collaboration-learning/claim-contract-entry.ts, .kiro/specs/stale-owner-decision/\*\* · since: 2026-11-23
 
 - codex-kb-implement · role: contributor · scope: stale card replay, delivery reconciliation and audit archive helper · paths: ui/src/ui/chat/owner-decision-card*, src/gateway/collaboration-learning/owner-decision-delivery*, src/gateway/collaboration-learning/claim-contract-entry.ts · since: 2026-11-23
 
