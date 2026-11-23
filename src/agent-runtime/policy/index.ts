@@ -275,3 +275,10 @@ export type {
   OutboundArtifactGrant,
   TrustedDeliveryIssuer,
 } from "./accepted-artifact-delivery.js";
+
+export { resolveDependencyBlock } from "./dependency-resolution.js";
+export type {
+  DependencyBlockReason,
+  DependencyFallback,
+  DependencyResolution,
+} from "./dependency-resolution.js";
