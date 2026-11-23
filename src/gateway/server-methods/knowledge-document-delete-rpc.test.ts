@@ -188,4 +188,88 @@ describe("knowledge.base.documents.delete retry state", () => {
     expect(bases.getKnowledgeBase(unrelatedId)?.title).toBe("Concurrent unrelated KB");
     expect(bases.getKnowledgeBase(kbId)?.documentIds).not.toContain(documentId);
   });
+  it("public same-skill attach refuses terminal identity without restoring membership", async () => {
+    const created = await invoke("knowledge.base.create", { title: "Terminal reattach" });
+    const kbId = extractKnowledgeBaseId(created.payload);
+    const uploaded = await invoke("knowledge.personal.upload", {
+      knowledgeBaseId: kbId,
+      attachment: {
+        fileName: "terminal.md",
+        mimeType: "text/markdown",
+        kind: "text",
+        textContent: "A same-skill public attach must not revive a permanently deleted original.",
+      },
+    });
+    expect(uploaded.ok).toBe(true);
+    const skillId = String(uploaded.payload?.skillId);
+    const documentId = knowledgeDocumentIdFromSkillRef(kbId, skillId);
+    const index = await import("../knowledge/kb-index.js");
+    const actual = await vi.importActual<typeof import("../knowledge/kb-index.js")>(
+      "../knowledge/kb-index.js",
+    );
+    vi.mocked(index.deleteKnowledgeDocumentFromIndex).mockImplementation(
+      actual.deleteKnowledgeDocumentFromIndex,
+    );
+    expect(
+      (await invoke("knowledge.base.documents.delete", { knowledgeBaseId: kbId, documentId })).ok,
+    ).toBe(true);
+    const attach = await invoke("knowledge.base.attach", {
+      knowledgeBaseId: kbId,
+      documentId: skillId,
+    });
+    expect(attach.ok).toBe(false);
+    expect(attach.error?.message).toContain("document_deleted");
+    const bases = await import("../knowledge/knowledge-base-store.js");
+    expect(bases.getKnowledgeBase(kbId)?.documentIds).not.toContain(documentId);
+  });
+  it("does not purge a shared index row or the other KB when terminal reattach is refused", async () => {
+    const first = await invoke("knowledge.base.create", { title: "Shared original" });
+    const kbId = extractKnowledgeBaseId(first.payload);
+    const uploaded = await invoke("knowledge.personal.upload", {
+      knowledgeBaseId: kbId,
+      attachment: {
+        fileName: "shared.md",
+        mimeType: "text/markdown",
+        kind: "text",
+        size: 128,
+        textContent:
+          "Existing shared index data must survive a terminal refusal scoped to one knowledge base.",
+      },
+    });
+    expect(uploaded.ok).toBe(true);
+    const skillId = String(uploaded.payload?.skillId);
+    const documentId = knowledgeDocumentIdFromSkillRef(kbId, skillId);
+    const other = await invoke("knowledge.base.create", { title: "Other reference" });
+    const otherId = extractKnowledgeBaseId(other.payload);
+    expect(
+      (await invoke("knowledge.base.attach", { knowledgeBaseId: otherId, documentId })).ok,
+    ).toBe(true);
+    const actual = await vi.importActual<typeof import("../knowledge/kb-index.js")>(
+      "../knowledge/kb-index.js",
+    );
+    const bases = await import("../knowledge/knowledge-base-store.js");
+    const layout = await import("../knowledge/knowledge-directory.js");
+    const dbPath = actual.resolveKnowledgeIndexDbPath({
+      ownerId: "user-a",
+      tenantId: null,
+      indexRoot: layout.resolveKnowledgeDirectoryLayoutForBase(bases.getKnowledgeBase(kbId)!)
+        .indexRoot,
+    });
+    const index = await actual.openKnowledgeIndex({ dbPath, vectorEnabled: false });
+    try {
+      const before = actual.getKnowledgeDocument(index.db, documentId);
+      expect(before).toBeTruthy();
+      expect(
+        (await invoke("knowledge.base.documents.delete", { knowledgeBaseId: kbId, documentId })).ok,
+      ).toBe(true);
+      expect(
+        (await invoke("knowledge.base.attach", { knowledgeBaseId: kbId, documentId: skillId })).ok,
+      ).toBe(false);
+      expect(bases.getKnowledgeBase(kbId)?.documentIds).not.toContain(documentId);
+      expect(bases.getKnowledgeBase(otherId)?.documentIds).toContain(documentId);
+      expect(actual.getKnowledgeDocument(index.db, documentId)).toEqual(before);
+    } finally {
+      index.close();
+    }
+  });
 });

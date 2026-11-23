@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 // @vitest-environment node
 import fs from "node:fs";
 import path from "node:path";
@@ -8,12 +9,25 @@ import { getPersonalSkillAssetDetail } from "../skill-lifecycle-store.js";
 import { getDatasetSchemasForKb } from "./dataset-schema-store.js";
 import { knowledgeDocumentIdFromSkillRef } from "./document-display-title.js";
 import {
+  deleteKnowledgeDocumentFromIndex,
+  getKnowledgeDocument,
   knowledgeBaseHasIndexedChunks,
   openKnowledgeIndex,
   resolveKnowledgeIndexDbPath,
 } from "./kb-index.js";
-import { createKnowledgeBase, getKnowledgeBase } from "./knowledge-base-store.js";
-import { hasKnowledgeOriginal } from "./knowledge-original-store.js";
+import {
+  attachDocumentToKnowledgeBase,
+  deleteDocumentFromKnowledgeBase,
+  createKnowledgeBase,
+  getKnowledgeBase,
+} from "./knowledge-base-store.js";
+import { resolveKnowledgeDirectoryLayoutForBase } from "./knowledge-directory.js";
+import {
+  hasKnowledgeOriginal,
+  markKnowledgeOriginalDeleted,
+  withKnowledgeDocumentMutation,
+  deleteKnowledgeOriginal,
+} from "./knowledge-original-store.js";
 import { UNPARSED_DOCUMENT_PLACEHOLDER } from "./personal-document-upload.js";
 import {
   attachmentToIngestBuffer,
@@ -21,6 +35,7 @@ import {
   fetchWebPageForKnowledge,
   htmlToPlainText,
   importDatasetPersonalKnowledge,
+  ingestAttachedPersonalKnowledgeDocument,
   ingestCollectedPersonalKnowledge,
   ingestKnowledgePayloadToBase,
   ingestUploadedPersonalKnowledge,
@@ -475,5 +490,217 @@ describe("personal-knowledge-ingest hooks", () => {
     });
     expect(outcome.attempted).toBe(false);
     expect(outcome.reason).toBe("unparsed placeholder");
+  });
+  it("rejects terminal identity before embeddings, index creation, or membership commit", async () => {
+    const kb = createKnowledgeBase({ title: "Terminal", ownerId: "user-a" }, storePath);
+    const originalsRoot = path.join(tmpDir, "terminal-originals");
+    const identity = { kbId: kb.id, docId: "deleted", originalsRoot };
+    markKnowledgeOriginalDeleted(identity);
+    const commit = vi.fn();
+    const embedBatch = vi.fn(mockProvider.embedBatch);
+    const outcome = await ingestKnowledgePayloadToBase({
+      knowledgeBase: kb,
+      documentId: "deleted",
+      title: "Deleted",
+      fileName: "gone.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("terminal payload"),
+      ownerId: "user-a",
+      indexRoot,
+      originalsRoot,
+      embeddingProvider: { ...mockProvider, embedBatch },
+      onIndexed: commit,
+    });
+    expect(outcome).toMatchObject({ attempted: true, skipped: true, reason: "document_deleted" });
+    expect(embedBatch).not.toHaveBeenCalled();
+    expect(commit).not.toHaveBeenCalled();
+    expect(
+      fs.existsSync(resolveKnowledgeIndexDbPath({ ownerId: "user-a", tenantId: null, indexRoot })),
+    ).toBe(false);
+    expect(hasKnowledgeOriginal(identity)).toBe(false);
+  });
+
+  it("keeps non-terminal optional original write failures best-effort", async () => {
+    const kb = createKnowledgeBase({ title: "Optional", ownerId: "user-a" }, storePath);
+    const originalsRoot = path.join(tmpDir, "optional-originals");
+    const commit = vi.fn();
+    const originalWrite = fs.writeFileSync;
+    const spy = vi
+      .spyOn(fs, "writeFileSync")
+      .mockImplementation((...args: Parameters<typeof fs.writeFileSync>) => {
+        if (String(args[0]).endsWith("optional.md")) {
+          throw Object.assign(new Error("preview-only EACCES"), { code: "EACCES" });
+        }
+        return originalWrite(...args);
+      });
+    try {
+      const outcome = await ingestKnowledgePayloadToBase({
+        knowledgeBase: kb,
+        documentId: "optional",
+        title: "Optional",
+        fileName: "optional.md",
+        mimeType: "text/markdown",
+        buffer: Buffer.from("Optional preview failure must still index this searchable content."),
+        ownerId: "user-a",
+        indexRoot,
+        originalsRoot,
+        embeddingProvider: mockProvider,
+        onIndexed: commit,
+      });
+      expect(outcome.error).toBeUndefined();
+      expect(outcome.skipped).toBe(false);
+      expect(commit).toHaveBeenCalledOnce();
+      expect(hasKnowledgeOriginal({ kbId: kb.id, docId: "optional", originalsRoot })).toBe(false);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("reports a terminal dataset item and continues the other stable item without ghost membership", async () => {
+    const kb = createKnowledgeBase({ title: "Mixed", ownerId: "user-a" }, storePath);
+    const doc = `dataset-${createHash("sha256").update(`${kb.id}::Mixed`).digest("hex").slice(0, 20)}-0`;
+    markKnowledgeOriginalDeleted({
+      kbId: kb.id,
+      docId: doc,
+      originalsRoot: resolveKnowledgeDirectoryLayoutForBase(kb).originalsRoot,
+    });
+    const result = await importDatasetPersonalKnowledge({
+      knowledgeBaseId: kb.id,
+      datasetTitle: "Mixed",
+      records: [
+        { text: "Deleted same identity must not come back." },
+        { text: "Retained new dataset item indexes normally." },
+      ],
+      ownerId: "user-a",
+      storePath,
+      indexRoot,
+      embeddingProvider: mockProvider,
+    });
+    expect(result).toMatchObject({
+      imported: 1,
+      skipped: 1,
+      errors: [{ documentId: doc, reason: "document_deleted" }],
+    });
+    expect(result.documentIds).not.toContain(doc);
+    expect(getKnowledgeBase(kb.id, storePath)?.documentIds).not.toContain(doc);
+    const index = await openKnowledgeIndex({
+      dbPath: resolveKnowledgeIndexDbPath({ ownerId: "user-a", tenantId: null, indexRoot }),
+      vectorEnabled: false,
+    });
+    try {
+      expect(getKnowledgeDocument(index.db, doc)).toBeNull();
+      expect(getKnowledgeDocument(index.db, result.documentIds[0])).toBeTruthy();
+    } finally {
+      index.close();
+    }
+  });
+
+  it("rejects reattaching the same skill only in the revoked KB scope", async () => {
+    const kb = createKnowledgeBase({ title: "Revoked", ownerId: "user-a" }, storePath);
+    const other = createKnowledgeBase({ title: "Allowed", ownerId: "user-a" }, storePath);
+    const uploaded = uploadPersonalKnowledge({
+      attachment: {
+        fileName: "shared.md",
+        size: 80,
+        kind: "text",
+        mimeType: "text/markdown",
+        textContent: "Shared asset remains available to a different knowledge base.",
+      },
+    });
+    markKnowledgeOriginalDeleted({
+      kbId: kb.id,
+      docId: knowledgeDocumentIdFromSkillRef(kb.id, uploaded.skillId),
+      originalsRoot: resolveKnowledgeDirectoryLayoutForBase(kb).originalsRoot,
+    });
+    const commit = vi.fn();
+    const denied = await ingestAttachedPersonalKnowledgeDocument({
+      knowledgeBaseId: kb.id,
+      documentId: uploaded.skillId,
+      ownerId: "user-a",
+      storePath,
+      indexRoot,
+      embeddingProvider: mockProvider,
+      onIndexed: commit,
+    });
+    expect(denied.reason).toBe("document_deleted");
+    expect(commit).not.toHaveBeenCalled();
+    const allowed = await ingestAttachedPersonalKnowledgeDocument({
+      knowledgeBaseId: other.id,
+      documentId: uploaded.skillId,
+      ownerId: "user-a",
+      storePath,
+      indexRoot,
+      embeddingProvider: mockProvider,
+    });
+    expect(allowed.error).toBeUndefined();
+    expect(allowed.skipped).toBe(false);
+  });
+
+  it("serializes an awaited ingest commit, deletion, and a late reimport without partial index or membership", async () => {
+    const kb = createKnowledgeBase({ title: "Race", ownerId: "user-a" }, storePath);
+    const originalsRoot = path.join(tmpDir, "race-originals");
+    const identity = { kbId: kb.id, docId: "race", originalsRoot };
+    let resume!: () => void;
+    let entered!: () => void;
+    const paused = new Promise<void>((r) => {
+      resume = r;
+    });
+    const started = new Promise<void>((r) => {
+      entered = r;
+    });
+    const args = {
+      knowledgeBase: kb,
+      documentId: "race",
+      title: "Race",
+      fileName: "race.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("Concurrent deletion must win after the indexed membership commit."),
+      ownerId: "user-a",
+      indexRoot,
+      originalsRoot,
+      embeddingProvider: {
+        ...mockProvider,
+        embedBatch: async (texts: string[]) => {
+          entered();
+          await paused;
+          return mockProvider.embedBatch(texts);
+        },
+      },
+      onIndexed: () => {
+        attachDocumentToKnowledgeBase(kb.id, "race", storePath);
+      },
+    };
+    const first = ingestKnowledgePayloadToBase(args);
+    await started;
+    const deletion = withKnowledgeDocumentMutation(identity, async () => {
+      markKnowledgeOriginalDeleted(identity);
+      deleteKnowledgeOriginal(identity);
+      const index = await openKnowledgeIndex({
+        dbPath: resolveKnowledgeIndexDbPath({ ownerId: "user-a", tenantId: null, indexRoot }),
+        vectorEnabled: false,
+      });
+      try {
+        deleteKnowledgeDocumentFromIndex({ db: index.db, index, docId: "race" });
+      } finally {
+        index.close();
+      }
+      deleteDocumentFromKnowledgeBase(kb.id, "race", storePath);
+    });
+    const late = ingestKnowledgePayloadToBase({ ...args, embeddingProvider: mockProvider });
+    resume();
+    expect((await first).error).toBeUndefined();
+    await deletion;
+    expect((await late).reason).toBe("document_deleted");
+    expect(getKnowledgeBase(kb.id, storePath)?.documentIds).not.toContain("race");
+    expect(hasKnowledgeOriginal(identity)).toBe(false);
+    const index = await openKnowledgeIndex({
+      dbPath: resolveKnowledgeIndexDbPath({ ownerId: "user-a", tenantId: null, indexRoot }),
+      vectorEnabled: false,
+    });
+    try {
+      expect(getKnowledgeDocument(index.db, "race")).toBeNull();
+    } finally {
+      index.close();
+    }
   });
 });

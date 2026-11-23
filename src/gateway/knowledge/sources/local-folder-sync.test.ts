@@ -9,7 +9,9 @@ import {
   getKnowledgeBase,
   type KnowledgeBase,
 } from "../knowledge-base-store.js";
+import { markKnowledgeOriginalDeleted } from "../knowledge-original-store.js";
 import { upsertLocalFolderBinding } from "./local-folder-binding-store.js";
+import { buildLocalFolderDocId } from "./local-folder-runtime.js";
 import { loadLocalFolderSyncPlan } from "./local-folder-sync-plan-store.js";
 import {
   commitLocalFolderSync,
@@ -729,5 +731,59 @@ describe("local-folder-sync (P3 managed_push)", () => {
       "手册-2.md",
       "手册.md",
     ]);
+  });
+  it("does not accept a terminal managed upload because old shared chunks still exist", async () => {
+    const fixture = createFixture("Terminal mixed");
+    await seedFile(
+      fixture,
+      "deleted.md",
+      "Old indexed bytes retained for a shared-reference fixture.",
+    );
+    markKnowledgeOriginalDeleted({
+      kbId: fixture.knowledgeBase.id,
+      docId: buildLocalFolderDocId(fixture.sourceDescriptorId, "deleted.md"),
+      originalsRoot: path.join(tmpRoot, "originals"),
+    });
+    const files = [
+      commitFile("deleted.md", "New bytes must be refused for terminal identity."),
+      commitFile("retain.md", "A normal item in the same managed batch must continue."),
+    ];
+    const plan = await createManagedLocalFolderSyncPlan({
+      binding: fixture.binding,
+      bindingStorePath: fixture.bindingStore,
+      deviceId: "mac-1",
+      candidates: files.map((file) => ({
+        relativePath: file.relativePath,
+        rawHash: file.rawHash!,
+      })),
+      linkStorePath: fixture.linkStore,
+      planStorePath: fixture.planStore,
+      originalsRoot: path.join(tmpRoot, "originals"),
+    });
+    const result = await commitManagedLocalFolderSync({
+      ...managedCommitParams(fixture),
+      planId: plan.planId,
+      generation: plan.generation,
+      phase: "upload",
+      files,
+    });
+    expect(result.ingested).toBe(1);
+    expect(result.skipped).toBe(1);
+    expect(result.errors.join(" ")).toContain("document_deleted");
+    expect(
+      result.documents?.find((doc) => doc.relativePath === "deleted.md")?.chunkCount,
+    ).toBeGreaterThan(0);
+    expect(
+      loadLocalFolderSyncPlan(fixture.binding.bindingId, fixture.planStore)?.uploadedRelativePaths,
+    ).toEqual(["retain.md"]);
+    await expect(
+      commitManagedLocalFolderSync({
+        ...managedCommitParams(fixture),
+        planId: plan.planId,
+        generation: plan.generation,
+        phase: "finalize",
+        files: [],
+      }),
+    ).rejects.toThrow(/pending upload/);
   });
 });

@@ -1937,6 +1937,14 @@ export async function importDatasetKnowledgeUniversePersonal(state: AppPortState
       personalNoticeDatasetImported(response.imported),
       response.compatWarnings,
     );
+    if (response.errors?.length) {
+      afterEnsure.personalActionError = response.errors
+        .map((item) => item.message ?? item.reason)
+        .join("; ");
+      if (response.imported === 0) {
+        afterEnsure.personalActionNotice = null;
+      }
+    }
     await syncKnowledgeBaseAfterPersonalMutation(state, response);
     await refreshKnowledgeUniverseHome(state);
     await loadKnowledgeUniverseGovernance(state);

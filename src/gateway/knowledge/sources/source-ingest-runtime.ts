@@ -218,6 +218,7 @@ export async function ingestKnowledgeSourceBinding(params: {
     };
   }
 
+  let patched: SourceDescriptor | null = null;
   const ingest = await ingestKnowledgePayloadToBase({
     knowledgeBase: params.knowledgeBase,
     documentId,
@@ -233,6 +234,28 @@ export async function ingestKnowledgeSourceBinding(params: {
       ? { embeddingProvider: options.embeddingProvider }
       : {}),
     governanceOwnershipProof: params.governanceOwnershipProof,
+    onIndexed: (indexed) => {
+      attachDocumentToKnowledgeBase(knowledgeBaseId, documentId, options.kbStorePath);
+      upsertSourceDocumentLink(
+        {
+          sourceDescriptorId,
+          docId: documentId,
+          relativePath,
+          state: "active",
+          lastSeenAt: Date.now(),
+          lastIngestedVersionId: indexed.versionLabel ?? undefined,
+        },
+        options.sourceDocumentLinkStorePath,
+      );
+      patched = patchKnowledgeSourceBindingMetadata(
+        sourceDescriptorId,
+        {
+          lastIngestedAt: new Date().toISOString(),
+          documentId,
+        },
+        options.bindingsStorePath,
+      );
+    },
   });
 
   if (ingest.error || (ingest.skipped && ingest.reason === "empty content")) {
@@ -246,28 +269,6 @@ export async function ingestKnowledgeSourceBinding(params: {
       binding,
     };
   }
-
-  attachDocumentToKnowledgeBase(knowledgeBaseId, documentId, options.kbStorePath);
-  upsertSourceDocumentLink(
-    {
-      sourceDescriptorId,
-      docId: documentId,
-      relativePath,
-      state: "active",
-      lastSeenAt: Date.now(),
-      lastIngestedVersionId: ingest.versionLabel ?? undefined,
-    },
-    options.sourceDocumentLinkStorePath,
-  );
-
-  const patched = patchKnowledgeSourceBindingMetadata(
-    sourceDescriptorId,
-    {
-      lastIngestedAt: new Date().toISOString(),
-      documentId,
-    },
-    options.bindingsStorePath,
-  );
 
   return {
     ok: true,
