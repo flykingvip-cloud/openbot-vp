@@ -4,7 +4,10 @@
  */
 import { createHash } from "node:crypto";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
+import { withFileLock } from "../../infra/file-lock.js";
+import { resolveProcessScopedMap } from "../../shared/process-scoped-map.js";
 import { CONFIG_DIR } from "../../utils.js";
 import { computeRawContentHash } from "./document-fingerprint.js";
 import { MAX_BINARY_DATA_URL_BYTES } from "./personal-document-upload.js";
@@ -111,6 +114,53 @@ export function markKnowledgeOriginalDeleted(params: ReadKnowledgeOriginalParams
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
       throw error;
+    }
+  }
+}
+
+/** Terminal intent is an admission refusal, not an optional preview-store failure. */
+export function assertKnowledgeOriginalWritable(params: ReadKnowledgeOriginalParams): void {
+  if (isKnowledgeOriginalDeleted(params)) {
+    throw new Error("document_deleted: this document identity was permanently deleted");
+  }
+}
+
+const mutationQueues = resolveProcessScopedMap<Promise<void>>(
+  Symbol.for("openbot.knowledgeDocumentMutationQueues"),
+);
+
+/** Serialize ingest/index/membership commit with deletion, including other gateway processes.
+ * Legacy document IDs can share one index across KBs: lock by root/doc, not KB/doc.
+ * Deletion markers themselves remain KB-scoped.
+ * Keep locks outside the optional preview store so a preview write failure stays best-effort.
+ * The file-lock primitive is PID-reentrant, so independent same-process tasks also need a queue.
+ */
+export async function withKnowledgeDocumentMutation<T>(
+  params: ReadKnowledgeOriginalParams,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const root = resolveKnowledgeOriginalsRoot(params.originalsRoot);
+  const key = createHash("sha256")
+    .update(JSON.stringify([root, params.docId]))
+    .digest("hex");
+  const previous = mutationQueues.get(key) ?? Promise.resolve();
+  let release!: () => void;
+  const done = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const current = previous.then(() => done);
+  mutationQueues.set(key, current);
+  await previous;
+  try {
+    return await withFileLock(
+      path.join(os.tmpdir(), `openbot-knowledge-locks-${process.getuid?.() ?? "user"}`, key),
+      { retries: { retries: 600, factor: 1, minTimeout: 100, maxTimeout: 100 }, stale: 60_000 },
+      operation,
+    );
+  } finally {
+    release();
+    if (mutationQueues.get(key) === current) {
+      mutationQueues.delete(key);
     }
   }
 }
