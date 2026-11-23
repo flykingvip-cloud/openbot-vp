@@ -322,6 +322,7 @@ Docs: https://docs.openbot.love
 
 - Runtime: preserve uncertain tool-write outcomes without automatic retries; cached results require explicit host read authorization. Missing authorization denies replay and may pause receipt-dependent recovery. (#332) Thanks @flykingvip-cloud.
 - Groups: reconcile confirmation recovery with current plan versions and persist obsolete-card dismissal across reloads. (#338) Thanks @flykingvip-cloud.
+- Chat: preserve login-selected membership through reply dispatch, show one task admission receipt across status/final/history, and remove the composer task status bar. (#339) Thanks @flykingvip-cloud.
 
 ## 2026.3.8
 

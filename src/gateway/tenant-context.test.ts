@@ -778,6 +778,33 @@ describe("session store path for inbound agent turns (history split-brain)", () 
     expect(storePath).not.toContain(`${path.sep}users${path.sep}`);
   });
 
+  it.each(["employee", "enterprise"])(
+    "preserves the login membership for %s with multiple roles",
+    async (domain) => {
+      findMembershipByUserIdMock.mockReturnValue(undefined);
+      findMembershipByIdForUserMock.mockReturnValue({
+        id: "login-membership",
+        userId: "u1",
+        enterpriseId: "t1",
+      });
+      const result = await resolveSessionStorePathForInboundMessage({
+        cfg: managedCfg,
+        agentId: "main",
+        gatewayClientUser: "a@acme.com",
+        gatewayClientSessionDomain: domain,
+        gatewayClientSessionEnterpriseId: "t1",
+        gatewayClientSessionMembershipId: "login-membership",
+      });
+      expect(result).toBe(resolveStorePath(undefined, { agentId: "main" }));
+      expect(findMembershipByIdForUserMock).toHaveBeenCalledWith(
+        expect.anything(),
+        "login-membership",
+        "u1",
+      );
+      expect(findMembershipByUserIdMock).not.toHaveBeenCalled();
+    },
+  );
+
   it("routes dual-role / domain-less users to the same conversation store", async () => {
     const platformPath = await resolveSessionStorePathForInboundMessage({
       cfg: managedCfg,

@@ -15553,7 +15553,99 @@ tasks:
         via: verified
     since: 2026-11-22
     metadata: {}
+  - id: login-scope-propagation:codex-kb-review
+    owner: codex-kb-review
+    intent: []
+    paths:
+      - src/gateway/tenant-context.ts
+      - src/gateway/tenant-context.test.ts
+      - src/auto-reply/reply/dispatch-from-config.ts
+      - src/auto-reply/reply/session.ts
+      - .kiro/specs/login-scope-propagation/**
+    state: active
+    sessions:
+      - id: login-scope-20261123
+        taskId: login-scope-propagation:codex-kb-review
+        ide: codex
+        agent: codex-kb-review
+        status: active
+        lastSignalAt: 2026-11-23T02:21:13.562Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-23
+    metadata: {}
+  - id: group-interaction-separation:codex-kb-implement
+    owner: codex-kb-review
+    intent: []
+    paths:
+      - src/gateway/collaboration-learning/group-interaction-understanding*
+      - src/gateway/collaboration-learning/group-interaction-host*
+      - src/gateway/server-methods/chat.ts
+      - .kiro/specs/group-interaction-separation/**
+      - src/gateway/chat-group-interaction-isolation.s1b.test.ts
+      - src/gateway/collaboration-learning/discuss-to-task-chat-turn.ts
+      - src/gateway/collaboration-learning/discuss-to-task-chat-turn.test.ts
+      - src/gateway/server-methods/chat-transcript-inject.ts
+      - src/gateway/server-methods/chat-transcript-inject.test.ts
+      - ui/src/ui/controllers/chat.ts
+      - ui/src/ui/controllers/chat.test.ts
+    state: active
+    sessions:
+      - id: group-separation-20261123
+        taskId: group-interaction-separation:codex-kb-implement
+        ide: codex
+        agent: codex-kb-implement
+        status: active
+        lastSignalAt: 2026-11-23T01:11:12.113Z
+        metadata: {}
+      - id: group-receipt-review-20261123
+        taskId: group-interaction-separation:codex-kb-implement
+        ide: codex
+        agent: codex-kb-review
+        status: active
+        lastSignalAt: 2026-11-23T01:11:12.113Z
+        metadata: {}
+    ownerHistory:
+      - fromOwner: codex-kb-implement
+        toOwner: codex-kb-review
+        at: 2026-11-23T01:11:12.113Z
+        via: verified
+    since: 2026-11-22
+    metadata: {}
 landingStreams:
+  - id: group-interaction-separation:codex-kb-review
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - .kiro/specs/group-interaction-separation/**
+      - src/gateway/server-methods/chat.ts
+      - src/gateway/server-methods/chat-transcript-inject.ts
+      - src/gateway/collaboration-learning/discuss-to-task-chat-turn.ts
+      - src/gateway/collaboration-learning/group-interaction-understanding.ts
+      - src/gateway/collaboration-learning/group-interaction-host.ts
+      - src/gateway/collaboration-learning/group-interaction-host.test.ts
+      - src/gateway/chat-group-interaction-isolation.s1b.test.ts
+      - ui/src/ui/controllers/chat.ts
+      - ui/src/ui/controllers/chat.test.ts
+    canLandWith: []
+    metadata:
+      owner: codex-kb-review
+      task: group-interaction-separation
+      reason: Reviewed interaction and receipt integration only.
+  - id: login-scope-propagation:codex-kb-review
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - .kiro/specs/login-scope-propagation/**
+      - src/gateway/tenant-context.ts
+      - src/gateway/tenant-context.test.ts
+      - src/auto-reply/reply/dispatch-from-config.ts
+      - src/auto-reply/reply/session.ts
+    canLandWith: []
+    metadata:
+      owner: codex-kb-review
+      task: login-scope-propagation
+      reason: Scoped fix for login identity propagation; historical streams preserved.
   - id: stale-owner-decision:codex-kb-review
     landingPolicy: serial
     paths:

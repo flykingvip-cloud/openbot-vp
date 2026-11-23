@@ -32,9 +32,27 @@ import * as gatewayCall from "../gateway/call.js";
 import * as interAgentBus from "../organization/inter-agent-bus.js";
 import * as mentionDelivery from "../organization/mention-delivery.js";
 import * as mentionStateTracker from "../organization/mention-state-tracker.js";
+import * as formalBoardModule from "./collaboration-dispatch/claim-contract.js";
+import * as participantDecisionModule from "./collaboration-dispatch/decision-engine.js";
+import * as groupUnderstandingModule from "./collaboration-learning/group-interaction-understanding.js";
 import { resolvePlatformAuthConfig } from "./platform-auth/config.js";
 import type { PlatformAuthStore } from "./platform-auth/store-types.js";
 import { saveStore } from "./platform-auth/store.js";
+
+// This suite tests chat lifecycle isolation, not billing persistence. Give the
+// synthetic model turn an explicit commercial admission; billing denial remains
+// covered by authorize-commercial-run.test.ts. Never touches live subscriptions.
+vi.mock("./billing/agent-run-governance.js", async (original) => ({
+  ...(await original<typeof import("./billing/agent-run-governance.js")>()),
+  tryAcquireEnterpriseAgentRun: vi.fn(async () => ({
+    acquired: true,
+    skipped: false,
+    enterpriseId: "ent-s1b",
+    authorizationDecisionId: "auth-s1b-fixture",
+    subscriptionId: "sub-s1b-fixture",
+  })),
+  releaseEnterpriseAgentRun: vi.fn(async () => {}),
+}));
 
 const completeMock = vi.hoisted(() => vi.fn());
 
@@ -1897,4 +1915,136 @@ it("live seam: observation timestamp changes during understanding do not revoke 
   await sent.pending;
   expect(payloadText(findTerminal(context, runId))).not.toContain("当前群状态已更新");
   expect(dispatchSpy).toHaveBeenCalled();
+});
+
+describe("group interaction and formal admission separation", () => {
+  it("explains a flag-off rejection and answers the follow-up consultation without another formal admission", async () => {
+    const fixture = await isolateTrustedGroupGateway();
+    vi.spyOn(groupUnderstandingModule, "understandGroupInteraction").mockImplementation(
+      async (input) => ({
+        kind: "understood" as const,
+        decision:
+          input.message === LONG_TASK_MESSAGE
+            ? {
+                kind: "execution_request" as const,
+                request: {
+                  lifecycle: "long_task" as const,
+                  goal: "Research",
+                  acceptance: ["Report"],
+                },
+              }
+            : { kind: "reply" as const, text: "收到，请管理员配置正式任务能力。" },
+      }),
+    );
+    const context = createChatContext();
+    const dispatch = vi.spyOn(dispatchModule, "dispatchInboundMessage");
+    const run = `flag-off-${path.basename(fixture.root)}`;
+    const sent = await sendGroupChat({ fixture, context, runId: run, message: LONG_TASK_MESSAGE });
+    await sent.pending;
+    await vi.waitFor(() => expect(findTerminal(context, run)).toBeTruthy(), { timeout: 15000 });
+    const text = payloadText(findTerminal(context, run));
+    expect(text).toContain("功能配置门槛");
+    expect(text).toContain("仍可进行普通咨询");
+    expect(dispatch).not.toHaveBeenCalled();
+    const consult = `consult-${path.basename(fixture.root)}`;
+    const question = await sendGroupChat({
+      fixture,
+      context,
+      runId: consult,
+      message: "如何才能启动正式任务？",
+    });
+    await question.pending;
+    await vi.waitFor(() => expect(findTerminal(context, consult)).toBeTruthy(), { timeout: 15000 });
+    expect(payloadText(findTerminal(context, consult))).toContain("收到");
+    expect(JSON.stringify(findTerminal(context, consult))).not.toContain(
+      "formal_task_blocked_flag_off",
+    );
+    expect(dispatch).not.toHaveBeenCalled();
+  }, 30000);
+  it("does not invent task authority for an unbound group task change", async () => {
+    const fixture = await isolateTrustedGroupGateway();
+    const dispatch = vi.spyOn(dispatchModule, "dispatchInboundMessage");
+    vi.spyOn(groupUnderstandingModule, "understandGroupInteraction").mockResolvedValue({
+      kind: "understood",
+      decision: {
+        kind: "task_change",
+        target: { taskId: "foreign-task", revision: "stale" },
+        text: "Revise scope",
+        mode: "revise",
+      },
+    });
+    const context = createChatContext();
+    const runId = `group-change-${path.basename(fixture.root)}`;
+    const sent = await sendGroupChat({ fixture, context, runId, message: "修改原任务范围" });
+    await sent.pending;
+    await vi.waitFor(() => expect(findTerminal(context, runId)).toBeTruthy(), { timeout: 15000 });
+    expect(payloadText(findTerminal(context, runId))).toContain("尚未修改任务");
+    expect(dispatch).not.toHaveBeenCalled();
+  }, 30000);
+  it("does not let an ordinary reply use an unselected coordinator speaking slot", async () => {
+    const fixture = await isolateTrustedGroupGateway();
+    const original = participantDecisionModule.decideParticipants;
+    vi.spyOn(participantDecisionModule, "decideParticipants").mockImplementation((...args) => ({
+      ...original(...args),
+      primaryQueue: [],
+      supplementQueue: [],
+    }));
+    const understand = vi
+      .spyOn(groupUnderstandingModule, "understandGroupInteraction")
+      .mockResolvedValue({
+        kind: "understood",
+        decision: { kind: "reply", text: "UNAUTHORIZED-SPEECH" },
+      });
+    const context = createChatContext();
+    const runId = `no-speaker-${path.basename(fixture.root)}`;
+    const sent = await sendGroupChat({ fixture, context, runId, message: "普通咨询" });
+    await sent.pending;
+    await vi.waitFor(() => expect(context.chatAbortControllers.has(runId)).toBe(false), {
+      timeout: 15000,
+    });
+    expect(understand).not.toHaveBeenCalled();
+    expect(JSON.stringify(context.broadcastChat.mock.calls)).not.toContain("UNAUTHORIZED-SPEECH");
+  }, 30000);
+  it("keeps consultation available when current formal task board reads fail, and refuses controls explicitly", async () => {
+    const fixture = await isolateTrustedGroupGateway();
+    vi.spyOn(formalBoardModule, "listBoardClaimItems").mockRejectedValue(
+      new Error("private storage failure"),
+    );
+    const understand = vi.spyOn(groupUnderstandingModule, "understandGroupInteraction");
+    understand.mockResolvedValueOnce({
+      kind: "understood",
+      decision: { kind: "reply", text: "CONSULTATION-STILL-AVAILABLE" },
+    });
+    const context = createChatContext();
+    const runId = `board-unavailable-${path.basename(fixture.root)}`;
+    const sent = await sendGroupChat({ fixture, context, runId, message: "如何查看任务？" });
+    await sent.pending;
+    await vi.waitFor(() => expect(findTerminal(context, runId)).toBeTruthy(), { timeout: 15000 });
+    expect(payloadText(findTerminal(context, runId))).toContain("CONSULTATION-STILL-AVAILABLE");
+    expect(understand.mock.calls[0][0].taskTargetUnavailable).toBe(true);
+    expect(understand.mock.calls[0][0].taskTarget).toBeUndefined();
+    understand.mockResolvedValueOnce({
+      kind: "understood",
+      decision: {
+        kind: "task_control",
+        action: "cancel",
+        target: { taskId: "task-s1b-initial", revision: "invalid" },
+      },
+    });
+    const controlId = runId + "-control";
+    const control = await sendGroupChat({
+      fixture,
+      context,
+      runId: controlId,
+      message: "取消当前任务",
+    });
+    await control.pending;
+    await vi.waitFor(() => expect(findTerminal(context, controlId)).toBeTruthy(), {
+      timeout: 15000,
+    });
+    expect(payloadText(findTerminal(context, controlId))).toContain("暂无法核实");
+    expect(JSON.stringify(context.logGateway.warn.mock.calls)).not.toContain(
+      "private storage failure",
+    );
+  }, 30000);
 });
