@@ -134,6 +134,10 @@ import {
   previewKnowledgeDocument,
 } from "../knowledge/knowledge-document-preview.js";
 import { countActiveAgentsForKnowledgeBase } from "../knowledge/knowledge-lineage-store.js";
+import {
+  assertKnowledgeOriginalWritable,
+  withKnowledgeDocumentMutation,
+} from "../knowledge/knowledge-original-store.js";
 import { searchScopedKnowledgeBaseWithFallback } from "../knowledge/knowledge-retrieval-runtime.js";
 import {
   authorizePersonalKnowledgeObjectAccess,
@@ -665,6 +669,15 @@ function completeKnowledgeBaseConstruction(params: {
     return { ok: true };
   }
   if (isDigitizedKnowledgeIngest(params.ingest)) {
+    const base = getKnowledgeBase(params.knowledgeBaseId);
+    if (!base) {
+      return { ok: false, message: "knowledge base not found" };
+    }
+    assertKnowledgeOriginalWritable({
+      kbId: base.id,
+      docId: knowledgeDocumentIdFromSkillRef(base.id, params.skillId),
+      originalsRoot: resolveKnowledgeDirectoryLayoutForBase(base).originalsRoot,
+    });
     attachDocumentToKnowledgeBase(
       params.knowledgeBaseId,
       knowledgeDocumentIdFromSkillRef(params.knowledgeBaseId, params.skillId),
@@ -693,100 +706,110 @@ async function hardDeleteKnowledgeBaseDocument(params: {
   documentId: string;
   ownerId: string;
 }): Promise<KnowledgeBase> {
-  const knowledgeBasesInScope = listKnowledgeBases({
-    ownerId: params.knowledgeBase.ownerId,
-    ...(params.knowledgeBase.tenantId ? { tenantId: params.knowledgeBase.tenantId } : {}),
-  });
-  const referencedElsewhere = knowledgeBasesInScope.some((base) => {
-    if (base.id === params.knowledgeBase.id) {
-      return false;
-    }
-    return (
-      base.documentIds.includes(params.documentId) ||
-      (base.recycledDocumentIds ?? []).includes(params.documentId)
-    );
-  });
-  const { markKnowledgeOriginalDeleted, deleteKnowledgeOriginal } =
-    await import("../knowledge/knowledge-original-store.js");
-  const original = {
-    kbId: params.knowledgeBase.id,
-    docId: params.documentId,
-    originalsRoot: resolveKnowledgeDirectoryLayoutForBase(params.knowledgeBase).originalsRoot,
-  };
-  // Persist before any destructive work/await. This terminal intent survives a
-  // partial filesystem failure and blocks every preview fallback after restart.
-  markKnowledgeOriginalDeleted(original);
-  deleteKnowledgeOriginal(original);
-  deleteKnowledgeOriginal({ kbId: original.kbId, docId: original.docId });
-  if (referencedElsewhere) {
-    // Other KBs keep their shared index/asset; only this KB's originals are revoked.
-    return deleteDocumentFromKnowledgeBase(params.knowledgeBase.id, params.documentId);
-  }
-  deleteReservedDeliverableOriginal({
-    knowledgeBase: params.knowledgeBase,
-    documentId: params.documentId,
-  });
-
-  const indexRoot = resolveKnowledgeIndexRootForBase(params.knowledgeBase);
-  const dbPath = resolveKnowledgeIndexDbPath({
-    ownerId: params.knowledgeBase.ownerId,
-    tenantId: params.knowledgeBase.tenantId,
-    indexRoot,
-  });
-  // Membership is changed only after successful cleanup/index deletion. Never
-  // restore a whole-store snapshot over unrelated writes while awaiting the index.
-  if (fs.existsSync(dbPath)) {
-    const index = await openKnowledgeIndex({ dbPath, vectorEnabled: false });
-    try {
-      deleteKnowledgeDocumentFromIndex({
-        db: index.db,
-        index,
-        docId: params.documentId,
+  return withKnowledgeDocumentMutation(
+    {
+      kbId: params.knowledgeBase.id,
+      docId: params.documentId,
+      originalsRoot: resolveKnowledgeDirectoryLayoutForBase(params.knowledgeBase).originalsRoot,
+    },
+    async () => {
+      const knowledgeBasesInScope = listKnowledgeBases({
+        ownerId: params.knowledgeBase.ownerId,
+        ...(params.knowledgeBase.tenantId ? { tenantId: params.knowledgeBase.tenantId } : {}),
       });
-    } finally {
-      index.close();
-    }
-  }
-  // Drop Obsidian explicit metadata so removed docs cannot bleed into other graphs.
-  try {
-    const { deleteExplicitDocumentMetadata } =
-      await import("../knowledge/explicit-metadata-store.js");
-    deleteExplicitDocumentMetadata(params.documentId);
-  } catch {
-    // best-effort
-  }
-  try {
-    deleteSourceDocumentLinksForDocId(params.documentId);
-  } catch {
-    // best-effort
-  }
-  const next = deleteDocumentFromKnowledgeBase(params.knowledgeBase.id, params.documentId);
-
-  const skillId = maybeSkillDocumentId(params.documentId);
-  if (
-    skillId &&
-    params.knowledgeBase.ownerId === params.ownerId &&
-    params.knowledgeBase.visibility === "private"
-  ) {
-    try {
-      getPersonalSkillAssetDetail(skillId);
-      const stillReferenced = listKnowledgeBases({ ownerId: params.ownerId }).some((base) => {
+      const referencedElsewhere = knowledgeBasesInScope.some((base) => {
         if (base.id === params.knowledgeBase.id) {
           return false;
         }
         return (
-          base.documentIds.includes(skillId) || (base.recycledDocumentIds ?? []).includes(skillId)
+          base.documentIds.includes(params.documentId) ||
+          (base.recycledDocumentIds ?? []).includes(params.documentId)
         );
       });
-      if (!stillReferenced) {
-        deletePersonalSkillAsset(skillId);
+      const { markKnowledgeOriginalDeleted, deleteKnowledgeOriginal } =
+        await import("../knowledge/knowledge-original-store.js");
+      const original = {
+        kbId: params.knowledgeBase.id,
+        docId: params.documentId,
+        originalsRoot: resolveKnowledgeDirectoryLayoutForBase(params.knowledgeBase).originalsRoot,
+      };
+      // Persist before any destructive work/await. This terminal intent survives a
+      // partial filesystem failure and blocks every preview fallback after restart.
+      markKnowledgeOriginalDeleted(original);
+      deleteKnowledgeOriginal(original);
+      deleteKnowledgeOriginal({ kbId: original.kbId, docId: original.docId });
+      if (referencedElsewhere) {
+        // Other KBs keep their shared index/asset; only this KB's originals are revoked.
+        return deleteDocumentFromKnowledgeBase(params.knowledgeBase.id, params.documentId);
       }
-    } catch {
-      // Not a personal skill asset or already absent; deleting the KB source is enough.
-    }
-  }
+      deleteReservedDeliverableOriginal({
+        knowledgeBase: params.knowledgeBase,
+        documentId: params.documentId,
+      });
 
-  return next;
+      const indexRoot = resolveKnowledgeIndexRootForBase(params.knowledgeBase);
+      const dbPath = resolveKnowledgeIndexDbPath({
+        ownerId: params.knowledgeBase.ownerId,
+        tenantId: params.knowledgeBase.tenantId,
+        indexRoot,
+      });
+      // Membership is changed only after successful cleanup/index deletion. Never
+      // restore a whole-store snapshot over unrelated writes while awaiting the index.
+      if (fs.existsSync(dbPath)) {
+        const index = await openKnowledgeIndex({ dbPath, vectorEnabled: false });
+        try {
+          deleteKnowledgeDocumentFromIndex({
+            db: index.db,
+            index,
+            docId: params.documentId,
+          });
+        } finally {
+          index.close();
+        }
+      }
+      // Drop Obsidian explicit metadata so removed docs cannot bleed into other graphs.
+      try {
+        const { deleteExplicitDocumentMetadata } =
+          await import("../knowledge/explicit-metadata-store.js");
+        deleteExplicitDocumentMetadata(params.documentId);
+      } catch {
+        // best-effort
+      }
+      try {
+        deleteSourceDocumentLinksForDocId(params.documentId);
+      } catch {
+        // best-effort
+      }
+      const next = deleteDocumentFromKnowledgeBase(params.knowledgeBase.id, params.documentId);
+
+      const skillId = maybeSkillDocumentId(params.documentId);
+      if (
+        skillId &&
+        params.knowledgeBase.ownerId === params.ownerId &&
+        params.knowledgeBase.visibility === "private"
+      ) {
+        try {
+          getPersonalSkillAssetDetail(skillId);
+          const stillReferenced = listKnowledgeBases({ ownerId: params.ownerId }).some((base) => {
+            if (base.id === params.knowledgeBase.id) {
+              return false;
+            }
+            return (
+              base.documentIds.includes(skillId) ||
+              (base.recycledDocumentIds ?? []).includes(skillId)
+            );
+          });
+          if (!stillReferenced) {
+            deletePersonalSkillAsset(skillId);
+          }
+        } catch {
+          // Not a personal skill asset or already absent; deleting the KB source is enough.
+        }
+      }
+
+      return next;
+    },
+  );
 }
 
 function resolveKnowledgeGovernanceOwnershipProof(context: {
@@ -1344,6 +1367,7 @@ export const knowledgeHandlers: GatewayRequestHandlers = {
         records,
         ownerId: context.userId,
         knowledgeBase: authorizedKb ?? undefined,
+        governanceOwnershipProof: resolveKnowledgeGovernanceOwnershipProof(context),
       });
       respond(
         true,
@@ -2901,13 +2925,44 @@ export const knowledgeHandlers: GatewayRequestHandlers = {
     try {
       const skillId = resolveSkillAssetIdForDocument(documentId);
       const kbDocumentId = skillId ? knowledgeDocumentIdFromSkillRef(kbId, skillId) : documentId;
-      const knowledgeBase = attachDocumentToKnowledgeBase(kbId, kbDocumentId);
+      let committed = false;
       const ingest = await ingestAttachedPersonalKnowledgeDocument({
         knowledgeBaseId: kbId,
         documentId: skillId ?? documentId,
         ownerId: context.userId,
         knowledgeBase: existing,
+        governanceOwnershipProof: resolveKnowledgeGovernanceOwnershipProof(context),
+        onIndexed: () => {
+          attachDocumentToKnowledgeBase(kbId, kbDocumentId);
+          committed = true;
+        },
       });
+      if (ingest.error) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, ingest.error, { reason: ingest.reason }),
+        );
+        return;
+      }
+      if (!committed) {
+        await withKnowledgeDocumentMutation(
+          {
+            kbId,
+            docId: kbDocumentId,
+            originalsRoot: resolveKnowledgeDirectoryLayoutForBase(existing).originalsRoot,
+          },
+          async () => {
+            assertKnowledgeOriginalWritable({
+              kbId,
+              docId: kbDocumentId,
+              originalsRoot: resolveKnowledgeDirectoryLayoutForBase(existing).originalsRoot,
+            });
+            attachDocumentToKnowledgeBase(kbId, kbDocumentId);
+          },
+        );
+      }
+      const knowledgeBase = getKnowledgeBase(kbId);
       respond(true, { knowledgeBase, ingest });
     } catch (error) {
       respondKnowledgeBaseError(respond, error);
@@ -4005,7 +4060,7 @@ export const knowledgeHandlers: GatewayRequestHandlers = {
       });
       const refreshed = findLocalFolderBinding({ bindingId: binding.bindingId });
       respond(true, {
-        accepted: true,
+        accepted: summary.errors.length === 0 || summary.ingested > 0,
         bindingId: binding.bindingId,
         status: refreshed?.status ?? "idle",
         summary,
