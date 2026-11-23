@@ -76,6 +76,7 @@ import {
 import { parseKnowledgeIngestParseOptions } from "../knowledge/ingest-parse-options.js";
 import {
   deleteKnowledgeDocumentFromIndex,
+  deleteKnowledgeBaseRetrievalSummaries,
   openKnowledgeIndex,
   resolveKnowledgeIndexDbPath,
 } from "../knowledge/kb-index.js";
@@ -2145,6 +2146,17 @@ export const knowledgeHandlers: GatewayRequestHandlers = {
       );
       return;
     }
+    if (record.retry !== undefined) {
+      respond(
+        false,
+        undefined,
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          "automatic summary generation is not available; maintain summary fields explicitly",
+        ),
+      );
+      return;
+    }
     const context = await resolveKnowledgeSourceContext(client);
     const fields = record.fields;
     const base = authorizedKnowledgeBase(
@@ -2228,7 +2240,6 @@ export const knowledgeHandlers: GatewayRequestHandlers = {
         docId,
         indexRoot: resolveKnowledgeIndexRootForBase(base),
         fields: parsedFields,
-        retry: record.retry === true,
         metadata:
           record.metadata === undefined && parsedFields === undefined
             ? undefined
@@ -2893,6 +2904,19 @@ export const knowledgeHandlers: GatewayRequestHandlers = {
       return;
     }
     try {
+      const dbPath = resolveKnowledgeIndexDbPath({
+        ownerId: existing.ownerId,
+        tenantId: existing.tenantId,
+        indexRoot: resolveKnowledgeIndexRootForBase(existing),
+      });
+      if (fs.existsSync(dbPath)) {
+        const index = await openKnowledgeIndex({ dbPath, vectorEnabled: false });
+        try {
+          deleteKnowledgeBaseRetrievalSummaries(index.db, kbId);
+        } finally {
+          index.close();
+        }
+      }
       respond(true, deleteKnowledgeBase(kbId));
     } catch (error) {
       respondKnowledgeBaseError(respond, error);

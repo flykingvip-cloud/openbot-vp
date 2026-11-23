@@ -39,3 +39,40 @@ it("finds current authorized summary after the 100th document and excludes anoth
   expect(recallSummaryDocuments(db, "allowed", "needle")).toEqual([]);
   db.close();
 });
+
+it("filters stale FTS matches before limiting candidates", () => {
+  const db = new DatabaseSync(":memory:");
+  ensureRetrievalSummarySchema(db);
+  db.exec(
+    "CREATE TABLE documents(doc_id TEXT,kb_id TEXT,current_version_id TEXT,title TEXT);CREATE TABLE document_versions(version_id TEXT,semantic_hash TEXT)",
+  );
+  for (let i = 0; i < 81; i++) {
+    let id = "d" + i;
+    db.prepare("INSERT INTO documents VALUES(?,?,?,?)").run(id, "kb", id, id);
+    db.prepare("INSERT INTO document_versions VALUES(?,?)").run(id, id);
+    let p = {
+      schemaVersion: 1,
+      state: "ready",
+      documentType: "other",
+      sourceVersionId: id,
+      sourceContentHash: id,
+      templateVersion: "1",
+      fields: {
+        purpose:
+          i < 80
+            ? "needle needle needle needle needle"
+            : "a long valid document purpose ".repeat(40) + " needle",
+        keyPoints: [],
+        coverage: [],
+        entities: [],
+        boundaries: [],
+      },
+    };
+    db.prepare(
+      "INSERT INTO retrieval_summaries(doc_id,kb_id,version_id,content_hash,state,payload,updated_at) VALUES(?,?,?,?,?,?,?)",
+    ).run(id, "kb", id, id, i < 80 ? "stale" : "ready", JSON.stringify(p), 0);
+  }
+
+  expect(recallSummaryDocuments(db, "kb", "needle", 1)[0]?.docId).toBe("d80");
+  db.close();
+});

@@ -147,6 +147,52 @@ describe("knowledge.base.search RPC integration", () => {
     expect(String(first?.sourceUri)).toMatch(/^ku:\/\/kb\//);
   });
 
+  it("rejects cross-owner KB deletion and removes its manual summaries", async () => {
+    const created = await invoke("knowledge.base.create", { title: "Delete manual summary" });
+    const kbId = extractKnowledgeBaseId(created.payload);
+    const indexRoot = path.join(tmpDir, "knowledge", "index");
+    await ingestKnowledgeDocument({
+      kbId,
+      docId: "delete-manual",
+      title: "Delete",
+      fileName: "delete.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("Synthetic manual source"),
+      ownerId: "user-a",
+      tenantId: null,
+      indexRoot,
+      embeddingProvider: null,
+    });
+    const fields = { purpose: "manual", keyPoints: [], coverage: [], entities: [], boundaries: [] };
+    expect(
+      (
+        await invoke("knowledge.document.summary", {
+          knowledgeBaseId: kbId,
+          documentId: "delete-manual",
+          fields,
+        })
+      ).ok,
+    ).toBe(true);
+    setContext({ userId: "user-b" });
+    expect((await invoke("knowledge.base.delete", { knowledgeBaseId: kbId })).ok).toBe(false);
+    setContext({ userId: "user-a" });
+    expect((await invoke("knowledge.base.delete", { knowledgeBaseId: kbId })).ok).toBe(true);
+    const { openKnowledgeIndex, resolveKnowledgeIndexDbPath } =
+      await import("../knowledge/kb-index.js");
+    const index = await openKnowledgeIndex({
+      dbPath: resolveKnowledgeIndexDbPath({ ownerId: "user-a", tenantId: null, indexRoot }),
+      vectorEnabled: false,
+    });
+    try {
+      expect(
+        index.db.prepare("SELECT count(*) AS n FROM retrieval_summaries WHERE kb_id=?").get(kbId)
+          ?.n,
+      ).toBe(0);
+    } finally {
+      index.close();
+    }
+  });
+
   it("maintains summaries through ACL and recalls a document without bundle projection", async () => {
     const created = await invoke("knowledge.base.create", { title: "Summary KB" });
     const kbId = extractKnowledgeBaseId(created.payload);
@@ -162,6 +208,13 @@ describe("knowledge.base.search RPC integration", () => {
       indexRoot: path.join(tmpDir, "knowledge", "index"),
       embeddingProvider: null,
     });
+    const retry = await invoke("knowledge.document.summary", {
+      knowledgeBaseId: kbId,
+      documentId: "summary-only",
+      retry: true,
+    });
+    expect(retry.ok).toBe(false);
+    expect(retry.error?.message).toContain("automatic summary generation is not available");
     const fields = {
       purpose: "needle summary",
       keyPoints: [],
@@ -292,7 +345,7 @@ describe("knowledge.base.search RPC integration", () => {
           retry: true,
         })
       ).ok,
-    ).toBe(true);
+    ).toBe(false);
     setContext({ userId: "user-b" });
     expect(
       (

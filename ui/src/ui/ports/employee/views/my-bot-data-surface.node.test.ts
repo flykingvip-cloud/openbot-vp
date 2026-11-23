@@ -65,6 +65,7 @@ describe("robot data surface", () => {
     );
     const state = peekRobotDataSurface("law")?.open;
     expect(state?.text).toContain("initial");
+    expect(Object.keys(state ?? {})).not.toContain("retrySummary");
     await state?.editSummary?.(
       JSON.stringify({
         purpose: "edited",
