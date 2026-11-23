@@ -23,6 +23,7 @@ import {
   type VisibilityKnowledgeBase,
 } from "../../retrieval/visibility-resolver.js";
 import type { GatewayClient } from "../server-methods/types.js";
+import { knowledgeDocumentIdFromSkillRef } from "./document-display-title.js";
 import {
   knowledgeBaseHasIndexedChunks,
   openKnowledgeIndex,
@@ -34,6 +35,7 @@ import {
   listKnowledgeBases,
   type KnowledgeBase,
 } from "./knowledge-base-store.js";
+import { recallDocumentRetrievalSummaries } from "./retrieval-summary-document.js";
 import { loadKnowledgeSourceBundle } from "./source-bundle.js";
 import type { KnowledgeSourceContext } from "./sources/types.js";
 import type { KnowledgeObject } from "./types.js";
@@ -231,9 +233,6 @@ export async function searchScopedKnowledgeBaseWithFallback(params: {
   if (!knowledgeBase) {
     return { knowledgeBase: null, evidence: [], searchMode: "substring", substringMatches: [] };
   }
-  if (evidence.length > 0) {
-    return { knowledgeBase, evidence, searchMode: "indexed", substringMatches: [] };
-  }
   if (!trimmed) {
     return { knowledgeBase, evidence: [], searchMode: "substring", substringMatches: [] };
   }
@@ -244,10 +243,65 @@ export async function searchScopedKnowledgeBaseWithFallback(params: {
     objectIds.add(personalObjectIdForDocument(documentId));
   }
   const limit = Math.min(Math.max(params.maxResults ?? 8, 1), 50);
-  const substringMatches = bundle.objects
-    .filter((item) => objectIds.has(item.id) && matchesKnowledgeObjectQuery(item, trimmed))
+  // This KB has already passed resolveAccessibleKnowledgeBases above. Derivative
+  // summaries never widen the authorized candidate set or become body evidence.
+  const summaryHits = await recallDocumentRetrievalSummaries({
+    knowledgeBase,
+    query: trimmed,
+    indexRoot: params.indexRoot,
+    limit,
+  });
+  const candidates = new Map<
+    string,
+    KnowledgeObject & { retrievalScore: number; sourceUri?: string }
+  >();
+  for (const item of bundle.objects) {
+    const skillRef = item.id.startsWith("obj:personal:")
+      ? item.id.slice("obj:personal:".length)
+      : null;
+    const attachedByCanonicalId = skillRef
+      ? objectIds.has(knowledgeDocumentIdFromSkillRef(knowledgeBase.id, skillRef))
+      : false;
+    if (
+      (objectIds.has(item.id) || attachedByCanonicalId) &&
+      matchesKnowledgeObjectQuery(item, trimmed)
+    ) {
+      candidates.set(item.id, { ...item, retrievalScore: 0.5 });
+    }
+  }
+  for (const hit of summaryHits) {
+    const existing =
+      candidates.get(hit.docId) ?? candidates.get(personalObjectIdForDocument(hit.docId));
+    const id = existing?.id ?? hit.docId;
+    candidates.set(id, {
+      ...(existing ?? {
+        id,
+        title: hit.title,
+        source: knowledgeBase.visibility === "private" ? "personal" : "enterprise",
+        kind: "document",
+        summary: "检索摘要匹配；请读取原文核验。",
+        tags: [],
+        updatedAt: 0,
+      }),
+      retrievalScore: hit.score,
+      retrievalNavigation: {
+        docId: hit.docId,
+        kbId: knowledgeBase.id,
+        sourceUri: hit.sourceUri,
+        score: hit.score,
+      },
+      sourceUri: hit.sourceUri,
+    });
+  }
+  const substringMatches = [...candidates.values()]
+    .toSorted((a, b) => b.retrievalScore - a.retrievalScore || a.id.localeCompare(b.id))
     .slice(0, limit);
-  return { knowledgeBase, evidence: [], searchMode: "substring", substringMatches };
+  return {
+    knowledgeBase,
+    evidence,
+    searchMode: evidence.length ? "indexed" : "substring",
+    substringMatches,
+  };
 }
 
 export async function ensureGatewayKnowledgeRetrievalBootstrapped(): Promise<void> {
@@ -289,4 +343,45 @@ export async function startGatewayKnowledgeRetrieval(params: {
   ensureKnowledgeRetrievalSourceRegistered({ embeddingProvider });
   ensureDeliverableRetrievalSourceRegistered({ embeddingProvider });
   params.log.info?.("knowledge retrieval source registered on gateway startup");
+}
+
+/** Authorized document navigation candidates across every visible KB. */
+export async function searchAuthorizedSummaryCandidates(params: {
+  query: string;
+  retrievalContext: RetrievalContext;
+  limit?: number;
+}): Promise<KnowledgeObject[]> {
+  const limit = Math.min(Math.max(params.limit ?? 8, 1), 50);
+  const bases = listKnowledgeBases().filter((base) =>
+    isKnowledgeBaseVisible(params.retrievalContext, toVisibilityKnowledgeBase(base)),
+  );
+  const candidates: Array<KnowledgeObject & { score: number }> = [];
+  for (const base of bases) {
+    const hits = await recallDocumentRetrievalSummaries({
+      knowledgeBase: base,
+      query: params.query,
+      limit,
+    });
+    for (const hit of hits) {
+      candidates.push({
+        id: hit.docId,
+        title: hit.title,
+        summary: "摘要导览命中；请读取原文核验。",
+        tags: [],
+        updatedAt: 0,
+        kind: "document",
+        source: base.visibility === "private" ? "personal" : "enterprise",
+        score: hit.score,
+        retrievalNavigation: {
+          docId: hit.docId,
+          kbId: base.id,
+          sourceUri: hit.sourceUri,
+          score: hit.score,
+        },
+      });
+    }
+  }
+  return candidates
+    .toSorted((a, b) => b.score - a.score || a.id.localeCompare(b.id))
+    .slice(0, limit);
 }

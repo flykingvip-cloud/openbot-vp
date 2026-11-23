@@ -92,7 +92,11 @@ function parseDecision(value: unknown): InteractionModelDecision {
     }
     if (
       row.kind === "task_control" &&
-      (row.action === "pause" || row.action === "cancel" || row.action === "resume") &&
+      (row.action === "pause" ||
+        row.action === "cancel" ||
+        row.action === "resume" ||
+        row.action === "continue" ||
+        row.action === "status") &&
       Object.keys(row).every((key) => ["kind", "target", "action", "answer"].includes(key))
     ) {
       return { kind: "task_control", target: checkedTarget, action: row.action, ...answer };

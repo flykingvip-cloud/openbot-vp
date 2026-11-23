@@ -226,6 +226,8 @@ export async function initSessionState(params: {
     agentId,
     gatewayClientUser: ctx.GatewayClientUser,
     gatewayClientSessionDomain: ctx.GatewayClientSessionDomain,
+    gatewayClientSessionEnterpriseId: ctx.GatewayClientSessionEnterpriseId,
+    gatewayClientSessionMembershipId: ctx.GatewayClientSessionMembershipId,
   });
 
   // CRITICAL: Skip cache to ensure fresh data when resolving session identity.

@@ -15,6 +15,7 @@ import {
   registerDiscussToTaskSourceBinding,
   type SourceBindingRegisterResult,
 } from "./discuss-to-task-source-binding.js";
+import { explainFormalTaskRejection } from "./group-interaction-host.js";
 import type { CollaborationTenantResolution } from "./trusted-tenant.js";
 
 export type DiscussToTaskChatTurnFormalEstablish = {
@@ -330,7 +331,11 @@ export async function runControlledDiscussToTaskChatTurn(params: {
       return { d2tResult: null, bindingRegister };
     }
     const receipt = buildDiscussToTaskChatReceipt(d2tResult);
-    const baseVisible = formatDiscussToTaskUserVisibleStatus(d2tResult);
+    const receiptText = formatDiscussToTaskUserVisibleStatus(d2tResult);
+    const baseVisible =
+      d2tResult.statusCode === "formal_task_blocked_flag_off"
+        ? explainFormalTaskRejection(d2tResult.statusCode, receiptText)
+        : receiptText;
     const persisted = await persistUserVisibleReceipt({
       message: baseVisible,
       sourceMessageId,

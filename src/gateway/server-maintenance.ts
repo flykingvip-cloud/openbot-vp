@@ -1,5 +1,9 @@
 import { startDeliveryContextSweep } from "../agents/execution-preflight/completion-hold.js";
 import type { HealthSummary } from "../commands/health.js";
+import {
+  startPrivateDependencyEvents,
+  tickPrivateDependencies,
+} from "../conversation-task/private-dependency-runtime.js";
 import { cleanOldMedia } from "../media/store.js";
 import { drainUsageOutbox } from "./billing/usage-outbox-drain.js";
 import { abortChatRunById, type ChatAbortControllerEntry } from "./chat-abort.js";
@@ -7,6 +11,11 @@ import { tickScheduledConnectorSync } from "./enterprise-data/scheduled-connecto
 import { tickScheduledProjectionMaterialization } from "./enterprise-data/scheduled-projection-materializer.js";
 import { tickAgentKnowledgeGeneration } from "./knowledge/agent-knowledge-generation-runtime.js";
 import { tickKnowledgeGovernanceJobs } from "./knowledge/governance/runtime/gateway-tick.js";
+import { createRetrievalSummaryGenerationAuthority } from "./knowledge/retrieval-summary-authority.js";
+import {
+  setRetrievalSummaryGenerationAuthority,
+  tickConfiguredRetrievalSummaries,
+} from "./knowledge/retrieval-summary-runtime.js";
 import { tickDueWebSourceRefreshes } from "./knowledge/web-source-refresh-runtime.js";
 import { runMeetingReminderTick } from "./meeting-reminder-runtime.js";
 import type { ChatRunEntry } from "./server-chat.js";
@@ -72,6 +81,32 @@ export function startGatewayMaintenanceTimers(params: {
     params.broadcast(event, payload, opts);
   });
   startDeliveryContextSweep();
+  startPrivateDependencyEvents();
+  const dependencyPorts = {
+    wakeRunning: (
+      row: import("../conversation-task/private-dependency-store.js").PrivateDependency,
+    ) => {
+      const run = params.chatAbortControllers.get(row.wakeRunId);
+      return Boolean(
+        run &&
+        run.sessionKey === row.parent.sessionKey &&
+        !run.controller.signal.aborted &&
+        run.expiresAtMs > Date.now(),
+      );
+    },
+    parentBusy: (
+      row: import("../conversation-task/private-dependency-store.js").PrivateDependency,
+    ) =>
+      Array.from(params.chatAbortControllers.values()).some(
+        (run) =>
+          run.sessionKey === row.parent.sessionKey &&
+          !run.controller.signal.aborted &&
+          run.expiresAtMs > Date.now(),
+      ),
+  };
+  void tickPrivateDependencies({ ports: dependencyPorts }).catch((error) =>
+    params.logHealth.error(`dependency recovery failed: ${formatError(error)}`),
+  );
 
   // periodic keepalive
   const tickInterval = setInterval(() => {
@@ -93,6 +128,7 @@ export function startGatewayMaintenanceTimers(params: {
     .catch((err) => params.logHealth.error(`initial refresh failed: ${formatError(err)}`));
 
   // dedupe cache cleanup
+  setRetrievalSummaryGenerationAuthority(createRetrievalSummaryGenerationAuthority());
   let governanceJobsInFlight = false;
   let webRefreshInFlight = false;
   let agentKnowledgeGenInFlight = false;
@@ -103,6 +139,9 @@ export function startGatewayMaintenanceTimers(params: {
   const dedupeCleanup = setInterval(() => {
     const AGENT_RUN_SEQ_MAX = 10_000;
     const now = Date.now();
+    void tickPrivateDependencies({ ports: dependencyPorts }).catch((error) =>
+      params.logHealth.error(`dependency recovery failed: ${formatError(error)}`),
+    );
     for (const [k, v] of params.dedupe) {
       if (now - v.ts > DEDUPE_TTL_MS) {
         params.dedupe.delete(k);
@@ -223,6 +262,7 @@ export function startGatewayMaintenanceTimers(params: {
     if (!agentKnowledgeGenInFlight) {
       agentKnowledgeGenInFlight = true;
       void tickAgentKnowledgeGeneration()
+        .then(() => tickConfiguredRetrievalSummaries())
         .catch((err) => {
           params.logHealth.error(`agent knowledge generation failed: ${formatError(err)}`);
         })

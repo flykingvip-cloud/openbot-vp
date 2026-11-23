@@ -460,6 +460,7 @@ export function listKnowledgeChunkMetaForVersion(params: {
   db: DatabaseSync;
   docId: string;
   versionId: string;
+  includeArchived?: boolean;
 }): Array<{
   chunkId: string;
   heading: string | null;
@@ -471,10 +472,10 @@ export function listKnowledgeChunkMetaForVersion(params: {
     .prepare(
       `SELECT chunk_id, heading, section, start_line, end_line
        FROM ${KB_CHUNK_META_TABLE}
-       WHERE doc_id = ? AND version_id = ?
+       WHERE doc_id = ? AND version_id = ? AND (? = 1 OR chunk_id NOT LIKE 'history:%')
        ORDER BY start_line ASC`,
     )
-    .all(params.docId, params.versionId) as Array<{
+    .all(params.docId, params.versionId, params.includeArchived === true ? 1 : 0) as Array<{
     chunk_id: string;
     heading: string | null;
     section: string | null;
@@ -495,6 +496,7 @@ export function listKnowledgeChunksForVersion(params: {
   db: DatabaseSync;
   docId: string;
   versionId: string;
+  includeArchived?: boolean;
 }): Array<{
   chunkId: string;
   text: string;
@@ -509,10 +511,10 @@ export function listKnowledgeChunksForVersion(params: {
       `SELECT m.chunk_id, c.text, c.model, m.heading, m.section, m.start_line, m.end_line
        FROM ${KB_CHUNK_META_TABLE} m
        JOIN ${KB_CHUNKS_TABLE} c ON c.id = m.chunk_id
-       WHERE m.doc_id = ? AND m.version_id = ?
+       WHERE m.doc_id = ? AND m.version_id = ? AND (? = 1 OR m.chunk_id NOT LIKE 'history:%')
        ORDER BY m.start_line ASC`,
     )
-    .all(params.docId, params.versionId) as Array<{
+    .all(params.docId, params.versionId, params.includeArchived === true ? 1 : 0) as Array<{
     chunk_id: string;
     text: string;
     model: string;

@@ -1,7 +1,13 @@
+import * as dns from "node:dns/promises";
 import { ReadableStream } from "node:stream/web";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { VoyageBatchOutputLine, VoyageBatchRequest } from "./batch-voyage.js";
 import type { VoyageEmbeddingClient } from "./embeddings-voyage.js";
+
+vi.mock("node:dns/promises", async (original) => ({
+  ...(await original<typeof import("node:dns/promises")>()),
+  lookup: vi.fn(),
+}));
 
 // Mock internal.js if needed, but runWithConcurrency is simple enough to keep real.
 // We DO need to mock retryAsync to avoid actual delays/retries logic complicating tests
@@ -11,6 +17,11 @@ vi.mock("../infra/retry.js", () => ({
 
 describe("runVoyageEmbeddingBatches", () => {
   let runVoyageEmbeddingBatches: typeof import("./batch-voyage.js").runVoyageEmbeddingBatches;
+
+  beforeEach(() => {
+    // Fetch is synthetic; pin public DNS too so local proxy DNS cannot affect the test.
+    vi.mocked(dns.lookup).mockResolvedValue([{ address: "93.184.216.34", family: 4 }] as never);
+  });
 
   beforeAll(async () => {
     ({ runVoyageEmbeddingBatches } = await import("./batch-voyage.js"));

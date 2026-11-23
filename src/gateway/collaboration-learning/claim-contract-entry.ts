@@ -109,6 +109,7 @@ import {
   normalizeOwnerDecisionDelivery,
   proposalCreatedDelivery,
   readOwnerDecisionDeliveries,
+  reconcileOwnerDecisionDelivery,
   recordOwnerDecisionDelivery,
   staleOwnerDecisionDelivery,
   type OwnerDecisionCardDelivery,
@@ -2051,36 +2052,40 @@ export async function listCollaborationOwnerDecisionDeliveries(params: {
     groupId: params.groupId,
     taskId: params.taskId,
     cfg,
+    groupLocator: params.trusted?.groupLocator,
+    groupRootDir: params.trusted?.groupsRoot,
   });
   const latest = new Map<string, OwnerDecisionCardDelivery>();
   for (const row of rows) {
     latest.set(`${row.todolistId}:v${row.version}`, row);
   }
   const visible: OwnerDecisionCardDelivery[] = [];
-  const readable = new Map<string, boolean>();
+  const readable = new Map<string, ExecutorPrivateTodolist | null>();
   for (const row of latest.values()) {
     const key = `${row.taskId}:${row.todolistId}`;
-    let canRead = readable.get(key);
-    if (canRead == null) {
+    let plan = readable.get(key);
+    if (plan === undefined) {
       try {
-        await getCollaborationTodolist({
+        plan = await getCollaborationTodolist({
           groupId: params.groupId,
           taskId: row.taskId,
           todolistId: row.todolistId,
           actor: params.actor,
           tenant: params.tenant,
           cfg,
+          auth: params.auth,
+          trusted: params.trusted,
+          stores: params.stores,
         });
-        canRead = true;
       } catch {
-        canRead = false;
+        plan = null;
       }
-      readable.set(key, canRead);
+      readable.set(key, plan);
     }
     // D6b: historyReloadable describes redraw eligibility for an already-authorized
     // viewer; it must not bypass current access re-check after revocation.
-    if (canRead) {
-      visible.push(row);
+    if (plan) {
+      visible.push(reconcileOwnerDecisionDelivery(row, plan));
     }
   }
   return visible;

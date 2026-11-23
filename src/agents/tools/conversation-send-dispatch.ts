@@ -114,3 +114,12 @@ export function validateConversationDispatch(
     ...(secondUserConfirmWarning ? { secondUserConfirmWarning } : {}),
   };
 }
+
+/** Explicit dispatch references are bound to the host current task, never model history. */
+export function isCurrentConversationDispatch(
+  currentTaskId?: string,
+  requestedTaskId?: string,
+): boolean {
+  const requested = requestedTaskId?.trim();
+  return !requested || requested === currentTaskId?.trim();
+}

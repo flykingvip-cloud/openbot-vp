@@ -32,7 +32,7 @@ export type InteractionModelDecision =
   | {
       kind: "task_control";
       target: InteractionTaskTarget;
-      action: "pause" | "cancel" | "resume";
+      action: "pause" | "cancel" | "resume" | "continue" | "status";
       answer?: string;
     }
   | { kind: "execution_request"; request: InteractionExecutionRequest };

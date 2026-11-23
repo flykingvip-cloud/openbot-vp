@@ -70,6 +70,19 @@ import {
   recordFocusSwitchDecision,
   transcriptEntriesForInboundTurn,
 } from "../../conversation-task/focus-switch.js";
+import {
+  dependencyCapabilityMatches,
+  authorizePrivateDependency,
+} from "../../conversation-task/private-dependency-runtime.js";
+import {
+  isDependencyParentCurrent,
+  dependencyActivityFacts,
+  isDependencyWakeCurrent,
+} from "../../conversation-task/private-dependency-state.js";
+import {
+  readPrivateDependency,
+  listPrivateDependencies,
+} from "../../conversation-task/private-dependency-store.js";
 import { observeConversationTaskCancelPathConsult } from "../../conversation-task/reply-completion.js";
 import { resolveConversationFlags } from "../../conversations/flags.js";
 import { pageHistoryMessages } from "../../conversations/history-cursor.js";
@@ -192,6 +205,7 @@ import {
 } from "../chat-session-interest.js";
 import * as chatCheckpointStore from "../checkpoint-store.js";
 import { resolveComposerQuoteSendLayers } from "../collaboration-dispatch/chat-send-composer-quote.js";
+import { listBoardClaimItems } from "../collaboration-dispatch/claim-contract.js";
 import {
   collabEdgeContributionRole,
   hasCollabEdgeDirective,
@@ -324,6 +338,10 @@ import {
   runControlledDiscussToTaskChatTurn,
 } from "../collaboration-learning/discuss-to-task-chat-turn.js";
 import type { ExecutionDeliverableBinding } from "../collaboration-learning/execution-deliverable-binding.js";
+import {
+  readGroupInteractionTarget,
+  groupTaskControlReply,
+} from "../collaboration-learning/group-interaction-host.js";
 import { understandGroupInteraction } from "../collaboration-learning/group-interaction-understanding.js";
 import {
   bindGroupPublicTranscript,
@@ -487,6 +505,7 @@ import {
   appendPersistedAgentMessageToTranscript,
 } from "./chat-transcript-inject.js";
 import { findCollaborationSpaceStoreEntry } from "./collaboration-space-session-entry.js";
+import { projectTaskActivity } from "./task-activity-view.js";
 import type {
   GatewayRequestContext,
   GatewayRequestHandlerOptions,
@@ -4486,6 +4505,101 @@ async function readFreshGroupExecutionProposalSnapshot(params: {
 }
 
 export const chatHandlers: GatewayRequestHandlers = {
+  "task.activity.get": async ({ params, respond, context, client }) => {
+    const rawSessionKey =
+      params && typeof params === "object"
+        ? (params as { sessionKey?: unknown }).sessionKey
+        : undefined;
+    if (typeof rawSessionKey !== "string" || !rawSessionKey.trim() || rawSessionKey.length > 2048) {
+      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "sessionKey is required"));
+      return;
+    }
+    // Keep this read on the same identity and scope gates as chat.history.
+    await webchatIdentity.hydrateWebchatGatewayClientPlatformIdentity({ client });
+    await webchatIdentity.ensureGatewayClientUserFromPlatformIdentity({ client });
+    const restored = await restorePersonalWorkbenchActor({ client, sessionKey: rawSessionKey });
+    const sessionKey = await resolveEmployeeScopedChatSessionKey(client, rawSessionKey);
+    if (employeeChatTranscriptBlocked(client, sessionKey)) {
+      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "session access denied"));
+      return;
+    }
+    const foreignDenial = await foreignEmployeeStewardAccessDenial(client, sessionKey);
+    if (
+      foreignDenial ||
+      isRedundantRobotAliasSessionKey(rawSessionKey) ||
+      isRedundantRobotAliasSessionKey(sessionKey)
+    ) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, foreignDenial ?? "retired session"),
+      );
+      return;
+    }
+    const accessDenial = await resolvePersonalWorkbenchSessionAccessDenial({
+      client,
+      sessionKey,
+      logGateway: context.logGateway,
+    });
+    if (accessDenial) {
+      const message =
+        !restored.ok &&
+        restored.reason === "unrestorable" &&
+        accessDenial.includes("resolved employee actor")
+          ? restored.message
+          : accessDenial;
+      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, message));
+      return;
+    }
+    // Tenant binding is server-derived. No caller-supplied owner/tenant override.
+    await resolveAndBindChatTurnTenant(client, sessionKey);
+    const loaded = isSpaceAliasSessionKey(sessionKey)
+      ? await loadGroupSessionEntry(sessionKey, client)
+      : await loadSessionEntryForClient(sessionKey, client);
+    const nowMs = Date.now();
+    const entry = loaded.entry;
+    const transcriptPath = entry?.sessionId
+      ? resolveTranscriptPath({
+          sessionId: entry.sessionId,
+          storePath: loaded.storePath,
+          sessionFile: entry.sessionFile,
+          agentId: resolveSessionAgentId({ sessionKey, config: loaded.cfg }),
+        })
+      : null;
+    if (!transcriptPath) {
+      respond(true, { sessionKey: rawSessionKey.trim(), observedAtMs: nowMs, task: null });
+      return;
+    }
+    const board = sessionTaskState.read(transcriptPath);
+    const attempt = board.current?.executionAttempt;
+    const run = attempt ? context.chatAbortControllers.get(attempt) : undefined;
+    const liveAttempt =
+      run &&
+      run.sessionKey === sessionKey &&
+      run.sessionId === entry?.sessionId &&
+      !run.controller.signal.aborted &&
+      run.expiresAtMs > nowMs
+        ? attempt
+        : null;
+    respond(
+      true,
+      projectTaskActivity({
+        // Echo the requested surface for client correlation; all reads above use the scoped key.
+        sessionKey: rawSessionKey.trim(),
+        board,
+        nowMs,
+        activeExecutionAttempt: liveAttempt,
+        dependency: board.current
+          ? dependencyActivityFacts(
+              listPrivateDependencies(),
+              sessionKey,
+              board.current.taskId,
+              board.current.executionAttempt,
+            )
+          : null,
+      }),
+    );
+  },
   "chat.history": async ({ params, respond, context, client }) => {
     if (!validateChatHistoryParams(params)) {
       respond(
@@ -4992,6 +5106,8 @@ export const chatHandlers: GatewayRequestHandlers = {
     }
     const p = params as {
       sessionKey: string;
+      dependencyResumeId?: string;
+      dependencyResumeCapability?: string;
       message: string;
       thinking?: string;
       deliver?: boolean;
@@ -5032,6 +5148,37 @@ export const chatHandlers: GatewayRequestHandlers = {
       planConfirmDecisionId?: string;
       planConfirmExpectedVersion?: number;
     };
+    const dependencyResume = p.dependencyResumeId
+      ? readPrivateDependency(p.dependencyResumeId)
+      : null;
+    if (p.dependencyResumeId || p.dependencyResumeCapability) {
+      if (
+        !dependencyResume ||
+        !dependencyCapabilityMatches(dependencyResume, p.dependencyResumeCapability) ||
+        dependencyResume.wakeState !== "sending" ||
+        p.idempotencyKey !== dependencyResume.wakeRunId ||
+        p.sessionKey !== dependencyResume.parent.sessionKey ||
+        !(await authorizePrivateDependency(dependencyResume))
+      ) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, "dependency_resume_not_authorized"),
+        );
+        return;
+      }
+      // A 256-bit capability from the host's private durable record is mandatory.
+      // Bind the original owner, then pass through all normal chat scope gates.
+      client = {
+        ...client,
+        connect: client?.connect ?? ({} as never),
+        user: undefined,
+        platformUserId: dependencyResume.ownerId,
+        sessionDomain: "employee",
+        sessionEnterpriseId: dependencyResume.tenantId,
+        sessionTenantId: dependencyResume.tenantId,
+      } as GatewayClient;
+    }
     if ((p.systemInputProvenance || p.systemProvenanceReceipt) && !isAcpBridgeClient(client)) {
       respond(
         false,
@@ -6014,12 +6161,56 @@ export const chatHandlers: GatewayRequestHandlers = {
             }
           };
 
+          if (!systemInputProvenance && groupRuleMode?.mode === "dynamic") {
+            await resolveDynamicGroupRules();
+            parentAbortController.signal.throwIfAborted();
+            const resolved = buildGroupRuntimeAuthority({
+              scope,
+              episodeId,
+              cfg: policySnapshotCfg,
+              tenantTrust: collabTenant.trust,
+              ...(flagSnapshot ? { snapshot: flagSnapshot } : {}),
+            });
+            authority = resolved.authority;
+            facts = resolved.facts;
+            policySnapshot = resolved.snapshot;
+            collaborationEventKey = policySnapshotEnabled ? eventKeyOf(authority, beatId) : null;
+            decision = decideParticipants(authority, facts, {
+              message: mentionMessage,
+              roundId: clientRunId,
+              explicitMentions: resolveExplicitMentionTokens(p.mentions),
+              explicitMentionRefs: resolveExplicitMentionRefs(p.mentions),
+              recentGroupMessages,
+              operatingState: scope.operatingState ?? null,
+            });
+            if (policySnapshotEnabled) {
+              await persistPolicySnapshotBody({
+                snapshot: policySnapshot,
+                groupId: scope.groupId,
+                tenantId: scope.tenantId ?? null,
+                cfg: policySnapshotCfg,
+              });
+            }
+          }
+
           // One human interpretation before formal writes; member execution never
           // reclassifies the original request or binds it to a personal board.
           if (!systemInputProvenance) {
+            const currentGroupTaskId = facts.activeContext.currentTaskId;
+            const groupTaskRead = await readGroupInteractionTarget({
+              groupId: scope.groupId,
+              taskId: currentGroupTaskId,
+              read: (taskId) => listBoardClaimItems(authority, { taskId }),
+              warn: (message) => context.logGateway.warn(message),
+            });
+            const groupTaskTarget = groupTaskRead.target;
             const interpreter =
               scope.bots.find((bot) => bot.agentId === decision.primaryQueue[0]) ??
-              scope.bots.find((bot) => bot.agentId === scope.coordinatorBotId);
+              scope.bots.find(
+                (bot) =>
+                  bot.agentId === scope.coordinatorBotId &&
+                  decision.primaryQueue.includes(bot.agentId),
+              );
             if (!interpreter) {
               throw new Error("当前没有可用的协作交互机器人，本轮未启动执行。");
             }
@@ -6055,6 +6246,8 @@ export const chatHandlers: GatewayRequestHandlers = {
               },
               message: transcriptMessage,
               history: recentGroupMessages,
+              taskTarget: groupTaskTarget,
+              taskTargetUnavailable: !groupTaskRead.available,
               groupContext: {
                 title: scope.title,
                 members: scope.members,
@@ -6112,39 +6305,66 @@ export const chatHandlers: GatewayRequestHandlers = {
               return;
             }
             if (understanding.decision.kind !== "execution_request") {
-              throw new Error("尚未取得有效的组任务关联，本轮没有修改任务。");
-            }
-          }
-
-          if (!systemInputProvenance && groupRuleMode?.mode === "dynamic") {
-            await resolveDynamicGroupRules();
-            parentAbortController.signal.throwIfAborted();
-            const resolved = buildGroupRuntimeAuthority({
-              scope,
-              episodeId,
-              cfg: policySnapshotCfg,
-              tenantTrust: collabTenant.trust,
-              ...(flagSnapshot ? { snapshot: flagSnapshot } : {}),
-            });
-            authority = resolved.authority;
-            facts = resolved.facts;
-            policySnapshot = resolved.snapshot;
-            collaborationEventKey = policySnapshotEnabled ? eventKeyOf(authority, beatId) : null;
-            decision = decideParticipants(authority, facts, {
-              message: mentionMessage,
-              roundId: clientRunId,
-              explicitMentions: resolveExplicitMentionTokens(p.mentions),
-              explicitMentionRefs: resolveExplicitMentionRefs(p.mentions),
-              recentGroupMessages,
-              operatingState: scope.operatingState ?? null,
-            });
-            if (policySnapshotEnabled) {
-              await persistPolicySnapshotBody({
-                snapshot: policySnapshot,
-                groupId: scope.groupId,
-                tenantId: scope.tenantId ?? null,
-                cfg: policySnapshotCfg,
+              let text =
+                "当前组任务关联暂无法核实，尚未修改任务。普通咨询仍可继续；请稍后刷新本组任务看板后再操作。";
+              if (groupTaskRead.available) {
+                try {
+                  const freshScope = await resolveGroupDiscussionScope(rawSessionKey, client, {
+                    logGateway: context.logGateway,
+                  });
+                  const freshId = freshScope.operatingState?.activeContext?.currentTaskId;
+                  const freshRead = await readGroupInteractionTarget({
+                    groupId: scope.groupId,
+                    taskId: freshId,
+                    read: (taskId) => listBoardClaimItems(authority, { taskId }),
+                    warn: (message) => context.logGateway.warn(message),
+                  });
+                  if (freshRead.available) {
+                    text = groupTaskControlReply(
+                      understanding.decision,
+                      groupTaskTarget,
+                      freshRead.target,
+                      freshRead.items,
+                    );
+                  }
+                } catch {
+                  context.logGateway.warn(
+                    "group interaction control scope unavailable; no task mutation attempted",
+                  );
+                }
+              }
+              const persisted = await appendAssistantTranscriptMessage({
+                message: text,
+                sessionId: groupSession.entry.sessionId,
+                storePath: groupSession.storePath,
+                sessionFile: groupSession.entry.sessionFile,
+                createIfMissing: true,
+                idempotencyKey: `${clientRunId}:group-control`,
+                senderLabel: interpreter.name,
               });
+              if (!persisted.ok) {
+                throw new Error("任务说明暂未保存，本轮没有修改任务。");
+              }
+              setGatewayDedupeEntry({
+                dedupe: context.dedupe,
+                key: `chat:${clientRunId}`,
+                entry: {
+                  ts: Date.now(),
+                  ok: true,
+                  payload: { runId: clientRunId, status: "ok" as const },
+                },
+              });
+              broadcastChatFinal({
+                context,
+                runId: clientRunId,
+                sessionKey: rawSessionKey,
+                message: {
+                  ...persisted.message,
+                  senderLabel: interpreter.name,
+                  collaborationRoundId: clientRunId,
+                },
+              });
+              return;
             }
           }
 
@@ -6273,7 +6493,6 @@ export const chatHandlers: GatewayRequestHandlers = {
                   : { d2tResult: null };
               const d2tApplied = applyDiscussToTaskChatTurnToChatHandler(d2tTurn);
               formalTaskBoardPublished = d2tTurn.d2tResult?.stages.boardPublished === true;
-              formalTaskReceiptMessage = d2tApplied.transcriptPersist?.message;
               if (d2tApplied.formalTaskEstablish) {
                 formalTaskEstablish = d2tApplied.formalTaskEstablish;
               }
@@ -6291,6 +6510,7 @@ export const chatHandlers: GatewayRequestHandlers = {
                 nodeSendToSession: context.nodeSendToSession,
                 tenantId: collabTenant?.tenantId ?? client?.sessionEnterpriseId ?? null,
               });
+              formalTaskReceiptMessage = d2tEgress.payload?.message;
               if (d2tApplied.transcriptPersist && !d2tApplied.transcriptPersist.ok) {
                 context.logGateway.warn(
                   `discuss-to-task receipt transcript persist failed: ${d2tApplied.transcriptPersist.error ?? "unknown"}`,
@@ -6352,22 +6572,13 @@ export const chatHandlers: GatewayRequestHandlers = {
                   payload: { runId: clientRunId, status: "ok" as const },
                 },
               });
+              // The terminal event closes the parent turn but reuses the exact status
+              // receipt identity; it is not a second assistant reply.
               broadcastChatFinal({
                 context,
                 runId: clientRunId,
                 sessionKey: rawSessionKey,
-                message: formalTaskReceiptMessage ?? {
-                  role: "assistant",
-                  content: [
-                    {
-                      type: "text",
-                      text:
-                        formalTaskEstablish?.userMessage ||
-                        "正式任务尚未获准启动，本轮没有派发成员执行。",
-                    },
-                  ],
-                  timestamp: Date.now(),
-                },
+                message: formalTaskReceiptMessage,
               });
               return;
             }
@@ -6816,13 +7027,93 @@ export const chatHandlers: GatewayRequestHandlers = {
         client,
       });
       const callerWorkspaceCwd = callerWorkspace.cwd;
+      let dependencyBinding:
+        | import("../../agent-runtime/contracts/task-binding.js").TaskCompletionBinding
+        | undefined;
+      if (dependencyResume) {
+        const file = entry?.sessionFile;
+        const board = file ? sessionTaskState.read(file) : null;
+        const sameWakeAttempt = board && isDependencyWakeCurrent(dependencyResume, board);
+        if (
+          !file ||
+          file !== dependencyResume.parent.sessionFile ||
+          !board ||
+          (!sameWakeAttempt && !isDependencyParentCurrent(dependencyResume, board))
+        ) {
+          respond(
+            false,
+            undefined,
+            errorShape(ErrorCodes.INVALID_REQUEST, "dependency_parent_changed"),
+          );
+          return;
+        }
+        const identity = authoritativeStopIdentityFromClient(client);
+        if (
+          sessionStopBarrierActive({
+            sessionKeys: [resolvedSessionKey, sessionKey],
+            chatAbortControllers: context.chatAbortControllers,
+            taskId: dependencyResume.parent.taskId,
+            ...identity,
+          })
+        ) {
+          respond(
+            false,
+            undefined,
+            errorShape(ErrorCodes.INVALID_REQUEST, "dependency_resume_stopped"),
+          );
+          return;
+        }
+        if (!sameWakeAttempt) {
+          const resumed = resumeInterpretedCurrentTask({
+            ...identity,
+            sessionKey: resolvedSessionKey,
+            sessionFile: file,
+            request: {
+              action: "continue",
+              taskId: dependencyResume.parent.taskId,
+              expectedFocusRevision: board.focusRevision,
+              expectedWriteEpoch: board.writeEpoch ?? 0,
+            },
+            recheckInputs: {
+              sendPolicy,
+              accessAuthorized: true,
+              clientIdentityOk: clientIdentityOkForResume(client),
+              stopActive: sessionStopBarrierActive({
+                sessionKeys: [resolvedSessionKey, sessionKey],
+                chatAbortControllers: context.chatAbortControllers,
+                taskId: dependencyResume.parent.taskId,
+                ...identity,
+              }),
+            },
+          });
+          if (resumed.kind !== "accepted") {
+            respond(
+              false,
+              undefined,
+              errorShape(ErrorCodes.INVALID_REQUEST, "dependency_resume_blocked"),
+            );
+            return;
+          }
+          dependencyBinding = sessionTaskState.startExecution(file, resumed.binding, clientRunId);
+        } else {
+          dependencyBinding = sessionTaskState.captureBinding(file);
+        }
+        if (!dependencyBinding) {
+          respond(
+            false,
+            undefined,
+            errorShape(ErrorCodes.INVALID_REQUEST, "dependency_resume_binding_failed"),
+          );
+          return;
+        }
+      }
       let taskTracking: FocusSwitchGateDecision = {
         action: "continue",
         decisionCode: "focus_clear",
         cutContext: false,
         taskId: "",
       };
-      if (!p.growthBirthTurn) {
+      if (!p.growthBirthTurn && !dependencyResume) {
         try {
           // Establish durable conversation identity independently of task admission.
           const existingFocusFile = entry?.sessionFile?.trim() ?? "";
@@ -7328,11 +7619,14 @@ export const chatHandlers: GatewayRequestHandlers = {
               });
             }
           },
-          ...buildWebchatInteractionIngress({
-            clientRunId,
-            systemInputProvenance,
-            growthBirthTurn: p.growthBirthTurn,
-          }),
+          ...(!dependencyResume
+            ? buildWebchatInteractionIngress({
+                clientRunId,
+                systemInputProvenance,
+                growthBirthTurn: p.growthBirthTurn,
+              })
+            : {}),
+          ...(dependencyBinding ? { resumedTaskBinding: dependencyBinding } : {}),
           ...(taskTracking.action === "resume"
             ? { resumedTaskBinding: sessionTaskState.captureBinding(entry?.sessionFile) }
             : {}),

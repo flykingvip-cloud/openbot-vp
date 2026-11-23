@@ -3975,6 +3975,32 @@ describe("discuss-to-task receipt identity dedupe (R7)", () => {
     expect(state.chatRunId).toBe("run-open");
   });
 
+  it.each([false, true])(
+    "merges status, terminal and legacy history for one source (history=%s)",
+    (historyFirst) => {
+      const runId = "receipt-terminal";
+      const legacy = {
+        role: "assistant",
+        id: "transcript-envelope-id",
+        content: [{ type: "text", text: flagOffCopy }],
+        idempotencyKey: `${runId}:discuss-to-task-receipt`,
+      };
+      const state = createState({
+        sessionKey,
+        chatRunId: runId,
+        chatStream: "",
+        chatMessages: historyFirst ? [legacy] : [],
+      });
+      handleChatEvent(state, statusReceipt({ runId }));
+      handleChatEvent(state, { runId, sessionKey, state: "final", message: legacy });
+      expect(state.chatMessages).toHaveLength(1);
+      expect(state.chatRunId).toBeNull();
+      expect(JSON.stringify(state.chatMessages[0])).toContain(flagOffCopy);
+      handleChatEvent(state, statusReceipt({ runId: "another-request" }));
+      expect(state.chatMessages).toHaveLength(2);
+    },
+  );
+
   it("same-receipt status change updates in place (does not silently drop)", () => {
     const state = createState({
       sessionKey,

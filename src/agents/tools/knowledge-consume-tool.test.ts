@@ -3,6 +3,8 @@ import { ToolInputError } from "./common.js";
 
 const knowledgeSearch = vi.hoisted(() => vi.fn());
 const knowledgeObject = vi.hoisted(() => vi.fn());
+const summaryCandidates = vi.hoisted(() => vi.fn(async () => []));
+const scopedSearch = vi.hoisted(() => vi.fn());
 const searchKnowledgeEvidence = vi.hoisted(() => vi.fn());
 const resolveKnowledgeToolGatewayClient = vi.hoisted(() => vi.fn());
 const readEnterpriseFeedPageForTool = vi.hoisted(() => vi.fn());
@@ -35,6 +37,8 @@ vi.mock("../../gateway/knowledge/knowledge-retrieval-runtime.js", () => ({
     tenantId: "tenant-1",
   })),
   searchKnowledgeEvidence,
+  searchAuthorizedSummaryCandidates: summaryCandidates,
+  searchScopedKnowledgeBaseWithFallback: scopedSearch,
 }));
 
 const { createKnowledgeGetTool, createKnowledgeSearchTool } =
@@ -85,6 +89,13 @@ describe("knowledge consume tools", () => {
     });
     readEnterpriseFeedPageForTool.mockResolvedValue({ kind: "absent" });
     searchKnowledgeEvidence.mockResolvedValue([evidence()]);
+    summaryCandidates.mockResolvedValue([]);
+    scopedSearch.mockImplementation(async (input) => ({
+      knowledgeBase: { id: input.knowledgeBaseId },
+      evidence: await searchKnowledgeEvidence({ ...input, kbScope: [input.knowledgeBaseId] }),
+      searchMode: "indexed",
+      substringMatches: [],
+    }));
   });
 
   it("search maps indexed evidence to followable objectId and ku://", async () => {

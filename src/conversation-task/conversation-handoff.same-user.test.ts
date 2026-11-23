@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const seatAgents = vi.hoisted(() => ({ ids: [] as string[] }));
+vi.mock("../gateway/conversation-seat-grants.js", () => ({
+  conversationSeatAgentIds: async () => seatAgents.ids,
+}));
 const owners = new Map<string, string>();
 
 vi.mock("../gateway/ownership-store.js", () => ({
@@ -31,14 +35,15 @@ const { canSendConversationHandoff, listConversationPeers } =
 
 describe("ordinary assistant collaboration stays same-user", () => {
   beforeEach(() => {
+    seatAgents.ids = ["bot-a"];
     owners.clear();
     owners.set("bot-a", "user-a");
     owners.set("bot-b", "user-b");
   });
 
-  it("refuses an assistant messaging a different user's bot even for a tenant admin", () => {
+  it("refuses an assistant messaging a different user's bot even for a tenant admin", async () => {
     expect(
-      canSendConversationHandoff({
+      await canSendConversationHandoff({
         requesterUserId: "user-a",
         tenantId: "acme",
         tenantAdmin: true,
@@ -48,10 +53,11 @@ describe("ordinary assistant collaboration stays same-user", () => {
     ).toBe(false);
   });
 
-  it("allows same-user assistants to collaborate", () => {
+  it("allows same-user assistants to collaborate", async () => {
     owners.set("bot-c", "user-a");
+    seatAgents.ids = ["bot-a", "bot-c"];
     expect(
-      canSendConversationHandoff({
+      await canSendConversationHandoff({
         requesterUserId: "user-a",
         tenantId: "acme",
         tenantAdmin: false,
@@ -59,6 +65,41 @@ describe("ordinary assistant collaboration stays same-user", () => {
         callerAgentId: "bot-a",
       }),
     ).toBe(true);
+  });
+
+  it("lists a formally granted bot despite missing legacy user ownership", async () => {
+    seatAgents.ids = ["bot-b"];
+    const peers = await listConversationPeers({
+      tenantId: "acme",
+      requesterUserId: "user-a",
+      tenantAdmin: false,
+      sessionExists: () => true,
+    });
+    expect(peers.map((peer) => peer.agentId)).toContain("bot-b");
+  });
+
+  it("revoked seat access is not restored by stale legacy ownership", async () => {
+    seatAgents.ids = [];
+    const peers = await listConversationPeers({
+      tenantId: "acme",
+      requesterUserId: "user-a",
+      tenantAdmin: true,
+      sessionExists: () => true,
+    });
+    expect(peers).toEqual([]);
+  });
+
+  it("reports missing sessions without confusing them with missing grants", async () => {
+    const input = {
+      tenantId: "acme",
+      requesterUserId: "user-a",
+      tenantAdmin: false,
+      sessionExists: () => false,
+    };
+    expect(await listConversationPeers(input)).toEqual([]);
+    expect(await listConversationPeers({ ...input, includeMissingSessions: true })).toMatchObject([
+      { agentId: "bot-a", sessionExists: false, sessionKey: "agent:bot-a:main" },
+    ]);
   });
 
   it("does not list another user's assistant for a tenant admin", async () => {
