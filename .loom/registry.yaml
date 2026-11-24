@@ -1,5 +1,36 @@
 version: 1
 tasks:
+  - id: diagnosis-write-policy-test-fixtures
+    owner: codex-integration
+    intent:
+      - User-authorized four-test fixture repair; codex-wpb-successor contributes
+        patch only.
+    paths:
+      - src/batch1-capability-enablement/demos.test.ts
+      - src/batch1-capability-enablement/isolated-gateway.test.ts
+      - src/batch1-capability-enablement/isolated-loops.test.ts
+      - src/task-outcome/closed-loop-isolation-contract.test.ts
+    state: active
+    sessions:
+      - id: diagnosis-test-fixtures-20261124
+        taskId: diagnosis-write-policy-test-fixtures
+        ide: codex
+        agent: codex-wpb-successor
+        status: active
+        lastSignalAt: 2026-11-24T03:48:13.709393+00:00
+        metadata:
+          role: contributor; owner codex-integration submits after independent review
+      - id: diagnosis-test-integration-20261124
+        taskId: diagnosis-write-policy-test-fixtures
+        ide: codex
+        agent: codex-integration
+        status: active
+        lastSignalAt: 2026-11-24T04:04:25.319Z
+        metadata:
+          role: owner
+    ownerHistory: []
+    since: 2026-11-24
+    metadata: {}
   - id: knowledge-original-safe-lock-dir
     owner: codex-integration
     intent:
@@ -31547,6 +31578,22 @@ landingStreams:
       reason: Only seven previously unmatched exact paths; preserve all prior stream
         order/classification
 sharedPaths:
+  - glob: src/batch1-capability-enablement/demos.test.ts
+    landerTask: diagnosis-write-policy-test-fixtures
+    reason: User-authorized exact test fixture takeover; prior history retained.
+    reviewAfter: 2026-12-31
+  - glob: src/batch1-capability-enablement/isolated-gateway.test.ts
+    landerTask: diagnosis-write-policy-test-fixtures
+    reason: User-authorized exact test fixture takeover; prior history retained.
+    reviewAfter: 2026-12-31
+  - glob: src/batch1-capability-enablement/isolated-loops.test.ts
+    landerTask: diagnosis-write-policy-test-fixtures
+    reason: User-authorized exact test fixture takeover; prior history retained.
+    reviewAfter: 2026-12-31
+  - glob: src/task-outcome/closed-loop-isolation-contract.test.ts
+    landerTask: diagnosis-write-policy-test-fixtures
+    reason: User-authorized exact test fixture takeover; prior history retained.
+    reviewAfter: 2026-12-31
   - glob: src/gateway/knowledge/knowledge-original-store.ts
     landerTask: knowledge-original-safe-lock-dir
     reason: User-authorized exact takeover; preserve historical directory claims and Registry owner.
