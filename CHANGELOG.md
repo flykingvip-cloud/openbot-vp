@@ -327,7 +327,6 @@ Docs: https://docs.openbot.love
 - Knowledge: remove incomplete automatic summary generation and charging; retain authorized manual summaries and retrieval with accurate historical provenance. Stop old workers before upgrading to the safe document-lock directory. (#345) Thanks @flykingvip-cloud.
 - Build: reject a reserved parent entry selector before clearing output, preventing a successful partial build. (#346) Thanks @flykingvip-cloud.
 
-
 ## 2026.3.8
 
 ### Changes
