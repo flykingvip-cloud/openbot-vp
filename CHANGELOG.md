@@ -325,6 +325,7 @@ Docs: https://docs.openbot.love
 - Chat: preserve login-selected membership through reply dispatch, show one task admission receipt across status/final/history, and remove the composer task status bar. (#339) Thanks @flykingvip-cloud.
 - Agents: require tool-derived exact-content verification and in-scope correction before artifact closeout, avoiding invented byte counts or redundant repair confirmation. (#341) Thanks @flykingvip-cloud.
 - Knowledge: remove incomplete automatic summary generation and charging; retain authorized manual summaries and retrieval with accurate historical provenance. Stop old workers before upgrading to the safe document-lock directory. (#345) Thanks @flykingvip-cloud.
+- Build: reject a reserved parent entry selector before clearing output, preventing a successful partial build. (#346) Thanks @flykingvip-cloud.
 
 ## 2026.3.8
 

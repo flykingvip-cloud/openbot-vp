@@ -3,6 +3,11 @@ import { spawnSync } from "node:child_process";
 import { rmSync } from "node:fs";
 import { tsImport } from "tsx/esm/api";
 
+// The selector belongs to child tsdown invocations, never the official launcher.
+if (process.env.OPENBOT_BUILD_ENTRY_INDEX !== undefined) {
+  throw new Error("OPENBOT_BUILD_ENTRY_INDEX is reserved for child builds");
+}
+
 // Node 22.12 is supported; do not depend on Node 24 native TS stripping.
 const { default: configs } = await tsImport("../tsdown.config.ts", import.meta.url);
 
