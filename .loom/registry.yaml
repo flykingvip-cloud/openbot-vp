@@ -15855,6 +15855,7 @@ tasks:
     owner: codex-integration
     intent: []
     paths:
+      - CHANGELOG.md
       - src/gateway/knowledge/retrieval-summary-authority.ts
       - src/gateway/knowledge/retrieval-summary-authority.test.ts
       - src/gateway/knowledge/retrieval-summary-runtime.ts
@@ -15880,6 +15881,14 @@ tasks:
       - .kiro/specs/knowledge-retrieval-summary/tasks.md
     state: active
     sessions:
+      - id: manual345-changelog-20261124
+        taskId: knowledge-summary-manual-closeout:codex-kb-repair
+        ide: codex
+        agent: codex-integration
+        status: active
+        lastSignalAt: 2026-11-24T10:49:16.814371+00:00
+        metadata:
+          authorization: User approved one PR345 CHANGELOG note only; preserve all unrelated content.
       - id: knowledge-summary-manual-closeout-20261123
         taskId: knowledge-summary-manual-closeout:codex-kb-repair
         ide: codex
@@ -31735,8 +31744,9 @@ sharedPaths:
     reason: Human-authorized successor of test-only PR328; original owner session
       and task history retained.
   - glob: CHANGELOG.md
-    landerTask: runtime-changelog-332:codex-runtime
-    reason: Human-authorized single PR332 compatibility release note; preserve all
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason:
+      PR345 single-note takeover from runtime-changelog-332:codex-runtime; historical scope follows. Human-authorized single PR332 compatibility release note; preserve all
       other content and historical ownership.
   - glob: src/agent-runtime/capabilities/invocation/before-call.ts
     landerTask: runtime-beforeeffect-journal-review:codex-runtime
@@ -31827,8 +31837,8 @@ sharedPaths:
     landerTask: baseline-gates-repair-20261122:codex-wpb-successor
     reason: Human-authorized exact full-gate fixture repair; previous owner history retained.
   - glob: CHANGELOG.md
-    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
-    reason: Human-authorized three PR333 release notes only; predecessor task histories retained.
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: PR345 single-note takeover from baseline-gates-repair-20261122:codex-wpb-successor; historical scope follows. Human-authorized three PR333 release notes only; predecessor task histories retained.
   - glob: src/agent-runtime/state/durable-json.ts
     landerTask: baseline-gates-repair-20261122:codex-wpb-successor
     reason: Human-authorized exact audit path redaction; previous task history retained.
