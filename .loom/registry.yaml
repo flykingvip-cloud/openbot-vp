@@ -5,9 +5,18 @@ tasks:
     intent:
       - User-authorized parent launcher selector rejection before config import and dist removal.
     paths:
+      - CHANGELOG.md
       - scripts/tsdown-build.mjs
     state: active
     sessions:
+      - id: launcher-single-changelog-20261124
+        taskId: launcher-parent-selector-guard:codex-integration
+        ide: codex
+        agent: codex-integration
+        status: active
+        lastSignalAt: 2026-11-24T13:24:43.501907+00:00
+        metadata:
+          authorization: User-approved single PR release note only; preserve all unrelated history.
       - id: launcher-parent-selector-20261124
         taskId: launcher-parent-selector-guard:codex-integration
         ide: codex
@@ -31766,7 +31775,8 @@ sharedPaths:
     reason: Human-authorized successor of test-only PR328; original owner session
       and task history retained.
   - glob: CHANGELOG.md
-    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    landerTask: launcher-parent-selector-guard:codex-integration
+    # Single-note takeover from knowledge-summary-manual-closeout:codex-kb-repair; prior reason below is historical.
     reason:
       PR345 single-note takeover from runtime-changelog-332:codex-runtime; historical scope follows. Human-authorized single PR332 compatibility release note; preserve all
       other content and historical ownership.
@@ -31859,7 +31869,8 @@ sharedPaths:
     landerTask: baseline-gates-repair-20261122:codex-wpb-successor
     reason: Human-authorized exact full-gate fixture repair; previous owner history retained.
   - glob: CHANGELOG.md
-    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    landerTask: launcher-parent-selector-guard:codex-integration
+    # Single-note takeover from knowledge-summary-manual-closeout:codex-kb-repair; prior reason below is historical.
     reason: PR345 single-note takeover from baseline-gates-repair-20261122:codex-wpb-successor; historical scope follows. Human-authorized three PR333 release notes only; predecessor task histories retained.
   - glob: src/agent-runtime/state/durable-json.ts
     landerTask: baseline-gates-repair-20261122:codex-wpb-successor
