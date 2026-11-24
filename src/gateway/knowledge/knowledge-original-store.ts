@@ -4,9 +4,9 @@
  */
 import { createHash } from "node:crypto";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { withFileLock } from "../../infra/file-lock.js";
+import { resolvePreferredOpenBotTmpDir } from "../../infra/tmp-openclaw-dir.js";
 import { resolveProcessScopedMap } from "../../shared/process-scoped-map.js";
 import { CONFIG_DIR } from "../../utils.js";
 import { computeRawContentHash } from "./document-fingerprint.js";
@@ -153,7 +153,7 @@ export async function withKnowledgeDocumentMutation<T>(
   await previous;
   try {
     return await withFileLock(
-      path.join(os.tmpdir(), `openbot-knowledge-locks-${process.getuid?.() ?? "user"}`, key),
+      path.join(resolvePreferredOpenBotTmpDir(), "knowledge-locks", key),
       { retries: { retries: 600, factor: 1, minTimeout: 100, maxTimeout: 100 }, stale: 60_000 },
       operation,
     );

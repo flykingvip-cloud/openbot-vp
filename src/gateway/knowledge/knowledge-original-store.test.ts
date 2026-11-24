@@ -9,6 +9,7 @@ import {
   listKnowledgeOriginalDocumentIds,
   persistKnowledgeOriginal,
   readKnowledgeOriginal,
+  withKnowledgeDocumentMutation,
 } from "./knowledge-original-store.js";
 
 describe("knowledge-original-store", () => {
@@ -82,5 +83,47 @@ describe("knowledge-original-store", () => {
     });
     expect(found?.manifest.kbId).toBe("kb-other");
     expect(found?.buffer.toString("utf8")).toContain("%PDF-1.4 alias");
+  });
+});
+
+describe("knowledge document mutation locking", () => {
+  it("serializes independent mutations for the same document across KB scopes", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "kb-mutation-"));
+    let release!: () => void;
+    let entered!: () => void;
+    const held = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const barrier = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const order: string[] = [];
+    const first = withKnowledgeDocumentMutation(
+      { originalsRoot: root, kbId: "kb-a", docId: "same" },
+      async () => {
+        order.push("first");
+        entered();
+        await barrier;
+        order.push("released");
+      },
+    );
+    try {
+      await held;
+      const second = withKnowledgeDocumentMutation(
+        { originalsRoot: root, kbId: "kb-b", docId: "same" },
+        async () => {
+          order.push("second");
+        },
+      );
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(order).toEqual(["first"]);
+      release();
+      await Promise.all([first, second]);
+      expect(order).toEqual(["first", "released", "second"]);
+    } finally {
+      release();
+      await first;
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 });
