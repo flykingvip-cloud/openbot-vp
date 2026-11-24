@@ -1,63 +1,71 @@
+import { spawn } from "node:child_process";
 import fs from "node:fs";
-import fsPromises from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, expect, it } from "vitest";
 import { acquireFileLock, acquireFileLockSync } from "./file-lock.js";
+
 const roots: string[] = [];
+const options = { retries: { retries: 2, factor: 1, minTimeout: 1, maxTimeout: 1 }, stale: 1 };
 afterEach(() => {
-  vi.restoreAllMocks();
   for (const root of roots.splice(0)) {
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
-it("does not delete a replacement lock when stale inspection loses its snapshot", () => {
-  const { file, payload } = fixture();
-  fs.writeFileSync(`${file}.lock`, "");
-  const normalizedLock = path.join(
-    fs.realpathSync(path.dirname(file)),
-    `${path.basename(file)}.lock`,
-  );
-  const originalStat = fs.statSync;
-  vi.spyOn(fs, "statSync").mockImplementation((...args: Parameters<typeof fs.statSync>) => {
-    if (String(args[0]) === normalizedLock) {
-      fs.writeFileSync(`${file}.lock`, payload);
-      throw Object.assign(new Error("previous lock disappeared"), { code: "ENOENT" });
-    }
-    return originalStat(...args);
-  });
-  expect(() => acquireFileLockSync(file, options)).toThrow(/timeout/);
-  expect(fs.readFileSync(`${file}.lock`, "utf8")).toBe(payload);
-});
-const options = { retries: { retries: 0, factor: 1, minTimeout: 1, maxTimeout: 1 }, stale: 1 };
-it("async stale inspection cannot delete a replacement lock after ENOENT", async () => {
-  const { file, payload } = fixture();
-  fs.writeFileSync(`${file}.lock`, "");
-  vi.spyOn(fsPromises, "stat").mockImplementationOnce(async () => {
-    await fsPromises.writeFile(`${file}.lock`, payload);
-    throw Object.assign(new Error("previous lock disappeared"), { code: "ENOENT" });
-  });
-  await expect(acquireFileLock(file, options)).rejects.toThrow(/timeout/);
-  expect(fs.readFileSync(`${file}.lock`, "utf8")).toBe(payload);
-});
 function fixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "live-file-lock-"));
   roots.push(root);
-  const file = path.join(root, "store.json");
-  const payload = JSON.stringify({
-    pid: process.pid,
-    createdAt: new Date(Date.now() - 60000).toISOString(),
-  });
-  fs.writeFileSync(`${file}.lock`, payload);
-  return { file, payload };
+  return path.join(root, "store.json");
 }
-it("sync acquisition cannot steal an aged lock from a living owner", () => {
-  const { file, payload } = fixture();
-  expect(() => acquireFileLockSync(file, options)).toThrow(/timeout/);
-  expect(fs.readFileSync(`${file}.lock`, "utf8")).toBe(payload);
+for (const [name, payload] of [
+  ["dead PID", JSON.stringify({ pid: 2147483647, createdAt: "1970-01-01T00:00:00Z" })],
+  ["living PID", JSON.stringify({ pid: process.pid, createdAt: "1970-01-01T00:00:00Z" })],
+  ["malformed contents", "not-json"],
+  ["empty contents", ""],
+]) {
+  it(`sync and async bounded rejection preserves an aged lock with ${name}`, async () => {
+    const file = fixture();
+    fs.writeFileSync(`${file}.lock`, payload);
+    fs.utimesSync(`${file}.lock`, 0, 0);
+    const before = fs.statSync(`${file}.lock`);
+    expect(() => acquireFileLockSync(file, options)).toThrow(/timeout/);
+    await expect(acquireFileLock(file, options)).rejects.toThrow(/timeout/);
+    expect(fs.readFileSync(`${file}.lock`, "utf8")).toBe(payload);
+    expect(fs.statSync(`${file}.lock`).ino).toBe(before.ino);
+    expect(fs.statSync(`${file}.lock`).mtimeMs).toBe(before.mtimeMs);
+  });
+}
+it("normal async and sync release allow fresh acquisition", async () => {
+  const file = fixture();
+  const first = await acquireFileLock(file, options);
+  await first.release();
+  expect(fs.existsSync(`${file}.lock`)).toBe(false);
+  const second = acquireFileLockSync(file, options);
+  second.release();
+  const third = await acquireFileLock(file, options);
+  await third.release();
 });
-it("async acquisition cannot steal an aged lock from a living owner", async () => {
-  const { file, payload } = fixture();
-  await expect(acquireFileLock(file, options)).rejects.toThrow(/timeout/);
-  expect(fs.readFileSync(`${file}.lock`, "utf8")).toBe(payload);
+it("two real processes serialize critical sections", async () => {
+  const file = fixture();
+  const marker = `${file}.critical`;
+  const script = `import fs from 'node:fs';import {acquireFileLock} from ${JSON.stringify(new URL("./file-lock.ts", import.meta.url).href)};const lock=await acquireFileLock(${JSON.stringify(file)},{retries:{retries:200,factor:1,minTimeout:5,maxTimeout:5},stale:1});const fd=fs.openSync(${JSON.stringify(marker)},'wx');await new Promise(r=>setTimeout(r,40));fs.closeSync(fd);fs.unlinkSync(${JSON.stringify(marker)});await lock.release();`;
+  const run = () =>
+    new Promise<void>((resolve, reject) => {
+      const child = spawn(
+        process.execPath,
+        ["--import", "tsx", "--input-type=module", "-e", script],
+        { cwd: process.cwd(), stdio: ["ignore", "pipe", "pipe"] },
+      );
+      let stderr = "";
+      child.stderr.on("data", (chunk) => {
+        stderr += String(chunk);
+      });
+      child.on("error", reject);
+      child.on("close", (code) =>
+        code === 0 ? resolve() : reject(new Error(`child exit ${code}: ${stderr}`)),
+      );
+    });
+  await Promise.all([run(), run()]);
+  expect(fs.existsSync(marker)).toBe(false);
+  expect(fs.existsSync(`${file}.lock`)).toBe(false);
 });
