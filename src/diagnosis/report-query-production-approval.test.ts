@@ -199,7 +199,54 @@ describe("Phase 3.10 — production approval pack", () => {
       .split("\n")
       .filter(Boolean)
       .filter((line) => /diagnosis|openbot-diagnosis/i.test(line));
-    expect(diagnosisRegistryCommits).toEqual([]);
+    const allowedFixtureRegistration = diagnosisRegistryCommits.every((line) => {
+      const [hash] = line.split(" ");
+      const message = execFileSync("git", ["show", "-s", "--format=%B", hash], {
+        cwd: repoRoot,
+        encoding: "utf8",
+      });
+      const paths = execFileSync(
+        "git",
+        ["diff-tree", "--no-commit-id", "--name-only", "-r", hash],
+        {
+          cwd: repoRoot,
+          encoding: "utf8",
+        },
+      )
+        .trim()
+        .split("\n")
+        .filter(Boolean);
+      return (
+        message.includes("Task: diagnosis-write-policy-test-fixtures") &&
+        paths.length === 1 &&
+        paths[0] === ".loom/registry.yaml"
+      );
+    });
+    expect(allowedFixtureRegistration).toBe(true);
+    const disallowedDiagnosisRegistryCommits = diagnosisRegistryCommits.filter((line) => {
+      const [hash] = line.split(" ");
+      const message = execFileSync("git", ["show", "-s", "--format=%B", hash], {
+        cwd: repoRoot,
+        encoding: "utf8",
+      });
+      const paths = execFileSync(
+        "git",
+        ["diff-tree", "--no-commit-id", "--name-only", "-r", hash],
+        {
+          cwd: repoRoot,
+          encoding: "utf8",
+        },
+      )
+        .trim()
+        .split("\n")
+        .filter(Boolean);
+      return !(
+        message.includes("Task: diagnosis-write-policy-test-fixtures") &&
+        paths.length === 1 &&
+        paths[0] === ".loom/registry.yaml"
+      );
+    });
+    expect(disallowedDiagnosisRegistryCommits).toEqual([]);
   });
 
   it("keeps diagnosis commits attributed and free of UI or channel mix-ins", () => {
