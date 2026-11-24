@@ -32,10 +32,19 @@ tasks:
     intent:
       - User-approved policy A; no online stale unlink, offline cleanup after stopping all participants.
     paths:
+      - CHANGELOG.md
       - src/plugin-sdk/file-lock.ts
       - src/plugin-sdk/file-lock.liveness.test.ts
     state: active
     sessions:
+      - id: lock-single-changelog-20261124
+        taskId: file-lock-no-online-reclaim:codex-integration
+        ide: codex
+        agent: codex-integration
+        status: active
+        lastSignalAt: 2026-11-24T13:24:44.275400+00:00
+        metadata:
+          authorization: User-approved single PR release note only; preserve all unrelated history.
       - id: lock-policy-a-20261124
         taskId: file-lock-no-online-reclaim:codex-integration
         ide: codex
@@ -31795,8 +31804,8 @@ sharedPaths:
     reason: Human-authorized successor of test-only PR328; original owner session
       and task history retained.
   - glob: CHANGELOG.md
-    landerTask: launcher-parent-selector-guard:codex-integration
-    # Single-note takeover from knowledge-summary-manual-closeout:codex-kb-repair; prior reason below is historical.
+    landerTask: file-lock-no-online-reclaim:codex-integration
+    # Single-note takeover from launcher-parent-selector-guard:codex-integration; earlier knowledge-summary-manual-closeout history preserved below.
     reason:
       PR345 single-note takeover from runtime-changelog-332:codex-runtime; historical scope follows. Human-authorized single PR332 compatibility release note; preserve all
       other content and historical ownership.
@@ -31889,8 +31898,8 @@ sharedPaths:
     landerTask: baseline-gates-repair-20261122:codex-wpb-successor
     reason: Human-authorized exact full-gate fixture repair; previous owner history retained.
   - glob: CHANGELOG.md
-    landerTask: launcher-parent-selector-guard:codex-integration
-    # Single-note takeover from knowledge-summary-manual-closeout:codex-kb-repair; prior reason below is historical.
+    landerTask: file-lock-no-online-reclaim:codex-integration
+    # Single-note takeover from launcher-parent-selector-guard:codex-integration; earlier knowledge-summary-manual-closeout history preserved below.
     reason: PR345 single-note takeover from baseline-gates-repair-20261122:codex-wpb-successor; historical scope follows. Human-authorized three PR333 release notes only; predecessor task histories retained.
   - glob: src/agent-runtime/state/durable-json.ts
     landerTask: baseline-gates-repair-20261122:codex-wpb-successor
