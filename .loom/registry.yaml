@@ -27,6 +27,26 @@ tasks:
     ownerHistory: []
     since: 2026-11-24
     metadata: {}
+  - id: file-lock-no-online-reclaim:codex-integration
+    owner: codex-integration
+    intent:
+      - User-approved policy A; no online stale unlink, offline cleanup after stopping all participants.
+    paths:
+      - src/plugin-sdk/file-lock.ts
+      - src/plugin-sdk/file-lock.liveness.test.ts
+    state: active
+    sessions:
+      - id: lock-policy-a-20261124
+        taskId: file-lock-no-online-reclaim:codex-integration
+        ide: codex
+        agent: codex-wpb-successor
+        status: active
+        lastSignalAt: 2026-11-24T11:56:53.524200+00:00
+        metadata:
+          role: contributor; codex-integration is sole executor accountable for landing
+    ownerHistory: []
+    since: 2026-11-24
+    metadata: {}
   - id: diagnosis-write-policy-test-fixtures
     owner: codex-integration
     intent:
@@ -32779,12 +32799,12 @@ sharedPaths:
     reason: Authorized typed task control migration; preserve prior behavior and history.
     reviewAfter: 2026-11-30
   - glob: src/plugin-sdk/file-lock.liveness.test.ts
-    landerTask: agent-runtime-convergence
-    reason: Authorized bounded task-state lock race repair; retain predecessor scopes and history.
+    landerTask: file-lock-no-online-reclaim:codex-integration
+    reason: Policy A exact takeover from agent-runtime-convergence; predecessor scopes and history retained.
     reviewAfter: 2026-11-30
   - glob: src/plugin-sdk/file-lock.ts
-    landerTask: agent-runtime-convergence
-    reason: Authorized bounded task-state lock race repair; retain predecessor scopes and history.
+    landerTask: file-lock-no-online-reclaim:codex-integration
+    reason: Policy A exact takeover from agent-runtime-convergence; predecessor scopes and history retained.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/state/mutations/task-completion.ts
     landerTask: agent-runtime-convergence
