@@ -11,7 +11,6 @@ export async function accessDocumentRetrievalSummary(input: {
   docId: string;
   indexRoot?: string;
   fields?: NonNullable<RetrievalSummary["fields"]>;
-  retry?: boolean;
   metadata?: Pick<RetrievalSummary, "sourceRelations" | "editorialStatus" | "reviewedBy">;
 }) {
   const dbPath = resolveKnowledgeIndexDbPath({
@@ -31,20 +30,6 @@ export async function accessDocumentRetrievalSummary(input: {
       .get(input.knowledgeBase.id, input.docId);
     if (!source) {
       return undefined;
-    }
-    if (input.retry) {
-      const current = readRetrievalSummary(
-        index.db,
-        input.docId,
-        new Set([input.knowledgeBase.id]),
-      );
-      if (current?.method !== "human") {
-        index.db
-          .prepare(
-            "UPDATE retrieval_summaries SET state='pending',claim=NULL,attempts=0,next_retry_at=0,updated_at=? WHERE doc_id=? AND kb_id=? AND state IN ('failed','stale')",
-          )
-          .run(Date.now(), input.docId, input.knowledgeBase.id);
-      }
     }
     if (input.fields) {
       await editRetrievalSummary(index.db, input.docId, input.fields, async () => ({

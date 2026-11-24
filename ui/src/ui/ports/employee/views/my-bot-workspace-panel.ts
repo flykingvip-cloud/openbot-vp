@@ -1494,19 +1494,7 @@ function renderDataTab(props: MyBotWorkspacePanelProps) {
                 ${
                   surface.open.editSummary
                     ? html`<details><summary>维护检索摘要</summary>
-                  <p>摘要字段用于检索导览，保存需具备知识库写权限；不会修改正文。</p><button @click=${async (
-                    event: Event,
-                  ) => {
-                    const button = event.currentTarget as HTMLButtonElement;
-                    button.disabled = true;
-                    try {
-                      await surface.open?.retrySummary?.();
-                    } catch {
-                      button.textContent = "重试排队失败，请核对写权限";
-                    } finally {
-                      button.disabled = false;
-                    }
-                  }}>重新排队生成</button>
+                  <p>摘要字段用于检索导览，保存需具备知识库写权限；不会修改正文。自动生成不在本版本提供。</p>
                   <textarea aria-label="检索摘要结构化字段" .value=${surface.open.summaryFieldsJson ?? ""}></textarea>
                   <button @click=${async (event: Event) => {
                     const button = event.currentTarget as HTMLButtonElement;

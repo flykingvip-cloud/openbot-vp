@@ -169,3 +169,7 @@
 - 完整RPC最终6项全通过：/tmp/kb-summary-final-rpc-confirmation.log。
 - 根代理终验发现的3项type-aware lint已修复（grapheme计数Intl.Segmenter、冗余非空和类型断言），pnpm lint全仓0警告0错误：/tmp/kb-summary-final-type-aware-lint.log；pnpm tsgo通过：/tmp/kb-summary-final-type-aware-types.log。
   — codex-kb-implement
+
+## 2026-11-23 当前交付边界
+
+本版本仅允许人工创建和编辑检索摘要，并保留历史版本绑定摘要导航。自动模型生成、收费、后台 worker 和重试生成入口已移除；旧环境开关不能启用。历史模型摘要不代表人工审核。此前自动生成相关记录仅为历史设计和证据，不是当前能力。— codex-kb-repair

@@ -1,5 +1,56 @@
 version: 1
 tasks:
+  - id: diagnosis-write-policy-test-fixtures
+    owner: codex-integration
+    intent:
+      - User-authorized four-test fixture repair; codex-wpb-successor contributes
+        patch only.
+    paths:
+      - src/batch1-capability-enablement/demos.test.ts
+      - src/batch1-capability-enablement/isolated-gateway.test.ts
+      - src/batch1-capability-enablement/isolated-loops.test.ts
+      - src/task-outcome/closed-loop-isolation-contract.test.ts
+    state: active
+    sessions:
+      - id: diagnosis-test-fixtures-20261124
+        taskId: diagnosis-write-policy-test-fixtures
+        ide: codex
+        agent: codex-wpb-successor
+        status: active
+        lastSignalAt: 2026-11-24T03:48:13.709393+00:00
+        metadata:
+          role: contributor; owner codex-integration submits after independent review
+      - id: diagnosis-test-integration-20261124
+        taskId: diagnosis-write-policy-test-fixtures
+        ide: codex
+        agent: codex-integration
+        status: active
+        lastSignalAt: 2026-11-24T04:04:25.319Z
+        metadata:
+          role: owner
+    ownerHistory: []
+    since: 2026-11-24
+    metadata: {}
+  - id: knowledge-original-safe-lock-dir
+    owner: codex-integration
+    intent:
+      - User-authorized exact safe temporary lock directory correction; lock protocol unchanged.
+    paths:
+      - src/gateway/knowledge/knowledge-original-store.ts
+      - src/gateway/knowledge/knowledge-original-store.test.ts
+    state: active
+    sessions:
+      - id: knowledge-original-safe-lock-dir-20261124
+        taskId: knowledge-original-safe-lock-dir
+        ide: codex
+        agent: codex-integration
+        status: active
+        lastSignalAt: 2026-11-24T00:51:53.394596+00:00
+        metadata:
+          compatibility: Stop old workers before enabling the new lock root; old and new roots cannot coordinate concurrently.
+    ownerHistory: []
+    since: 2026-11-24
+    metadata: {}
   - id: arch-remediation-wp-e-policy-composition
     owner: codex-sdk-control-verifier
     intent:
@@ -15800,6 +15851,70 @@ tasks:
     ownerHistory: []
     since: 2026-11-23
     metadata: {}
+  - id: knowledge-summary-manual-closeout:codex-kb-repair
+    owner: codex-integration
+    intent: []
+    paths:
+      - CHANGELOG.md
+      - src/gateway/knowledge/retrieval-summary-authority.ts
+      - src/gateway/knowledge/retrieval-summary-authority.test.ts
+      - src/gateway/knowledge/retrieval-summary-runtime.ts
+      - src/gateway/knowledge/retrieval-summary-runtime.test.ts
+      - src/gateway/knowledge/retrieval-summary-hierarchy.ts
+      - src/gateway/knowledge/retrieval-summary-hierarchy.test.ts
+      - src/gateway/knowledge/retrieval-summary-worker.ts
+      - src/gateway/knowledge/retrieval-summary-worker.test.ts
+      - src/gateway/server-maintenance.ts
+      - src/gateway/knowledge/retrieval-summary-store.ts
+      - src/gateway/knowledge/retrieval-summary-store.test.ts
+      - src/gateway/knowledge/retrieval-summary-document.ts
+      - src/gateway/knowledge/retrieval-summary-recall.ts
+      - src/gateway/knowledge/retrieval-summary-recall.test.ts
+      - src/gateway/server-methods/knowledge.ts
+      - src/gateway/server-methods/knowledge-base-search-rpc.test.ts
+      - src/gateway/knowledge/kb-index.ts
+      - src/gateway/knowledge/kb-index.test.ts
+      - ui/src/ui/ports/employee/views/my-bot-data-surface.ts
+      - ui/src/ui/ports/employee/views/my-bot-data-surface.node.test.ts
+      - ui/src/ui/ports/employee/views/my-bot-workspace-panel.ts
+      - .kiro/specs/knowledge-retrieval-summary/design.md
+      - .kiro/specs/knowledge-retrieval-summary/tasks.md
+    state: active
+    sessions:
+      - id: manual345-changelog-20261124
+        taskId: knowledge-summary-manual-closeout:codex-kb-repair
+        ide: codex
+        agent: codex-integration
+        status: active
+        lastSignalAt: 2026-11-24T10:49:16.814371+00:00
+        metadata:
+          authorization: User approved one PR345 CHANGELOG note only; preserve all unrelated content.
+      - id: knowledge-summary-manual-closeout-20261123
+        taskId: knowledge-summary-manual-closeout:codex-kb-repair
+        ide: codex
+        agent: codex-kb-repair
+        status: active
+        lastSignalAt: 2026-11-23T22:18:35.580Z
+        metadata:
+          predecessorOwners:
+            - cursor-knowledge-consume
+            - cursor
+          authorization: human-approved exact scope reduction on a137; automatic paid
+            summary removed
+      - id: knowledge-manual-integration-20261124
+        taskId: knowledge-summary-manual-closeout:codex-kb-repair
+        ide: codex
+        agent: codex-integration
+        status: active
+        metadata: {}
+        lastSignalAt: 2026-11-23T22:18:35.580Z
+    ownerHistory:
+      - fromOwner: codex-kb-repair
+        toOwner: codex-integration
+        at: 2026-11-23T22:18:35.580Z
+        via: verified
+    since: 2026-11-23
+    metadata: {}
 landingStreams:
   - id: delivery-acceptance-integration-20261122
     landingPolicy: serial
@@ -31472,6 +31587,99 @@ landingStreams:
       reason: Only seven previously unmatched exact paths; preserve all prior stream
         order/classification
 sharedPaths:
+  - glob: src/batch1-capability-enablement/demos.test.ts
+    landerTask: diagnosis-write-policy-test-fixtures
+    reason: User-authorized exact test fixture takeover; prior history retained.
+    reviewAfter: 2026-12-31
+  - glob: src/batch1-capability-enablement/isolated-gateway.test.ts
+    landerTask: diagnosis-write-policy-test-fixtures
+    reason: User-authorized exact test fixture takeover; prior history retained.
+    reviewAfter: 2026-12-31
+  - glob: src/batch1-capability-enablement/isolated-loops.test.ts
+    landerTask: diagnosis-write-policy-test-fixtures
+    reason: User-authorized exact test fixture takeover; prior history retained.
+    reviewAfter: 2026-12-31
+  - glob: src/task-outcome/closed-loop-isolation-contract.test.ts
+    landerTask: diagnosis-write-policy-test-fixtures
+    reason: User-authorized exact test fixture takeover; prior history retained.
+    reviewAfter: 2026-12-31
+  - glob: src/gateway/knowledge/knowledge-original-store.ts
+    landerTask: knowledge-original-safe-lock-dir
+    reason: User-authorized exact takeover; preserve historical directory claims and Registry owner.
+    reviewAfter: 2026-12-31
+  - glob: src/gateway/knowledge/knowledge-original-store.test.ts
+    landerTask: knowledge-original-safe-lock-dir
+    reason: User-authorized exact takeover; preserve historical directory claims and Registry owner.
+    reviewAfter: 2026-12-31
+  - glob: src/gateway/knowledge/retrieval-summary-authority.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: src/gateway/knowledge/retrieval-summary-authority.test.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: src/gateway/knowledge/retrieval-summary-runtime.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: src/gateway/knowledge/retrieval-summary-runtime.test.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: src/gateway/knowledge/retrieval-summary-hierarchy.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: src/gateway/knowledge/retrieval-summary-hierarchy.test.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: src/gateway/knowledge/retrieval-summary-worker.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: src/gateway/knowledge/retrieval-summary-worker.test.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: src/gateway/server-maintenance.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: src/gateway/knowledge/retrieval-summary-store.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: src/gateway/knowledge/retrieval-summary-store.test.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: src/gateway/knowledge/retrieval-summary-document.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: src/gateway/knowledge/retrieval-summary-recall.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: src/gateway/knowledge/retrieval-summary-recall.test.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: src/gateway/server-methods/knowledge.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: src/gateway/server-methods/knowledge-base-search-rpc.test.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: src/gateway/knowledge/kb-index.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: src/gateway/knowledge/kb-index.test.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: ui/src/ui/ports/employee/views/my-bot-data-surface.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: ui/src/ui/ports/employee/views/my-bot-data-surface.node.test.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: ui/src/ui/ports/employee/views/my-bot-workspace-panel.ts
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: .kiro/specs/knowledge-retrieval-summary/design.md
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
+  - glob: .kiro/specs/knowledge-retrieval-summary/tasks.md
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
   - glob: src/gateway/tools-invoke-http.fabric-phase2.integration.test.ts
     landerTask: arch-remediation-wp-e-policy-composition
     reason: User-approved exact test takeover; original directory claims retained.
@@ -31536,8 +31744,9 @@ sharedPaths:
     reason: Human-authorized successor of test-only PR328; original owner session
       and task history retained.
   - glob: CHANGELOG.md
-    landerTask: runtime-changelog-332:codex-runtime
-    reason: Human-authorized single PR332 compatibility release note; preserve all
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason:
+      PR345 single-note takeover from runtime-changelog-332:codex-runtime; historical scope follows. Human-authorized single PR332 compatibility release note; preserve all
       other content and historical ownership.
   - glob: src/agent-runtime/capabilities/invocation/before-call.ts
     landerTask: runtime-beforeeffect-journal-review:codex-runtime
@@ -31628,8 +31837,8 @@ sharedPaths:
     landerTask: baseline-gates-repair-20261122:codex-wpb-successor
     reason: Human-authorized exact full-gate fixture repair; previous owner history retained.
   - glob: CHANGELOG.md
-    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
-    reason: Human-authorized three PR333 release notes only; predecessor task histories retained.
+    landerTask: knowledge-summary-manual-closeout:codex-kb-repair
+    reason: PR345 single-note takeover from baseline-gates-repair-20261122:codex-wpb-successor; historical scope follows. Human-authorized three PR333 release notes only; predecessor task histories retained.
   - glob: src/agent-runtime/state/durable-json.ts
     landerTask: baseline-gates-repair-20261122:codex-wpb-successor
     reason: Human-authorized exact audit path redaction; previous task history retained.

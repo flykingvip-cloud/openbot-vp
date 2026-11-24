@@ -10,7 +10,22 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+
+// The production policy is frozen at startup. This isolated suite opts in via
+// the real resolver before consumers initialize; inherited flags are ignored.
+vi.mock("../diagnosis/write-policy.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../diagnosis/write-policy.js")>();
+  return {
+    ...actual,
+    DIAGNOSIS_WRITE_POLICY: actual.resolveDiagnosisWritePolicy({
+      OPENBOT_DIAGNOSIS_WRITES_ENABLED: "true",
+      OPENBOT_DIAGNOSIS_CONVERSATION_DELIVERY_ENABLED: "true",
+      OPENBOT_DIAGNOSIS_DAIBAI_DELIVERY_ENABLED: "true",
+    }),
+  };
+});
+
 import {
   deliverDiagnosisViaOfficialLiveGateway,
   type OfficialDiagnosisGatewayCall,

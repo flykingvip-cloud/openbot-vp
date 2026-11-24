@@ -20,7 +20,7 @@ export function recallSummaryDocuments(
     try {
       candidateIds = db
         .prepare(
-          "SELECT doc_id FROM retrieval_summary_fts WHERE retrieval_summary_fts MATCH ? AND kb_id=? ORDER BY rank LIMIT ?",
+          "SELECT f.doc_id FROM retrieval_summary_fts f JOIN retrieval_summaries r ON r.doc_id=f.doc_id AND r.kb_id=f.kb_id JOIN documents d ON d.doc_id=r.doc_id AND d.kb_id=r.kb_id JOIN document_versions v ON v.version_id=d.current_version_id WHERE retrieval_summary_fts MATCH ? AND f.kb_id=? AND r.state='ready' AND r.version_id=d.current_version_id AND r.content_hash=v.semantic_hash ORDER BY rank LIMIT ?",
         )
         .all(
           terms.map((term) => `"${term.replaceAll('"', '""')}"`).join(" OR "),

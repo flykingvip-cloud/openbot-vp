@@ -26,7 +26,6 @@ export type RobotDataOpenState = {
   title: string;
   text: string;
   editSummary?: (fieldsJson: string) => Promise<void>;
-  retrySummary?: () => Promise<void>;
   summaryFieldsJson?: string;
 };
 
@@ -385,13 +384,13 @@ export async function openRobotDataItem(
     const status =
       (
         {
-          pending: "待生成",
-          processing: "生成中",
+          pending: "待手工维护",
+          processing: "待手工维护",
           ready: "可用",
-          failed: "生成失败",
+          failed: "待手工维护",
           stale: "原文已更新，待复核",
         } as Record<string, string>
-      )[rawStatus] ?? "待生成";
+      )[rawStatus] ?? "待手工维护";
     surface.open = {
       title: item.title,
       summaryFieldsJson: JSON.stringify(
@@ -399,14 +398,6 @@ export async function openRobotDataItem(
         null,
         2,
       ),
-      retrySummary: async () => {
-        await host.client!.request("knowledge.document.summary", {
-          knowledgeBaseId: item.knowledgeBaseId,
-          documentId: item.documentId,
-          retry: true,
-        });
-        await openRobotDataItem(host, item, render);
-      },
       editSummary: async (fieldsJson) => {
         const fields: unknown = JSON.parse(fieldsJson);
         await host.client!.request("knowledge.document.summary", {
@@ -416,7 +407,7 @@ export async function openRobotDataItem(
         });
         await openRobotDataItem(host, item, render);
       },
-      text: `检索摘要状态：${status}${typeof summary?.failureCode === "string" ? "（请核对原文访问和模型配置后重试）" : ""}\n${summaryText}\n\n${clip(text) || "这份知识暂时没有可阅读的正文。"}`,
+      text: `检索摘要来源：${summary?.method === "human" ? "人工维护" : summary?.method === "model" ? "历史模型摘要（不代表人工审核）" : "未填写"}；源版本：${typeof summary?.sourceVersionId === "string" ? summary.sourceVersionId : "未知"}\n检索摘要状态：${status}${typeof summary?.failureCode === "string" ? "（请核对原文后手工维护摘要）" : ""}\n${summaryText}\n\n${clip(text) || "这份知识暂时没有可阅读的正文。"}`,
     };
   } catch {
     surface.open = { title: item.title, text: "这份知识暂时打不开。" };

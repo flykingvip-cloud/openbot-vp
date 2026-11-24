@@ -265,6 +265,23 @@ export function countKnowledgeDocumentVersions(db: DatabaseSync, docId: string):
   return row.count;
 }
 
+/** Host-owned token for manual writes delayed across source deletion/reconstruction. */
+export function knowledgeDocumentGeneration(db: DatabaseSync, docId: string): number {
+  db.exec(
+    "CREATE TABLE IF NOT EXISTS knowledge_document_generations(doc_id TEXT PRIMARY KEY,generation INTEGER NOT NULL)",
+  );
+  return Number(
+    db.prepare("SELECT generation FROM knowledge_document_generations WHERE doc_id=?").get(docId)
+      ?.generation ?? 0,
+  );
+}
+function advanceKnowledgeDocumentGeneration(db: DatabaseSync, docId: string): void {
+  knowledgeDocumentGeneration(db, docId);
+  db.prepare(
+    "INSERT INTO knowledge_document_generations VALUES(?,1) ON CONFLICT(doc_id) DO UPDATE SET generation=generation+1",
+  ).run(docId);
+}
+
 export function upsertKnowledgeDocument(params: {
   db: DatabaseSync;
   docId: string;
@@ -274,6 +291,7 @@ export function upsertKnowledgeDocument(params: {
   currentVersionId?: string | null;
   now?: number;
 }): KnowledgeDocumentRecord {
+  advanceKnowledgeDocumentGeneration(params.db, params.docId);
   const now = params.now ?? Date.now();
   const existing = getKnowledgeDocument(params.db, params.docId);
   params.db
@@ -689,6 +707,38 @@ export function upsertKnowledgeChunks(params: {
   return written;
 }
 
+/** Remove only this KB's derivative manual metadata, keeping the shared tenant index. */
+export function deleteKnowledgeBaseRetrievalSummaries(db: DatabaseSync, kbId: string): void {
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    db.exec("CREATE TABLE IF NOT EXISTS retrieval_summary_deleted_bases(kb_id TEXT PRIMARY KEY)");
+    db.prepare("INSERT OR IGNORE INTO retrieval_summary_deleted_bases(kb_id) VALUES(?)").run(kbId);
+
+    if (db.prepare("SELECT 1 FROM sqlite_master WHERE name='documents'").get()) {
+      for (const row of db.prepare("SELECT doc_id FROM documents WHERE kb_id=?").all(kbId)) {
+        advanceKnowledgeDocumentGeneration(db, String(row.doc_id));
+      }
+    }
+    // Remove legacy section caches if an earlier opt-in build created them.
+    for (const table of ["retrieval_summary_sections"]) {
+      if (db.prepare("SELECT 1 FROM sqlite_master WHERE name=?").get(table)) {
+        db.prepare(
+          `DELETE FROM ${table} WHERE doc_id IN (SELECT doc_id FROM documents WHERE kb_id=?)`,
+        ).run(kbId);
+      }
+    }
+    for (const table of ["retrieval_summaries", "retrieval_summary_fts"]) {
+      if (db.prepare("SELECT 1 FROM sqlite_master WHERE name=?").get(table)) {
+        db.prepare(`DELETE FROM ${table} WHERE kb_id=?`).run(kbId);
+      }
+    }
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+}
+
 export function deleteKnowledgeDocumentFromIndex(params: {
   db: DatabaseSync;
   index: KnowledgeIndex;
@@ -701,6 +751,17 @@ export function deleteKnowledgeDocumentFromIndex(params: {
 
   params.db.exec("BEGIN IMMEDIATE");
   try {
+    advanceKnowledgeDocumentGeneration(params.db, params.docId);
+
+    for (const table of [
+      "retrieval_summaries",
+      "retrieval_summary_fts",
+      "retrieval_summary_sections",
+    ]) {
+      if (params.db.prepare("SELECT 1 FROM sqlite_master WHERE name=?").get(table)) {
+        params.db.prepare(`DELETE FROM ${table} WHERE doc_id=?`).run(params.docId);
+      }
+    }
     if (removedChunkIds.length > 0) {
       const deleteChunkMeta = params.db.prepare(
         `DELETE FROM ${KB_CHUNK_META_TABLE} WHERE chunk_id = ?`,
