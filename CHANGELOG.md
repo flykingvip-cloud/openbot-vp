@@ -326,6 +326,7 @@ Docs: https://docs.openbot.love
 - Agents: require tool-derived exact-content verification and in-scope correction before artifact closeout, avoiding invented byte counts or redundant repair confirmation. (#341) Thanks @flykingvip-cloud.
 - Knowledge: remove incomplete automatic summary generation and charging; retain authorized manual summaries and retrieval with accurate historical provenance. Stop old workers before upgrading to the safe document-lock directory. (#345) Thanks @flykingvip-cloud.
 - Build: reject a reserved parent entry selector before clearing output, preventing a successful partial build. (#346) Thanks @flykingvip-cloud.
+- Locks: preserve competing lock files instead of reclaiming them by PID, age or malformed contents. After a crash, stop all participants before offline cleanup; normal release and bounded retries remain available. (#347) Thanks @flykingvip-cloud.
 
 ## 2026.3.8
 
