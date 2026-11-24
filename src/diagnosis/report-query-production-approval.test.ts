@@ -2,7 +2,9 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { isDeepStrictEqual } from "node:util";
 import { describe, expect, it } from "vitest";
+import { parse as parseYaml } from "yaml";
 import { coreGatewayHandlers } from "../gateway/server-methods.js";
 import { GATEWAY_METHOD_PACK_MANIFEST } from "../gateway/server-methods/packs/manifest.js";
 import { GATEWAY_METHOD_PACKS } from "../gateway/server-methods/packs/registry.js";
@@ -20,6 +22,51 @@ import { evaluateDiagnosisProductionReadiness } from "./report-query-production-
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
+
+const fixtureTaskId = "diagnosis-write-policy-test-fixtures";
+const fixturePaths = new Set([
+  "src/batch1-capability-enablement/demos.test.ts",
+  "src/batch1-capability-enablement/isolated-gateway.test.ts",
+  "src/batch1-capability-enablement/isolated-loops.test.ts",
+  "src/task-outcome/closed-loop-isolation-contract.test.ts",
+]);
+type AuditRegistry = {
+  tasks: Array<{ id: string; paths: string[] }>;
+  sharedPaths: Array<{ glob: string; landerTask: string }>;
+  [key: string]: unknown;
+};
+function isAuthorizedFixtureRegistration(
+  message: string,
+  paths: string[],
+  before: AuditRegistry,
+  after: AuditRegistry,
+): boolean {
+  if (
+    !message.split("\n").includes(`Task: ${fixtureTaskId}`) ||
+    paths.length !== 1 ||
+    paths[0] !== ".loom/registry.yaml"
+  ) {
+    return false;
+  }
+  const added = after.tasks.filter((task) => task.id === fixtureTaskId);
+  const entries = after.sharedPaths.filter((entry) => entry.landerTask === fixtureTaskId);
+  if (
+    before.tasks.some((task) => task.id === fixtureTaskId) ||
+    added.length !== 1 ||
+    added[0].paths.length !== fixturePaths.size ||
+    !added[0].paths.every((p) => fixturePaths.has(p)) ||
+    entries.length !== fixturePaths.size ||
+    !entries.every((entry) => fixturePaths.has(entry.glob))
+  ) {
+    return false;
+  }
+  // Only the explicitly authorized task and exact mappings may be added.
+  return isDeepStrictEqual(before, {
+    ...after,
+    tasks: after.tasks.filter((task) => task.id !== fixtureTaskId),
+    sharedPaths: after.sharedPaths.filter((entry) => entry.landerTask !== fixtureTaskId),
+  });
+}
 
 const FORBIDDEN_SIDE_EFFECTS = [
   "appendSkillInvocationEvent",
@@ -199,51 +246,20 @@ describe("Phase 3.10 — production approval pack", () => {
       .split("\n")
       .filter(Boolean)
       .filter((line) => /diagnosis|openbot-diagnosis/i.test(line));
-    const allowedFixtureRegistration = diagnosisRegistryCommits.every((line) => {
-      const [hash] = line.split(" ");
-      const message = execFileSync("git", ["show", "-s", "--format=%B", hash], {
-        cwd: repoRoot,
-        encoding: "utf8",
-      });
-      const paths = execFileSync(
-        "git",
-        ["diff-tree", "--no-commit-id", "--name-only", "-r", hash],
-        {
-          cwd: repoRoot,
-          encoding: "utf8",
-        },
-      )
-        .trim()
-        .split("\n")
-        .filter(Boolean);
-      return (
-        message.includes("Task: diagnosis-write-policy-test-fixtures") &&
-        paths.length === 1 &&
-        paths[0] === ".loom/registry.yaml"
-      );
-    });
-    expect(allowedFixtureRegistration).toBe(true);
     const disallowedDiagnosisRegistryCommits = diagnosisRegistryCommits.filter((line) => {
       const [hash] = line.split(" ");
-      const message = execFileSync("git", ["show", "-s", "--format=%B", hash], {
-        cwd: repoRoot,
-        encoding: "utf8",
-      });
-      const paths = execFileSync(
-        "git",
-        ["diff-tree", "--no-commit-id", "--name-only", "-r", hash],
-        {
-          cwd: repoRoot,
-          encoding: "utf8",
-        },
-      )
+      const git = (...args: string[]) =>
+        execFileSync("git", args, { cwd: repoRoot, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
+      const message = git("show", "-s", "--format=%B", hash);
+      const paths = git("diff-tree", "--no-commit-id", "--name-only", "-r", hash)
         .trim()
         .split("\n")
         .filter(Boolean);
-      return !(
-        message.includes("Task: diagnosis-write-policy-test-fixtures") &&
-        paths.length === 1 &&
-        paths[0] === ".loom/registry.yaml"
+      return !isAuthorizedFixtureRegistration(
+        message,
+        paths,
+        parseYaml(git("show", `${hash}^:.loom/registry.yaml`)),
+        parseYaml(git("show", `${hash}:.loom/registry.yaml`)),
       );
     });
     expect(disallowedDiagnosisRegistryCommits).toEqual([]);
@@ -297,5 +313,42 @@ describe("Phase 3.10 — production approval pack", () => {
         expect(file).not.toBe(".loom/registry.yaml");
       }
     }
+  });
+});
+
+describe("authorized fixture registration audit", () => {
+  const before: AuditRegistry = { tasks: [], sharedPaths: [], landingStreams: [] };
+  const after: AuditRegistry = {
+    ...before,
+    tasks: [{ id: fixtureTaskId, paths: [...fixturePaths] }],
+    sharedPaths: [...fixturePaths].map((glob) => ({ glob, landerTask: fixtureTaskId })),
+  };
+  const message = `Governance registration\n\nTask: ${fixtureTaskId}`;
+  it("accepts only the explicit test-only additive registration", () => {
+    expect(isAuthorizedFixtureRegistration(message, [".loom/registry.yaml"], before, after)).toBe(
+      true,
+    );
+  });
+  it("rejects production paths, mixed commits and unrelated registry edits", () => {
+    expect(
+      isAuthorizedFixtureRegistration(
+        message,
+        [".loom/registry.yaml", "src/diagnosis/diagnose.ts"],
+        before,
+        after,
+      ),
+    ).toBe(false);
+    expect(
+      isAuthorizedFixtureRegistration(message, [".loom/registry.yaml"], before, {
+        ...after,
+        tasks: [{ id: fixtureTaskId, paths: ["src/diagnosis/diagnose.ts"] }],
+      }),
+    ).toBe(false);
+    expect(
+      isAuthorizedFixtureRegistration(message, [".loom/registry.yaml"], before, {
+        ...after,
+        landingStreams: [{ id: "unauthorized" }],
+      }),
+    ).toBe(false);
   });
 });
