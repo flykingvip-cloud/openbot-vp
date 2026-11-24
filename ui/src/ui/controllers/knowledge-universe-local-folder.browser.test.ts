@@ -264,6 +264,10 @@ describe("managed folder import in real Chromium", () => {
       uploadedCount: 3,
       deletedCount: 1,
       commitCount: commitRequests.length,
+      documents: [],
+      readyCount: 0,
+      allReady: true,
+      skipped: [{ relativePath: "empty.txt", fileName: "empty.txt", reason: "empty" }],
     });
   });
 });

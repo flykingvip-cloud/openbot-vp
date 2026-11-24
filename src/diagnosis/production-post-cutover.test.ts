@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { vi } from "vitest";
 import { describe, expect, it } from "vitest";
 import { coreGatewayHandlers } from "../gateway/server-methods.js";
 import { GATEWAY_METHOD_PACKS } from "../gateway/server-methods/packs/registry.js";
@@ -80,4 +81,19 @@ describe("P24.4 post-cutover re-evaluation", () => {
     expect(DIAGNOSIS_DAIBAI_DELIVERY_ENABLED).toBe(true);
     expect(DIAGNOSIS_REMEDIATION_EXECUTION_ENABLED).toBe(false);
   });
+});
+
+// These historical cutover / functional rehearsals explicitly opt into writes
+// against injected local ports. Default-closed behavior is covered separately
+// in write-policy.test.ts; this is not production enablement.
+vi.mock("./write-policy.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./write-policy.js")>();
+  return {
+    ...actual,
+    DIAGNOSIS_WRITE_POLICY: {
+      selfEvolutionConfirm: true,
+      conversationDelivery: true,
+      daibaiDelivery: true,
+    },
+  };
 });

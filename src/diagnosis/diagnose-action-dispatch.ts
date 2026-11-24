@@ -23,6 +23,7 @@ import {
 } from "../gateway/steward-call-authorization.js";
 import { INTERNAL_MESSAGE_CHANNEL } from "../utils/message-channel.js";
 import { extractDiagnoseSpaceGroupId } from "./diagnose-policy.js";
+import { DIAGNOSIS_WRITE_POLICY } from "./write-policy.js";
 
 export type DiagnoseHandoffChannel = "diagnosed_agent_session" | "steward";
 
@@ -69,6 +70,10 @@ export type DiagnoseActionDispatchResult = {
   prompt?: string;
   actions?: ["同意", "不同意"];
   roleLabel?: "平台管理员" | "企业管理员";
+  receipt?: {
+    delivered: boolean;
+    reason: "delivered" | "conversation_delivery_gate_closed" | "unavailable";
+  };
 };
 
 export type DiagnoseActionSessionSend = (input: {
@@ -118,6 +123,10 @@ export function planDiagnoseActionHandoff(input: {
       prompt?: string;
       actions?: ["同意", "不同意"];
       roleLabel?: "平台管理员" | "企业管理员";
+      receipt?: {
+        delivered: boolean;
+        reason: "delivered" | "conversation_delivery_gate_closed" | "unavailable";
+      };
       targetSessionKey?: string;
     } {
   const title = input.title.trim();
@@ -290,7 +299,10 @@ export async function dispatchDiagnoseConversationAction(
       ...(input.plainConversation ? { plainConversation: true } : {}),
       ...(input.fromDisplayName?.trim() ? { fromDisplayName: input.fromDisplayName.trim() } : {}),
     });
-    if (!input.omitReceipt) {
+    let receipt: DiagnoseActionDispatchResult["receipt"];
+    if (!input.omitReceipt && !DIAGNOSIS_WRITE_POLICY.conversationDelivery) {
+      receipt = { delivered: false, reason: "conversation_delivery_gate_closed" };
+    } else if (!input.omitReceipt) {
       try {
         await injectReceipt({
           sessionKey: planned.requesterSessionKey,
@@ -303,8 +315,10 @@ export async function dispatchDiagnoseConversationAction(
                 planned.message,
               ].join("\n"),
         });
+        receipt = { delivered: true, reason: "delivered" };
       } catch {
-        // Receipt is best-effort; the target wake already happened.
+        // Target wake and receipt outcomes are independent and explicitly reported.
+        receipt = { delivered: false, reason: "unavailable" };
       }
     }
     return {
@@ -314,6 +328,7 @@ export async function dispatchDiagnoseConversationAction(
       targetSessionKey: planned.targetSessionKey,
       requesterSessionKey: planned.requesterSessionKey,
       runId: sent.runId,
+      ...(receipt ? { receipt } : {}),
     };
   } catch {
     return { ok: false, reason: "unavailable" };

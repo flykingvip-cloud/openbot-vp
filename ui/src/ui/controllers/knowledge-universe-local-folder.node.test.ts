@@ -8,6 +8,7 @@ import type {
   LocalFolderSyncPlanResponse,
 } from "../capability/knowledge-universe/endpoints.ts";
 import type { KnowledgeUniverseGateway } from "../capability/knowledge-universe/gateway-client.ts";
+import { importKnowledgeUniverseDatasetToSpace } from "./knowledge-universe-dataset-import.ts";
 import {
   getManagedPushDirectoryId,
   ManagedPushReadError,
@@ -17,6 +18,7 @@ import {
   syncManagedPushDirectory,
 } from "./knowledge-universe-local-folder-upload.ts";
 import {
+  scanKnowledgeUniverseLocalFolderNow,
   bindKnowledgeUniverseLocalFolder,
   formatLocalFolderImportOutcome,
   formatLocalFolderImportProgressLabel,
@@ -898,4 +900,84 @@ describe("bindKnowledgeUniverseLocalFolder", () => {
     expect(request).not.toHaveBeenCalled();
     expect(getKnowledgeUniverseRuntime(state).personalActionError).toContain("Choose");
   });
+  it("shows terminal scan refusal rather than a success notice", async () => {
+    const request = vi.fn(async (method: string) =>
+      method === "knowledge.local-folder.scan-now"
+        ? {
+            accepted: false,
+            status: "error",
+            summary: {
+              scanned: 1,
+              ingested: 0,
+              skipped: 1,
+              errors: ["entry.md: document_deleted: permanently deleted"],
+            },
+          }
+        : { items: [] },
+    );
+    const state = {
+      client: { request },
+      connected: true,
+      requestUpdate: vi.fn(),
+    } as unknown as AppPortState;
+    getKnowledgeUniverseRuntime(state).selectedKnowledgeBaseId = "kb-1";
+    await scanKnowledgeUniverseLocalFolderNow(state, "binding-1");
+    expect(getKnowledgeUniverseRuntime(state).personalActionError).toContain("document_deleted");
+    expect(getKnowledgeUniverseRuntime(state).personalActionNotice).toBeNull();
+  });
+
+  it.each([0, 1])(
+    "displays dataset terminal item refusal with %i successful other items",
+    async (imported) => {
+      const request = vi.fn(async (method: string) => {
+        if (method === "knowledge.personal.importDataset") {
+          return {
+            attempted: true,
+            imported,
+            skipped: 1,
+            chunkCount: imported,
+            documentIds: [],
+            errors: [
+              {
+                documentId: "deleted",
+                reason: "document_deleted",
+                message: "document_deleted: permanently deleted",
+              },
+            ],
+          };
+        }
+        return {
+          knowledgeBases: [],
+          documents: [],
+          sources: [],
+          items: [],
+          groups: [],
+          stats: {},
+          suggestions: [],
+          results: [],
+          nodes: [],
+          edges: [],
+        };
+      });
+      const state = {
+        client: { request },
+        connected: true,
+        requestUpdate: vi.fn(),
+      } as unknown as AppPortState;
+      const runtime = getKnowledgeUniverseRuntime(state);
+      runtime.selectedKnowledgeBaseId = "kb-1";
+      runtime.personalDatasetText = "Name,Value\nTerminal,blocked";
+      runtime.libraryWorkspaceDatasetImportTab = "manual";
+      await importKnowledgeUniverseDatasetToSpace(state);
+      expect(
+        request.mock.calls.some(([method]) => method === "knowledge.personal.importDataset"),
+      ).toBe(true);
+      expect(runtime.personalActionError).toContain("document_deleted");
+      if (imported === 0) {
+        expect(runtime.personalActionNotice).toBeNull();
+      } else {
+        expect(runtime.personalActionNotice).toBeTruthy();
+      }
+    },
+  );
 });

@@ -154,8 +154,10 @@ export async function tickKnowledgeVectorizeJobs(params?: {
           if (rows.length === 0) {
             throw new Error("embedding batch returned no vectors");
           }
-          upsertKnowledgeChunks({ index, chunks: rows });
-          result.vectorized += rows.length;
+          // Deletion/version replacement can finish while embeddings await. The conditional
+          // commit checks current chunk identity under the same SQLite write transaction.
+          const written = upsertKnowledgeChunks({ index, chunks: rows, existingOnly: true });
+          result.vectorized += written;
           if (rows.length < missing.length) {
             throw new Error("partial embedding batch");
           }

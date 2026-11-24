@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EmbeddingProvider } from "../../memory/embeddings.js";
+import { knowledgeDocumentIdFromSkillRef } from "../knowledge/document-display-title.js";
 import type { KnowledgeSourceContext } from "../knowledge/sources/types.js";
 import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "./types.js";
 
@@ -16,7 +17,7 @@ const contextState = vi.hoisted(() => ({
     seatId: null,
     tenantId: null,
     hasEnterpriseScope: false,
-  } satisfies KnowledgeSourceContext,
+  } as KnowledgeSourceContext,
 }));
 
 const mockProvider: EmbeddingProvider = {
@@ -93,6 +94,17 @@ async function invoke(
   return response;
 }
 
+function extractUploadedDocumentId(
+  kbId: string,
+  payload: Record<string, unknown> | undefined,
+): string {
+  const skillId = payload?.skillId;
+  if (typeof skillId !== "string" || !skillId) {
+    throw new Error("expected upload skillId");
+  }
+  return knowledgeDocumentIdFromSkillRef(kbId, skillId);
+}
+
 function extractKnowledgeBaseId(payload: Record<string, unknown> | undefined): string {
   const kb = payload?.knowledgeBase;
   if (!kb || typeof kb !== "object") {
@@ -140,7 +152,7 @@ describe("knowledge.document.preview", () => {
       },
     });
     expect(uploaded.ok).toBe(true);
-    const documentId = (uploaded.payload?.skillId as string | undefined) ?? "";
+    const documentId = extractUploadedDocumentId(kbId, uploaded.payload);
     expect(documentId).toBeTruthy();
     expect(hasKnowledgeOriginal({ kbId, docId: documentId })).toBe(true);
 
@@ -191,7 +203,7 @@ describe("knowledge.document.preview", () => {
         textContent: "# Temp\n\nDelete me.",
       },
     });
-    const documentId = (uploaded.payload?.skillId as string | undefined) ?? "";
+    const documentId = extractUploadedDocumentId(kbId, uploaded.payload);
     expect(documentId).toBeTruthy();
     expect(hasKnowledgeOriginal({ kbId, docId: documentId })).toBe(true);
 
@@ -228,7 +240,7 @@ describe("knowledge.document.preview", () => {
         textContent: "# Listed\n\nSource flag.",
       },
     });
-    const documentId = (uploaded.payload?.skillId as string | undefined) ?? "";
+    const documentId = extractUploadedDocumentId(kbId, uploaded.payload);
     expect(documentId).toBeTruthy();
 
     const sources = await invoke("knowledge.base.sources.list", { knowledgeBaseId: kbId });
@@ -236,5 +248,215 @@ describe("knowledge.document.preview", () => {
     const items = (sources.payload?.sources as Array<Record<string, unknown>> | undefined) ?? [];
     const match = items.find((item) => item.documentId === documentId);
     expect(match?.canPreviewOriginal).toBe(true);
+  });
+  it("uses the tenant originals root, retains exact bytes, and removes the blob on hard delete", async () => {
+    contextState.current.tenantId = "tenant-preview-rpc";
+    const created = await invoke("knowledge.base.create", {
+      title: "Tenant preview",
+      visibility: "private",
+    });
+    expect(created.ok).toBe(true);
+    const kbId = extractKnowledgeBaseId(created.payload);
+    const originalText = "# Tenant original\n\nExact original bytes, not normalized index text.\n";
+    const uploaded = await invoke("knowledge.personal.upload", {
+      knowledgeBaseId: kbId,
+      title: "Tenant original",
+      attachment: {
+        fileName: "tenant-original.md",
+        mimeType: "text/markdown",
+        size: Buffer.byteLength(originalText),
+        kind: "text",
+        textContent: originalText,
+      },
+    });
+    expect(uploaded.ok).toBe(true);
+    const docId = extractUploadedDocumentId(kbId, uploaded.payload);
+    const { getKnowledgeBase } = await import("../knowledge/knowledge-base-store.js");
+    const { resolveKnowledgeDirectoryLayoutForBase } =
+      await import("../knowledge/knowledge-directory.js");
+    const base = getKnowledgeBase(kbId)!;
+    expect(base.tenantId).toBe("tenant-preview-rpc");
+    const originalsRoot = resolveKnowledgeDirectoryLayoutForBase(base).originalsRoot;
+    expect(hasKnowledgeOriginal({ kbId, docId, originalsRoot })).toBe(true);
+    const preview = await invoke("knowledge.document.preview", {
+      knowledgeBaseId: kbId,
+      documentId: docId,
+    });
+    expect(preview.ok).toBe(true);
+    expect(preview.payload?.source).toBe("original_store");
+    expect(Buffer.from(String(preview.payload?.base64), "base64").toString("utf8")).toBe(
+      originalText,
+    );
+    const before = await invoke("knowledge.base.sources.list", { knowledgeBaseId: kbId });
+    expect(
+      (
+        (before.payload?.sources ?? []) as Array<{
+          documentId: string;
+          canPreviewOriginal: boolean;
+        }>
+      ).find((item) => item.documentId === docId)?.canPreviewOriginal,
+    ).toBe(true);
+    const deleted = await invoke("knowledge.base.documents.delete", {
+      knowledgeBaseId: kbId,
+      documentId: docId,
+    });
+    expect(deleted.ok).toBe(true);
+    expect(hasKnowledgeOriginal({ kbId, docId, originalsRoot })).toBe(false);
+    const after = await invoke("knowledge.base.sources.list", { knowledgeBaseId: kbId });
+    expect(after.ok).toBe(true);
+    expect(Array.isArray(after.payload?.sources)).toBe(true);
+    expect(
+      (
+        (after.payload?.sources ?? []) as Array<{ documentId: string; canPreviewOriginal: boolean }>
+      ).find((item) => item.documentId === docId)?.canPreviewOriginal,
+    ).not.toBe(true);
+    const removedPreview = await invoke("knowledge.document.preview", {
+      knowledgeBaseId: kbId,
+      documentId: docId,
+    });
+    expect(removedPreview.ok).toBe(false);
+    expect(removedPreview.error?.details).toEqual({ reason: "original_not_retained" });
+  });
+  it("fails closed durably when legacy cleanup fails, then retries without resurrecting either root", async () => {
+    contextState.current.tenantId = "tenant-delete-fault";
+    const created = await invoke("knowledge.base.create", {
+      title: "Fault",
+      visibility: "private",
+    });
+    const kbId = extractKnowledgeBaseId(created.payload);
+    const text = "# Legacy exact bytes\n\nKeep whitespace.\n";
+    const uploaded = await invoke("knowledge.personal.upload", {
+      knowledgeBaseId: kbId,
+      title: "Fault original",
+      attachment: {
+        fileName: "fault.md",
+        mimeType: "text/markdown",
+        size: Buffer.byteLength(text),
+        kind: "text",
+        textContent: text,
+      },
+    });
+    expect(uploaded.ok).toBe(true);
+    const docId = extractUploadedDocumentId(kbId, uploaded.payload);
+    const store = await import("../knowledge/knowledge-original-store.js");
+    const { getKnowledgeBase } = await import("../knowledge/knowledge-base-store.js");
+    const { resolveKnowledgeDirectoryLayoutForBase } =
+      await import("../knowledge/knowledge-directory.js");
+    const originalsRoot = resolveKnowledgeDirectoryLayoutForBase(
+      getKnowledgeBase(kbId)!,
+    ).originalsRoot;
+    store.persistKnowledgeOriginal({
+      kbId,
+      docId,
+      fileName: "legacy.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from(text),
+    });
+    // An unrevoked historical copy remains compatible with normal preview.
+    store.deleteKnowledgeOriginal({ kbId, docId, originalsRoot });
+    const legacy = await invoke("knowledge.document.preview", {
+      knowledgeBaseId: kbId,
+      documentId: docId,
+    });
+    expect(legacy.ok).toBe(true);
+    expect(Buffer.from(String(legacy.payload?.base64), "base64").toString()).toBe(text);
+    store.persistKnowledgeOriginal({
+      kbId,
+      docId,
+      originalsRoot,
+      fileName: "fault.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from(text),
+    });
+    const legacyDir = path.join(resolveKnowledgeOriginalsRoot(), kbId, docId);
+    const realRemove = fs.rmSync.bind(fs);
+    const remove = vi.spyOn(fs, "rmSync").mockImplementation((target, options) => {
+      if (String(target) === legacyDir) {
+        throw Object.assign(new Error("injected legacy cleanup denial"), { code: "EACCES" });
+      }
+      return realRemove(target, options);
+    });
+    try {
+      const failed = await invoke("knowledge.base.documents.delete", {
+        knowledgeBaseId: kbId,
+        documentId: docId,
+      });
+      expect(failed.ok).toBe(false);
+      expect(fs.existsSync(legacyDir)).toBe(true);
+      expect(getKnowledgeBase(kbId)?.documentIds).toContain(docId);
+      expect(store.isKnowledgeOriginalDeleted({ kbId, docId, originalsRoot })).toBe(true);
+      expect(
+        (await invoke("knowledge.document.preview", { knowledgeBaseId: kbId, documentId: docId }))
+          .ok,
+      ).toBe(false);
+      const sources = await invoke("knowledge.base.sources.list", { knowledgeBaseId: kbId });
+      expect(
+        (
+          (sources.payload?.sources ?? []) as Array<{
+            documentId: string;
+            canPreviewOriginal?: boolean;
+          }>
+        ).find((x) => x.documentId === docId)?.canPreviewOriginal,
+      ).not.toBe(true);
+      // Cross-tenant callers cannot use pending deletion to gain read or cleanup authority.
+      contextState.current = { ...contextState.current, userId: "user-b", tenantId: "tenant-b" };
+      expect(
+        (await invoke("knowledge.document.preview", { knowledgeBaseId: kbId, documentId: docId }))
+          .ok,
+      ).toBe(false);
+      expect(
+        (
+          await invoke("knowledge.base.documents.delete", {
+            knowledgeBaseId: kbId,
+            documentId: docId,
+          })
+        ).ok,
+      ).toBe(false);
+      contextState.current = {
+        ...contextState.current,
+        userId: "user-a",
+        tenantId: "tenant-delete-fault",
+      };
+      expect(() =>
+        store.persistKnowledgeOriginal({
+          kbId,
+          docId,
+          originalsRoot,
+          fileName: "race.md",
+          mimeType: "text/markdown",
+          buffer: Buffer.from("concurrent writer"),
+        }),
+      ).toThrow("knowledge_original_deleted");
+    } finally {
+      remove.mockRestore();
+    }
+    // Re-import uses disk state, not an in-memory revocation cache.
+    vi.resetModules();
+    const restarted = await import("../knowledge/knowledge-document-preview.js");
+    expect(
+      await restarted.readKnowledgeDocumentContent({ knowledgeBaseId: kbId, documentId: docId }),
+    ).toBeNull();
+    expect(
+      (
+        await invoke("knowledge.base.documents.delete", {
+          knowledgeBaseId: kbId,
+          documentId: docId,
+        })
+      ).ok,
+    ).toBe(true);
+    expect(fs.existsSync(legacyDir)).toBe(false);
+    expect(store.hasKnowledgeOriginal({ kbId, docId, originalsRoot })).toBe(false);
+    expect(
+      await restarted.readKnowledgeDocumentContent({ knowledgeBaseId: kbId, documentId: docId }),
+    ).toBeNull();
+    // Idempotent retry remains successful and does not remove the durable intent.
+    expect(
+      (
+        await invoke("knowledge.base.documents.delete", {
+          knowledgeBaseId: kbId,
+          documentId: docId,
+        })
+      ).ok,
+    ).toBe(true);
   });
 });

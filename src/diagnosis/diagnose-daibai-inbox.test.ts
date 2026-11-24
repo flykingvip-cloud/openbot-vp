@@ -174,3 +174,18 @@ describe("diagnose Da Bai conversation (path A)", () => {
     expect(payload.delivery.reason).toBe("daibai_delivery_gate_closed");
   });
 });
+
+// These historical cutover / functional rehearsals explicitly opt into writes
+// against injected local ports. Default-closed behavior is covered separately
+// in write-policy.test.ts; this is not production enablement.
+vi.mock("./write-policy.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./write-policy.js")>();
+  return {
+    ...actual,
+    DIAGNOSIS_WRITE_POLICY: {
+      selfEvolutionConfirm: true,
+      conversationDelivery: true,
+      daibaiDelivery: true,
+    },
+  };
+});

@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { vi } from "vitest";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { executeConfirmDiagnosePrescription } from "../agents/tools/confirm-diagnose-evolution-tool.js";
 import type { GatewayRequestHandler } from "../gateway/server-methods/types.js";
@@ -494,4 +495,19 @@ describe("M2 issue queue and controlled self-evolution", () => {
       enabled: true,
     });
   });
+});
+
+// These historical cutover / functional rehearsals explicitly opt into writes
+// against injected local ports. Default-closed behavior is covered separately
+// in write-policy.test.ts; this is not production enablement.
+vi.mock("./write-policy.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./write-policy.js")>();
+  return {
+    ...actual,
+    DIAGNOSIS_WRITE_POLICY: {
+      selfEvolutionConfirm: true,
+      conversationDelivery: true,
+      daibaiDelivery: true,
+    },
+  };
 });

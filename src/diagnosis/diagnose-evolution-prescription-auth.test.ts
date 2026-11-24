@@ -1,3 +1,4 @@
+import { vi } from "vitest";
 /**
  * E-M3-A1 / E-M3-A2 Class A confirm authorization matrix.
  * Path B CONFIRM exception 2026-10-19: DIAGNOSIS_SELF_EVOLUTION_CONFIRM_ENABLED is true.
@@ -399,4 +400,19 @@ describe("E-M3 Class A confirm auth matrix (Path B CONFIRM open)", () => {
   it("E-M3 production constant remains true after fixture-enabled cases", () => {
     expect(DIAGNOSIS_SELF_EVOLUTION_CONFIRM_ENABLED).toBe(true);
   });
+});
+
+// These historical cutover / functional rehearsals explicitly opt into writes
+// against injected local ports. Default-closed behavior is covered separately
+// in write-policy.test.ts; this is not production enablement.
+vi.mock("./write-policy.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./write-policy.js")>();
+  return {
+    ...actual,
+    DIAGNOSIS_WRITE_POLICY: {
+      selfEvolutionConfirm: true,
+      conversationDelivery: true,
+      daibaiDelivery: true,
+    },
+  };
 });

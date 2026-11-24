@@ -33,11 +33,12 @@ import {
 } from "./report-query-production-rehearsal.js";
 import { DiagnosisContractError, isDiagnosisContractError } from "./types.js";
 import type { DiagnosisVisualizationBundle } from "./visualization.js";
+import { DIAGNOSIS_WRITE_POLICY } from "./write-policy.js";
 
 export const DIAGNOSIS_PRODUCTION_CUTOVER_INCREMENT = "P11" as const;
 export const DIAGNOSIS_PRODUCTION_CUTOVER_SCHEMA_VERSION = 1 as const;
 
-export const DIAGNOSIS_DAIBAI_DELIVERY_ENABLED = true;
+export const DIAGNOSIS_DAIBAI_DELIVERY_ENABLED = DIAGNOSIS_WRITE_POLICY.daibaiDelivery;
 export const DIAGNOSIS_REMEDIATION_EXECUTION_ENABLED = false;
 export const DIAGNOSIS_P24_5_DAIBAI_ALLOWLISTED = true;
 export const DIAGNOSIS_P24_5_LIVE_SESSION_KEY = "diagnosis:canary:daibai" as const;

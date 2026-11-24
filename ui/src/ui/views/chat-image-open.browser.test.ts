@@ -1,8 +1,13 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mountApp, registerAppMountHooks } from "../test-helpers/app-mount.ts";
 
 registerAppMountHooks();
+
+beforeEach(async () => {
+  const { preloadEmployeeWorkbenchBundle } = await import("../ports/cross-port-shell-lazy.ts");
+  await preloadEmployeeWorkbenchBundle();
+});
 
 afterEach(() => {
   vi.restoreAllMocks();

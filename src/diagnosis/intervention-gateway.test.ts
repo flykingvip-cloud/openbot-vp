@@ -1,3 +1,4 @@
+import { vi } from "vitest";
 /**
  * Track I WS infra — materialize RPC + resolveExpandInput SoT semantics.
  * Gates stay closed. Memory store is process-local.
@@ -280,4 +281,19 @@ describe("resolveExpandInput SoT semantics (null ≠ [])", () => {
       payload.children.every((c) => !String(c.target.sessionKey ?? "").includes(":space:")),
     ).toBe(true);
   });
+});
+
+// These historical cutover / functional rehearsals explicitly opt into writes
+// against injected local ports. Default-closed behavior is covered separately
+// in write-policy.test.ts; this is not production enablement.
+vi.mock("./write-policy.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./write-policy.js")>();
+  return {
+    ...actual,
+    DIAGNOSIS_WRITE_POLICY: {
+      selfEvolutionConfirm: true,
+      conversationDelivery: true,
+      daibaiDelivery: true,
+    },
+  };
 });

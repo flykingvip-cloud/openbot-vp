@@ -19,8 +19,8 @@ const tickSource = readFileSync(
 );
 
 describe("confirm diagnose prescription tool", () => {
-  it("keeps Path B CONFIRM open and shares one handler for the alias", () => {
-    expect(DIAGNOSIS_SELF_EVOLUTION_CONFIRM_ENABLED).toBe(true);
+  it("keeps Path B CONFIRM closed by default and shares one handler for the alias", () => {
+    expect(DIAGNOSIS_SELF_EVOLUTION_CONFIRM_ENABLED).toBe(false);
     expect(source).not.toContain("user.daibai.ask");
     expect(source).not.toContain("user.daibai.execute");
     expect(source).not.toContain("chat.send");
@@ -40,7 +40,7 @@ describe("confirm diagnose prescription tool", () => {
     expect(visible.map((tool) => tool.name)).toEqual(["confirm_diagnose_prescription"]);
   });
 
-  it("does not refuse with confirm_not_enabled when Path B CONFIRM is open", async () => {
+  it("refuses canonical and alias tools before prescription lookup by default", async () => {
     const tool = createConfirmDiagnosePrescriptionTool({ tenantId: "001" });
     const result = await tool.execute("c1", {
       prescriptionId: "abc",
@@ -48,11 +48,11 @@ describe("confirm diagnose prescription tool", () => {
     });
     const details = result.details as { ok?: boolean; reason?: string };
     expect(details.ok).toBe(false);
-    expect(details.reason).not.toBe("confirm_not_enabled");
+    expect(details.reason).toBe("confirm_not_enabled");
     const alias = await executeConfirmDiagnosePrescription(
       { prescriptionId: "abc", professionalReportId: "pdr-1" },
       { tenantId: "001" },
     );
-    expect((alias.details as { reason?: string }).reason).not.toBe("confirm_not_enabled");
+    expect((alias.details as { reason?: string }).reason).toBe("confirm_not_enabled");
   });
 });

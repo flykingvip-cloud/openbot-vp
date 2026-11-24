@@ -1,3 +1,4 @@
+import { vi } from "vitest";
 import { describe, expect, it } from "vitest";
 import { createMemoryInterventionCaseStore } from "./intervention-case-store.js";
 import { newInterventionCaseId, type InterventionCase } from "./intervention-case.js";
@@ -44,4 +45,19 @@ describe("intervention daibai canary", () => {
     expect(interventionDaibaiGatesDefaultClosed().daibaiDeliveryEnabled).toBe(true);
     expect(interventionDaibaiGatesDefaultClosed().remediationExecutionEnabled).toBe(false);
   });
+});
+
+// These historical cutover / functional rehearsals explicitly opt into writes
+// against injected local ports. Default-closed behavior is covered separately
+// in write-policy.test.ts; this is not production enablement.
+vi.mock("./write-policy.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./write-policy.js")>();
+  return {
+    ...actual,
+    DIAGNOSIS_WRITE_POLICY: {
+      selfEvolutionConfirm: true,
+      conversationDelivery: true,
+      daibaiDelivery: true,
+    },
+  };
 });

@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EmbeddingProvider } from "../../memory/embeddings.js";
+import { knowledgeDocumentIdFromSkillRef } from "../knowledge/document-display-title.js";
 import type { KnowledgeSourceContext } from "../knowledge/sources/types.js";
 import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "./types.js";
 
@@ -113,7 +114,7 @@ function extractKnowledgeBaseId(payload: Record<string, unknown> | undefined): s
   return id;
 }
 
-describe("knowledge.base.documents.delete rollback", () => {
+describe("knowledge.base.documents.delete retry state", () => {
   beforeEach(() => {
     cleanStore();
     contextState.current = {
@@ -128,7 +129,7 @@ describe("knowledge.base.documents.delete rollback", () => {
     cleanStore();
   });
 
-  it("restores the knowledge-base binding when index deletion fails", async () => {
+  it("preserves bindings and unrelated concurrent writes on index failure, then retries", async () => {
     const created = await invoke("knowledge.base.create", { title: "Delete rollback KB" });
     const kbId = extractKnowledgeBaseId(created.payload);
 
@@ -146,9 +147,23 @@ describe("knowledge.base.documents.delete rollback", () => {
     const skillId = (uploaded.payload?.skillId as string | undefined) ?? "";
     expect(skillId).toBeTruthy();
 
+    const documentId = knowledgeDocumentIdFromSkillRef(kbId, skillId);
+    const index = await import("../knowledge/kb-index.js");
+    const actualIndex = await vi.importActual<typeof import("../knowledge/kb-index.js")>(
+      "../knowledge/kb-index.js",
+    );
+    const bases = await import("../knowledge/knowledge-base-store.js");
+    let unrelatedId = "";
+    vi.mocked(index.deleteKnowledgeDocumentFromIndex).mockImplementationOnce(() => {
+      unrelatedId = bases.createKnowledgeBase({
+        title: "Concurrent unrelated KB",
+        ownerId: "user-a",
+      }).id;
+      throw new Error("index delete failed");
+    });
     const deleted = await invoke("knowledge.base.documents.delete", {
       knowledgeBaseId: kbId,
-      documentId: skillId,
+      documentId,
     });
     expect(deleted.ok).toBe(false);
     expect(deleted.error?.message).toContain("index delete failed");
@@ -156,6 +171,105 @@ describe("knowledge.base.documents.delete rollback", () => {
     const sources = await invoke("knowledge.base.sources.list", { knowledgeBaseId: kbId });
     expect(sources.ok).toBe(true);
     const items = sources.payload?.sources as Array<{ documentId?: string }> | undefined;
-    expect(items?.some((item) => item.documentId === skillId)).toBe(true);
+    expect(items?.some((item) => item.documentId === documentId)).toBe(true);
+    expect(bases.getKnowledgeBase(unrelatedId)?.title).toBe("Concurrent unrelated KB");
+    expect(bases.getKnowledgeBase(kbId)?.documentIds).toContain(documentId);
+    expect(
+      (await invoke("knowledge.document.preview", { knowledgeBaseId: kbId, documentId })).ok,
+    ).toBe(false);
+    vi.mocked(index.deleteKnowledgeDocumentFromIndex).mockImplementation(
+      actualIndex.deleteKnowledgeDocumentFromIndex,
+    );
+    const retried = await invoke("knowledge.base.documents.delete", {
+      knowledgeBaseId: kbId,
+      documentId,
+    });
+    expect(retried.ok).toBe(true);
+    expect(bases.getKnowledgeBase(unrelatedId)?.title).toBe("Concurrent unrelated KB");
+    expect(bases.getKnowledgeBase(kbId)?.documentIds).not.toContain(documentId);
+  });
+  it("public same-skill attach refuses terminal identity without restoring membership", async () => {
+    const created = await invoke("knowledge.base.create", { title: "Terminal reattach" });
+    const kbId = extractKnowledgeBaseId(created.payload);
+    const uploaded = await invoke("knowledge.personal.upload", {
+      knowledgeBaseId: kbId,
+      attachment: {
+        fileName: "terminal.md",
+        mimeType: "text/markdown",
+        kind: "text",
+        textContent: "A same-skill public attach must not revive a permanently deleted original.",
+      },
+    });
+    expect(uploaded.ok).toBe(true);
+    const skillId = String(uploaded.payload?.skillId);
+    const documentId = knowledgeDocumentIdFromSkillRef(kbId, skillId);
+    const index = await import("../knowledge/kb-index.js");
+    const actual = await vi.importActual<typeof import("../knowledge/kb-index.js")>(
+      "../knowledge/kb-index.js",
+    );
+    vi.mocked(index.deleteKnowledgeDocumentFromIndex).mockImplementation(
+      actual.deleteKnowledgeDocumentFromIndex,
+    );
+    expect(
+      (await invoke("knowledge.base.documents.delete", { knowledgeBaseId: kbId, documentId })).ok,
+    ).toBe(true);
+    const attach = await invoke("knowledge.base.attach", {
+      knowledgeBaseId: kbId,
+      documentId: skillId,
+    });
+    expect(attach.ok).toBe(false);
+    expect(attach.error?.message).toContain("document_deleted");
+    const bases = await import("../knowledge/knowledge-base-store.js");
+    expect(bases.getKnowledgeBase(kbId)?.documentIds).not.toContain(documentId);
+  });
+  it("does not purge a shared index row or the other KB when terminal reattach is refused", async () => {
+    const first = await invoke("knowledge.base.create", { title: "Shared original" });
+    const kbId = extractKnowledgeBaseId(first.payload);
+    const uploaded = await invoke("knowledge.personal.upload", {
+      knowledgeBaseId: kbId,
+      attachment: {
+        fileName: "shared.md",
+        mimeType: "text/markdown",
+        kind: "text",
+        size: 128,
+        textContent:
+          "Existing shared index data must survive a terminal refusal scoped to one knowledge base.",
+      },
+    });
+    expect(uploaded.ok).toBe(true);
+    const skillId = String(uploaded.payload?.skillId);
+    const documentId = knowledgeDocumentIdFromSkillRef(kbId, skillId);
+    const other = await invoke("knowledge.base.create", { title: "Other reference" });
+    const otherId = extractKnowledgeBaseId(other.payload);
+    expect(
+      (await invoke("knowledge.base.attach", { knowledgeBaseId: otherId, documentId })).ok,
+    ).toBe(true);
+    const actual = await vi.importActual<typeof import("../knowledge/kb-index.js")>(
+      "../knowledge/kb-index.js",
+    );
+    const bases = await import("../knowledge/knowledge-base-store.js");
+    const layout = await import("../knowledge/knowledge-directory.js");
+    const dbPath = actual.resolveKnowledgeIndexDbPath({
+      ownerId: "user-a",
+      tenantId: null,
+      indexRoot: layout.resolveKnowledgeDirectoryLayoutForBase(bases.getKnowledgeBase(kbId)!)
+        .indexRoot,
+    });
+    const index = await actual.openKnowledgeIndex({ dbPath, vectorEnabled: false });
+    try {
+      const before = actual.getKnowledgeDocument(index.db, documentId);
+      expect(before).toBeTruthy();
+      expect(
+        (await invoke("knowledge.base.documents.delete", { knowledgeBaseId: kbId, documentId })).ok,
+      ).toBe(true);
+      expect(
+        (await invoke("knowledge.base.attach", { knowledgeBaseId: kbId, documentId: skillId })).ok,
+      ).toBe(false);
+      expect(bases.getKnowledgeBase(kbId)?.documentIds).not.toContain(documentId);
+      expect(bases.getKnowledgeBase(otherId)?.documentIds).toContain(documentId);
+      expect(actual.getKnowledgeDocument(index.db, documentId)).toEqual(before);
+    } finally {
+      index.close();
+    }
   });
 });

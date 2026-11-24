@@ -182,6 +182,7 @@ export type KnowledgePersonalImportDatasetRequest = {
 };
 
 export type KnowledgePersonalImportDatasetResponse = {
+  errors?: Array<{ documentId: string; reason: string; message?: string }>;
   knowledgeBaseId?: string;
   attempted: boolean;
   imported: number;
@@ -531,6 +532,7 @@ export type LocalFolderScanNowRequest = {
 };
 
 export type LocalFolderScanNowResponse = {
+  summary?: { scanned: number; ingested: number; skipped: number; errors: string[] };
   accepted: boolean;
   bindingId: string;
   status: LocalFolderBindingStatus;

@@ -38,6 +38,17 @@ vi.mock("../enterprise-seat-assets-store.js", async (importOriginal) => {
   };
 });
 
+// Mock the tenant-aware I/O seam itself: the facade's importOriginal cycle can
+// capture the real loader before its partial mock is installed.
+vi.mock("./seat-store-loader.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./seat-store-loader.js")>();
+  return {
+    ...actual,
+    loadSeatAssetsStoreForTenantId: vi.fn(async () => seatAssetsState.current),
+    loadSeatAssetsStoreForContext: vi.fn(async () => seatAssetsState.current),
+  };
+});
+
 const NOW = "2026-07-30T00:00:00.000Z";
 
 function makeSeatAssetsStore(): EnterpriseSeatAssetsStore {

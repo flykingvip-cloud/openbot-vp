@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { vi } from "vitest";
 import { afterEach, describe, expect, it } from "vitest";
 import { isConversationEvaluationEnabled } from "../conversation-evaluation/feature.js";
 import { evaluationFilePath } from "../conversation-evaluation/store.js";
@@ -540,3 +541,18 @@ async function invoke(
   } as never);
   return captured;
 }
+
+// These historical cutover / functional rehearsals explicitly opt into writes
+// against injected local ports. Default-closed behavior is covered separately
+// in write-policy.test.ts; this is not production enablement.
+vi.mock("./write-policy.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./write-policy.js")>();
+  return {
+    ...actual,
+    DIAGNOSIS_WRITE_POLICY: {
+      selfEvolutionConfirm: true,
+      conversationDelivery: true,
+      daibaiDelivery: true,
+    },
+  };
+});

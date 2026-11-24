@@ -501,8 +501,8 @@ describe("knowledge-base-library-content", () => {
   it("groups imported dataset records into one dataset with runtime stats", async () => {
     const ownerId = "user-dataset-runtime";
     const kb = createKnowledgeBase({ title: "Dataset KB", ownerId, tenantId: null }, storePath);
-    const datasetId = "dataset:0123456789abcdef0123";
-    const recordIds = [`${datasetId}:0`, `${datasetId}:1`];
+    const datasetId = "dataset-0123456789abcdef0123";
+    const recordIds = [`${datasetId}-0`, `${datasetId}-1`];
     for (let i = 0; i < recordIds.length; i += 1) {
       attachDocumentToKnowledgeBase(kb.id, recordIds[i], storePath);
       await ingestKnowledgeDocument({

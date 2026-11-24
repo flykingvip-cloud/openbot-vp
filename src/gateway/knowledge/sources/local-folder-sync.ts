@@ -581,6 +581,27 @@ export async function commitLocalFolderSync(params: {
           client: params.client,
           embeddingProvider: params.embeddingProvider,
           governanceOwnershipProof: params.governanceOwnershipProof,
+          onIndexed: (indexed) => {
+            try {
+              attachDocumentToKnowledgeBase(params.knowledgeBase.id, docId, params.kbStorePath);
+            } catch {
+              // already attached
+            }
+
+            upsertSourceDocumentLink(
+              {
+                sourceDescriptorId,
+                docId,
+                relativePath: file.relativePath,
+                state: "active",
+                lastSeenAt: now,
+                lastIngestedVersionId: indexed.versionLabel ?? undefined,
+                rawHash: file.rawHash,
+                semanticHash: undefined,
+              },
+              params.linkStorePath,
+            );
+          },
           deferEmbedding: true,
         });
 
@@ -606,26 +627,6 @@ export async function commitLocalFolderSync(params: {
           result.errors.push(`${file.relativePath}: ${outcome.error}`);
           continue;
         }
-
-        try {
-          attachDocumentToKnowledgeBase(params.knowledgeBase.id, docId, params.kbStorePath);
-        } catch {
-          // already attached
-        }
-
-        upsertSourceDocumentLink(
-          {
-            sourceDescriptorId,
-            docId,
-            relativePath: file.relativePath,
-            state: "active",
-            lastSeenAt: now,
-            lastIngestedVersionId: outcome.versionLabel ?? undefined,
-            rawHash: file.rawHash,
-            semanticHash: undefined,
-          },
-          params.linkStorePath,
-        );
 
         if (outcome.skipped) {
           result.skipped += 1;
@@ -729,6 +730,9 @@ function uploadPathsAcceptedByCommit(
       .filter((path): path is string => Boolean(path)),
   );
   return uploadedPaths.filter((path) => {
+    if (failed.has(path)) {
+      return false;
+    }
     const document = result.documents?.find((item) => item.relativePath === path);
     if (document && (document.originalStored || document.chunkCount > 0)) {
       return true;

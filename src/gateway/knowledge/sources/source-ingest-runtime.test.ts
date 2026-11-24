@@ -11,8 +11,12 @@ import {
   resolveKnowledgeIndexDbPath,
 } from "../kb-index.js";
 import { listKnowledgeBaseSources } from "../knowledge-base-sources-list.js";
+import { getKnowledgeBase } from "../knowledge-base-store.js";
 import { createKnowledgeBase } from "../knowledge-base-store.js";
+import { resolveKnowledgeDirectoryLayoutForBase } from "../knowledge-directory.js";
+import { markKnowledgeOriginalDeleted } from "../knowledge-original-store.js";
 import { bindKnowledgeSource } from "./source-binding-store.js";
+import { listSourceDocumentLinks } from "./source-document-link-store.js";
 import { ingestKnowledgeSourceBinding } from "./source-ingest-runtime.js";
 import type { KnowledgeSourceContext } from "./types.js";
 
@@ -99,7 +103,7 @@ describe("source-ingest-runtime", () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(result.documentId).toMatch(/^srcdir:/);
+    expect(result.documentId).toMatch(/^srcdir-/);
     expect(result.ingest?.skipped).toBe(false);
     expect(fetchApi).toHaveBeenCalledOnce();
 
@@ -174,7 +178,7 @@ describe("source-ingest-runtime", () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(result.documentId).toMatch(/^srcdir:/);
+    expect(result.documentId).toMatch(/^srcdir-/);
     expect(fetchExternal).toHaveBeenCalledWith(
       expect.objectContaining({
         endpoint: binding.endpoint,
@@ -230,5 +234,74 @@ describe("source-ingest-runtime", () => {
     expect(result.reason).toBe("governance_write_denied:missing_ownership_proof");
     expect(result.ingest?.skipped).toBe(true);
     expect(result.ingest?.error).toBe("governance_write_denied:missing_ownership_proof");
+  });
+  it("returns a visible terminal source refusal without indexing, membership or active link", async () => {
+    const kb = createKnowledgeBase(
+      { title: "Blocked source", ownerId: "user-1", tenantId: "tenant-1" },
+      kbStorePath,
+    );
+    const binding = bindKnowledgeSource(
+      {
+        kind: "api",
+        title: "Terminal API",
+        knowledgeBaseId: kb.id,
+        ownerId: "user-1",
+        endpoint: "https://api.example.test",
+        visibility: "private",
+      },
+      bindingsStorePath,
+    );
+    const first = await ingestKnowledgeSourceBinding({
+      sourceDescriptorId: binding.id,
+      knowledgeBase: kb,
+      context,
+      ownerId: "user-1",
+      governanceOwnershipProof,
+      options: {
+        bindingsStorePath,
+        kbStorePath,
+        sourceDocumentLinkStorePath: linkStorePath,
+        indexRoot,
+        embeddingProvider: mockProvider,
+        fetchApi: vi.fn(async () => ({ data: { text: "Source fixture content" } })) as never,
+        authorizedKnowledgeBaseIds: new Set([kb.id]),
+      },
+    });
+    expect(first.ok).toBe(true);
+    expect(first.documentId).toBeTruthy();
+    const id = first.documentId!;
+    markKnowledgeOriginalDeleted({
+      kbId: kb.id,
+      docId: id,
+      originalsRoot: resolveKnowledgeDirectoryLayoutForBase(kb).originalsRoot,
+    });
+    const before = JSON.stringify(getKnowledgeBase(kb.id, kbStorePath));
+    const linksBefore = JSON.stringify(
+      listSourceDocumentLinks({ sourceDescriptorId: binding.id }, linkStorePath),
+    );
+    const second = await ingestKnowledgeSourceBinding({
+      sourceDescriptorId: binding.id,
+      knowledgeBase: kb,
+      context,
+      ownerId: "user-1",
+      governanceOwnershipProof,
+      options: {
+        bindingsStorePath,
+        kbStorePath,
+        sourceDocumentLinkStorePath: linkStorePath,
+        indexRoot,
+        embeddingProvider: mockProvider,
+        fetchApi: vi.fn(async () => ({
+          data: { text: "Updated content must not be indexed" },
+        })) as never,
+        authorizedKnowledgeBaseIds: new Set([kb.id]),
+      },
+    });
+    expect(second.ok).toBe(false);
+    expect(second.ingest?.reason).toBe("document_deleted");
+    expect(JSON.stringify(getKnowledgeBase(kb.id, kbStorePath))).toBe(before);
+    expect(
+      JSON.stringify(listSourceDocumentLinks({ sourceDescriptorId: binding.id }, linkStorePath)),
+    ).toBe(linksBefore);
   });
 });

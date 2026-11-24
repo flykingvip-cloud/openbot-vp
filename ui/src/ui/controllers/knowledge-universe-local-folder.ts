@@ -366,7 +366,7 @@ export async function scanKnowledgeUniverseLocalFolderNow(state: AppPortState, b
   try {
     const gateway = createKnowledgeUniverseGateway(state.client);
     const result = (await gateway.scanLocalFolderNow({ bindingId })) as {
-      summary?: { scanned?: number; ingested?: number };
+      summary?: { scanned?: number; ingested?: number; errors?: string[] };
     };
     const scanned = result.summary?.scanned ?? 0;
     const ingested = result.summary?.ingested ?? 0;
@@ -374,6 +374,12 @@ export async function scanKnowledgeUniverseLocalFolderNow(state: AppPortState, b
       "frontstage.workbench.knowledgeUniverse.importToSpace.localFolder.notices.scanned",
       { scanned: String(scanned), ingested: String(ingested) },
     );
+    if (result.summary?.errors?.length) {
+      runtime.personalActionError = result.summary.errors.join("; ");
+      if (ingested === 0) {
+        runtime.personalActionNotice = null;
+      }
+    }
     await loadKnowledgeUniverseLocalFolderStatus(state);
   } catch (error) {
     runtime.personalActionError =

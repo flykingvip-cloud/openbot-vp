@@ -58,6 +58,13 @@ async function resolveDeliverableDocIds(ctx: RetrievalContext): Promise<Set<stri
     const docId = resolveDeliverableDocumentId(item.deliverableId);
     if (docId) {
       docIds.add(docId);
+      const canonical = resolveDeliverableDocumentId(
+        item.deliverableId,
+        archiveMap[item.deliverableId],
+      );
+      if (canonical) {
+        docIds.add(canonical);
+      }
     }
   }
   return docIds;

@@ -351,6 +351,24 @@ export async function scanLocalFolderBinding(params: {
         client: params.client,
         embeddingProvider: params.embeddingProvider,
         governanceOwnershipProof: params.governanceOwnershipProof,
+        onIndexed: (indexed) => {
+          try {
+            attachDocumentToKnowledgeBase(params.knowledgeBase.id, docId, params.kbStorePath);
+          } catch {
+            // already attached or store race
+          }
+          upsertSourceDocumentLink(
+            {
+              sourceDescriptorId: binding.sourceDescriptorId,
+              docId,
+              relativePath: file.relativePath,
+              state: "active",
+              lastSeenAt: now,
+              lastIngestedVersionId: indexed.versionLabel ?? undefined,
+            },
+            params.linkStorePath,
+          );
+        },
         deferEmbedding: true,
       });
       if (outcome.error) {
@@ -358,22 +376,6 @@ export async function scanLocalFolderBinding(params: {
         summary.errors.push(`${file.relativePath}: ${outcome.error}`);
         continue;
       }
-      try {
-        attachDocumentToKnowledgeBase(params.knowledgeBase.id, docId, params.kbStorePath);
-      } catch {
-        // already attached or store race
-      }
-      upsertSourceDocumentLink(
-        {
-          sourceDescriptorId: binding.sourceDescriptorId,
-          docId,
-          relativePath: file.relativePath,
-          state: "active",
-          lastSeenAt: now,
-          lastIngestedVersionId: outcome.versionLabel ?? undefined,
-        },
-        params.linkStorePath,
-      );
       if (outcome.skipped) {
         summary.skipped += 1;
       } else {
@@ -426,7 +428,7 @@ export async function scanLocalFolderBinding(params: {
     updateLocalFolderBindingStatus(
       binding.bindingId,
       {
-        status: "idle",
+        status: summary.errors.length > 0 ? "error" : "idle",
         lastScanAt: now,
         lastEventAt: now,
         lastError: summary.errors[0] ?? null,

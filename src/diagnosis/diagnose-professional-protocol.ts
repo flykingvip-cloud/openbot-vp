@@ -5,11 +5,12 @@
  * next-heartbeat is a cron wake mode, not an agent heartbeat config change.
  */
 import { createHash } from "node:crypto";
+import { DIAGNOSIS_WRITE_POLICY } from "./write-policy.js";
 
 export const DIAGNOSIS_DIAGNOSE_PERSIST_SCHEDULE = false as const;
 
-/** Path B CONFIRM exception 2026-10-19 (pathb-confirm-exception): gray confirm opened. */
-export const DIAGNOSIS_SELF_EVOLUTION_CONFIRM_ENABLED = true as const;
+/** Default closed. Historical gray-confirm approval is not startup authorization. */
+export const DIAGNOSIS_SELF_EVOLUTION_CONFIRM_ENABLED = DIAGNOSIS_WRITE_POLICY.selfEvolutionConfirm;
 
 export const DIAGNOSIS_PROFESSIONAL_REPORT_ARTIFACT = "diagnosis_professional_report" as const;
 

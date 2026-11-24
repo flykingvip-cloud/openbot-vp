@@ -46,7 +46,7 @@ describe("diagnose action 1:1 dispatch", () => {
     ).toEqual({ ok: false, reason: "session_missing" });
   });
 
-  it("wakes the target session and injects a steward receipt", async () => {
+  it("wakes the target session but declines the default-disabled diagnosis receipt", async () => {
     const send = vi.fn(async () => ({ runId: "run-1" }));
     const injectReceipt = vi.fn(async () => undefined);
     const result = await dispatchDiagnoseConversationAction({
@@ -67,9 +67,11 @@ describe("diagnose action 1:1 dispatch", () => {
       requesterSessionKey: "agent:main:employee:user-1",
       sessionOwnerPlatformUserId: "user-1",
     });
-    expect(injectReceipt).toHaveBeenCalledWith(
-      expect.objectContaining({ text: expect.stringContaining("不是协作小组") }),
-    );
+    expect(injectReceipt).not.toHaveBeenCalled();
+    expect(result.receipt).toEqual({
+      delivered: false,
+      reason: "conversation_delivery_gate_closed",
+    });
     expect(JSON.stringify(result)).not.toContain("user.daibai.ask");
   });
 

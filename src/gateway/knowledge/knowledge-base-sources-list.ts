@@ -12,8 +12,14 @@ import {
   type KnowledgeBaseDocumentSummary,
 } from "./knowledge-base-library-content.js";
 import type { KnowledgeBase, KnowledgeBaseVisibility } from "./knowledge-base-store.js";
-import { resolveKnowledgeIndexRootForBase } from "./knowledge-directory.js";
-import { listKnowledgeOriginalDocumentIds } from "./knowledge-original-store.js";
+import {
+  resolveKnowledgeDirectoryLayoutForBase,
+  resolveKnowledgeIndexRootForBase,
+} from "./knowledge-directory.js";
+import {
+  isKnowledgeOriginalDeleted,
+  listKnowledgeOriginalDocumentIds,
+} from "./knowledge-original-store.js";
 import { listReservedDeliverableDocuments } from "./reserved-deliverable-original.js";
 import { listOpenableLocalFolderDocumentIds } from "./sources/local-folder-open.js";
 import { listKnowledgeSourceBindings } from "./sources/source-binding-store.js";
@@ -228,10 +234,18 @@ export async function listKnowledgeBaseSources(
     bindingStorePath: params.localFolderBindingStorePath,
     linkStorePath: params.sourceDocumentLinkStorePath,
   });
-  const previewableOriginalDocIds = listKnowledgeOriginalDocumentIds({
-    kbId,
-    originalsRoot: params.originalsRoot,
-  });
+  const originalsRoot =
+    params.originalsRoot ??
+    resolveKnowledgeDirectoryLayoutForBase(params.knowledgeBase, {
+      tenantsRoot: params.tenantsRoot,
+      configDir: params.configDir,
+    }).originalsRoot;
+  const previewableOriginalDocIds = listKnowledgeOriginalDocumentIds({ kbId, originalsRoot });
+  if (params.originalsRoot === undefined) {
+    for (const id of listKnowledgeOriginalDocumentIds({ kbId })) {
+      previewableOriginalDocIds.add(id);
+    }
+  }
   const canPreviewDoc = (docId: string) =>
     previewableOriginalDocIds.has(docId) || openableOriginalDocIds.has(docId);
   const items: KnowledgeBaseSourceListItem[] = [];
@@ -420,5 +434,15 @@ export async function listKnowledgeBaseSources(
       !isKnowledgeCabinInternalLabel(item.title),
   );
 
+  // Apply last so legacy/local/reserved projections cannot override deletion intent.
+  for (const item of filtered) {
+    if (
+      item.documentId &&
+      isKnowledgeOriginalDeleted({ kbId, docId: item.documentId, originalsRoot })
+    ) {
+      item.canPreviewOriginal = false;
+      item.canOpenOriginal = false;
+    }
+  }
   return filtered.toSorted((left, right) => right.updatedAtMs - left.updatedAtMs);
 }
