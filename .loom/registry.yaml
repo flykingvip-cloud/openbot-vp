@@ -1,5 +1,25 @@
 version: 1
 tasks:
+  - id: knowledge-original-safe-lock-dir
+    owner: codex-integration
+    intent:
+      - User-authorized exact safe temporary lock directory correction; lock protocol unchanged.
+    paths:
+      - src/gateway/knowledge/knowledge-original-store.ts
+      - src/gateway/knowledge/knowledge-original-store.test.ts
+    state: active
+    sessions:
+      - id: knowledge-original-safe-lock-dir-20261124
+        taskId: knowledge-original-safe-lock-dir
+        ide: codex
+        agent: codex-integration
+        status: active
+        lastSignalAt: 2026-11-24T00:51:53.394596+00:00
+        metadata:
+          compatibility: Stop old workers before enabling the new lock root; old and new roots cannot coordinate concurrently.
+    ownerHistory: []
+    since: 2026-11-24
+    metadata: {}
   - id: arch-remediation-wp-e-policy-composition
     owner: codex-sdk-control-verifier
     intent:
@@ -31527,6 +31547,14 @@ landingStreams:
       reason: Only seven previously unmatched exact paths; preserve all prior stream
         order/classification
 sharedPaths:
+  - glob: src/gateway/knowledge/knowledge-original-store.ts
+    landerTask: knowledge-original-safe-lock-dir
+    reason: User-authorized exact takeover; preserve historical directory claims and Registry owner.
+    reviewAfter: 2026-12-31
+  - glob: src/gateway/knowledge/knowledge-original-store.test.ts
+    landerTask: knowledge-original-safe-lock-dir
+    reason: User-authorized exact takeover; preserve historical directory claims and Registry owner.
+    reviewAfter: 2026-12-31
   - glob: src/gateway/knowledge/retrieval-summary-authority.ts
     landerTask: knowledge-summary-manual-closeout:codex-kb-repair
     reason: Human-approved exact PR334 repair; predecessor tasks and history retained.
