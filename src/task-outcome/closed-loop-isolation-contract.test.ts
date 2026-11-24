@@ -11,7 +11,27 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+const diagnosisFixture = vi.hoisted(() => ({ conversationDelivery: false }));
+vi.mock("../diagnosis/write-policy.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../diagnosis/write-policy.js")>();
+  return {
+    ...actual,
+    get DIAGNOSIS_WRITE_POLICY() {
+      return actual.resolveDiagnosisWritePolicy({
+        OPENBOT_DIAGNOSIS_WRITES_ENABLED: diagnosisFixture.conversationDelivery ? "true" : "false",
+        OPENBOT_DIAGNOSIS_CONVERSATION_DELIVERY_ENABLED: diagnosisFixture.conversationDelivery
+          ? "true"
+          : "false",
+      });
+    },
+  };
+});
+afterEach(() => {
+  diagnosisFixture.conversationDelivery = false;
+});
+
 import { buildEmployeeBuiltinStewardSessionKey } from "../agents/builtin-steward/employee-isolation.js";
 import { extractGoalCorrectionMutation } from "../auto-reply/reply/goal-correction-mutation.js";
 import { applyInboundTaskFeedback } from "../auto-reply/reply/inbound-task-feedback.js";
@@ -864,6 +884,26 @@ describe("closed-loop isolation contract", () => {
       sessionKey: "agent:bot:main",
     });
     const sends: string[] = [];
+    const disabled = await deliverDiagnoseReportToConversation({
+      request,
+      reportText: "default policy stays closed",
+      tenantId: "tenant-a",
+      send: async () => {
+        sends.push("unexpected-default-send");
+        return "accepted";
+      },
+      resolveOwners: () => [
+        {
+          userId: "platform-alice",
+          route: "employee",
+          sessionKey: buildEmployeeBuiltinStewardSessionKey("platform-alice"),
+        },
+      ],
+    });
+    expect(disabled.delivered).toBe(false);
+    expect(sends).toEqual([]);
+    expect(store.loadTask("task-notify")).toEqual(before);
+    diagnosisFixture.conversationDelivery = true;
     const accepted = await deliverDiagnoseReportToConversation({
       request,
       reportText: "跟进：原任务结果已被否定",
@@ -1076,7 +1116,7 @@ describe("closed-loop isolation contract", () => {
 
   it("keeps issue, support, adoption, and claim boundaries closed", async () => {
     expect(DIAGNOSIS_REMEDIATION_EXECUTION_ENABLED).toBe(false);
-    expect(DIAGNOSIS_SELF_EVOLUTION_CONFIRM_ENABLED).toBe(true);
+    expect(DIAGNOSIS_SELF_EVOLUTION_CONFIRM_ENABLED).toBe(false);
     expect(
       isCollabTaskClaimContractEnabled({} as OpenBotConfig, "group-isolation", "tenant-a"),
     ).toBe(false);
@@ -1119,7 +1159,7 @@ describe("closed-loop isolation contract", () => {
         },
         context: {} as never,
       });
-      expect(body).toMatchObject({ ok: false, reason: "confirm_not_enabled", enabled: true });
+      expect(body).toMatchObject({ ok: false, reason: "confirm_not_enabled", enabled: false });
     }
     expect(store.loadTask("task-boundary")?.outcomeVersion).toBe(version);
 

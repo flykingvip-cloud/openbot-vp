@@ -1,7 +1,22 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
+
+// The production policy is frozen at startup. This isolated suite opts in via
+// the real resolver before consumers initialize; inherited flags are ignored.
+vi.mock("../diagnosis/write-policy.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../diagnosis/write-policy.js")>();
+  return {
+    ...actual,
+    DIAGNOSIS_WRITE_POLICY: actual.resolveDiagnosisWritePolicy({
+      OPENBOT_DIAGNOSIS_WRITES_ENABLED: "true",
+      OPENBOT_DIAGNOSIS_CONVERSATION_DELIVERY_ENABLED: "true",
+      OPENBOT_DIAGNOSIS_DAIBAI_DELIVERY_ENABLED: "true",
+    }),
+  };
+});
+
 import { runAllDemos } from "./run-demos.js";
 
 const DEMO_EVIDENCE_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), "batch1-demo-evidence-"));
