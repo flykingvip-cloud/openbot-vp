@@ -1,5 +1,23 @@
 version: 1
 tasks:
+  - id: launcher-parent-selector-guard:codex-integration
+    owner: codex-integration
+    intent:
+      - User-authorized parent launcher selector rejection before config import and dist removal.
+    paths:
+      - scripts/tsdown-build.mjs
+    state: active
+    sessions:
+      - id: launcher-parent-selector-20261124
+        taskId: launcher-parent-selector-guard:codex-integration
+        ide: codex
+        agent: codex-integration
+        status: active
+        lastSignalAt: 2026-11-24T11:04:45.736986+00:00
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-24
+    metadata: {}
   - id: diagnosis-write-policy-test-fixtures
     owner: codex-integration
     intent:
@@ -31587,6 +31605,10 @@ landingStreams:
       reason: Only seven previously unmatched exact paths; preserve all prior stream
         order/classification
 sharedPaths:
+  - glob: scripts/tsdown-build.mjs
+    landerTask: launcher-parent-selector-guard:codex-integration
+    reason: User-authorized exact launcher guard takeover; cursor predecessor task history preserved.
+    reviewAfter: 2026-12-31
   - glob: src/batch1-capability-enablement/demos.test.ts
     landerTask: diagnosis-write-policy-test-fixtures
     reason: User-authorized exact test fixture takeover; prior history retained.
