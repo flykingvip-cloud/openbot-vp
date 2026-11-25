@@ -1,5 +1,24 @@
 version: 1
 tasks:
+  - id: pending-claim-recheck
+    owner: codex-runtime-state-executor
+    intent:
+      - User-authorized two-path pending claim recovery recheck.
+    paths:
+      - src/task-outcome/consumer-boot.ts
+      - src/task-outcome/s4-result-delivery-loop.test.ts
+    state: active
+    sessions:
+      - id: pending-claim-recheck-20261125
+        taskId: pending-claim-recheck
+        ide: codex
+        agent: codex-runtime-state-executor
+        status: active
+        lastSignalAt: 2026-11-25T08:49:23.593736+00:00
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-25
+    metadata: {}
   - id: launcher-parent-selector-guard:codex-integration
     owner: codex-integration
     intent:
@@ -18783,7 +18802,6 @@ landingStreams:
       - src/gateway/server-methods/agent.ts
       - src/gateway/server-methods/evolution-control.ts
       - src/task-outcome/budget.ts
-      - src/task-outcome/consumer-boot.ts
       - src/task-outcome/entrypoint-ensure.ts
       - src/task-outcome/entrypoints/subagent.ts
       - src/task-outcome/executor-closeout-residuals.test.ts
@@ -18802,6 +18820,10 @@ landingStreams:
       - src/gateway/supervisor/types.ts
     canLandWith: []
     metadata:
+      pendingClaimExactMigration20261125:
+        formerPath: src/task-outcome/consumer-boot.ts
+        newStream: pending-claim-recheck-exact
+        authorizedBy: human
       task: askOutcome-p0-task-outcome-contract
       owner: 执行器收尾
       purpose:
@@ -19543,6 +19565,18 @@ landingStreams:
       reviewAfter: 2026-11-30
       convergeNote: post-#107 landed; hot paths trimmed; sharedPaths landers remain authoritative
       purpose: "#91 leftover real gateway models.admission verification/decision RPC"
+  - id: pending-claim-recheck-exact
+    landingPolicy: serial
+    paths:
+      - src/task-outcome/consumer-boot.ts
+      - src/task-outcome/s4-result-delivery-loop.test.ts
+    canLandWith: []
+    metadata:
+      task: pending-claim-recheck
+      authorizedBy: human
+      previousSourceStream: askOutcome-executor-closeout
+      previousTestStream: askOutcome-p0-r83-remediation
+      scope: Only these two exact classifications change; prior stream order retained.
   - id: askOutcome-p0-r83-remediation
     landingPolicy: serial
     paths:
@@ -31643,6 +31677,14 @@ landingStreams:
       reason: Only seven previously unmatched exact paths; preserve all prior stream
         order/classification
 sharedPaths:
+  - glob: src/task-outcome/consumer-boot.ts
+    landerTask: pending-claim-recheck
+    reason: User-authorized exact takeover; askOutcome and cursor predecessor histories retained.
+    reviewAfter: 2026-12-31
+  - glob: src/task-outcome/s4-result-delivery-loop.test.ts
+    landerTask: pending-claim-recheck
+    reason: User-authorized exact takeover; askOutcome and cursor predecessor histories retained.
+    reviewAfter: 2026-12-31
   - glob: scripts/tsdown-build.mjs
     landerTask: launcher-parent-selector-guard:codex-integration
     reason: User-authorized exact launcher guard takeover; cursor predecessor task history preserved.
