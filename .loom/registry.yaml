@@ -16075,6 +16075,7 @@ tasks:
       - src/retrieval/sources/knowledge-source.test.ts
       - src/knowledge/adapter/**
       - src/knowledge/**
+      - src/gateway/knowledge/knowledge-base-members.ts
     state: active
     sessions:
       - id: 20261125-knowledge-alignment
@@ -16082,19 +16083,31 @@ tasks:
         ide: codex
         agent: codex-knowledge
         status: active
-        lastSignalAt: 2026-11-25T12:20:53.431Z
+        lastSignalAt: 2026-11-25T12:47:17.692Z
         metadata: {}
       - id: 20261125-m2b
         taskId: knowledge-sdk-alignment:codex-knowledge
         ide: codex
         agent: codex-knowledge
         status: active
-        lastSignalAt: 2026-11-25T12:20:53.431Z
+        lastSignalAt: 2026-11-25T12:47:17.692Z
         metadata: {}
     ownerHistory: []
     since: 2026-11-25
     metadata: {}
 landingStreams:
+  - id: knowledge-sdk-alignment:codex-knowledge
+    landingPolicy: serial
+    paths:
+      - src/knowledge/adapter/**
+      - docs/architecture/knowledge-sdk-alignment/**
+      - src/gateway/knowledge/knowledge-base-permissions.ts
+      - src/gateway/knowledge/knowledge-base-permissions.test.ts
+      - src/gateway/knowledge/knowledge-base-members.ts
+      - src/retrieval/sources/knowledge-source.test.ts
+    canLandWith: []
+    metadata:
+      legacyTitle: User-authorized M2-B isolated contract adapter and safety remediation
   - id: delivery-acceptance-integration-20261122
     landingPolicy: serial
     paths:
@@ -36945,4 +36958,9 @@ sharedPaths:
     reason: User explicitly authorizes M2-B exact-scope ownership reconciliation and
       landing; isolated HEAD originals and tests reviewed; only codex-knowledge
       deltas present; prior task/session history retained.
+    reviewAfter: 2026-12-31
+  - glob: src/gateway/knowledge/knowledge-base-members.ts
+    landerTask: knowledge-sdk-alignment:codex-knowledge
+    reason: User-authorized M2-B stable subject compatibility field; verified
+      original and scoped delta, historical broad claims preserved.
     reviewAfter: 2026-12-31
