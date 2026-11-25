@@ -41,6 +41,20 @@ function activeMemberRole(
   actor: KnowledgeBasePermissionActor,
   members: KnowledgeBaseMemberRecord[] = listKnowledgeBaseMembers(knowledgeBase.id),
 ): KnowledgeBaseMemberRole | null {
+  // Agent execution cannot convert an email invitation into stable user authority.
+  if (actor.agentId?.trim()) {
+    if (!actor.userId?.trim()) {
+      return null;
+    }
+    return (
+      members.find(
+        (member) =>
+          member.knowledgeBaseId === knowledgeBase.id &&
+          member.status === "active" &&
+          member.userId === actor.userId,
+      )?.role ?? null
+    );
+  }
   const email = normalizeEmail(actor.email);
   if (!email) {
     return null;
@@ -55,32 +69,27 @@ function activeMemberRole(
   );
 }
 
-function canReadViaRobotBinding(
-  knowledgeBase: KnowledgeBase,
-  actor: KnowledgeBasePermissionActor,
-): boolean {
-  const agentId = actor.agentId?.trim();
-  if (!agentId || !knowledgeBase.robotIds.includes(agentId)) {
-    return false;
-  }
-  if (actor.userId && knowledgeBase.ownerId === actor.userId) {
-    return true;
-  }
-  const actorTenant = canonicalizeTenantId(actor.tenantId);
-  const kbTenant = canonicalizeTenantId(knowledgeBase.tenantId);
-  return Boolean(actorTenant && kbTenant && actorTenant === kbTenant);
-}
-
 export function canReadKnowledgeBase(params: {
   knowledgeBase: KnowledgeBase;
   actor: KnowledgeBasePermissionActor;
   members?: KnowledgeBaseMemberRecord[];
 }): boolean {
   const { knowledgeBase, actor } = params;
-  if (actor.userId && knowledgeBase.ownerId === actor.userId) {
-    return true;
+  // Agent binding only narrows a trusted user's access; it never grants membership.
+  if (actor.agentId?.trim()) {
+    const actorTenant = canonicalizeTenantId(actor.tenantId);
+    const kbTenant = canonicalizeTenantId(knowledgeBase.tenantId);
+    if (
+      !actor.userId?.trim() ||
+      !actorTenant ||
+      !kbTenant ||
+      actorTenant !== kbTenant ||
+      !knowledgeBase.robotIds.includes(actor.agentId.trim())
+    ) {
+      return false;
+    }
   }
-  if (canReadViaRobotBinding(knowledgeBase, actor)) {
+  if (actor.userId && knowledgeBase.ownerId === actor.userId) {
     return true;
   }
   if (activeMemberRole(knowledgeBase, actor, params.members)) {

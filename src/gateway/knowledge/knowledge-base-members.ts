@@ -10,6 +10,8 @@ export type KnowledgeBaseMemberStatus = "pending" | "active";
 
 export type KnowledgeBaseMemberRecord = {
   memberId: string;
+  /** Verified internal subject, absent for legacy email-only invitations. */
+  userId?: string;
   knowledgeBaseId: string;
   email: string;
   role: KnowledgeBaseMemberRole;
@@ -54,6 +56,7 @@ function sanitizeMember(value: unknown): KnowledgeBaseMemberRecord | null {
   }
   return {
     memberId,
+    ...(stringValue(value.userId) ? { userId: stringValue(value.userId) } : {}),
     knowledgeBaseId,
     email,
     role: normalizeRole(value.role),
