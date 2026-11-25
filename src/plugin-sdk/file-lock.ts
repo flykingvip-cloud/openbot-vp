@@ -1,7 +1,6 @@
 import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { isPidAlive } from "../shared/pid-alive.js";
 import { resolveProcessScopedMap } from "../shared/process-scoped-map.js";
 
 export type FileLockOptions = {
@@ -12,12 +11,8 @@ export type FileLockOptions = {
     maxTimeout: number;
     randomize?: boolean;
   };
+  /** Retained for API compatibility; locks are never reclaimed online. */
   stale: number;
-};
-
-type LockFilePayload = {
-  pid: number;
-  createdAt: string;
 };
 
 type HeldLock = {
@@ -26,6 +21,8 @@ type HeldLock = {
   lockPath: string;
 };
 
+// Abandoned locks require offline cleanup after stopping every participant.
+// PID, age and malformed contents cannot authorize deleting another lock.
 const HELD_LOCKS_KEY = Symbol.for("openclaw.fileLockHeldLocks");
 const HELD_LOCKS = resolveProcessScopedMap<HeldLock>(HELD_LOCKS_KEY);
 
@@ -38,19 +35,6 @@ function computeDelayMs(retries: FileLockOptions["retries"], attempt: number): n
   return Math.min(retries.maxTimeout, Math.round(base * jitter));
 }
 
-async function readLockPayload(lockPath: string): Promise<LockFilePayload | null> {
-  try {
-    const raw = await fs.readFile(lockPath, "utf8");
-    const parsed = JSON.parse(raw) as Partial<LockFilePayload>;
-    if (typeof parsed.pid !== "number" || typeof parsed.createdAt !== "string") {
-      return null;
-    }
-    return { pid: parsed.pid, createdAt: parsed.createdAt };
-  } catch {
-    return null;
-  }
-}
-
 async function resolveNormalizedFilePath(filePath: string): Promise<string> {
   const resolved = path.resolve(filePath);
   const dir = path.dirname(resolved);
@@ -60,27 +44,6 @@ async function resolveNormalizedFilePath(filePath: string): Promise<string> {
     return path.join(realDir, path.basename(resolved));
   } catch {
     return resolved;
-  }
-}
-
-async function isStaleLock(lockPath: string, staleMs: number): Promise<boolean> {
-  const payload = await readLockPayload(lockPath);
-  if (payload?.pid) {
-    // Elapsed time alone cannot revoke a live process holding the critical section.
-    return !isPidAlive(payload.pid);
-  }
-  if (payload?.createdAt) {
-    const createdAt = Date.parse(payload.createdAt);
-    if (!Number.isFinite(createdAt) || Date.now() - createdAt > staleMs) {
-      return true;
-    }
-  }
-  try {
-    const stat = await fs.stat(lockPath);
-    return Date.now() - stat.mtimeMs > staleMs;
-  } catch {
-    // Losing the inspection snapshot does not authorize deleting a replacement lock.
-    return false;
   }
 }
 
@@ -136,10 +99,6 @@ export async function acquireFileLock(
       if (code !== "EEXIST") {
         throw err;
       }
-      if (await isStaleLock(lockPath, options.stale)) {
-        await fs.rm(lockPath, { force: true }).catch(() => undefined);
-        continue;
-      }
       if (attempt >= attempts - 1) {
         break;
       }
@@ -189,39 +148,6 @@ function resolveNormalizedFilePathSync(filePath: string): string {
   }
 }
 
-function readLockPayloadSync(lockPath: string): LockFilePayload | null {
-  try {
-    const raw = fsSync.readFileSync(lockPath, "utf8");
-    const parsed = JSON.parse(raw) as Partial<LockFilePayload>;
-    if (typeof parsed.pid !== "number" || typeof parsed.createdAt !== "string") {
-      return null;
-    }
-    return { pid: parsed.pid, createdAt: parsed.createdAt };
-  } catch {
-    return null;
-  }
-}
-
-function isStaleLockSync(lockPath: string, staleMs: number): boolean {
-  const payload = readLockPayloadSync(lockPath);
-  if (payload?.pid) {
-    return !isPidAlive(payload.pid);
-  }
-  if (payload?.createdAt) {
-    const createdAt = Date.parse(payload.createdAt);
-    if (!Number.isFinite(createdAt) || Date.now() - createdAt > staleMs) {
-      return true;
-    }
-  }
-  try {
-    const stat = fsSync.statSync(lockPath);
-    return Date.now() - stat.mtimeMs > staleMs;
-  } catch {
-    // Losing the inspection snapshot does not authorize deleting a replacement lock.
-    return false;
-  }
-}
-
 function releaseHeldLockSync(normalizedFile: string): void {
   const current = HELD_LOCKS_SYNC.get(normalizedFile);
   if (!current) {
@@ -250,7 +176,7 @@ export type FileLockHandleSync = {
 };
 
 /**
- * Sync counterpart of acquireFileLock — same `${file}.lock` protocol + stale pid break.
+ * Sync counterpart of acquireFileLock — same `${file}.lock` protocol without online stale reclamation.
  * Used by sync stores (session task board) so cross-process writers share one mechanism.
  */
 export function acquireFileLockSync(
@@ -285,14 +211,6 @@ export function acquireFileLockSync(
       const code = (err as { code?: string }).code;
       if (code !== "EEXIST") {
         throw err;
-      }
-      if (isStaleLockSync(lockPath, options.stale)) {
-        try {
-          fsSync.rmSync(lockPath, { force: true });
-        } catch {
-          // race
-        }
-        continue;
       }
       if (attempt >= attempts - 1) {
         break;
