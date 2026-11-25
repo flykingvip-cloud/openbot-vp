@@ -302,6 +302,17 @@ export async function deliverRecoveredAwaitingSends(params: {
         deliveryId: claimed.registration.deliveryId,
         taskId: claimed.registration.taskId,
       };
+      // Claim acquisition may wait while task ownership or authorization changes.
+      // Recheck the locked registration immediately before the send port. The
+      // claim is already unknown; refusal must not revive automatic resend.
+      if (
+        !canReuseCurrentBinding(claimed.registration) ||
+        !recheckCurrentOutboundAuthorization({ cfg: params.cfg, pending: claimed.registration })
+          .allow
+      ) {
+        out.blocked += 1;
+        continue;
+      }
       const receipts = await send({
         cfg: params.cfg,
         agentId: params.agentId,
