@@ -24,6 +24,7 @@ import {
   INTERACTION_TIMEOUT_TEXT,
 } from "../agent-runtime/model/index.js";
 import { replyTurnRuntime } from "../agent-runtime/wiring/reply-turn.js";
+import { evaluateBoundTaskAcceptance } from "../agent-runtime/wiring/task-acceptance.js";
 import { makeZeroUsageSnapshot } from "../agents/usage.js";
 import * as dispatchModule from "../auto-reply/dispatch.js";
 import {
@@ -33,11 +34,33 @@ import {
 } from "../config/config.js";
 import { updateSessionStore } from "../config/sessions/store.js";
 import type { OpenBotConfig } from "../config/types.js";
+import {
+  peekAwaitingDelivery,
+  clearAwaitingDeliveriesForTests,
+} from "../task-outcome/pending-delivery.js";
+import {
+  recordRunnerTurnOutcome,
+  TASK_OUTCOME_STORE_DIRNAME,
+} from "../task-outcome/runtime-from-runner.js";
+import { DurableTaskOutcomeStore } from "../task-outcome/store.js";
 import { resolveConfigDir } from "../utils.js";
 import { readChatTurnTerminal, resolveChatTurnTerminalDir } from "./chat-interaction-failure.js";
 import { resolvePlatformAuthConfig } from "./platform-auth/config.js";
 import type { PlatformAuthStore } from "./platform-auth/store-types.js";
 import { saveStore } from "./platform-auth/store.js";
+
+// Explicit synthetic admission isolates dispatch behavior from subscription storage.
+// Production billing denial is validated separately; no live subscription changes.
+vi.mock("./billing/agent-run-governance.js", async (original) => ({
+  ...(await original<typeof import("./billing/agent-run-governance.js")>()),
+  tryAcquireEnterpriseAgentRun: vi.fn(async () => ({
+    acquired: true,
+    skipped: false,
+    enterpriseId: "ent-s1a",
+    authorizationDecisionId: "auth-s1a-fixture",
+  })),
+  releaseEnterpriseAgentRun: vi.fn(async () => {}),
+}));
 
 const completeMock = vi.hoisted(() => vi.fn());
 
@@ -109,11 +132,9 @@ async function isolateTrustedGateway() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "s1a-dispatch-chain-"));
   dirs.push(root);
   process.env.OPENBOT_STATE_DIR = root;
-  process.env.OPENCLAW_STATE_DIR = root;
   const configPath = path.join(root, "openbot.json");
   const platformAuthPath = path.join(root, "platform-auth.json");
   process.env.OPENBOT_CONFIG_PATH = configPath;
-  process.env.OPENCLAW_CONFIG_PATH = configPath;
 
   const now = new Date().toISOString();
   const userId = "u-s1a";
@@ -321,6 +342,172 @@ describe("checkpoint A isolated Gateway dispatch chain (in-process handlers, rea
     completeMock.mockReset();
   });
 
+  it("admits a personal long task and hands the same persisted binding to execution", async () => {
+    const fixture = await isolateTrustedGateway();
+    completeMock.mockResolvedValue({
+      role: "assistant",
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            kind: "execution_request",
+            request: {
+              lifecycle: "long_task",
+              goal: "Isolated staged report",
+              acceptance: ["Verified report"],
+              checks: [
+                {
+                  criterion: 0,
+                  validator: "artifact.text.exact.v1",
+                  artifact: "stage1-result.txt",
+                  expected: "VERIFIED",
+                },
+              ],
+            },
+          }),
+        },
+      ],
+      usage: makeZeroUsageSnapshot(),
+      stopReason: "stop",
+    });
+    // Stop at the execution port: this proves handoff, not provider/tool delivery.
+    const execution = vi
+      .spyOn(replyTurnRuntime.execution, "runAdmittedTurn")
+      .mockRejectedValue(new Error("stage1_execution_boundary_probe"));
+    const context = createChatContext();
+    const runId = `stage1-long-${path.basename(fixture.root)}`;
+    await chatHandlers["chat.send"]({
+      params: {
+        sessionKey: fixture.sessionKey,
+        message: "建立分阶段长期报告任务",
+        idempotencyKey: runId,
+        timeoutMs: 15000,
+      },
+      respond: vi.fn() as never,
+      context: context as never,
+      req: {} as never,
+      client: fixture.client as never,
+      isWebchatConnect: () => false,
+    });
+    await vi.waitFor(() => expect(execution).toHaveBeenCalledTimes(1), { timeout: 15000 });
+    const params = execution.mock.calls[0][0];
+    const run = params.followupRun.run;
+    const board = replyTurnRuntime.state.read(run.sessionFile);
+    expect(run.executionAdmitted).toBe(true);
+    expect(run.taskCompletionBinding?.taskId).toBeTruthy();
+    expect(run.taskCompletionBinding?.taskId).toBe(board.current?.taskId);
+    expect(board.current?.goalText).toContain("Isolated staged report");
+    expect(board.current?.acceptanceChecks).toEqual([
+      {
+        criterion: 0,
+        validator: "artifact.text.exact.v1",
+        artifact: "stage1-result.txt",
+        expected: "VERIFIED",
+      },
+    ]);
+    // Synthetic output after the intercepted executor: real safe file read and
+    // verifier, but not evidence that a provider/tool generated this artifact.
+    const workspaceDir = path.join(fixture.root, "acceptance-output");
+    fs.mkdirSync(workspaceDir, { recursive: true });
+    fs.writeFileSync(path.join(workspaceDir, "stage1-result.txt"), "VERIFIED");
+    const checked = await evaluateBoundTaskAcceptance({
+      sessionFile: run.sessionFile,
+      workspaceDir,
+      runId: run.taskCompletionBinding!.executionAttempt!,
+      completionBinding: run.taskCompletionBinding,
+    });
+    expect(checked?.evaluation.status).toBe("passed");
+    expect(checked?.evaluation.taskId).toBe(board.current?.taskId);
+    expect(checked?.evidence).toHaveLength(1);
+    const commitOutcome = vi.fn();
+    const publishPending = vi.fn();
+    // No transport identity: exercise the production verifier adapter and commit
+    // payload, without pretending this fixture registered/sent a delivery.
+    const prepared = await replyTurnRuntime.delivery.prepareVisibleDelivery({} as OpenBotConfig, {
+      runId: run.taskCompletionBinding!.executionAttempt!,
+      sessionFile: run.sessionFile,
+      workspaceDir,
+      completionBinding: run.taskCompletionBinding,
+      contract: { id: "stage1-contract", version: "1", kind: "execution", requiredValidators: [] },
+      commitOutcome,
+      publishPending,
+    });
+    expect(prepared).toBe("passed");
+    expect(commitOutcome).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({
+        acceptance: { status: "passed" },
+        acceptanceEvidence: checked?.evidence,
+        delivery: { status: "pending" },
+      }),
+    );
+    expect(publishPending).not.toHaveBeenCalled();
+    const agentDir = path.join(fixture.root, "outcome-agent");
+    const persistRoot = path.join(agentDir, TASK_OUTCOME_STORE_DIRNAME);
+    const outcomeTaskId = `stage1-outcome:${runId}`;
+    const outcomeConfig = { agents: { list: [{ id: "stage1", agentDir }] } } as OpenBotConfig;
+    const published = vi.fn();
+    try {
+      await replyTurnRuntime.delivery.prepareVisibleDelivery(outcomeConfig, {
+        agentId: "stage1",
+        runId: run.taskCompletionBinding!.executionAttempt!,
+        outcomeTaskId,
+        sessionFile: run.sessionFile,
+        workspaceDir,
+        completionBinding: run.taskCompletionBinding,
+        contract: {
+          id: "stage1-contract",
+          version: "1",
+          kind: "execution",
+          requiredValidators: [],
+        },
+        commitOutcome: (success, options) =>
+          recordRunnerTurnOutcome(outcomeConfig, "stage1", {
+            success,
+            ...options,
+            runId: run.taskCompletionBinding!.executionAttempt!,
+            taskId: outcomeTaskId,
+            scope: {
+              kind: "personal",
+              personalDomainId: "personal:stage1",
+              subjectRef: "synthetic-user",
+              authzScopeRef: "stage1-test",
+            },
+          }),
+        publishPending: published,
+      });
+      const persisted = new DurableTaskOutcomeStore(persistRoot).loadTask(outcomeTaskId);
+      expect(persisted?.acceptance.status).toBe("passed");
+      expect(persisted?.delivery.status).toBe("pending");
+      expect(persisted?.acceptanceEvidence).toEqual(checked?.evidence);
+      expect(published).toHaveBeenCalledTimes(1);
+      expect(
+        peekAwaitingDelivery({
+          deliveryId: `delivery:${run.taskCompletionBinding!.executionAttempt!}:visible`,
+          persistRoot,
+        }),
+      ).toMatchObject({
+        taskId: outcomeTaskId,
+        checkedTask: { binding: run.taskCompletionBinding },
+      });
+    } finally {
+      clearAwaitingDeliveriesForTests(persistRoot);
+    }
+    fs.writeFileSync(path.join(workspaceDir, "stage1-result.txt"), "VERIFIED\n");
+    const mismatched = await evaluateBoundTaskAcceptance({
+      sessionFile: run.sessionFile,
+      workspaceDir,
+      runId: run.taskCompletionBinding!.executionAttempt!,
+      completionBinding: run.taskCompletionBinding,
+    });
+    expect(mismatched?.evaluation.status).toBe("failed");
+    expect(
+      fs.realpathSync(run.sessionFile).startsWith(`${fs.realpathSync(fixture.root)}${path.sep}`),
+      run.sessionFile,
+    ).toBe(true);
+    await vi.waitFor(() => expect(findTerminal(context, runId)).toBeTruthy(), { timeout: 15000 });
+  }, 30000);
+
   it("R3: an ordinary model reply has zero business execution and zero task-board writes", async () => {
     const fixture = await isolateTrustedGateway();
     const governedSpy = vi.spyOn(commandFacade, "runGovernedInteraction");
@@ -350,7 +537,14 @@ describe("checkpoint A isolated Gateway dispatch chain (in-process handlers, rea
     expect(respond.mock.calls[0]?.[0]).toBe(true);
     await vi.waitFor(
       () => {
-        expect(completeMock, "model complete was not reached").toHaveBeenCalled();
+        expect(
+          completeMock,
+          JSON.stringify({
+            terminal: findTerminal(context, runId),
+            warns: context.logGateway.warn.mock.calls,
+            response: respond.mock.calls,
+          }),
+        ).toHaveBeenCalled();
         expect(findTerminal(context, runId)).toBeTruthy();
       },
       { timeout: 15_000 },

@@ -1,5 +1,23 @@
 version: 1
 tasks:
+  - id: web-personal-single-stage1:codex-kb-review
+    owner: codex-kb-review
+    intent:
+      - User-authorized exact test re-verification only; no submission.
+    paths:
+      - src/gateway/chat-interaction-failure.s1-dispatch-chain.test.ts
+    state: active
+    sessions:
+      - id: personal-single-20261124
+        taskId: web-personal-single-stage1:codex-kb-review
+        ide: codex
+        agent: codex-kb-review
+        status: active
+        lastSignalAt: 2026-11-25T01:25:11.412410+00:00
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-25
+    metadata: {}
   - id: launcher-parent-selector-guard:codex-integration
     owner: codex-integration
     intent:
@@ -31643,6 +31661,10 @@ landingStreams:
       reason: Only seven previously unmatched exact paths; preserve all prior stream
         order/classification
 sharedPaths:
+  - glob: src/gateway/chat-interaction-failure.s1-dispatch-chain.test.ts
+    landerTask: web-personal-single-stage1:codex-kb-review
+    reason: User-approved exact test verification; all predecessor histories retained.
+    reviewAfter: 2026-12-31
   - glob: scripts/tsdown-build.mjs
     landerTask: launcher-parent-selector-guard:codex-integration
     reason: User-authorized exact launcher guard takeover; cursor predecessor task history preserved.
