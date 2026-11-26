@@ -1,5 +1,47 @@
 version: 1
 tasks:
+  - id: arch-slice-2b1-candidate-and-bypass
+    owner: architecture-executor
+    intent:
+      - Slice 2B-1 candidate-core unification and runEmbeddedPiAgent bypass elimination.
+    paths:
+      - extensions/llm-task/src/llm-task-tool.test.ts
+      - extensions/llm-task/src/llm-task-tool.ts
+      - extensions/voice-call/src/core-bridge.ts
+      - extensions/voice-call/src/response-generator.ts
+      - scripts/architecture/manifest.json
+      - src/agent-runtime/execution/index.ts
+      - src/agent-runtime/execution/runner/admitted-candidate-cli.ts
+      - src/agent-runtime/execution/runner/admitted-candidate-embedded.ts
+      - src/agent-runtime/execution/runner/candidate-core.test.ts
+      - src/agent-runtime/execution/runner/candidate-core.ts
+      - src/agent-runtime/execution/runner/command-candidate.ts
+      - src/agent-runtime/execution/runner/queued-candidate.ts
+      - src/agent-runtime/execution/runner/scheduled-candidate.ts
+      - src/agent-runtime/execution/runner/unified-lifecycle.test.ts
+      - src/agent-runtime/execution/runner/unified-lifecycle.ts
+      - src/agent-runtime/model/llm-slug-auxiliary.test.ts
+      - src/auto-reply/reply/agent-runner-memory.governance.test.ts
+      - src/auto-reply/reply/agent-runner-memory.test.ts
+      - src/auto-reply/reply/agent-runner-memory.ts
+      - src/extensionAPI.ts
+      - src/gateway/governance/governance-contract.test.ts
+      - src/gateway/governance/model-caller-registry.ts
+      - src/hooks/llm-slug-generator.ts
+      - src/types/extension-api.d.ts
+    state: active
+    sessions:
+      - id: slice2b1-integration-20261126
+        taskId: arch-slice-2b1-candidate-and-bypass
+        ide: antigravity
+        agent: architecture-executor
+        status: active
+        lastSignalAt: "2026-11-26T13:51:00Z"
+        metadata:
+          authorization: User-authorized Slice 2B-1 local landing on isolated branch.
+    ownerHistory: []
+    since: "2026-11-26"
+    metadata: {}
   - id: arch-slice-2a-unified-lifecycle
     owner: codex-integration
     intent:
@@ -16014,6 +16056,38 @@ tasks:
     since: 2026-11-23
     metadata: {}
 landingStreams:
+  - id: arch-slice-2b1-candidate-and-bypass
+    landingPolicy: serial
+    paths:
+      - extensions/llm-task/src/llm-task-tool.test.ts
+      - extensions/llm-task/src/llm-task-tool.ts
+      - extensions/voice-call/src/core-bridge.ts
+      - extensions/voice-call/src/response-generator.ts
+      - scripts/architecture/manifest.json
+      - src/agent-runtime/execution/index.ts
+      - src/agent-runtime/execution/runner/admitted-candidate-cli.ts
+      - src/agent-runtime/execution/runner/admitted-candidate-embedded.ts
+      - src/agent-runtime/execution/runner/candidate-core.test.ts
+      - src/agent-runtime/execution/runner/candidate-core.ts
+      - src/agent-runtime/execution/runner/command-candidate.ts
+      - src/agent-runtime/execution/runner/queued-candidate.ts
+      - src/agent-runtime/execution/runner/scheduled-candidate.ts
+      - src/agent-runtime/execution/runner/unified-lifecycle.test.ts
+      - src/agent-runtime/execution/runner/unified-lifecycle.ts
+      - src/agent-runtime/model/llm-slug-auxiliary.test.ts
+      - src/auto-reply/reply/agent-runner-memory.governance.test.ts
+      - src/auto-reply/reply/agent-runner-memory.test.ts
+      - src/auto-reply/reply/agent-runner-memory.ts
+      - src/extensionAPI.ts
+      - src/gateway/governance/governance-contract.test.ts
+      - src/gateway/governance/model-caller-registry.ts
+      - src/hooks/llm-slug-generator.ts
+      - src/types/extension-api.d.ts
+    canLandWith: []
+    metadata:
+      task: arch-slice-2b1-candidate-and-bypass
+      agent: architecture-executor
+      purpose: Exact 24-file Slice 2B-1 candidate core and bypass elimination landing stream.
   - id: arch-slice-2a-unified-lifecycle
     landingPolicy: serial
     paths:
