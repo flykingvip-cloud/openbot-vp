@@ -6,7 +6,7 @@ import type {
   LegacyKuUri,
   WriteActivationResult,
   PolicyGeneration,
-} from "./openbot-adapter-dto";
+} from "./openbot-adapter-dto.js";
 const SEG = "(?:[A-Za-z0-9._~-]|%[0-9A-Fa-f]{2})+";
 const KB = new RegExp(
   "^kb://org/(" + SEG + ")/doc/(" + SEG + ")@([1-9][0-9]*)(?:#(anchor|chunk)=(" + SEG + "))?$",

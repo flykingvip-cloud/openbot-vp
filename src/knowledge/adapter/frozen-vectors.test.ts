@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { sha256, signRequest, KnowledgeSdkClient } from "./client.js";
 import { adapterConfigFromEnv } from "./config.js";
-import hashes from "./fixtures/hash-vectors-utf8.json";
-import signatures from "./fixtures/signed-request-canonicalization.json";
+import hashes from "./fixtures/hash-vectors-utf8.json" with { type: "json" };
+import signatures from "./fixtures/signed-request-canonicalization.json" with { type: "json" };
 import { detachKnowledgeReference } from "./references.js";
 import { normalizeTextPythonCompat } from "./uri-mapping.js";
 describe("M1 frozen vectors", () => {
