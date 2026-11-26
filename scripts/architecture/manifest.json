@@ -832,7 +832,11 @@
       "src/agent-runtime/execution/runner/execution-scope",
       "src/agent-runtime/execution/runner/controlled-execution",
       "src/agent-runtime/model/authorized-session",
-      "src/agent-runtime/model/command-admission-session"
+      "src/agent-runtime/model/command-admission-session",
+      "src/agent-runtime/execution/runner/embedded-run.ts",
+      "src/agents/pi-embedded.ts",
+      "src/agents/pi-embedded-runner.ts",
+      "src/agents/model-fallback.ts"
     ],
     "description": "Memory flush is auxiliary inference via shared model governance; it cannot open work-item controlled execution or commercial admission sessions."
   },
@@ -845,7 +849,11 @@
       "src/agent-runtime/model/authorized-session",
       "src/agent-runtime/model/command-admission-session",
       "src/agents/pi-embedded",
-      "src/agents/cli-runner"
+      "src/agents/cli-runner",
+      "src/agent-runtime/execution/runner/embedded-run.ts",
+      "src/agents/pi-embedded.ts",
+      "src/agents/pi-embedded-runner.ts",
+      "src/agents/model-fallback.ts"
     ],
     "description": "Slug filename generation is auxiliary inference via shared model governance; it cannot open work-item admission or legacy embedded facades."
   },
@@ -943,5 +951,27 @@
       "src/agents/model-fallback.ts"
     ],
     "description": "Command admission session delegates lease, snapshot, infer, and usage state to authorized-session."
+  },
+  {
+    "name": "runtime-extension-api-controlled-auxiliary",
+    "from": "src/extensionAPI.ts",
+    "denyImportsFrom": [
+      "src/agent-runtime/execution/runner/embedded-run.ts",
+      "src/agents/pi-embedded.ts",
+      "src/agents/pi-embedded-runner.ts",
+      "src/agents/model-fallback.ts"
+    ],
+    "description": "extensionAPI routes auxiliary turns through execution/index runControlledAuxiliaryTurn rather than direct embedded or fallback runners."
+  },
+  {
+    "name": "runtime-extensions-controlled-auxiliary",
+    "from": "extensions/**",
+    "denyImportsFrom": [
+      "src/agent-runtime/execution/runner/embedded-run.ts",
+      "src/agents/pi-embedded.ts",
+      "src/agents/pi-embedded-runner.ts",
+      "src/agents/model-fallback.ts"
+    ],
+    "description": "Extensions must not bypass the unified execution lifecycle by directly importing embedded-run, pi-embedded, pi-embedded-runner, or model-fallback."
   }
 ]

@@ -3,12 +3,17 @@ import type { OpenBotConfig } from "../../../config/config.js";
 import {
   createAuthorizedModelSession,
   createCommandAdmissionSession,
+  resolveAuxiliaryModelGovernance,
+  type AuxiliaryModelPurpose,
   type ModelInferenceInput,
   type ModelInferenceResult,
+  type ModelSessionPorts,
   type SessionUsageRecordInput,
 } from "../../model/index.js";
 import type { AdmittedTurnHost } from "./admitted-turn-host.js";
 import { createControlledExecutionUseCase } from "./controlled-execution.js";
+import type { RunEmbeddedPiAgentParams } from "./embedded-request.js";
+import { runEmbeddedPiAgent } from "./embedded-run.js";
 import type { ExecutionInferenceInput } from "./execution-scope.js";
 
 type TurnSession = ReturnType<typeof createAuthorizedModelSession>;
@@ -45,10 +50,19 @@ export type UnifiedWorkItemLifecycleOptions = {
   ports: SupervisorWorkItemLifecyclePorts;
 };
 
+export type UnifiedAuxiliaryLifecycleOptions = {
+  mode: "auxiliary";
+  runId: string;
+  purpose: AuxiliaryModelPurpose | "extension";
+  parentRunId?: string;
+  env?: NodeJS.ProcessEnv;
+};
+
 export type UnifiedExecutionLifecycleOptions =
   | UnifiedTurnLifecycleOptions
   | UnifiedCommandLifecycleOptions
-  | UnifiedWorkItemLifecycleOptions;
+  | UnifiedWorkItemLifecycleOptions
+  | UnifiedAuxiliaryLifecycleOptions;
 
 async function runSingleShotInference<T>(
   input: ModelInferenceInput<T>,
@@ -197,20 +211,90 @@ function createWorkItemLifecycle(options: UnifiedWorkItemLifecycleOptions) {
   };
 }
 
+function createAuxiliaryLifecycle(options: UnifiedAuxiliaryLifecycleOptions) {
+  const ports: ModelSessionPorts = {
+    accounting: {
+      recordCreditUsage: async () => undefined as never,
+    },
+    admission: {
+      tryAcquireEnterpriseAgentRun: async () => ({ acquired: false, skipped: true }),
+      releaseEnterpriseAgentRun: async () => {},
+    },
+    model: {
+      resolveEmbeddedModelGovernance: (() => {
+        if (options.purpose === "extension") {
+          return {
+            governanceMode: "legacy" as const,
+            governanceContext: { purpose: "extension" },
+          };
+        }
+        return resolveAuxiliaryModelGovernance({
+          purpose: options.purpose,
+          parentRunId: options.parentRunId,
+          env: options.env,
+        });
+      }) as unknown as ModelSessionPorts["model"]["resolveEmbeddedModelGovernance"],
+      buildRunModelSetSnapshot: () => undefined,
+      forgetRunModelSet: () => {},
+      rememberRunModelSet: () => {},
+      snapshotCreditReportingFromGate: () => undefined,
+      resolvePlatformModelsMode: () => "native",
+      runWithModelFallback,
+    },
+  };
+  const session = createAuthorizedModelSession(options.runId, ports);
+  const scope = createControlledExecutionUseCase({
+    async prepare(input: { config: OpenBotConfig; signal?: AbortSignal }) {
+      input.signal?.throwIfAborted();
+      await session.authorize({});
+      input.signal?.throwIfAborted();
+      const governance = session.prepareModelSet({
+        config: input.config,
+        routing: {
+          allowlist: undefined,
+          preferredModelOrder: undefined,
+        } as unknown as Parameters<TurnSession["prepareModelSet"]>[0]["routing"],
+      });
+      input.signal?.throwIfAborted();
+      return { kind: "ready" as const, governance };
+    },
+    infer<T>(input: ModelInferenceInput<T>) {
+      if (input.singleShot) {
+        session.assertPrepared();
+        return runSingleShotInference(input);
+      }
+      return session.infer(input);
+    },
+    dispose() {
+      return session.dispose();
+    },
+  });
+  return {
+    ...scope,
+    recordUsage(input: SessionUsageRecordInput) {
+      return session.recordUsage(input);
+    },
+  };
+}
+
 export type UnifiedTurnExecutionLifecycle = ReturnType<typeof createTurnLifecycle>;
 export type UnifiedCommandExecutionLifecycle = ReturnType<typeof createCommandLifecycle>;
 export type UnifiedWorkItemExecutionLifecycle = ReturnType<typeof createWorkItemLifecycle>;
+export type UnifiedAuxiliaryExecutionLifecycle = ReturnType<typeof createAuxiliaryLifecycle>;
 export type UnifiedExecutionLifecycle<
   M extends UnifiedExecutionLifecycleOptions["mode"] = UnifiedExecutionLifecycleOptions["mode"],
 > = M extends "turn"
   ? UnifiedTurnExecutionLifecycle
   : M extends "command"
     ? UnifiedCommandExecutionLifecycle
-    : UnifiedWorkItemExecutionLifecycle;
+    : M extends "work_item"
+      ? UnifiedWorkItemExecutionLifecycle
+      : UnifiedAuxiliaryExecutionLifecycle;
 
 /**
  * Single controlled-execution lifecycle factory across turn (chat/cron/followup),
- * command (CLI/gateway/subagent/ACP), and work_item (supervisor) scenes.
+ * command (CLI/gateway/subagent/ACP), work_item (supervisor), and auxiliary
+ * (memory_flush/slug_filename/extension) scenes.
  * All modes share the frozen `createControlledExecutionUseCase` stage order,
  * AbortSignal propagation, and single-dispose lease safety.
  */
@@ -223,6 +307,9 @@ export function createUnifiedExecutionLifecycle(
 export function createUnifiedExecutionLifecycle(
   options: UnifiedWorkItemLifecycleOptions,
 ): UnifiedWorkItemExecutionLifecycle;
+export function createUnifiedExecutionLifecycle(
+  options: UnifiedAuxiliaryLifecycleOptions,
+): UnifiedAuxiliaryExecutionLifecycle;
 export function createUnifiedExecutionLifecycle(options: UnifiedExecutionLifecycleOptions) {
   switch (options.mode) {
     case "turn":
@@ -231,6 +318,35 @@ export function createUnifiedExecutionLifecycle(options: UnifiedExecutionLifecyc
       return createCommandLifecycle(options);
     case "work_item":
       return createWorkItemLifecycle(options);
+    case "auxiliary":
+      return createAuxiliaryLifecycle(options);
+  }
+}
+
+export async function runControlledAuxiliaryTurn(params: RunEmbeddedPiAgentParams) {
+  const lifecycle = createUnifiedExecutionLifecycle({
+    mode: "auxiliary",
+    runId: params.runId,
+    purpose: "extension",
+  });
+  try {
+    await lifecycle.prepare({
+      config: params.config ?? {},
+      signal: params.abortSignal,
+    });
+    const outcome = await lifecycle.infer({
+      cfg: params.config ?? {},
+      provider: params.provider ?? "",
+      model: params.model ?? "",
+      agentDir: params.agentDir,
+      taskText: params.prompt,
+      signal: params.abortSignal,
+      singleShot: true,
+      run: async () => runEmbeddedPiAgent(params),
+    });
+    return outcome.result;
+  } finally {
+    await lifecycle.dispose();
   }
 }
 

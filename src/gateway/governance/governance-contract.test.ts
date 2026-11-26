@@ -70,9 +70,8 @@ const EXPECTED_REGISTERED_GAPS: string[] = [
 /** Enterprise-scope model paths that must pass `governanceMode` (plan §4 / P3-3). */
 const ENTERPRISE_MODEL_CALLER_IDS = [
   "auto-reply",
-  "memory-flush",
-  "llm-slug-generator",
   // agent-command converged onto authorized-session.ts (auto-reply row) in Slice 2A.
+  // memory-flush and llm-slug-generator converged onto authorized-session.ts in Slice 2B-1.
   "image-tool",
   "pdf-tool",
 ] as const;
@@ -281,10 +280,10 @@ describe("§5 execution entry inventory", () => {
       expect(SOURCE_TEXT.get("src/agent-runtime/model/command-admission-session.ts")).toContain(
         "await acquireAgentCommandCommercialRun",
       );
-      expect(SOURCE_TEXT.get("src/agent-runtime/execution/runner/command-candidate.ts")).toContain(
+      expect(SOURCE_TEXT.get("src/agent-runtime/execution/runner/candidate-core.ts")).toContain(
         "runCliAgent",
       );
-      expect(SOURCE_TEXT.get("src/agent-runtime/execution/runner/command-candidate.ts")).toContain(
+      expect(SOURCE_TEXT.get("src/agent-runtime/execution/runner/candidate-core.ts")).toContain(
         "recordCliBackendUsage",
       );
       // Gate is acquired in agentCommandInternal before runWithModelFallback → runAgentAttempt → runCliAgent.

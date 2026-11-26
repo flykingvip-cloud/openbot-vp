@@ -8,14 +8,17 @@ export type {
 export { runAdmittedTurn } from "./runner/admitted-turn.js";
 export {
   createUnifiedExecutionLifecycle,
+  runControlledAuxiliaryTurn,
   type UnifiedExecutionLifecycle,
   type UnifiedExecutionLifecycleOptions,
   type UnifiedTurnExecutionLifecycle,
   type UnifiedCommandExecutionLifecycle,
   type UnifiedWorkItemExecutionLifecycle,
+  type UnifiedAuxiliaryExecutionLifecycle,
   type UnifiedTurnLifecycleOptions,
   type UnifiedCommandLifecycleOptions,
   type UnifiedWorkItemLifecycleOptions,
+  type UnifiedAuxiliaryLifecycleOptions,
   type SupervisorWorkItemAdmission,
   type SupervisorWorkItemLifecyclePorts,
 } from "./runner/unified-lifecycle.js";

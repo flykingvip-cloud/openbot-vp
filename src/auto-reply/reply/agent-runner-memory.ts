@@ -2,12 +2,14 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
-import { runEmbeddedPiAgent } from "../../agent-runtime/execution/index.js";
+import {
+  createUnifiedExecutionLifecycle,
+  runEmbeddedPiAgent,
+} from "../../agent-runtime/execution/index.js";
 import type { EmbeddedPiRunResult } from "../../agent-runtime/execution/index.js";
 import { resolveAuxiliaryModelGovernance } from "../../agent-runtime/model/index.js";
 import { resolveBootstrapWarningSignaturesSeen } from "../../agents/bootstrap-budget.js";
 import { estimateMessagesTokens } from "../../agents/compaction.js";
-import { runWithModelFallback } from "../../agents/model-fallback.js";
 import { isCliProvider } from "../../agents/model-selection.js";
 import { resolveSandboxConfigForAgent, resolveSandboxRuntimeStatus } from "../../agents/sandbox.js";
 import {
@@ -538,61 +540,75 @@ export async function runMemoryFlushIfNeeded(params: {
     .filter(Boolean)
     .join("\n\n");
   try {
-    const memoryFlushGovernance = resolveMemoryFlushModelGovernance(params.parentRunId);
-    await runWithModelFallback({
-      ...resolveModelFallbackOptions(params.followupRun.run),
-      ...memoryFlushGovernance,
-      // Default allowlistEnforcement is governance-mode: shadow records only, no filter.
-      runId: flushRunId,
-      run: async (provider, model, runOptions) => {
-        const { authProfile, embeddedContext, senderContext } = buildEmbeddedRunContexts({
-          run: params.followupRun.run,
-          sessionCtx: params.sessionCtx,
-          hasRepliedRef: params.opts?.hasRepliedRef,
-          provider,
-        });
-        const runBaseParams = buildEmbeddedRunBaseParams({
-          run: params.followupRun.run,
-          provider,
-          model,
-          runId: flushRunId,
-          authProfile,
-          allowTransientCooldownProbe: runOptions?.allowTransientCooldownProbe,
-        });
-        const result = await runEmbeddedPiAgent({
-          ...embeddedContext,
-          ...senderContext,
-          ...runBaseParams,
-          ...(runBaseParams.oguiDecisionRun
-            ? { oguiDecisionRun: { ...runBaseParams.oguiDecisionRun, allowIssue: false } }
-            : {}),
-          trigger: "memory",
-          memoryFlushWritePath,
-          prompt: resolveMemoryFlushPromptForRun({
-            prompt: memoryFlushSettings.prompt,
-            cfg: params.cfg,
-            nowMs: memoryFlushNowMs,
-          }),
-          extraSystemPrompt: flushSystemPrompt,
-          bootstrapPromptWarningSignaturesSeen,
-          bootstrapPromptWarningSignature:
-            bootstrapPromptWarningSignaturesSeen[bootstrapPromptWarningSignaturesSeen.length - 1],
-          onAgentEvent: (evt) => {
-            if (evt.stream === "compaction") {
-              const phase = typeof evt.data.phase === "string" ? evt.data.phase : "";
-              if (phase === "end") {
-                memoryCompactionCompleted = true;
-              }
-            }
-          },
-        });
-        bootstrapPromptWarningSignaturesSeen = resolveBootstrapWarningSignaturesSeen(
-          result.meta?.systemPromptReport,
-        );
-        memoryFlushResult = result;
-        return result;
-      },
+    const fallbackOptions = resolveModelFallbackOptions(params.followupRun.run);
+    const flushPrompt = resolveMemoryFlushPromptForRun({
+      prompt: memoryFlushSettings.prompt,
+      cfg: params.cfg,
+      nowMs: memoryFlushNowMs,
     });
+    const lifecycle = createUnifiedExecutionLifecycle({
+      mode: "auxiliary",
+      runId: flushRunId,
+      purpose: "memory_flush",
+      parentRunId: params.parentRunId,
+    });
+    try {
+      await lifecycle.prepare({
+        config: params.cfg,
+        signal: params.opts?.abortSignal,
+      });
+      await lifecycle.infer({
+        ...fallbackOptions,
+        taskText: flushPrompt,
+        signal: params.opts?.abortSignal,
+        run: async (provider, model, runOptions) => {
+          const { authProfile, embeddedContext, senderContext } = buildEmbeddedRunContexts({
+            run: params.followupRun.run,
+            sessionCtx: params.sessionCtx,
+            hasRepliedRef: params.opts?.hasRepliedRef,
+            provider,
+          });
+          const runBaseParams = buildEmbeddedRunBaseParams({
+            run: params.followupRun.run,
+            provider,
+            model,
+            runId: flushRunId,
+            authProfile,
+            allowTransientCooldownProbe: runOptions?.allowTransientCooldownProbe,
+          });
+          const result = await runEmbeddedPiAgent({
+            ...embeddedContext,
+            ...senderContext,
+            ...runBaseParams,
+            ...(runBaseParams.oguiDecisionRun
+              ? { oguiDecisionRun: { ...runBaseParams.oguiDecisionRun, allowIssue: false } }
+              : {}),
+            trigger: "memory",
+            memoryFlushWritePath,
+            prompt: flushPrompt,
+            extraSystemPrompt: flushSystemPrompt,
+            bootstrapPromptWarningSignaturesSeen,
+            bootstrapPromptWarningSignature:
+              bootstrapPromptWarningSignaturesSeen[bootstrapPromptWarningSignaturesSeen.length - 1],
+            onAgentEvent: (evt) => {
+              if (evt.stream === "compaction") {
+                const phase = typeof evt.data.phase === "string" ? evt.data.phase : "";
+                if (phase === "end") {
+                  memoryCompactionCompleted = true;
+                }
+              }
+            },
+          });
+          bootstrapPromptWarningSignaturesSeen = resolveBootstrapWarningSignaturesSeen(
+            result.meta?.systemPromptReport,
+          );
+          memoryFlushResult = result;
+          return result;
+        },
+      });
+    } finally {
+      await lifecycle.dispose();
+    }
     let memoryFlushCompactionCount =
       activeSessionEntry?.compactionCount ??
       (params.sessionKey ? activeSessionStore?.[params.sessionKey]?.compactionCount : 0) ??

@@ -6,8 +6,10 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { runEmbeddedPiAgent } from "../agent-runtime/execution/index.js";
-import { resolveAuxiliaryModelGovernance } from "../agent-runtime/model/index.js";
+import {
+  createUnifiedExecutionLifecycle,
+  runEmbeddedPiAgent,
+} from "../agent-runtime/execution/index.js";
 import {
   resolveDefaultAgentId,
   resolveAgentWorkspaceDir,
@@ -15,7 +17,6 @@ import {
   resolveAgentEffectiveModelPrimary,
 } from "../agents/agent-scope.js";
 import { DEFAULT_PROVIDER, DEFAULT_MODEL } from "../agents/defaults.js";
-import { runWithModelFallback } from "../agents/model-fallback.js";
 import { parseModelRef } from "../agents/model-selection.js";
 import type { OpenBotConfig } from "../config/config.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
@@ -55,34 +56,40 @@ Reply with ONLY the slug, nothing else. Examples: "vendor-pitch", "api-design", 
     const provider = parsed?.provider ?? DEFAULT_PROVIDER;
     const model = parsed?.model ?? DEFAULT_MODEL;
     const runId = `slug-gen-${Date.now()}`;
-    const auxiliaryGovernance = resolveAuxiliaryModelGovernance({
+    const lifecycle = createUnifiedExecutionLifecycle({
+      mode: "auxiliary",
+      runId,
       purpose: "slug_filename",
       parentRunId: params.parentRunId,
     });
-
-    const fallbackResult = await runWithModelFallback({
-      cfg: params.cfg,
-      provider,
-      model,
-      agentDir,
-      runId,
-      ...auxiliaryGovernance,
-      run: async (providerOverride, modelOverride) =>
-        runEmbeddedPiAgent({
-          sessionId: `slug-generator-${Date.now()}`,
-          sessionKey: "temp:slug-generator",
-          agentId,
-          sessionFile: tempSessionFile!,
-          workspaceDir,
-          agentDir,
-          config: params.cfg,
-          prompt,
-          provider: providerOverride,
-          model: modelOverride,
-          timeoutMs: 15_000, // 15 second timeout
-          runId,
-        }),
-    });
+    let fallbackResult: Awaited<ReturnType<typeof lifecycle.infer>>;
+    try {
+      await lifecycle.prepare({ config: params.cfg });
+      fallbackResult = await lifecycle.infer({
+        cfg: params.cfg,
+        provider,
+        model,
+        agentDir,
+        taskText: prompt,
+        run: async (providerOverride, modelOverride) =>
+          runEmbeddedPiAgent({
+            sessionId: `slug-generator-${Date.now()}`,
+            sessionKey: "temp:slug-generator",
+            agentId,
+            sessionFile: tempSessionFile!,
+            workspaceDir,
+            agentDir,
+            config: params.cfg,
+            prompt,
+            provider: providerOverride,
+            model: modelOverride,
+            timeoutMs: 15_000, // 15 second timeout
+            runId,
+          }),
+      });
+    } finally {
+      await lifecycle.dispose();
+    }
 
     const result = fallbackResult.result;
 

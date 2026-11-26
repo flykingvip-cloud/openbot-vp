@@ -4,7 +4,10 @@ import {
   CONTROLLED_EXECUTION_STAGE_ORDER,
   assertControlledExecutionStages,
 } from "./controlled-execution.js";
-import { createUnifiedExecutionLifecycle } from "./unified-lifecycle.js";
+import {
+  createUnifiedExecutionLifecycle,
+  runControlledAuxiliaryTurn,
+} from "./unified-lifecycle.js";
 
 const mocks = vi.hoisted(() => ({
   acquireCmd: vi.fn((..._args: unknown[]): unknown => undefined),
@@ -26,6 +29,10 @@ const mocks = vi.hoisted(() => ({
   forgetRunModelSet: vi.fn((..._args: unknown[]) => {}),
   buildRunModelSetSnapshot: vi.fn((input: Record<string, unknown>) => ({ ...input })),
   snapshotCreditReportingFromGate: vi.fn((..._args: unknown[]) => undefined),
+  runEmbeddedPiAgent: vi.fn(async (..._args: unknown[]) => ({
+    payloads: [{ text: "aux-ok" }],
+    meta: { durationMs: 1 },
+  })),
 }));
 
 vi.mock("../../model/command-commercial-gate.js", () => ({
@@ -42,11 +49,16 @@ vi.mock("../../../gateway/billing/record-credit-usage.js", () => ({
   recordCreditUsage: (...args: unknown[]) => mocks.recordCreditUsage(...args),
 }));
 
+vi.mock("./embedded-run.js", () => ({
+  runEmbeddedPiAgent: (...args: unknown[]) => mocks.runEmbeddedPiAgent(...args),
+}));
+
 vi.mock("../../../gateway/governance/spawn-snapshot-handoff.js", () => ({
   buildRunModelSetSnapshot: (input: Record<string, unknown>) =>
     mocks.buildRunModelSetSnapshot(input),
   rememberRunModelSet: (...args: unknown[]) => mocks.rememberRunModelSet(...args),
   forgetRunModelSet: (...args: unknown[]) => mocks.forgetRunModelSet(...args),
+  lookupRunModelSet: () => undefined,
   snapshotCreditReportingFromGate: (...args: unknown[]) =>
     mocks.snapshotCreditReportingFromGate(...args),
 }));
@@ -76,10 +88,16 @@ it("exposes the frozen controlled execution stage order across turn, command, an
     mode: "work_item",
     ports: { acquire: async () => ({ status: "skipped" as const }), release: async () => {} },
   });
+  const auxiliary = createUnifiedExecutionLifecycle({
+    mode: "auxiliary",
+    runId: "u-aux",
+    purpose: "memory_flush",
+  });
   for (const [scene, lifecycle] of [
     ["turn", turn],
     ["command", command],
     ["work_item", workItem],
+    ["auxiliary", auxiliary],
   ] as Array<[string, { stages: typeof CONTROLLED_EXECUTION_STAGE_ORDER }]>) {
     expect(lifecycle.stages).toBe(CONTROLLED_EXECUTION_STAGE_ORDER);
     expect(() => assertControlledExecutionStages(lifecycle, scene)).not.toThrow();
@@ -270,4 +288,69 @@ it("work_item mode supports recordUsage parity and single-dispose safety", async
   await Promise.all([lifecycle.dispose(), lifecycle.dispose()]);
   expect(release).toHaveBeenCalledOnce();
   expect(release).toHaveBeenCalledWith("wi-1");
+});
+
+it("auxiliary mode routes memory_flush/slug_filename through AuthorizedModelSession without overwriting parent snapshot", async () => {
+  const lifecycle = createUnifiedExecutionLifecycle({
+    mode: "auxiliary",
+    runId: "aux-flush-1",
+    purpose: "memory_flush",
+    parentRunId: "parent-1",
+  });
+  const prep = await lifecycle.prepare({ config: {} });
+  expect(prep.kind).toBe("ready");
+  const out = await lifecycle.infer({
+    cfg: {},
+    provider: "openai",
+    model: "gpt-5.2",
+    taskText: "flush",
+    run: async () => ({ payloads: [{ text: "flushed" }] }),
+  });
+  expect(out.result).toEqual({ payloads: [{ text: "flushed" }] });
+  expect(mocks.runWithModelFallback).toHaveBeenCalledWith(
+    expect.objectContaining({
+      runId: "aux-flush-1",
+      governanceContext: expect.objectContaining({
+        purpose: "memory_flush",
+        parentRunId: "parent-1",
+      }),
+    }),
+  );
+  expect(mocks.rememberRunModelSet).not.toHaveBeenCalled();
+  await lifecycle.dispose();
+});
+
+it("runControlledAuxiliaryTurn executes extension turns through auxiliary lifecycle and respects AbortSignal", async () => {
+  const result = await runControlledAuxiliaryTurn({
+    sessionId: "s-aux",
+    sessionFile: "/tmp/s-aux.jsonl",
+    workspaceDir: "/tmp",
+    config: {},
+    prompt: "hello",
+    provider: "openai",
+    model: "gpt-5.2",
+    timeoutMs: 1000,
+    runId: "aux-ext-1",
+  });
+  expect(result.payloads?.[0]?.text).toBe("aux-ok");
+  expect(mocks.runEmbeddedPiAgent).toHaveBeenCalledOnce();
+  expect(mocks.runWithModelFallback).not.toHaveBeenCalled();
+
+  const controller = new AbortController();
+  controller.abort();
+  await expect(
+    runControlledAuxiliaryTurn({
+      sessionId: "s-aux-abort",
+      sessionFile: "/tmp/s-aux-abort.jsonl",
+      workspaceDir: "/tmp",
+      config: {},
+      prompt: "hello",
+      provider: "openai",
+      model: "gpt-5.2",
+      timeoutMs: 1000,
+      runId: "aux-ext-2",
+      abortSignal: controller.signal,
+    }),
+  ).rejects.toThrow();
+  expect(mocks.runEmbeddedPiAgent).toHaveBeenCalledOnce();
 });
