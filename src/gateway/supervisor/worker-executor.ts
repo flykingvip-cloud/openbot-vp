@@ -8,7 +8,7 @@
 import crypto from "node:crypto";
 import {
   assertControlledExecutionStages,
-  createSupervisorWorkItemLifecycle,
+  createUnifiedExecutionLifecycle,
   runCliAgent,
   type SupervisorWorkItemAdmission,
 } from "../../agent-runtime/execution/index.js";
@@ -45,19 +45,22 @@ import type { SupervisedTask } from "./types.js";
 
 /** Bind supervisor commercial ports to the shared controlled work-item lifecycle. */
 function bindSupervisorWorkItemLifecycle() {
-  return createSupervisorWorkItemLifecycle({
-    async acquire(input): Promise<SupervisorWorkItemAdmission> {
-      try {
-        const held = await acquireSupervisorCommercialRun(input);
-        return held ? { status: "acquired" } : { status: "skipped" };
-      } catch (err) {
-        if (err instanceof SupervisorCommercialRunDeniedError) {
-          return { status: "denied", message: err.message };
+  return createUnifiedExecutionLifecycle({
+    mode: "work_item",
+    ports: {
+      async acquire(input): Promise<SupervisorWorkItemAdmission> {
+        try {
+          const held = await acquireSupervisorCommercialRun(input);
+          return held ? { status: "acquired" } : { status: "skipped" };
+        } catch (err) {
+          if (err instanceof SupervisorCommercialRunDeniedError) {
+            return { status: "denied", message: err.message };
+          }
+          throw err;
         }
-        throw err;
-      }
+      },
+      release: (runId) => releaseSupervisorCommercialRun(runId),
     },
-    release: (runId) => releaseSupervisorCommercialRun(runId),
   });
 }
 

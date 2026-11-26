@@ -72,7 +72,7 @@ const ENTERPRISE_MODEL_CALLER_IDS = [
   "auto-reply",
   "memory-flush",
   "llm-slug-generator",
-  "agent-command",
+  // agent-command converged onto authorized-session.ts (auto-reply row) in Slice 2A.
   "image-tool",
   "pdf-tool",
 ] as const;
@@ -277,7 +277,7 @@ describe("§5 execution entry inventory", () => {
       expect(e16?.symbols).toEqual(["runCliAgent", "recordCliBackendUsage"]);
       const agent = SOURCE_TEXT.get("src/commands/agent.ts");
       expect(agent).toBeDefined();
-      expect(agent).toContain("createCommandExecutionLifecycle");
+      expect(agent).toContain("createUnifiedExecutionLifecycle");
       expect(SOURCE_TEXT.get("src/agent-runtime/model/command-admission-session.ts")).toContain(
         "await acquireAgentCommandCommercialRun",
       );

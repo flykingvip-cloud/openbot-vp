@@ -1,7 +1,7 @@
 import type { CommandDeliveryReceipt } from "../agent-runtime/contracts/delivery.js";
 import { persistAcpTurnTranscript } from "../agent-runtime/state/index.js";
 import { persistCommandSessionEntry as persistSessionEntry } from "../agent-runtime/state/index.js";
-import { assertControlledExecutionStages, createCommandOutcomeCloseout, createCommandBudget, runCommandCandidate, createCommandExecutionLifecycle, runCommandAcpTurn, type EmbeddedPiRunResult } from "../agent-runtime/execution/index.js";
+import { assertControlledExecutionStages, createCommandOutcomeCloseout, createCommandBudget, runCommandCandidate, createUnifiedExecutionLifecycle, runCommandAcpTurn, type EmbeddedPiRunResult } from "../agent-runtime/execution/index.js";
 import { settleCommandBudgetForCloseout } from "../agent-runtime/execution/index.js";
 import { getAcpSessionManager } from "../acp/control-plane/manager.js";
 import { resolveAcpSessionCwd } from "../acp/runtime/session-identifiers.js";
@@ -372,7 +372,7 @@ async function agentCommandInternal(
   const isSubagentLane = laneRaw === String(AGENT_LANE_SUBAGENT);
   // Command scene adapter: commercial admission + E2/E3/E6 ports stay on the
   // authority adapter; stage order comes only from the controlled use-case.
-  const controlledExecution = createCommandExecutionLifecycle({runId, isSubagentLane, identity: opts.executionIdentity, entry: opts.governanceEntry});
+  const controlledExecution = createUnifiedExecutionLifecycle({ mode: "command", runId, isSubagentLane, identity: opts.executionIdentity, entry: opts.governanceEntry, config: cfg });
   assertControlledExecutionStages(controlledExecution, "Command host");
   // Subagent runs take their own commercial slot (quota + concurrency).
   // Model allowlists for the child still come from the parent snapshot.
@@ -439,10 +439,26 @@ async function agentCommandInternal(
     }
 
     if (acpResolution?.kind === "ready" && sessionKey) {
-      const { startedAt, stopReason, finalTextRaw, finalText } = await runCommandAcpTurn({
-        cfg, sessionKey, runId, body, agent: acpResolution.meta.agent,
-        abortSignal: opts.abortSignal, manager: acpManager,
+      const acpAgent = acpResolution.meta.agent;
+      const acpInference = await controlledExecution.infer({
+        cfg,
+        provider: "acp",
+        model: acpAgent,
+        taskText: opts.message ?? body,
+        signal: opts.abortSignal,
+        singleShot: true,
+        run: async () =>
+          await runCommandAcpTurn({
+            cfg,
+            sessionKey,
+            runId,
+            body,
+            agent: acpAgent,
+            abortSignal: opts.abortSignal,
+            manager: acpManager,
+          }),
       });
+      const { startedAt, stopReason, finalTextRaw, finalText } = acpInference.result;
       try {
         sessionEntry = await persistAcpTurnTranscript({
           body,

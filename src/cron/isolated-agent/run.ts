@@ -1,7 +1,7 @@
 import {
   assertControlledExecutionStages,
   runScheduledCandidate,
-  createExecutionLifecycle,
+  createUnifiedExecutionLifecycle,
 } from "../../agent-runtime/execution/index.js";
 import type { EmbeddedPiRunResult } from "../../agent-runtime/execution/index.js";
 import { bindAdmittedTurnHost } from "../../agent-runtime/wiring/admitted-turn-host.js";
@@ -1029,7 +1029,11 @@ export async function runCronIsolatedAgentTurn(params: {
     const runPrompt = async (promptText: string) => {
       const cronRunId = cronSession.sessionEntry.sessionId;
       // Cron scene adapter: schedule/ledger/delivery stay here; stage order is controlled.
-      const controlledExecution = createExecutionLifecycle(cronRunId, bindAdmittedTurnHost());
+      const controlledExecution = createUnifiedExecutionLifecycle({
+        mode: "turn",
+        runId: cronRunId,
+        host: bindAdmittedTurnHost(),
+      });
       assertControlledExecutionStages(controlledExecution, "Cron host");
       const runContextEstimate = buildRunContextEstimateParts({
         taskText: promptText,
