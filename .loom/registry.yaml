@@ -1,5 +1,36 @@
 version: 1
 tasks:
+  - id: arch-phase-3-state-fencing-effect-gate
+    owner: architecture-executor
+    intent:
+      - Phase 3 WP-B/WP-F storage-level fencingGeneration guard and beforeEffect side-effect gate.
+    paths:
+      - src/agent-runtime/capabilities/index.ts
+      - src/agent-runtime/capabilities/invocation/before-call.before-effect.test.ts
+      - src/agent-runtime/capabilities/invocation/before-call.ts
+      - src/agent-runtime/contracts/operation.ts
+      - src/agent-runtime/state/index.ts
+      - src/agent-runtime/state/repository/async-wait-job-store.ts
+      - src/agent-runtime/state/repository/async-wait-job.ts
+      - src/agent-runtime/state/repository/blocked-followup-delivery.ts
+      - src/agent-runtime/state/repository/fencing.test.ts
+      - src/agent-runtime/state/repository/fencing.ts
+      - src/agent-runtime/state/repository/task-board-file.ts
+      - src/agent-runtime/state/repository/tool-operation.ts
+      - src/agents/pi-tools.ts
+    state: active
+    sessions:
+      - id: phase3-state-fencing-20261126
+        taskId: arch-phase-3-state-fencing-effect-gate
+        ide: antigravity
+        agent: architecture-executor
+        status: active
+        lastSignalAt: "2026-11-26T15:11:00Z"
+        metadata:
+          authorization: User-authorized Phase 3 local landing on isolated branch.
+    ownerHistory: []
+    since: "2026-11-26"
+    metadata: {}
   - id: arch-phase-1-delivery-recovery
     owner: architecture-executor
     intent:
@@ -16114,6 +16145,27 @@ tasks:
     since: 2026-11-23
     metadata: {}
 landingStreams:
+  - id: arch-phase-3-state-fencing-effect-gate
+    landingPolicy: serial
+    paths:
+      - src/agent-runtime/capabilities/index.ts
+      - src/agent-runtime/capabilities/invocation/before-call.before-effect.test.ts
+      - src/agent-runtime/capabilities/invocation/before-call.ts
+      - src/agent-runtime/contracts/operation.ts
+      - src/agent-runtime/state/index.ts
+      - src/agent-runtime/state/repository/async-wait-job-store.ts
+      - src/agent-runtime/state/repository/async-wait-job.ts
+      - src/agent-runtime/state/repository/blocked-followup-delivery.ts
+      - src/agent-runtime/state/repository/fencing.test.ts
+      - src/agent-runtime/state/repository/fencing.ts
+      - src/agent-runtime/state/repository/task-board-file.ts
+      - src/agent-runtime/state/repository/tool-operation.ts
+      - src/agents/pi-tools.ts
+    canLandWith: []
+    metadata:
+      task: arch-phase-3-state-fencing-effect-gate
+      agent: architecture-executor
+      purpose: Exact 13-file Phase 3 state fencing and beforeEffect gate landing stream.
   - id: arch-phase-1-delivery-recovery
     landingPolicy: serial
     paths:
