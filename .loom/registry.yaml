@@ -1,5 +1,38 @@
 version: 1
 tasks:
+  - id: arch-phase-4-control-plane-slim
+    owner: architecture-executor
+    intent:
+      - Phase 4 WP-A/D/I/H/K control plane slimming, legacy lifecycle retirement, and evolution gating.
+    paths:
+      - scripts/architecture/manifest.json
+      - src/agent-runtime/evolution/index.test.ts
+      - src/agent-runtime/evolution/index.ts
+      - src/agent-runtime/execution/runner/admitted-turn.test.ts
+      - src/agent-runtime/execution/runner/command-lifecycle.test.ts
+      - src/agent-runtime/execution/runner/command-lifecycle.ts
+      - src/agent-runtime/execution/runner/execution-lifecycle.test.ts
+      - src/agent-runtime/execution/runner/execution-lifecycle.ts
+      - src/agent-runtime/execution/runner/supervisor-lifecycle.test.ts
+      - src/agent-runtime/execution/runner/supervisor-lifecycle.ts
+      - src/gateway/billing/chat-reply-credit-reservation.slice3.test.ts
+      - src/gateway/queries/chat-history.test.ts
+      - src/gateway/queries/chat-history.ts
+      - src/gateway/queries/index.ts
+      - src/shared/text/assistant-scratchpad.zh-cot.test.ts
+    state: active
+    sessions:
+      - id: phase4-control-plane-20261127
+        taskId: arch-phase-4-control-plane-slim
+        ide: antigravity
+        agent: architecture-executor
+        status: active
+        lastSignalAt: "2026-11-26T21:20:00Z"
+        metadata:
+          authorization: User-authorized Phase 4 local landing on isolated branch.
+    ownerHistory: []
+    since: "2026-11-27"
+    metadata: {}
   - id: arch-phase-3-state-fencing-effect-gate
     owner: architecture-executor
     intent:
@@ -16145,6 +16178,29 @@ tasks:
     since: 2026-11-23
     metadata: {}
 landingStreams:
+  - id: arch-phase-4-control-plane-slim
+    landingPolicy: serial
+    paths:
+      - scripts/architecture/manifest.json
+      - src/agent-runtime/evolution/index.test.ts
+      - src/agent-runtime/evolution/index.ts
+      - src/agent-runtime/execution/runner/admitted-turn.test.ts
+      - src/agent-runtime/execution/runner/command-lifecycle.test.ts
+      - src/agent-runtime/execution/runner/command-lifecycle.ts
+      - src/agent-runtime/execution/runner/execution-lifecycle.test.ts
+      - src/agent-runtime/execution/runner/execution-lifecycle.ts
+      - src/agent-runtime/execution/runner/supervisor-lifecycle.test.ts
+      - src/agent-runtime/execution/runner/supervisor-lifecycle.ts
+      - src/gateway/billing/chat-reply-credit-reservation.slice3.test.ts
+      - src/gateway/queries/chat-history.test.ts
+      - src/gateway/queries/chat-history.ts
+      - src/gateway/queries/index.ts
+      - src/shared/text/assistant-scratchpad.zh-cot.test.ts
+    canLandWith: []
+    metadata:
+      task: arch-phase-4-control-plane-slim
+      agent: architecture-executor
+      purpose: Exact 15-file Phase 4 control-plane slimming, legacy lifecycle retirement, and evolution gating landing stream.
   - id: arch-phase-3-state-fencing-effect-gate
     landingPolicy: serial
     paths:
