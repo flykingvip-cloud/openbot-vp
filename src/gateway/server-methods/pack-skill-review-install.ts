@@ -17,7 +17,10 @@ import {
   type PackSkillReviewGateStatus,
   type PackSkillReviewUnlock,
 } from "../enterprise-data/pack-skill-review-gate.js";
-import { loadEnterpriseDataStore } from "../enterprise-data/store.js";
+import {
+  loadEnterpriseDataStore,
+  resolveDefaultEnterpriseDataStorePath,
+} from "../enterprise-data/store.js";
 import type { EnterpriseDataStore } from "../enterprise-data/types.js";
 import { ErrorCodes, errorShape } from "../protocol/index.js";
 import { resolveControlPlaneStorePathForClient } from "../tenant-context.js";
@@ -46,7 +49,7 @@ async function loadGovernedEnterpriseDataStore(
 ): Promise<EnterpriseDataStore> {
   const cfg = loadConfig();
   if (!isSharedTenantAddressingEnabled(cfg)) {
-    return loadEnterpriseDataStore();
+    return loadEnterpriseDataStore(resolveDefaultEnterpriseDataStorePath());
   }
   const storePath = await resolveControlPlaneStorePathForClient(
     client,
