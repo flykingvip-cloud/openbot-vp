@@ -1,6 +1,7 @@
 import { rmSync } from "node:fs";
-import { completeSimple, type TextContent } from "@earendil-works/pi-ai/compat";
+import type { TextContent } from "@earendil-works/pi-ai/compat";
 import { EdgeTTS } from "node-edge-tts";
+import { invokeAuxiliarySimpleCompletion } from "../agent-runtime/model/index.js";
 import { ensureCustomApiRegistered } from "../agents/custom-api-registry.js";
 import { getApiKeyForModel, requireApiKey } from "../agents/model-auth.js";
 import {
@@ -470,7 +471,7 @@ export async function summarizeText(params: {
           }),
         );
       }
-      const res = await completeSimple(
+      const res = await invokeAuxiliarySimpleCompletion(
         resolved.model,
         {
           messages: [

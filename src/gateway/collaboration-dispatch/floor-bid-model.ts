@@ -9,7 +9,7 @@
  * reasoning headroom so a short JSON body can still land after thinking.
  * Shadow-B stays observational (drivesProductionDecision=false).
  */
-import { completeSimple } from "@earendil-works/pi-ai/compat";
+import { invokeAuxiliarySimpleCompletion } from "../../agent-runtime/model/index.js";
 import { getApiKeyForModel, requireApiKey } from "../../agents/model-auth.js";
 import { resolveDefaultModelForAgent } from "../../agents/model-selection.js";
 import { resolveModel } from "../../agents/pi-embedded-runner/model.js";
@@ -111,7 +111,7 @@ export function createProductionFloorBidModel(cfg?: OpenBotConfig): FloorBidMode
         await getApiKeyForModel({ model: resolved.model, cfg: resolvedCfg }),
         modelRef.provider,
       );
-      const response = await completeSimple(
+      const response = await invokeAuxiliarySimpleCompletion(
         resolved.model,
         {
           messages: [

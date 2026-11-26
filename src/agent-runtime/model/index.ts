@@ -87,4 +87,11 @@ export {
   resolveAgentCommandModelGovernance,
 } from "./command-governance.js";
 
-export { invokeMetadataCompletion } from "./metadata-completion.js";
+export {
+  invokeAuxiliaryCompletion,
+  invokeAuxiliarySimpleCompletion,
+  invokeMetadataCompletion,
+  type AuxiliaryMessage,
+  type AuxiliaryModel,
+  type AuxiliaryModelApi,
+} from "./metadata-completion.js";

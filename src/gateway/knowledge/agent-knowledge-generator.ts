@@ -1,5 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
-import { completeSimple, type TextContent } from "@earendil-works/pi-ai/compat";
+import type { TextContent } from "@earendil-works/pi-ai/compat";
+import { invokeAuxiliarySimpleCompletion } from "../../agent-runtime/model/index.js";
 import { getApiKeyForModel, requireApiKey } from "../../agents/model-auth.js";
 import { resolveDefaultModelForAgent } from "../../agents/model-selection.js";
 import { resolveModel } from "../../agents/pi-embedded-runner/model.js";
@@ -368,7 +369,7 @@ export function createAgentKnowledgeLlmCaller(params?: {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS);
     try {
-      const response = await completeSimple(
+      const response = await invokeAuxiliarySimpleCompletion(
         model,
         { messages: [{ role: "user", content: prompt, timestamp: Date.now() }] },
         { apiKey, maxTokens: maxTokens ?? 512, temperature: 0.2, signal: controller.signal },

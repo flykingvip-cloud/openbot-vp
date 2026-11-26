@@ -1,5 +1,37 @@
 /** Zero-tool metadata transport. Its caller owns authorization and accounting. */
-import { complete, type Api, type Model, type Context } from "@earendil-works/pi-ai/compat";
+import {
+  complete,
+  completeSimple,
+  type Api,
+  type AssistantMessage,
+  type Context,
+  type Message,
+  type Model,
+} from "@earendil-works/pi-ai/compat";
+
+export type AuxiliaryModelApi = Api;
+export type AuxiliaryModel = Model<Api>;
+export type AuxiliaryMessage = Message;
+
+/** Governed auxiliary pi-ai `complete` boundary for runtime and tool callers. */
+export async function invokeAuxiliaryCompletion<TApi extends Api>(
+  model: Model<TApi>,
+  context: Context,
+  options?: Parameters<typeof complete>[2],
+): Promise<AssistantMessage> {
+  options?.signal?.throwIfAborted();
+  return await complete(model, context, options);
+}
+
+/** Governed auxiliary pi-ai `completeSimple` boundary for non-turn callers. */
+export async function invokeAuxiliarySimpleCompletion<TApi extends Api>(
+  model: Model<TApi>,
+  context: Context,
+  options?: Parameters<typeof completeSimple>[2],
+): Promise<AssistantMessage> {
+  options?.signal?.throwIfAborted();
+  return await completeSimple(model, context, options);
+}
 export async function invokeMetadataCompletion(params: {
   model: Model<Api>;
   apiKey?: string;

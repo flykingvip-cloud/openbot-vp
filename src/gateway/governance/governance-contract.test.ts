@@ -555,8 +555,8 @@ describe("§4.8 model caller registry", () => {
  */
 describe("direct model invocation registry (§4.8 blind spot)", () => {
   const PI_COMPAT_IMPORT = "@earendil-works/pi-ai/compat";
-  // `complete(` as a bare call, not `.complete(` or `onComplete(`.
-  const COMPLETE_CALL = /(?<![A-Za-z0-9_$.])complete\s*\(/;
+  // `complete(` or `completeSimple(` as a bare call, not `.complete(` or `onComplete(`.
+  const COMPLETE_CALL = /(?<![A-Za-z0-9_$.])(?:complete|completeSimple)\s*\(/;
 
   it("has unique ids and valid dispositions", () => {
     const ids = DIRECT_MODEL_INVOCATION_REGISTRY.map((entry) => entry.id);
