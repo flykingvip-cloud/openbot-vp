@@ -1,5 +1,35 @@
 version: 1
 tasks:
+  - id: arch-slice-2b2-direct-model-and-governance
+    owner: architecture-executor
+    intent:
+      - Slice 2B-2 direct complete/completeSimple consolidation and governance contract closure.
+    paths:
+      - src/agent-runtime/model/index.ts
+      - src/agent-runtime/model/metadata-completion.ts
+      - src/agent-runtime/model/rule-adaptation/model-port.ts
+      - src/agents/tools/image-tool.ts
+      - src/agents/tools/pdf-tool.ts
+      - src/digital-employee-creation/llm-compiler.ts
+      - src/gateway/collaboration-dispatch/floor-bid-model.ts
+      - src/gateway/governance/direct-model-invocation-registry.ts
+      - src/gateway/governance/governance-contract.test.ts
+      - src/gateway/knowledge/agent-knowledge-generator.ts
+      - src/gateway/knowledge/governance/detection/chunk-conflict-llm.ts
+      - src/tts/tts-core.ts
+    state: active
+    sessions:
+      - id: slice2b2-integration-20261126
+        taskId: arch-slice-2b2-direct-model-and-governance
+        ide: antigravity
+        agent: architecture-executor
+        status: active
+        lastSignalAt: "2026-11-26T14:09:00Z"
+        metadata:
+          authorization: User-authorized Slice 2B-2 local landing on isolated branch.
+    ownerHistory: []
+    since: "2026-11-26"
+    metadata: {}
   - id: arch-slice-2b1-candidate-and-bypass
     owner: architecture-executor
     intent:
@@ -16056,6 +16086,26 @@ tasks:
     since: 2026-11-23
     metadata: {}
 landingStreams:
+  - id: arch-slice-2b2-direct-model-and-governance
+    landingPolicy: serial
+    paths:
+      - src/agent-runtime/model/index.ts
+      - src/agent-runtime/model/metadata-completion.ts
+      - src/agent-runtime/model/rule-adaptation/model-port.ts
+      - src/agents/tools/image-tool.ts
+      - src/agents/tools/pdf-tool.ts
+      - src/digital-employee-creation/llm-compiler.ts
+      - src/gateway/collaboration-dispatch/floor-bid-model.ts
+      - src/gateway/governance/direct-model-invocation-registry.ts
+      - src/gateway/governance/governance-contract.test.ts
+      - src/gateway/knowledge/agent-knowledge-generator.ts
+      - src/gateway/knowledge/governance/detection/chunk-conflict-llm.ts
+      - src/tts/tts-core.ts
+    canLandWith: []
+    metadata:
+      task: arch-slice-2b2-direct-model-and-governance
+      agent: architecture-executor
+      purpose: Exact 12-file Slice 2B-2 direct complete/completeSimple consolidation and governance contract closure.
   - id: arch-slice-2b1-candidate-and-bypass
     landingPolicy: serial
     paths:
