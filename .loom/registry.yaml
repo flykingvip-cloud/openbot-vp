@@ -16066,7 +16066,7 @@ tasks:
     since: 2026-11-23
     metadata: {}
   - id: knowledge-sdk-alignment:codex-knowledge
-    owner: codex-knowledge
+    owner: grok-knowledge
     intent: []
     paths:
       - src/gateway/knowledge/knowledge-base-permissions.ts
@@ -16076,6 +16076,8 @@ tasks:
       - src/knowledge/adapter/**
       - src/knowledge/**
       - src/gateway/knowledge/knowledge-base-members.ts
+      - src/gateway/server-methods/vault-sync.ts
+      - src/gateway/server-methods/vault-sync.test.ts
     state: active
     sessions:
       - id: 20261125-knowledge-alignment
@@ -16083,16 +16085,35 @@ tasks:
         ide: codex
         agent: codex-knowledge
         status: active
-        lastSignalAt: 2026-11-25T12:47:17.692Z
+        lastSignalAt: 2026-11-26T00:22:25.283Z
         metadata: {}
       - id: 20261125-m2b
         taskId: knowledge-sdk-alignment:codex-knowledge
         ide: codex
         agent: codex-knowledge
         status: active
-        lastSignalAt: 2026-11-25T12:47:17.692Z
+        lastSignalAt: 2026-11-26T00:22:25.283Z
         metadata: {}
-    ownerHistory: []
+      - id: 20261126-vault-target-auth
+        taskId: knowledge-sdk-alignment:codex-knowledge
+        ide: codex
+        agent: codex-knowledge
+        status: active
+        lastSignalAt: 2026-11-26T00:22:25.283Z
+        metadata: {}
+      - id: 20261126-grok-knowledge-verify-then-take
+        taskId: knowledge-sdk-alignment:codex-knowledge
+        ide: grok
+        agent: grok-knowledge
+        status: active
+        lastSignalAt: 2026-11-26T02:49:50.977Z
+        metadata:
+          via: verified
+    ownerHistory:
+      - fromOwner: codex-knowledge
+        toOwner: grok-knowledge
+        at: 2026-11-26T02:49:50.977Z
+        via: verified
     since: 2026-11-25
     metadata: {}
 landingStreams:
@@ -16105,6 +16126,8 @@ landingStreams:
       - src/gateway/knowledge/knowledge-base-permissions.test.ts
       - src/gateway/knowledge/knowledge-base-members.ts
       - src/retrieval/sources/knowledge-source.test.ts
+      - src/gateway/server-methods/vault-sync.ts
+      - src/gateway/server-methods/vault-sync.test.ts
     canLandWith: []
     metadata:
       legacyTitle: User-authorized M2-B isolated contract adapter and safety remediation
@@ -36963,4 +36986,20 @@ sharedPaths:
     landerTask: knowledge-sdk-alignment:codex-knowledge
     reason: User-authorized M2-B stable subject compatibility field; verified
       original and scoped delta, historical broad claims preserved.
+    reviewAfter: 2026-12-31
+  - glob: src/gateway/server-methods/vault-sync.ts
+    landerTask: knowledge-sdk-alignment:codex-knowledge
+    reason: User-authorized exact-file landing for the vault target-KB write
+      authorization patch. Predecessor owners, paths, and session history are
+      retained, including knowledge-vault-sync:cursor-vault-sync,
+      main-recovery-routing, and pi-sdk-family-migration-v3:cursor. No
+      whole-task takeover.
+    reviewAfter: 2026-12-31
+  - glob: src/gateway/server-methods/vault-sync.test.ts
+    landerTask: knowledge-sdk-alignment:codex-knowledge
+    reason: User-authorized exact-file landing for the vault target-KB write
+      authorization patch. Predecessor owners, paths, and session history are
+      retained, including knowledge-vault-sync:cursor-vault-sync,
+      main-recovery-routing, and pi-sdk-family-migration-v3:cursor. No
+      whole-task takeover.
     reviewAfter: 2026-12-31
