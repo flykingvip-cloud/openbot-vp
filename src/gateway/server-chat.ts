@@ -948,14 +948,13 @@ export function createAgentEventHandler({
         logChatFinalBroadcast(payload, recipientCount);
         nodeSendToSession(sessionKey, "chat", payload);
       };
-      if (prepared?.idempotencyKey && prepared.record) {
-        const delivered = deliverPreparedChatFinal({ prepared, send: sendFinal });
-        if (!delivered.ok) {
+      deliverPreparedChatFinal({
+        prepared,
+        send: sendFinal,
+        onFailure: () => {
           log.warn("chat.final deliverable broadcast failed", { runId: clientRunId, sessionKey });
-        }
-        return;
-      }
-      sendFinal();
+        },
+      });
       return;
     }
     const payload = {

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { deliverWithIdempotentReceipt } from "../../../agent-runtime/delivery/index.js";
 import { loadConfig } from "../../../config/config.js";
 import { resolveStateDir } from "../../../config/paths.js";
 import { extractDeliverableEnvelope } from "../../../shared/preview-artifact/deliverable-envelope.js";
@@ -830,36 +831,36 @@ export function noteChatDeliverableBroadcast(params: {
 }
 
 /**
- * Broadcast helper. A throw is a failed delivery attempt on the same
- * idempotency key — it does not create another version and does not discard
- * the analysis body the caller already prepared.
+ * Broadcast helper. Delegates to the canonical receipt-idempotent delivery
+ * boundary: a throw when an idempotent ledger record exists is recorded on the
+ * same key without creating another version or discarding the prepared body.
  */
 export function deliverPreparedChatFinal(params: {
-  prepared: PreparedChatDeliverable;
+  prepared?: PreparedChatDeliverable | null;
   send: () => void;
+  onFailure?: () => void;
 }): { ok: boolean } {
-  try {
-    params.send();
-    if (params.prepared.idempotencyKey && params.prepared.record) {
+  const prepared = params.prepared;
+  const hasReceipt = Boolean(prepared?.idempotencyKey && prepared.record);
+  const result = deliverWithIdempotentReceipt({
+    hasReceipt,
+    send: params.send,
+    noteOutcome: (ok) => {
+      if (!prepared?.idempotencyKey || !prepared.record) {
+        return;
+      }
       noteChatDeliverableBroadcast({
-        stateDir: params.prepared.stateDir,
-        sessionKey: params.prepared.record.sessionKey,
-        idempotencyKey: params.prepared.idempotencyKey,
-        ok: true,
+        stateDir: prepared.stateDir,
+        sessionKey: prepared.record.sessionKey,
+        idempotencyKey: prepared.idempotencyKey,
+        ok,
       });
-    }
-    return { ok: true };
-  } catch {
-    if (params.prepared.idempotencyKey && params.prepared.record) {
-      noteChatDeliverableBroadcast({
-        stateDir: params.prepared.stateDir,
-        sessionKey: params.prepared.record.sessionKey,
-        idempotencyKey: params.prepared.idempotencyKey,
-        ok: false,
-      });
-    }
-    return { ok: false };
+    },
+  });
+  if (!result.ok) {
+    params.onFailure?.();
   }
+  return { ok: result.ok };
 }
 
 export function overlayChatDeliverablePublish(params: {

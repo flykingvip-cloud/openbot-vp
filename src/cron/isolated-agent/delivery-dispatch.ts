@@ -1,11 +1,10 @@
+import { dispatchOutboundDelivery } from "../../agent-runtime/delivery/index.js";
 import { countActiveDescendantRuns } from "../../agents/subagent-registry.js";
 import { SILENT_REPLY_TOKEN } from "../../auto-reply/tokens.js";
 import type { ReplyPayload } from "../../auto-reply/types.js";
 import { createOutboundSendDeps, type CliDeps } from "../../cli/outbound-send-deps.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import { callGateway } from "../../gateway/call.js";
-import { sleepWithAbort } from "../../infra/backoff.js";
-import { deliverOutboundPayloads } from "../../infra/outbound/deliver.js";
 import { resolveAgentOutboundIdentity } from "../../infra/outbound/identity.js";
 import { buildOutboundSessionContext } from "../../infra/outbound/session-context.js";
 import { logWarn } from "../../logger.js";
@@ -118,84 +117,8 @@ export type DispatchCronDeliveryState = {
   deliveryPayloads: ReplyPayload[];
 };
 
-const TRANSIENT_DIRECT_CRON_DELIVERY_ERROR_PATTERNS: readonly RegExp[] = [
-  /\berrorcode=unavailable\b/i,
-  /\bstatus\s*[:=]\s*"?unavailable\b/i,
-  /\bUNAVAILABLE\b/,
-  /no active .* listener/i,
-  /gateway not connected/i,
-  /gateway closed \(1006/i,
-  /gateway timeout/i,
-  /\b(econnreset|econnrefused|etimedout|enotfound|ehostunreach|network error)\b/i,
-];
-
-const PERMANENT_DIRECT_CRON_DELIVERY_ERROR_PATTERNS: readonly RegExp[] = [
-  /unsupported channel/i,
-  /unknown channel/i,
-  /chat not found/i,
-  /user not found/i,
-  /bot was blocked by the user/i,
-  /forbidden: bot was kicked/i,
-  /recipient is not a valid/i,
-  /outbound not configured for channel/i,
-];
-
-function summarizeDirectCronDeliveryError(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message || "error";
-  }
-  if (typeof error === "string") {
-    return error;
-  }
-  try {
-    return JSON.stringify(error) || String(error);
-  } catch {
-    return String(error);
-  }
-}
-
-function isTransientDirectCronDeliveryError(error: unknown): boolean {
-  const message = summarizeDirectCronDeliveryError(error);
-  if (!message) {
-    return false;
-  }
-  if (PERMANENT_DIRECT_CRON_DELIVERY_ERROR_PATTERNS.some((re) => re.test(message))) {
-    return false;
-  }
-  return TRANSIENT_DIRECT_CRON_DELIVERY_ERROR_PATTERNS.some((re) => re.test(message));
-}
-
 function resolveDirectCronRetryDelaysMs(): readonly number[] {
   return process.env.OPENCLAW_TEST_FAST === "1" ? [8, 16, 32] : [5_000, 10_000, 20_000];
-}
-
-async function retryTransientDirectCronDelivery<T>(params: {
-  jobId: string;
-  signal?: AbortSignal;
-  run: () => Promise<T>;
-}): Promise<T> {
-  const retryDelaysMs = resolveDirectCronRetryDelaysMs();
-  let retryIndex = 0;
-  for (;;) {
-    if (params.signal?.aborted) {
-      throw new Error("cron delivery aborted");
-    }
-    try {
-      return await params.run();
-    } catch (err) {
-      const delayMs = retryDelaysMs[retryIndex];
-      if (delayMs == null || !isTransientDirectCronDeliveryError(err) || params.signal?.aborted) {
-        throw err;
-      }
-      const nextAttempt = retryIndex + 2;
-      const maxAttempts = retryDelaysMs.length + 1;
-      logWarn(
-        `[cron:${params.jobId}] transient direct announce delivery failure, retrying ${nextAttempt}/${maxAttempts} in ${Math.round(delayMs / 1000)}s: ${summarizeDirectCronDeliveryError(err)}`,
-      );
-      retryIndex += 1;
-      await sleepWithAbort(delayMs, params.signal);
-    }
-  }
 }
 
 export async function dispatchCronDelivery(
@@ -252,27 +175,26 @@ export async function dispatchCronDelivery(
         agentId: params.agentId,
         sessionKey: params.agentSessionKey,
       });
-      const runDelivery = async () =>
-        await deliverOutboundPayloads({
-          cfg: params.cfgWithAgentDefaults,
-          channel: delivery.channel,
-          to: delivery.to,
-          accountId: delivery.accountId,
-          threadId: delivery.threadId,
-          payloads: payloadsForDelivery,
-          session: deliverySession,
-          identity,
-          bestEffort: params.deliveryBestEffort,
-          deps: createOutboundSendDeps(params.deps),
-          abortSignal: params.abortSignal,
-        });
-      const deliveryResults = options?.retryTransient
-        ? await retryTransientDirectCronDelivery({
-            jobId: params.job.id,
-            signal: params.abortSignal,
-            run: runDelivery,
-          })
-        : await runDelivery();
+      const { results: deliveryResults } = await dispatchOutboundDelivery({
+        cfg: params.cfgWithAgentDefaults,
+        channel: delivery.channel,
+        to: delivery.to,
+        accountId: delivery.accountId,
+        threadId: delivery.threadId,
+        payloads: payloadsForDelivery,
+        session: deliverySession,
+        identity,
+        bestEffort: params.deliveryBestEffort,
+        deps: createOutboundSendDeps(params.deps),
+        abortSignal: params.abortSignal,
+        retryTransient: options?.retryTransient,
+        retryDelaysMs: resolveDirectCronRetryDelaysMs(),
+        onRetry: (info) => {
+          logWarn(
+            `[cron:${params.job.id}] transient direct announce delivery failure, retrying ${info.nextAttempt}/${info.maxAttempts} in ${Math.round(info.delayMs / 1000)}s: ${info.summary}`,
+          );
+        },
+      });
       delivered = deliveryResults.length > 0;
       return null;
     } catch (err) {
