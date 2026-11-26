@@ -1,13 +1,14 @@
 /** One capability invocation boundary. Existing adapters retain tool implementations. */
 export {
   assertToolResultReplayAllowed,
+  createBeforeEffectGate,
   runBeforeToolCallHook,
   wrapToolWithBeforeToolCallHook,
   isToolWrappedWithBeforeToolCallHook,
   consumeAdjustedParamsForToolCall,
   __testing,
 } from "./invocation/before-call.js";
-export type { HookContext } from "./invocation/before-call.js";
+export type { EffectGateInput, HookContext } from "./invocation/before-call.js";
 export { declareCapability } from "./catalog.js";
 export type { CapabilityDeclaration } from "../contracts/capability.js";
 

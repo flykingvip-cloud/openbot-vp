@@ -20,6 +20,7 @@ export type PersistedOperation<T = unknown> = {
   operationId: string;
   state: "started" | "prepared" | "not_issued" | "intent" | "unknown" | "succeeded";
   attemptId?: string;
+  fencingGeneration?: number;
   scopeFingerprint?: string;
   refusals?: Array<{ attemptId: string; atMs: number; reason: string }>;
   startedAtMs: number;

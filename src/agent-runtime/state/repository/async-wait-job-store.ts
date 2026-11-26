@@ -98,6 +98,8 @@ export type AsyncWaitJobIntent = {
   resultEvidence?: AsyncWaitResultEvidence;
   /** Captured from the live host turn when the wait was recorded. */
   trustedIdentity?: AsyncWaitTrustedIdentity;
+  /** Storage-level monotonic fencing generation (synchronized with recovery.claimGeneration). */
+  fencingGeneration?: number;
   recovery?: AsyncWaitRecoveryState;
 };
 

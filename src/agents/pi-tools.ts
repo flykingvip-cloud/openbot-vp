@@ -350,6 +350,8 @@ export function createOpenClawCodingTools(options?: {
   forceWorkspaceOnly?: boolean;
   /** Canonical trusted turn identity for Seat-bound tools. */
   executionIdentity?: ExecutionIdentityContext;
+  /** Optional ownership/fencing check enforced before external side-effect tools. */
+  fencingCheck?: () => Promise<void> | void;
   /** Enterprise gateway session user for Seat-bound tools (schedule, meeting, …). */
   gatewayClientUser?: string;
   gatewayClientSessionDomain?: import("../gateway/server-methods/types.js").GatewayClient["sessionDomain"];
@@ -879,10 +881,16 @@ export function createOpenClawCodingTools(options?: {
   // hiding browser on a public-fetch turn.
   const policyFilteredCapabilities = withProviderSafeNames.map((tool) => tool.name);
   const effectAuthority = createChatSendWriteAuthorityRecheck(options);
-  const withHooks = withProviderSafeNames.map((tool) =>
-    wrapToolWithBeforeToolCallHook(tool, {
+  const taskBoundary =
+    options?.sessionFile && options.taskExecutionBinding
+      ? captureTaskActionBoundary(options.sessionFile, options.taskExecutionBinding)
+      : undefined;
+  const withHooks = withProviderSafeNames.map((tool) => {
+    const externalWrite = isExternalWriteTool(tool.name);
+    return wrapToolWithBeforeToolCallHook(tool, {
+      fencingCheck: externalWrite ? options?.fencingCheck : undefined,
       beforeEffect:
-        effectAuthority && isExternalWriteTool(tool.name)
+        effectAuthority && externalWrite
           ? async () => {
               if (!(await effectAuthority.isAuthorityStillGranted())) {
                 throw new ToolAuthorizationError("Tool execution denied (authority_revoked).");
@@ -893,15 +901,12 @@ export function createOpenClawCodingTools(options?: {
       sessionKey: options?.sessionKey,
       sessionId: options?.sessionId,
       runId: options?.runId,
-      taskBoundary:
-        options?.sessionFile && options.taskExecutionBinding
-          ? captureTaskActionBoundary(options.sessionFile, options.taskExecutionBinding)
-          : undefined,
+      taskBoundary,
       loopDetection: resolveToolLoopDetectionConfig({ cfg: options?.config, agentId }),
       candidateCapabilities,
       policyFilteredCapabilities,
-    }),
-  );
+    });
+  });
   const withAbort = options?.abortSignal
     ? withHooks.map((tool) => wrapToolWithAbortSignal(tool, options.abortSignal))
     : withHooks;
@@ -910,7 +915,7 @@ export function createOpenClawCodingTools(options?: {
   // pi-ai's Anthropic OAuth transport remaps tool names to Claude Code-style names
   // on the wire and maps them back for tool dispatch.
   const withAuthority = withAbort.map((tool) =>
-    wrapToolWithAuthoritativeWriteRecheck(tool, createChatSendWriteAuthorityRecheck(options)),
+    wrapToolWithAuthoritativeWriteRecheck(tool, effectAuthority),
   );
   const afterInbound = !options?.inboundToolCeiling
     ? withAuthority

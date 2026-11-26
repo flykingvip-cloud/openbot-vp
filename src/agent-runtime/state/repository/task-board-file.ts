@@ -3,6 +3,11 @@ import fs from "node:fs";
 import { SESSION_TASK_BOARD_LOCK_OPTIONS, withFileLockSync } from "../../../infra/file-lock.js";
 import type { SessionTaskBoard, TaskBoardScope, TrackedTask } from "../../contracts/task.js";
 import { normalizeConstraintEntries } from "../../policy/index.js";
+import {
+  assertFencingGenerationMatch,
+  nextFencingGeneration,
+  StaleFencingGenerationError,
+} from "./fencing.js";
 
 export function emptySessionTaskBoard(scope?: TaskBoardScope): SessionTaskBoard {
   return { parked: [], focusRevision: 0, ...(scope ? { scope } : {}) };
@@ -108,7 +113,7 @@ export function writeSessionTaskBoardUnlocked(sessionFile: string, board: Sessio
   const normalized: SessionTaskBoard = {
     ...board,
     focusRevision: board.focusRevision ?? 0,
-    writeEpoch: diskEpoch + 1,
+    writeEpoch: nextFencingGeneration(diskEpoch),
     parked: board.parked ?? [],
     current: normalizeTrackedTask(board.current) ?? board.current,
   };
@@ -127,11 +132,14 @@ export function readInteractionTaskBoard(sessionFile: string): SessionTaskBoard 
   return readSessionTaskBoardUnlocked(sessionFile, true);
 }
 
-export class StaleSessionTaskBoardWriteError extends Error {
+export class StaleSessionTaskBoardWriteError extends StaleFencingGenerationError {
   readonly claimedEpoch: number | undefined;
   readonly diskEpoch: number;
   constructor(claimedEpoch: number | undefined, diskEpoch: number) {
     super(
+      claimedEpoch,
+      diskEpoch,
+      "session-task-board",
       `stale session task board write: claimed writeEpoch=${String(claimedEpoch)} disk=${diskEpoch}`,
     );
     this.name = "StaleSessionTaskBoardWriteError";
@@ -147,9 +155,25 @@ export class StaleSessionTaskBoardWriteError extends Error {
 export function mutateSessionTaskBoard<T>(
   sessionFile: string,
   mutate: (live: SessionTaskBoard) => { board: SessionTaskBoard; value: T },
+  options?: { expectedWriteEpoch?: number },
 ): T {
   return withSessionTaskBoardLock(sessionFile, () => {
     const live = readSessionTaskBoardUnlocked(sessionFile);
+    const diskEpoch = typeof live.writeEpoch === "number" ? live.writeEpoch : 0;
+    if (options?.expectedWriteEpoch !== undefined) {
+      try {
+        assertFencingGenerationMatch({
+          expectedGeneration: options.expectedWriteEpoch,
+          currentGeneration: diskEpoch,
+          resource: "session-task-board",
+        });
+      } catch (error) {
+        if (error instanceof StaleFencingGenerationError) {
+          throw new StaleSessionTaskBoardWriteError(options.expectedWriteEpoch, diskEpoch);
+        }
+        throw error;
+      }
+    }
     const { board, value } = mutate(live);
     writeSessionTaskBoardUnlocked(sessionFile, board);
     return value;
@@ -179,8 +203,18 @@ export function writeSessionTaskBoard(sessionFile: string, board: SessionTaskBoa
     const disk = readSessionTaskBoardUnlocked(sessionFile);
     const diskEpoch = typeof disk.writeEpoch === "number" ? disk.writeEpoch : 0;
     const claimed = board.writeEpoch;
-    if (diskEpoch > 0 && claimed !== diskEpoch) {
-      throw new StaleSessionTaskBoardWriteError(claimed, diskEpoch);
+    try {
+      assertFencingGenerationMatch({
+        expectedGeneration: claimed,
+        currentGeneration: diskEpoch,
+        resource: "session-task-board",
+        allowBootstrapWhenZero: true,
+      });
+    } catch (error) {
+      if (error instanceof StaleFencingGenerationError) {
+        throw new StaleSessionTaskBoardWriteError(claimed, diskEpoch);
+      }
+      throw error;
     }
     writeSessionTaskBoardUnlocked(sessionFile, board);
   });
