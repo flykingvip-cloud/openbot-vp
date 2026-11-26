@@ -16014,6 +16014,35 @@ tasks:
     since: 2026-11-23
     metadata: {}
 landingStreams:
+  - id: arch-slice-2a-unified-lifecycle
+    landingPolicy: serial
+    paths:
+      - scripts/architecture/manifest.json
+      - src/agent-runtime/execution/index.ts
+      - src/agent-runtime/execution/runner/unified-lifecycle.ts
+      - src/agent-runtime/execution/runner/unified-lifecycle.test.ts
+      - src/agent-runtime/execution/runner/admitted-turn-attempt.ts
+      - src/agent-runtime/execution/runner/admitted-turn.ts
+      - src/agent-runtime/execution/runner/command-lifecycle.test.ts
+      - src/agent-runtime/execution/runner/command-lifecycle.ts
+      - src/agent-runtime/execution/runner/execution-lifecycle.ts
+      - src/agent-runtime/execution/runner/supervisor-lifecycle.ts
+      - src/agent-runtime/model/authorized-session.ts
+      - src/agent-runtime/model/command-admission-session.test.ts
+      - src/agent-runtime/model/command-admission-session.ts
+      - src/agent-runtime/model/index.ts
+      - src/auto-reply/reply/followup-runner.ts
+      - src/commands/agent.acp.test.ts
+      - src/commands/agent.ts
+      - src/cron/isolated-agent/run.ts
+      - src/gateway/governance/governance-contract.test.ts
+      - src/gateway/governance/model-caller-registry.ts
+      - src/gateway/supervisor/worker-executor.ts
+    canLandWith: []
+    metadata:
+      task: arch-slice-2a-unified-lifecycle
+      agent: architecture-executor
+      purpose: Exact 21-file Slice 2A unified execution lifecycle landing stream.
   - id: delivery-acceptance-integration-20261122
     landingPolicy: serial
     paths:
