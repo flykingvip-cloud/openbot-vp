@@ -1,5 +1,47 @@
 version: 1
 tasks:
+  - id: arch-slice-2a-unified-lifecycle
+    owner: codex-integration
+    intent:
+      - User-approved exact Slice2A takeover; business validation remains separate.
+    paths:
+      - scripts/architecture/manifest.json
+      - src/agent-runtime/execution/index.ts
+      - src/agent-runtime/execution/runner/unified-lifecycle.ts
+      - src/agent-runtime/execution/runner/unified-lifecycle.test.ts
+      - src/agent-runtime/execution/runner/admitted-turn-attempt.ts
+      - src/agent-runtime/execution/runner/admitted-turn.ts
+      - src/agent-runtime/execution/runner/command-lifecycle.test.ts
+      - src/agent-runtime/execution/runner/command-lifecycle.ts
+      - src/agent-runtime/execution/runner/execution-lifecycle.ts
+      - src/agent-runtime/execution/runner/supervisor-lifecycle.ts
+      - src/agent-runtime/model/authorized-session.ts
+      - src/agent-runtime/model/command-admission-session.test.ts
+      - src/agent-runtime/model/command-admission-session.ts
+      - src/agent-runtime/model/index.ts
+      - src/auto-reply/reply/followup-runner.ts
+      - src/commands/agent.acp.test.ts
+      - src/commands/agent.ts
+      - src/cron/isolated-agent/run.ts
+      - src/gateway/governance/governance-contract.test.ts
+      - src/gateway/governance/model-caller-registry.ts
+      - src/gateway/supervisor/worker-executor.ts
+    state: active
+    sessions:
+      - id: slice2a-integration-20261126
+        taskId: arch-slice-2a-unified-lifecycle
+        ide: codex
+        agent: codex-integration
+        status: active
+        lastSignalAt: 2026-11-26T12:59:52.579422+00:00
+        metadata:
+          userDeclaredPriorParent: 232f380f-b424-4683-98af-961b6f436bfe
+          userDeclaredPriorChild: f4b7cb41-d7d6-4321-aa8e-fbd449d3fdfc
+          priorDisplayName: architecture-executor
+          provenance: User-declared prior work; display name is not an agent signature.
+    ownerHistory: []
+    since: 2026-11-26
+    metadata: {}
   - id: launcher-parent-selector-guard:codex-integration
     owner: codex-integration
     intent:
@@ -31643,6 +31685,26 @@ landingStreams:
       reason: Only seven previously unmatched exact paths; preserve all prior stream
         order/classification
 sharedPaths:
+  - glob: src/agent-runtime/execution/runner/supervisor-lifecycle.ts
+    landerTask: arch-slice-2a-unified-lifecycle
+    reason: User-approved exact Slice2A takeover; predecessor histories retained.
+    reviewAfter: 2026-12-31
+  - glob: src/agent-runtime/execution/runner/command-lifecycle.test.ts
+    landerTask: arch-slice-2a-unified-lifecycle
+    reason: User-approved exact Slice2A takeover; predecessor histories retained.
+    reviewAfter: 2026-12-31
+  - glob: src/agent-runtime/execution/runner/admitted-turn-attempt.ts
+    landerTask: arch-slice-2a-unified-lifecycle
+    reason: User-approved exact Slice2A takeover; predecessor histories retained.
+    reviewAfter: 2026-12-31
+  - glob: src/agent-runtime/execution/runner/unified-lifecycle.test.ts
+    landerTask: arch-slice-2a-unified-lifecycle
+    reason: User-approved exact Slice2A takeover; predecessor histories retained.
+    reviewAfter: 2026-12-31
+  - glob: src/agent-runtime/execution/runner/unified-lifecycle.ts
+    landerTask: arch-slice-2a-unified-lifecycle
+    reason: User-approved exact Slice2A takeover; predecessor histories retained.
+    reviewAfter: 2026-12-31
   - glob: scripts/tsdown-build.mjs
     landerTask: launcher-parent-selector-guard:codex-integration
     reason: User-authorized exact launcher guard takeover; cursor predecessor task history preserved.
@@ -31920,7 +31982,8 @@ sharedPaths:
     landerTask: baseline-gates-repair-20261122:codex-wpb-successor
     reason: Human-authorized exact audit path redaction; previous task history retained.
   - glob: src/agent-runtime/model/index.ts
-    landerTask: baseline-gates-repair-20261122:codex-wpb-successor
+    landerTask: arch-slice-2a-unified-lifecycle
+    # Exact takeover from baseline-gates-repair-20261122:codex-wpb-successor; prior reason and history retained.
     reason: Human-authorized exact audit path redaction; previous task history retained.
   - glob: src/gateway/collaboration-learning.ts
     landerTask: baseline-gates-repair-20261122:codex-wpb-successor
@@ -32552,7 +32615,8 @@ sharedPaths:
     reason: Human-authorized exact R14 integration takeover; prior declarations and history preserved.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/execution/runner/admitted-turn.ts
-    landerTask: agent-runtime-observability:codex-observe-owner
+    landerTask: arch-slice-2a-unified-lifecycle
+    # Exact takeover from agent-runtime-observability:codex-observe-owner; prior reason and history retained.
     reason: Human-authorized exact R14 integration takeover; prior declarations and history preserved.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/execution/runner/command-budget.test.ts
@@ -32568,7 +32632,8 @@ sharedPaths:
     reason: Human-authorized exact R14 integration takeover; prior declarations and history preserved.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/execution/runner/command-lifecycle.ts
-    landerTask: agent-runtime-observability:codex-observe-owner
+    landerTask: arch-slice-2a-unified-lifecycle
+    # Exact takeover from agent-runtime-observability:codex-observe-owner; prior reason and history retained.
     reason: Human-authorized exact R14 integration takeover; prior declarations and history preserved.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/execution/runner/queued-candidate.pricing.test.ts
@@ -32584,7 +32649,8 @@ sharedPaths:
     reason: Human-authorized exact R14 integration takeover; prior declarations and history preserved.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/model/authorized-session.ts
-    landerTask: agent-runtime-observability:codex-observe-owner
+    landerTask: arch-slice-2a-unified-lifecycle
+    # Exact takeover from agent-runtime-observability:codex-observe-owner; prior reason and history retained.
     reason: Human-authorized exact R14 integration takeover; prior declarations and history preserved.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/state/command-session.ts
@@ -32596,15 +32662,18 @@ sharedPaths:
     reason: Human-authorized exact R14 integration takeover; prior declarations and history preserved.
     reviewAfter: 2026-11-30
   - glob: src/auto-reply/reply/followup-runner.ts
-    landerTask: agent-runtime-observability:codex-observe-owner
+    landerTask: arch-slice-2a-unified-lifecycle
+    # Exact takeover from agent-runtime-observability:codex-observe-owner; prior reason and history retained.
     reason: Human-authorized exact R14 integration takeover; prior declarations and history preserved.
     reviewAfter: 2026-11-30
   - glob: src/commands/agent.ts
-    landerTask: agent-runtime-observability:codex-observe-owner
+    landerTask: arch-slice-2a-unified-lifecycle
+    # Exact takeover from agent-runtime-observability:codex-observe-owner; prior reason and history retained.
     reason: Human-authorized exact R14 integration takeover; prior declarations and history preserved.
     reviewAfter: 2026-11-30
   - glob: src/cron/isolated-agent/run.ts
-    landerTask: agent-runtime-observability:codex-observe-owner
+    landerTask: arch-slice-2a-unified-lifecycle
+    # Exact takeover from agent-runtime-observability:codex-observe-owner; prior reason and history retained.
     reason: Human-authorized exact R14 integration takeover; prior declarations and history preserved.
     reviewAfter: 2026-11-30
   - glob: src/executor-evidence/acceptance-fix-r2.isolation.test.ts
@@ -33024,7 +33093,8 @@ sharedPaths:
       source reviewed and other task paths preserved.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/execution/runner/admitted-turn.ts
-    landerTask: agent-runtime-convergence
+    landerTask: arch-slice-2a-unified-lifecycle
+    # Exact takeover from agent-runtime-convergence; prior reason and history retained.
     reason:
       User-authorized bounded mainline admission guard; reviewed HEAD and exact diff, preserving
       landed observation integration and predecessor sessions.
@@ -33131,11 +33201,13 @@ sharedPaths:
     reason: Human-authorized bounded interaction transport migration; previous declarations retained.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/model/index.ts
-    landerTask: agent-runtime-convergence
+    landerTask: arch-slice-2a-unified-lifecycle
+    # Exact takeover from agent-runtime-convergence; prior reason and history retained.
     reason: Human-authorized bounded interaction transport migration; previous declarations retained.
     reviewAfter: 2026-11-30
   - glob: src/gateway/governance/model-caller-registry.ts
-    landerTask: agent-runtime-convergence
+    landerTask: arch-slice-2a-unified-lifecycle
+    # Exact takeover from agent-runtime-convergence; prior reason and history retained.
     reason: Human-authorized shared inference caller ownership migration.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/command/interpret-interaction.ts
@@ -33159,7 +33231,8 @@ sharedPaths:
     reason: Human-authorized scoped shared-model boundary migration; preserve prior task history.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/model/index.ts
-    landerTask: agent-runtime-convergence
+    landerTask: arch-slice-2a-unified-lifecycle
+    # Exact takeover from agent-runtime-convergence; prior reason and history retained.
     reason: Human-authorized scoped shared-model boundary migration; preserve prior task history.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/model/authorized-session.test.ts
@@ -33167,11 +33240,13 @@ sharedPaths:
     reason: Human-authorized scoped shared-model boundary migration; preserve prior task history.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/model/authorized-session.ts
-    landerTask: agent-runtime-convergence
+    landerTask: arch-slice-2a-unified-lifecycle
+    # Exact takeover from agent-runtime-convergence; prior reason and history retained.
     reason: Human-authorized scoped shared-model boundary migration; preserve prior task history.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/execution/runner/admitted-turn.ts
-    landerTask: agent-runtime-convergence
+    landerTask: arch-slice-2a-unified-lifecycle
+    # Exact takeover from agent-runtime-convergence; prior reason and history retained.
     reason: Human-authorized scoped shared-model boundary migration; preserve prior task history.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/execution/lifecycle/admission-lease.ts
@@ -33199,7 +33274,8 @@ sharedPaths:
       migration.
     reviewAfter: 2026-11-30
   - glob: src/gateway/governance/governance-contract.test.ts
-    landerTask: agent-runtime-convergence
+    landerTask: arch-slice-2a-unified-lifecycle
+    # Exact takeover from agent-runtime-convergence; prior reason and history retained.
     reason:
       Human-authorized legacy execution adapter retirement with actual owner evidence and caller
       migration.
@@ -33218,7 +33294,8 @@ sharedPaths:
       that directory lander.
     reviewAfter: 2026-11-30
   - glob: scripts/architecture/manifest.json
-    landerTask: runtime-rule-adaptation
+    landerTask: arch-slice-2a-unified-lifecycle
+    # Exact takeover from runtime-rule-adaptation; prior reason and history retained.
     reason:
       Owner t55u 2026-11-14 dependency-boundary close-out. Exact-file sharedPath only; predecessor
       owners, paths, session history, and the later exact sharedPaths on exec-chain-fidelity-ab-min
@@ -33226,7 +33303,8 @@ sharedPaths:
       change that directory lander.
     reviewAfter: 2026-11-30
   - glob: scripts/architecture/manifest.json
-    landerTask: exec-chain-fidelity-ab-min
+    landerTask: arch-slice-2a-unified-lifecycle
+    # Exact takeover from exec-chain-fidelity-ab-min; prior reason and history retained.
     reason:
       "Owner t54u 于 2026-11-14 同意仅对 src/agent-runtime/context/interaction-history.test.ts 的
       runtime-model-public-entry 增加例外，不扩目录、不豁免生产代码。Exact-file sharedPath only; predecessor owners,
@@ -33235,7 +33313,8 @@ sharedPaths:
       Independent acceptance: codex-runtime-manager."
     reviewAfter: 2026-11-30
   - glob: scripts/architecture/manifest.json
-    landerTask: agent-runtime-convergence
+    landerTask: arch-slice-2a-unified-lifecycle
+    # Exact takeover from agent-runtime-convergence; prior reason and history retained.
     reason: Human-authorized runtime migration guard for retired entry paths; retain prior ownership
       history.
     reviewAfter: 2026-11-30
@@ -34136,7 +34215,8 @@ sharedPaths:
     reason: Human-approved 2026-08-26 takeover for parent-scoped chat selection protocol / typed
       runtime-context selection.
   - glob: src/cron/isolated-agent/run.ts
-    landerTask: agent-runtime-convergence
+    landerTask: arch-slice-2a-unified-lifecycle
+    # Exact takeover from agent-runtime-convergence; prior reason and history retained.
     reason:
       User-authorized scoped execution lifecycle migration; verified predecessor state and retain
       knowledge/identity/billing behavior and prior ownership history.
@@ -34987,7 +35067,8 @@ sharedPaths:
     reason: Human-authorized exact-file final runtime closure; retain other declarations and history.
     reviewAfter: 2026-11-30
   - glob: src/auto-reply/reply/followup-runner.ts
-    landerTask: agent-runtime-convergence
+    landerTask: arch-slice-2a-unified-lifecycle
+    # Exact takeover from agent-runtime-convergence; prior reason and history retained.
     reason: Human-authorized exact-file final runtime closure; retain other declarations and history.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/command/task-proposal-reply.ts
@@ -35231,7 +35312,8 @@ sharedPaths:
     reason: Human-authorized bounded command execution migration; preserve prior scopes and history.
     reviewAfter: 2026-11-30
   - glob: src/commands/agent.ts
-    landerTask: agent-runtime-convergence
+    landerTask: arch-slice-2a-unified-lifecycle
+    # Exact takeover from agent-runtime-convergence; prior reason and history retained.
     reason: Human-authorized bounded command execution migration; preserve prior scopes and history.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/execution/runner/command-candidate.ts
@@ -35303,7 +35385,8 @@ sharedPaths:
     reason: Human-authorized bounded ACP transcript state migration; preserve other scopes and history.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/execution/index.ts
-    landerTask: agent-runtime-convergence
+    landerTask: arch-slice-2a-unified-lifecycle
+    # Exact takeover from agent-runtime-convergence; prior reason and history retained.
     reason: Human-authorized bounded runtime migration; preserve prior scopes and history.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/execution/runner/acp-turn.ts
@@ -35311,7 +35394,8 @@ sharedPaths:
     reason: Human-authorized bounded runtime migration; preserve prior scopes and history.
     reviewAfter: 2026-11-30
   - glob: src/commands/agent.acp.test.ts
-    landerTask: agent-runtime-convergence
+    landerTask: arch-slice-2a-unified-lifecycle
+    # Exact takeover from agent-runtime-convergence; prior reason and history retained.
     reason: Human-authorized bounded runtime migration; preserve prior scopes and history.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/delivery/dispatch/command-result.ts
@@ -35431,11 +35515,13 @@ sharedPaths:
     reason: User-authorized runtime acceptance blocker remediation; preserve other scopes.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/model/command-admission-session.ts
-    landerTask: agent-runtime-convergence
+    landerTask: arch-slice-2a-unified-lifecycle
+    # Exact takeover from agent-runtime-convergence; prior reason and history retained.
     reason: User-authorized command governance convergence; preserve prior scopes.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/model/command-admission-session.test.ts
-    landerTask: agent-runtime-convergence
+    landerTask: arch-slice-2a-unified-lifecycle
+    # Exact takeover from agent-runtime-convergence; prior reason and history retained.
     reason: User-authorized command governance convergence; preserve prior scopes.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/model/command-governance.ts
@@ -35894,7 +35980,8 @@ sharedPaths:
       writes."
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/execution/runner/execution-lifecycle.ts
-    landerTask: agent-runtime-convergence
+    landerTask: arch-slice-2a-unified-lifecycle
+    # Exact takeover from agent-runtime-convergence; prior reason and history retained.
     reason: User-authorized scoped execution lifecycle convergence; preserve predecessor scopes and
       history.
     reviewAfter: 2026-11-30
@@ -35904,7 +35991,8 @@ sharedPaths:
       history.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/execution/runner/command-lifecycle.ts
-    landerTask: agent-runtime-convergence
+    landerTask: arch-slice-2a-unified-lifecycle
+    # Exact takeover from agent-runtime-convergence; prior reason and history retained.
     reason: User-authorized scoped shared execution lifecycle migration; preserve predecessor
       declarations and history.
     reviewAfter: 2026-11-30
@@ -36185,7 +36273,8 @@ sharedPaths:
     reason: User-authorized scoped runtime migration; preserve predecessor scopes and history.
     reviewAfter: 2026-11-30
   - glob: src/gateway/supervisor/worker-executor.ts
-    landerTask: agent-runtime-convergence
+    landerTask: arch-slice-2a-unified-lifecycle
+    # Exact takeover from agent-runtime-convergence; prior reason and history retained.
     reason:
       Authorized package-1 residual entry convergence; supervisor CLI must use execution/index;
       preserve predecessor history.
