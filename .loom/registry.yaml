@@ -1,5 +1,25 @@
 version: 1
 tasks:
+  - id: pr349-baseline-fixes:codex-kb-review
+    owner: codex-kb-review
+    intent:
+      - User-approved three exact baseline protocol and tenant fixes only.
+    paths:
+      - apps/macos/Sources/OpenBotProtocol/GatewayModels.swift
+      - apps/shared/OpenBotKit/Sources/OpenBotProtocol/GatewayModels.swift
+      - src/gateway/server-methods/pack-skill-review-install.ts
+    state: active
+    sessions:
+      - id: pr349-fixes-20261126
+        taskId: pr349-baseline-fixes:codex-kb-review
+        ide: codex
+        agent: codex-kb-review
+        status: active
+        lastSignalAt: 2026-11-26T00:30:39.371497+00:00
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-26
+    metadata: {}
   - id: launcher-parent-selector-guard:codex-integration
     owner: codex-integration
     intent:
@@ -31643,6 +31663,14 @@ landingStreams:
       reason: Only seven previously unmatched exact paths; preserve all prior stream
         order/classification
 sharedPaths:
+  - glob: src/gateway/server-methods/pack-skill-review-install.ts
+    landerTask: pr349-baseline-fixes:codex-kb-review
+    reason: User-approved exact baseline fix; predecessor history retained.
+    reviewAfter: 2026-12-31
+  - glob: apps/shared/OpenBotKit/Sources/OpenBotProtocol/GatewayModels.swift
+    landerTask: pr349-baseline-fixes:codex-kb-review
+    reason: User-approved exact baseline fix; predecessor history retained.
+    reviewAfter: 2026-12-31
   - glob: scripts/tsdown-build.mjs
     landerTask: launcher-parent-selector-guard:codex-integration
     reason: User-authorized exact launcher guard takeover; cursor predecessor task history preserved.
@@ -34132,7 +34160,8 @@ sharedPaths:
     reason: Human-approved 2026-08-26 takeover for parent-scoped chat selection protocol / typed
       runtime-context selection.
   - glob: apps/macos/Sources/OpenBotProtocol/GatewayModels.swift
-    landerTask: knowledge-consume-precision:cursor-knowledge-consume
+    landerTask: pr349-baseline-fixes:codex-kb-review
+    # Exact takeover from knowledge-consume-precision:cursor-knowledge-consume; predecessor reason/history retained.
     reason: Human-approved 2026-08-26 takeover for parent-scoped chat selection protocol / typed
       runtime-context selection.
   - glob: src/cron/isolated-agent/run.ts

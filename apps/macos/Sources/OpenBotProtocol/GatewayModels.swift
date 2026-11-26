@@ -459,6 +459,8 @@ public struct ErrorShape: Codable, Sendable {
 
 public struct AgentEvent: Codable, Sendable {
     public let runid: String
+    public let sourcerunid: String?
+    public let sessionkey: String?
     public let seq: Int
     public let stream: String
     public let ts: Int
@@ -466,12 +468,16 @@ public struct AgentEvent: Codable, Sendable {
 
     public init(
         runid: String,
+        sourcerunid: String?,
+        sessionkey: String?,
         seq: Int,
         stream: String,
         ts: Int,
         data: [String: AnyCodable])
     {
         self.runid = runid
+        self.sourcerunid = sourcerunid
+        self.sessionkey = sessionkey
         self.seq = seq
         self.stream = stream
         self.ts = ts
@@ -480,6 +486,8 @@ public struct AgentEvent: Codable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case runid = "runId"
+        case sourcerunid = "sourceRunId"
+        case sessionkey = "sessionKey"
         case seq
         case stream
         case ts
@@ -2986,6 +2994,84 @@ public struct CollaborationTaskAcceptSubmissionParams: Codable, Sendable {
         case checkedacceptancecriteria = "checkedAcceptanceCriteria"
         case proxyforactorid = "proxyForActorId"
         case proxybasis = "proxyBasis"
+    }
+}
+
+public struct CollaborationTaskRequestAcceptedArtifactDeliveryParams: Codable, Sendable {
+    public let groupid: String
+    public let taskid: String
+    public let itemid: String
+    public let target: [String: AnyCodable]
+
+    public init(
+        groupid: String,
+        taskid: String,
+        itemid: String,
+        target: [String: AnyCodable])
+    {
+        self.groupid = groupid
+        self.taskid = taskid
+        self.itemid = itemid
+        self.target = target
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case groupid = "groupId"
+        case taskid = "taskId"
+        case itemid = "itemId"
+        case target
+    }
+}
+
+public struct CollaborationTaskRevokeAcceptedArtifactDeliveryParams: Codable, Sendable {
+    public let groupid: String
+    public let taskid: String
+    public let itemid: String
+    public let target: [String: AnyCodable]
+
+    public init(
+        groupid: String,
+        taskid: String,
+        itemid: String,
+        target: [String: AnyCodable])
+    {
+        self.groupid = groupid
+        self.taskid = taskid
+        self.itemid = itemid
+        self.target = target
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case groupid = "groupId"
+        case taskid = "taskId"
+        case itemid = "itemId"
+        case target
+    }
+}
+
+public struct CollaborationTaskReadAcceptedArtifactDeliveryParams: Codable, Sendable {
+    public let groupid: String
+    public let taskid: String
+    public let itemid: String
+    public let target: [String: AnyCodable]
+
+    public init(
+        groupid: String,
+        taskid: String,
+        itemid: String,
+        target: [String: AnyCodable])
+    {
+        self.groupid = groupid
+        self.taskid = taskid
+        self.itemid = itemid
+        self.target = target
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case groupid = "groupId"
+        case taskid = "taskId"
+        case itemid = "itemId"
+        case target
     }
 }
 
@@ -6838,6 +6924,8 @@ public struct ChatGuideAppendParams: Codable, Sendable {
 
 public struct ChatSendParams: Codable, Sendable {
     public let sessionkey: String
+    public let dependencyresumeid: String?
+    public let dependencyresumecapability: String?
     public let message: String
     public let thinking: String?
     public let deliver: Bool?
@@ -6864,6 +6952,8 @@ public struct ChatSendParams: Codable, Sendable {
 
     public init(
         sessionkey: String,
+        dependencyresumeid: String?,
+        dependencyresumecapability: String?,
         message: String,
         thinking: String?,
         deliver: Bool?,
@@ -6889,6 +6979,8 @@ public struct ChatSendParams: Codable, Sendable {
         contextscope: [String: AnyCodable]?)
     {
         self.sessionkey = sessionkey
+        self.dependencyresumeid = dependencyresumeid
+        self.dependencyresumecapability = dependencyresumecapability
         self.message = message
         self.thinking = thinking
         self.deliver = deliver
@@ -6916,6 +7008,8 @@ public struct ChatSendParams: Codable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case sessionkey = "sessionKey"
+        case dependencyresumeid = "dependencyResumeId"
+        case dependencyresumecapability = "dependencyResumeCapability"
         case message
         case thinking
         case deliver
