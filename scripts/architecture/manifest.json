@@ -973,5 +973,74 @@
       "src/agents/model-fallback.ts"
     ],
     "description": "Extensions must not bypass the unified execution lifecycle by directly importing embedded-run, pi-embedded, pi-embedded-runner, or model-fallback."
+  },
+  {
+    "name": "legacy-lifecycle-retirement",
+    "from": "src/**",
+    "denyImportsFrom": [
+      "src/agent-runtime/execution/runner/execution-lifecycle.ts",
+      "src/agent-runtime/execution/runner/command-lifecycle.ts",
+      "src/agent-runtime/execution/runner/supervisor-lifecycle.ts"
+    ],
+    "exemptFiles": [
+      "src/agent-runtime/execution/index.ts",
+      "src/agent-runtime/execution/runner/execution-lifecycle.test.ts",
+      "src/agent-runtime/execution/runner/command-lifecycle.test.ts",
+      "src/agent-runtime/execution/runner/supervisor-lifecycle.test.ts"
+    ],
+    "description": "Retired legacy lifecycle tombstones (Phase 4) must not be imported outside their own tombstone tests and execution/index compat re-exports."
+  },
+  {
+    "name": "gateway-queries-read-only-boundary",
+    "from": "src/gateway/queries/**",
+    "denyImportsFrom": [
+      "src/agent-runtime/**",
+      "src/gateway/server-chat.ts",
+      "src/gateway/server-methods/chat-transcript-inject.ts"
+    ],
+    "description": "Gateway query modules are read-only and must not import agent-runtime or control-plane mutation/dispatch handlers."
+  },
+  {
+    "name": "gateway-queries-chat-history-boundary",
+    "from": "src/**",
+    "denyImportsFrom": ["src/gateway/server-methods/chat.ts"],
+    "exemptFiles": [
+      "src/gateway/queries/chat-history.ts",
+      "src/gateway/server-methods.ts",
+      "src/gateway/operator-shared-session-heal.test.ts",
+      "src/gateway/chat-group-interaction-isolation.s1b.test.ts",
+      "src/gateway/chat-interaction-failure.s1-process.test.ts",
+      "src/gateway/chat-interaction-failure.s1-dispatch-chain.test.ts",
+      "src/gateway/collaboration-learning/r6-wake-handler-chain.gateway.test.ts",
+      "src/gateway/server-methods/chat.aside-dialogue-history.test.ts",
+      "src/gateway/server-methods/chat.restore.test.ts",
+      "src/gateway/server-methods/chat.control-channel-multiline-digest.test.ts",
+      "src/gateway/server-methods/chat-archives.security.test.ts",
+      "src/gateway/server-methods/chat.task-status-order.test.ts",
+      "src/gateway/server-methods/chat.deliverable-chip-survive-sanitize.test.ts",
+      "src/gateway/server-methods/chat.history-tool-result.test.ts",
+      "src/gateway/server-methods/chat.control-channel-history.test.ts",
+      "src/gateway/server-methods/daibai-guide-history.test.ts",
+      "src/gateway/server-methods/chat.history-image-omit.test.ts",
+      "src/gateway/server-methods/chat.deliverable-persist-reload.test.ts",
+      "src/gateway/server-methods/server-methods.test.ts",
+      "src/gateway/server-methods/chat.history-cursor.test.ts",
+      "src/gateway/server-methods/chat.abort-persistence.test.ts",
+      "src/gateway/server-methods/chat.active-run-history.test.ts",
+      "src/gateway/server-methods/chat.directive-tags.test.ts",
+      "src/gateway/server-methods/chat.group-transcript.test.ts",
+      "src/gateway/server-methods/chat.group-write-acl.test.ts",
+      "src/gateway/server-methods/chat.history-d3.test.ts",
+      "src/gateway/server-methods/chat.history-employee-isolation.test.ts",
+      "src/gateway/server-methods/chat.mentions.test.ts",
+      "src/gateway/server-methods/chat.ogui-decision-history.test.ts",
+      "src/gateway/server-methods/chat.owner-pause-abort.test.ts",
+      "src/gateway/server-methods/chat.pack1-replay.test.ts",
+      "src/gateway/server-methods/chat.transcript-authorization.test.ts",
+      "src/gateway/server-methods/chat.transcript-cwd.test.ts",
+      "src/gateway/server-methods/task-activity-rpc.test.ts",
+      "src/gateway/server-methods/task-dependency-resume.test.ts"
+    ],
+    "description": "New consumers must import chat-history query helpers from src/gateway/queries/ rather than directly importing src/gateway/server-methods/chat.ts."
   }
 ]
