@@ -1,18 +1,96 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { CONFIG_DIR } from "../../utils.js";
+import { createKnowledgeBase } from "../knowledge/knowledge-base-store.js";
+import type { KnowledgeSourceContext } from "../knowledge/sources/types.js";
 import type { GatewayClient } from "./types.js";
 import { vaultSyncHandlers } from "./vault-sync.js";
 
+const knowledgeAuth = vi.hoisted(() => ({
+  dir: `/tmp/openbot-vault-sync-kb-${Math.random().toString(36).slice(2)}`,
+  resolveKnowledgeSourceContext: vi.fn(),
+}));
+
+vi.mock("../../utils.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../utils.js")>();
+  return {
+    ...actual,
+    CONFIG_DIR: knowledgeAuth.dir,
+  };
+});
+
+vi.mock("../knowledge/context.js", () => ({
+  resolveKnowledgeSourceContext: knowledgeAuth.resolveKnowledgeSourceContext,
+}));
+
 const tmpDirs: string[] = [];
+
+const VAULT_OWNER = "owner@acme.test";
+const ACTOR_USER_ID = "user-owner";
+const TENANT_ACME = "tenant-acme";
+const TENANT_OTHER = "tenant-other";
+
+const EMPTY_KNOWLEDGE_CONTEXT: KnowledgeSourceContext = {
+  tenantId: null,
+  seatId: null,
+  userId: null,
+  teamLabel: null,
+  roleCode: null,
+  departmentId: null,
+  agentType: "employee-agent",
+  hasEnterpriseScope: false,
+};
+
+function kbStorePath(): string {
+  return path.join(knowledgeAuth.dir, "knowledge", "bases.json");
+}
+
+function setKnowledgeContext(context: Partial<KnowledgeSourceContext> = {}): void {
+  knowledgeAuth.resolveKnowledgeSourceContext.mockResolvedValue({
+    ...EMPTY_KNOWLEDGE_CONTEXT,
+    ...context,
+  });
+}
+
+function setAuthorizedKnowledgeContext(overrides: Partial<KnowledgeSourceContext> = {}): void {
+  setKnowledgeContext({
+    userId: ACTOR_USER_ID,
+    tenantId: TENANT_ACME,
+    ...overrides,
+  });
+}
+
+function createOwnedKnowledgeBase(params?: { tenantId?: string | null; ownerId?: string }): {
+  id: string;
+} {
+  return createKnowledgeBase(
+    {
+      title: "Authorized target KB",
+      ownerId: params?.ownerId ?? ACTOR_USER_ID,
+      tenantId: params?.tenantId === undefined ? TENANT_ACME : params.tenantId,
+      visibility: "private",
+    },
+    kbStorePath(),
+  );
+}
+
+beforeEach(() => {
+  expect(CONFIG_DIR).toBe(knowledgeAuth.dir);
+  fs.rmSync(knowledgeAuth.dir, { recursive: true, force: true });
+  fs.mkdirSync(path.dirname(kbStorePath()), { recursive: true });
+  setKnowledgeContext();
+});
 
 afterEach(() => {
   for (const dir of tmpDirs.splice(0)) {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+  fs.rmSync(knowledgeAuth.dir, { recursive: true, force: true });
   delete process.env.OPENBOT_VAULT_SYNC_DIR;
   delete process.env.OPENBOT_VAULT_SYNC_LEGACY_GATEWAY_SYNC;
+  knowledgeAuth.resolveKnowledgeSourceContext.mockReset();
 });
 
 function mockRespond() {
@@ -30,6 +108,27 @@ function mockRespond() {
 
 function mockClient(user: string): GatewayClient {
   return { connect: {} as GatewayClient["connect"], user };
+}
+
+async function createVault(user: string): Promise<string> {
+  const createMock = mockRespond();
+  await vaultSyncHandlers["knowledge.vault-sync.create"]({
+    params: { deviceId: "dev-1" },
+    respond: createMock.respond as never,
+    client: mockClient(user),
+    req: {} as never,
+    isWebchatConnect: () => false,
+    context: {} as never,
+  });
+  expect(createMock.last?.ok).toBe(true);
+  const payload = createMock.last?.payload as { vaultId?: string } | undefined;
+  const vaultId = payload?.vaultId ?? "";
+  expect(vaultId).toBeTruthy();
+  return vaultId;
+}
+
+function errorMessage(mock: { last: { error?: unknown } | null }): string | undefined {
+  return (mock.last?.error as { message?: string } | undefined)?.message;
 }
 
 describe("vaultSyncHandlers", () => {
@@ -206,25 +305,59 @@ describe("vaultSyncHandlers", () => {
     expect(reindexMock.last?.ok).toBe(false);
   });
 
-  it("binds knowledge base and reindexes for member", async () => {
+  it("rejects arbitrary target knowledge base even for vault owner", async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vault-sync-gw-bind-"));
     tmpDirs.push(dir);
     process.env.OPENBOT_VAULT_SYNC_DIR = dir;
-    const createMock = mockRespond();
-    await vaultSyncHandlers["knowledge.vault-sync.create"]({
-      params: { deviceId: "dev-1" },
-      respond: createMock.respond as never,
-      client: mockClient("owner@acme.test"),
+    setAuthorizedKnowledgeContext();
+    createOwnedKnowledgeBase();
+    const vaultId = await createVault(VAULT_OWNER);
+    const bindMock = mockRespond();
+    await vaultSyncHandlers["knowledge.vault-sync.runtime.bind-kb"]({
+      params: { vaultId, knowledgeBaseId: "kb-sales" },
+      respond: bindMock.respond as never,
+      client: mockClient(VAULT_OWNER),
       req: {} as never,
       isWebchatConnect: () => false,
       context: {} as never,
     });
-    const created = createMock.last?.payload as { vaultId: string };
+    expect(bindMock.last?.ok).toBe(false);
+    const bindPayload = bindMock.last?.payload as
+      | { binding?: { knowledgeBaseId?: string } }
+      | undefined;
+    expect(bindPayload?.binding).toBeUndefined();
+    expect(errorMessage(bindMock)).toBe("target knowledge base write denied");
+
+    const reindexMock = mockRespond();
+    await vaultSyncHandlers["knowledge.vault-sync.runtime.reindex"]({
+      params: {
+        vaultId,
+        knowledgeBaseId: "kb-sales",
+        touchedRelativePaths: ["."],
+      },
+      respond: reindexMock.respond as never,
+      client: mockClient(VAULT_OWNER),
+      req: {} as never,
+      isWebchatConnect: () => false,
+      context: {} as never,
+    });
+    expect(reindexMock.last?.ok).toBe(false);
+    expect(errorMessage(reindexMock)).toBe("target knowledge base write denied");
+  });
+
+  it("binds and reindexes an authorized same-tenant target knowledge base", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vault-sync-gw-legal-"));
+    tmpDirs.push(dir);
+    process.env.OPENBOT_VAULT_SYNC_DIR = dir;
+    setAuthorizedKnowledgeContext();
+    const kb = createOwnedKnowledgeBase();
+    const vaultId = await createVault(VAULT_OWNER);
+
     const bindMock = mockRespond();
     await vaultSyncHandlers["knowledge.vault-sync.runtime.bind-kb"]({
-      params: { vaultId: created.vaultId, knowledgeBaseId: "kb-sales" },
+      params: { vaultId, knowledgeBaseId: kb.id },
       respond: bindMock.respond as never,
-      client: mockClient("owner@acme.test"),
+      client: mockClient(VAULT_OWNER),
       req: {} as never,
       isWebchatConnect: () => false,
       context: {} as never,
@@ -233,27 +366,143 @@ describe("vaultSyncHandlers", () => {
     const bindPayload = bindMock.last?.payload as
       | { binding?: { knowledgeBaseId?: string } }
       | undefined;
-    expect(bindPayload?.binding?.knowledgeBaseId).toBe("kb-sales");
+    expect(bindPayload?.binding?.knowledgeBaseId).toBe(kb.id);
 
     const reindexMock = mockRespond();
     await vaultSyncHandlers["knowledge.vault-sync.runtime.reindex"]({
       params: {
-        vaultId: created.vaultId,
-        knowledgeBaseId: "kb-sales",
+        vaultId,
+        knowledgeBaseId: kb.id,
         touchedRelativePaths: ["."],
       },
       respond: reindexMock.respond as never,
-      client: mockClient("owner@acme.test"),
+      client: mockClient(VAULT_OWNER),
       req: {} as never,
       isWebchatConnect: () => false,
       context: {} as never,
     });
     expect(reindexMock.last?.ok).toBe(true);
     const summary = reindexMock.last?.payload as {
-      matchedBindings: number;
       knowledgeBaseId: string | null;
+      matchedBindings: number;
     };
-    expect(summary.knowledgeBaseId).toBe("kb-sales");
+    expect(summary.knowledgeBaseId).toBe(kb.id);
     expect(summary.matchedBindings).toBe(0);
+  });
+
+  it("rejects a cross-tenant target even when the actor owns that knowledge base", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vault-sync-gw-xtenant-"));
+    tmpDirs.push(dir);
+    process.env.OPENBOT_VAULT_SYNC_DIR = dir;
+    setAuthorizedKnowledgeContext();
+    const foreignKb = createOwnedKnowledgeBase({ tenantId: TENANT_OTHER });
+    const vaultId = await createVault(VAULT_OWNER);
+
+    const bindMock = mockRespond();
+    await vaultSyncHandlers["knowledge.vault-sync.runtime.bind-kb"]({
+      params: { vaultId, knowledgeBaseId: foreignKb.id },
+      respond: bindMock.respond as never,
+      client: mockClient(VAULT_OWNER),
+      req: {} as never,
+      isWebchatConnect: () => false,
+      context: {} as never,
+    });
+    expect(bindMock.last?.ok).toBe(false);
+    expect(errorMessage(bindMock)).toBe("target knowledge base write denied");
+
+    const reindexMock = mockRespond();
+    await vaultSyncHandlers["knowledge.vault-sync.runtime.reindex"]({
+      params: {
+        vaultId,
+        knowledgeBaseId: foreignKb.id,
+        touchedRelativePaths: ["."],
+      },
+      respond: reindexMock.respond as never,
+      client: mockClient(VAULT_OWNER),
+      req: {} as never,
+      isWebchatConnect: () => false,
+      context: {} as never,
+    });
+    expect(reindexMock.last?.ok).toBe(false);
+    expect(errorMessage(reindexMock)).toBe("target knowledge base write denied");
+  });
+
+  it("revalidates a persisted binding on reindex and rejects after the tenant no longer matches", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vault-sync-gw-persist-"));
+    tmpDirs.push(dir);
+    process.env.OPENBOT_VAULT_SYNC_DIR = dir;
+    setAuthorizedKnowledgeContext();
+    const kb = createOwnedKnowledgeBase();
+    const vaultId = await createVault(VAULT_OWNER);
+
+    const bindMock = mockRespond();
+    await vaultSyncHandlers["knowledge.vault-sync.runtime.bind-kb"]({
+      params: { vaultId, knowledgeBaseId: kb.id },
+      respond: bindMock.respond as never,
+      client: mockClient(VAULT_OWNER),
+      req: {} as never,
+      isWebchatConnect: () => false,
+      context: {} as never,
+    });
+    expect(bindMock.last?.ok).toBe(true);
+
+    const persistedOk = mockRespond();
+    await vaultSyncHandlers["knowledge.vault-sync.runtime.reindex"]({
+      params: {
+        vaultId,
+        touchedRelativePaths: ["."],
+      },
+      respond: persistedOk.respond as never,
+      client: mockClient(VAULT_OWNER),
+      req: {} as never,
+      isWebchatConnect: () => false,
+      context: {} as never,
+    });
+    expect(persistedOk.last?.ok).toBe(true);
+    const persistedSummary = persistedOk.last?.payload as { knowledgeBaseId: string | null };
+    expect(persistedSummary.knowledgeBaseId).toBe(kb.id);
+
+    setAuthorizedKnowledgeContext({ tenantId: TENANT_OTHER });
+    const persistedDenied = mockRespond();
+    await vaultSyncHandlers["knowledge.vault-sync.runtime.reindex"]({
+      params: {
+        vaultId,
+        touchedRelativePaths: ["."],
+      },
+      respond: persistedDenied.respond as never,
+      client: mockClient(VAULT_OWNER),
+      req: {} as never,
+      isWebchatConnect: () => false,
+      context: {} as never,
+    });
+    expect(persistedDenied.last?.ok).toBe(false);
+    expect(errorMessage(persistedDenied)).toBe("target knowledge base write denied");
+  });
+
+  it("rejects an RPC rootPath override even for an authorized target knowledge base", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vault-sync-gw-root-"));
+    tmpDirs.push(dir);
+    process.env.OPENBOT_VAULT_SYNC_DIR = dir;
+    setAuthorizedKnowledgeContext();
+    const kb = createOwnedKnowledgeBase();
+    const vaultId = await createVault(VAULT_OWNER);
+
+    const reindexMock = mockRespond();
+    await vaultSyncHandlers["knowledge.vault-sync.runtime.reindex"]({
+      params: {
+        vaultId,
+        knowledgeBaseId: kb.id,
+        rootPath: "/tmp/openbot-forged-vault-root",
+        touchedRelativePaths: ["."],
+        persistBinding: false,
+      },
+      respond: reindexMock.respond as never,
+      client: mockClient(VAULT_OWNER),
+      req: {} as never,
+      isWebchatConnect: () => false,
+      context: {} as never,
+    });
+    expect(reindexMock.last?.ok).toBe(false);
+    expect(errorMessage(reindexMock)).toBe("RPC root override denied");
   });
 });
