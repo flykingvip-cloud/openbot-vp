@@ -1,5 +1,33 @@
 version: 1
 tasks:
+  - id: arch-phase-1-delivery-recovery
+    owner: architecture-executor
+    intent:
+      - Phase 1 Slice 1A Delivery & Recovery unification onto agent-runtime/delivery.
+    paths:
+      - src/agent-runtime/delivery/dispatch/idempotent-delivery.test.ts
+      - src/agent-runtime/delivery/dispatch/idempotent-delivery.ts
+      - src/agent-runtime/delivery/dispatch/outbound-dispatch.test.ts
+      - src/agent-runtime/delivery/dispatch/outbound-dispatch.ts
+      - src/agent-runtime/delivery/index.ts
+      - src/auto-reply/reply/route-reply.ts
+      - src/cron/isolated-agent/delivery-dispatch.ts
+      - src/gateway/knowledge/deliverables/chat-deliverable-publish.ts
+      - src/gateway/server-chat.ts
+      - src/gateway/server-methods/chat.ts
+    state: active
+    sessions:
+      - id: phase1-delivery-20261126
+        taskId: arch-phase-1-delivery-recovery
+        ide: antigravity
+        agent: architecture-executor
+        status: active
+        lastSignalAt: "2026-11-26T14:38:00Z"
+        metadata:
+          authorization: User-authorized Phase 1 local landing on isolated branch.
+    ownerHistory: []
+    since: "2026-11-26"
+    metadata: {}
   - id: arch-slice-2b2-direct-model-and-governance
     owner: architecture-executor
     intent:
@@ -16086,6 +16114,24 @@ tasks:
     since: 2026-11-23
     metadata: {}
 landingStreams:
+  - id: arch-phase-1-delivery-recovery
+    landingPolicy: serial
+    paths:
+      - src/agent-runtime/delivery/dispatch/idempotent-delivery.test.ts
+      - src/agent-runtime/delivery/dispatch/idempotent-delivery.ts
+      - src/agent-runtime/delivery/dispatch/outbound-dispatch.test.ts
+      - src/agent-runtime/delivery/dispatch/outbound-dispatch.ts
+      - src/agent-runtime/delivery/index.ts
+      - src/auto-reply/reply/route-reply.ts
+      - src/cron/isolated-agent/delivery-dispatch.ts
+      - src/gateway/knowledge/deliverables/chat-deliverable-publish.ts
+      - src/gateway/server-chat.ts
+      - src/gateway/server-methods/chat.ts
+    canLandWith: []
+    metadata:
+      task: arch-phase-1-delivery-recovery
+      agent: architecture-executor
+      purpose: Exact 10-file Phase 1 Delivery & Recovery unification landing stream.
   - id: arch-slice-2b2-direct-model-and-governance
     landingPolicy: serial
     paths:
