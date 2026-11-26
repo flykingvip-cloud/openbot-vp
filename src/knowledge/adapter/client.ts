@@ -8,6 +8,12 @@ export type KnowledgeActorContext = {
   actorType: "human";
   agentId: string;
   requestId: string;
+  roles?: string[];
+  departmentIds?: string[];
+  orgRoles?: string[];
+  clearanceLevel?: string;
+  sessionId?: string;
+  profileGeneration?: number;
 };
 export type AdapterConfig = {
   enabled: boolean;
@@ -77,10 +83,61 @@ export function isPublishedResult(value: {
   current_version: number;
 }): boolean {
   return (
-    value.activated &&
+    // Only boolean true is published; a truthy check would accept coerced values.
+    // oxlint-disable-next-line typescript-eslint/no-unnecessary-boolean-literal-compare
+    value.activated === true &&
     value.lifecycle_state === "published" &&
     value.created_version === value.current_version
   );
+}
+
+/** Allowed IdentityContext purposes from SDK pin 9940818b v2_schemas.py. */
+export const KNOWLEDGE_SDK_V2_PURPOSES = [
+  "read",
+  "ground_internal_llm",
+  "ground_external_llm",
+  "export",
+  "eval_and_train",
+] as const;
+export type KnowledgeSdkV2Purpose = (typeof KNOWLEDGE_SDK_V2_PURPOSES)[number];
+
+/**
+ * Exact eight Wave2 routes from knowledge_sdk.server.v2.ROUTES at pin 9940818b.
+ * v2_auth takes purpose from the signed IdentityContext and passes it to policy;
+ * the runtime does not remap purpose per route. Official wave2 tests
+ * (test_runtime.py context(), test_sandbox.py) and the Python client defaults
+ * (client/base.py) use Purpose.READ for create_kb, list_kbs, ingest,
+ * get_document, rollback_document, search, and verify_ref. Pack endpoints that
+ * default to EXPORT are outside this minimum slice. Unknown paths fail closed.
+ */
+export const KNOWLEDGE_SDK_V2_ROUTE_PURPOSES = {
+  "POST /v2/spaces": "read",
+  "GET /v2/spaces": "read",
+  "GET /v2/spaces/{kb_id}": "read",
+  "POST /v2/assets": "read",
+  "GET /v2/assets/{doc_id}": "read",
+  "POST /v2/assets/{doc_id}:rollback": "read",
+  "POST /v2/retrieval:search": "read",
+  "POST /v2/citations:verify": "read",
+} as const satisfies Record<string, KnowledgeSdkV2Purpose>;
+
+export function purposeForV2Route(method: "GET" | "POST", path: string): KnowledgeSdkV2Purpose {
+  if (path.includes("?") || path.includes("#") || path.includes("//")) {
+    throw new KnowledgeSdkError("INVALID_SDK_CONFIGURATION");
+  }
+  for (const [route, purpose] of Object.entries(KNOWLEDGE_SDK_V2_ROUTE_PURPOSES)) {
+    const space = route.indexOf(" ");
+    const routeMethod = route.slice(0, space);
+    const routePath = route.slice(space + 1);
+    if (routeMethod !== method) {
+      continue;
+    }
+    const pattern = new RegExp(`^${routePath.replace(/\{[a-z_]+\}/g, "[^/?#:]+")}$`);
+    if (pattern.test(path)) {
+      return purpose;
+    }
+  }
+  throw new KnowledgeSdkError("INVALID_SDK_CONFIGURATION");
 }
 /** Experimental contract-stub transport only. Not wired into Gateway or SDK runtime.
  * V2 authentication binding must be verified against the nominated Wave2 fixture.
@@ -118,18 +175,33 @@ export class KnowledgeSdkClient {
     ) {
       throw new KnowledgeSdkError("INVALID_SDK_CONFIGURATION");
     }
+    const purpose = purposeForV2Route(method, path);
     const body = method === "GET" ? "" : JSON.stringify(payload ?? {});
     const actorHeader = Buffer.from(
       JSON.stringify({
-        issuer: actor.issuer,
-        subject_id: actor.subjectId,
-        actor_type: actor.actorType,
-        policy_generation: actor.policyGeneration,
+        request_id: actor.requestId,
+        tenant_id: actor.tenantId,
+        actor: {
+          issuer: actor.issuer,
+          subject_id: actor.subjectId,
+          actor_type: "human",
+          roles: actor.roles ?? [],
+          department_ids: actor.departmentIds ?? [],
+          ancestor_department_ids: [],
+          org_roles: actor.orgRoles ?? [],
+          clearance_level: actor.clearanceLevel ?? "",
+          clearance_tags: [],
+          policy_generation: actor.policyGeneration,
+          session_id: actor.sessionId ?? "",
+        },
+        agent: {
+          agent_id: actor.agentId,
+          profile_generation: actor.profileGeneration ?? 1,
+          task_id: "",
+        },
+        purpose,
       }),
     ).toString("base64url");
-    const agentHeader = Buffer.from(JSON.stringify({ agent_id: actor.agentId })).toString(
-      "base64url",
-    );
     const timestamp = Math.floor(Date.now() / 1000).toString();
     const nonce = randomBytes(24).toString("hex");
     const headers: Record<string, string> = {
@@ -137,8 +209,6 @@ export class KnowledgeSdkClient {
       "X-Request-Id": actor.requestId,
       "X-Tenant-Id": actor.tenantId,
       "X-KB-Actor": actorHeader,
-      "X-KB-Agent": agentHeader,
-      "X-KB-Purpose": "ground_internal_llm",
       "X-KB-Timestamp": timestamp,
       "X-KB-Nonce": nonce,
     };
@@ -147,8 +217,6 @@ export class KnowledgeSdkClient {
         method,
         target: path,
         actorHeader,
-        agentHeader,
-        purpose: headers["X-KB-Purpose"],
         timestamp,
         nonce,
         body,
@@ -171,10 +239,21 @@ export class KnowledgeSdkClient {
       throw new KnowledgeSdkError("SDK_UNAVAILABLE");
     }
     if (!response.ok) {
-      throw new KnowledgeSdkError(
-        response.status === 409 ? "IDEMPOTENCY_CONFLICT" : "SDK_REQUEST_DENIED",
-        response.status,
-      );
+      const envelope: unknown = await response.json().catch(() => null);
+      let code = "SDK_REQUEST_DENIED";
+      if (envelope && typeof envelope === "object" && "error" in envelope) {
+        const error = envelope.error;
+        if (
+          error &&
+          typeof error === "object" &&
+          "code" in error &&
+          typeof error.code === "string" &&
+          /^[A-Z_]+$/.test(error.code)
+        ) {
+          code = error.code;
+        }
+      }
+      throw new KnowledgeSdkError(code, response.status);
     }
     return response.json();
   }
