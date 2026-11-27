@@ -45,65 +45,29 @@ export type ModelCallerEntry = {
 };
 
 export const MODEL_CALLER_REGISTRY: readonly ModelCallerEntry[] = [
-  {
-    id: "llm-slug-generator",
-    file: "src/hooks/llm-slug-generator.ts",
-    fn: "runWithModelFallback",
-    caller: "generateSlugViaLLM",
-    callSites: 1,
-    inventoryIds: ["E1m"],
-    governanceToday: "allowlist-when-gated",
-    registration: "explicit-mode",
-    evidenceFiles: ["src/agent-runtime/model/auxiliary-model-governance.ts"],
-    followUp:
-      "Auxiliary filename inference inherits parent governance when available; otherwise records absent allowlist under configured mode. Never creates or advances tasks.",
-  },
+  // Slice 2A + 2B-1: turn (E1/E14/E1f/E4), command (E2/E3/E7), and auxiliary
+  // (E1m: memory-flush, llm-slug-generator) converge onto createUnifiedExecutionLifecycle
+  // and the single runWithModelFallback call site in authorized-session.ts.
   {
     id: "auto-reply",
     file: "src/agent-runtime/model/authorized-session.ts",
     fn: "runWithModelFallback",
     caller: "createAuthorizedModelSession",
     callSites: 1,
-    inventoryIds: ["E1", "E14", "E1f", "E4"],
+    inventoryIds: ["E1", "E14", "E1f", "E4", "E2", "E3", "E7", "E1m"],
     governanceToday: "allowlist-when-gated",
     registration: "explicit-mode",
     followUp: "P3 enforced after §8.4 (default stays shadow; hard filter until then)",
-    evidenceFiles: ["src/agents/embedded-model-governance.ts"],
-  },
-  // Post-PR-1a (#134): agent.ts spreads resolveAgentCommandModelGovernance(), which passes
-  // an explicit governanceMode (legacy when the gate is skipped, shadow by default) and the
-  // gate allowlist; the literals live in the helper, so it is listed as evidence.
-  {
-    id: "agent-command",
-    file: "src/agent-runtime/execution/runner/command-lifecycle.ts",
-    fn: "runWithModelFallback",
-    caller: "createCommandExecutionLifecycle",
-    callSites: 1,
-    inventoryIds: ["E2", "E3", "E7"],
-    governanceToday: "allowlist-when-gated",
-    registration: "explicit-mode",
-    followUp: "P3 enforced after §8.4 parity (default stays shadow)",
     evidenceFiles: [
+      "src/agents/embedded-model-governance.ts",
       "src/agent-runtime/model/command-governance.ts",
       "src/agent-runtime/model/command-admission-session.ts",
-      "src/commands/agent.ts",
-    ],
-  },
-  {
-    id: "memory-flush",
-    file: "src/auto-reply/reply/agent-runner-memory.ts",
-    fn: "runWithModelFallback",
-    caller: "runMemoryFlushIfNeeded",
-    callSites: 1,
-    inventoryIds: ["E1m"],
-    governanceToday: "allowlist-when-gated",
-    registration: "explicit-mode",
-    followUp:
-      "P3-2 inherits parent run snapshot; default shadow record-only (governance-mode); P3 enforced after §8.4",
-    evidenceFiles: [
-      "src/auto-reply/reply/agent-runner-memory.ts",
       "src/agent-runtime/model/auxiliary-model-governance.ts",
+      "src/agent-runtime/execution/runner/unified-lifecycle.ts",
+      "src/auto-reply/reply/agent-runner-memory.ts",
       "src/auto-reply/reply/agent-runner.ts",
+      "src/hooks/llm-slug-generator.ts",
+      "src/commands/agent.ts",
     ],
   },
   {

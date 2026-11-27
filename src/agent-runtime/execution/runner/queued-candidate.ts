@@ -1,15 +1,14 @@
-import { resolveBootstrapWarningSignaturesSeen } from "../../../agents/bootstrap-budget.js";
 import { resolveRunAuthProfile } from "../../../auto-reply/reply/agent-runner-utils.js";
 import type { FollowupRun } from "../../../auto-reply/reply/queue.js";
-import { resolveEnterpriseEmbeddedTransport } from "../../../gateway/enterprise-model/embedded-transport.js";
-import { inheritExecutionIdentityRunFields } from "../../../gateway/execution-identity-context.js";
 import type { EmployeeModelGateResult } from "../../../gateway/model-entitlement/employee-model-gate.js";
-import {
-  rememberModelResultUsage,
-  TaskBudgetExceededError,
-  usageRetainedForCandidateCharge,
-} from "../../../task-outcome/runtime-from-runner.js";
 import { sessionTaskState } from "../../state/index.js";
+import {
+  buildBootstrapWarningParams,
+  createCandidateUsageCharger,
+  inheritExecutionIdentityRunFields,
+  resolveBootstrapWarningSignaturesSeen,
+  resolveCandidateEmbeddedTransport,
+} from "./candidate-core.js";
 import type { EmbeddedPiRunResult } from "./embedded-result.js";
 import { runEmbeddedPiAgent } from "./embedded-run.js";
 
@@ -46,40 +45,30 @@ export async function runQueuedCandidate(
   },
 ) {
   const { queued, provider, model, runId, modelGate, runOptions } = input;
-  const bootstrapPromptWarningSignaturesSeen = input.bootstrapWarnings;
   const authProfile = resolveRunAuthProfile(queued.run, provider);
-  const transport = await resolveEnterpriseEmbeddedTransport({
+  const { transportFields } = await resolveCandidateEmbeddedTransport({
     provider,
     model,
     tenantId: modelGate?.tenantId?.trim() || modelGate?.creditReporting?.enterpriseId?.trim() || "",
   });
-  const embeddedProvider = transport.provider;
-  const embeddedModel = transport.model;
-  const providerAuthOverride = transport.providerAuthOverride;
-  const enterpriseRuntimeModelId = transport.enterpriseRuntimeModelId;
   host.assertBudget();
-  let charged = false;
-  const chargeOnce = (usage?: unknown) => {
-    if (charged) {
-      return;
-    }
-    charged = true;
-    host.recordUsage({
-      usage,
-      catalogProvider: provider,
-      catalogModel: model,
-      transportProvider: embeddedProvider,
-      transportModel: embeddedModel,
-      pricingSource: "transport",
-    });
-  };
+  const charger = createCandidateUsageCharger({
+    onCharge: (usage) =>
+      host.recordUsage({
+        usage,
+        catalogProvider: provider,
+        catalogModel: model,
+        transportProvider: transportFields.provider,
+        transportModel: transportFields.model,
+        pricingSource: "transport",
+      }),
+  });
   if (
     queued.run.taskCompletionBinding &&
     !sessionTaskState.bindingCurrent(queued.run.sessionFile, queued.run.taskCompletionBinding)
   ) {
     throw new Error("Queued task was paused, closed or replaced before provider startup");
   }
-  let notedUsage: unknown;
   let result: EmbeddedPiRunResult;
   try {
     result = await runEmbeddedPiAgent({
@@ -132,10 +121,7 @@ export async function runQueuedCandidate(
       ...(queued.run.privateRunBag ? { privateRunBag: queued.run.privateRunBag } : {}),
       ownerNumbers: queued.run.ownerNumbers,
       enforceFinalTag: queued.run.enforceFinalTag,
-      provider: embeddedProvider,
-      model: embeddedModel,
-      ...(providerAuthOverride ? { providerAuthOverride } : {}),
-      ...(enterpriseRuntimeModelId ? { enterpriseRuntimeModelId } : {}),
+      ...transportFields,
       ...authProfile,
       thinkLevel: queued.run.thinkLevel,
       verboseLevel: queued.run.verboseLevel,
@@ -147,9 +133,7 @@ export async function runQueuedCandidate(
       runId,
       allowTransientCooldownProbe: runOptions?.allowTransientCooldownProbe,
       blockReplyBreak: queued.run.blockReplyBreak,
-      bootstrapPromptWarningSignaturesSeen,
-      bootstrapPromptWarningSignature:
-        bootstrapPromptWarningSignaturesSeen[bootstrapPromptWarningSignaturesSeen.length - 1],
+      ...buildBootstrapWarningParams(input.bootstrapWarnings),
       onAgentEvent: (evt) => {
         if (evt.stream !== "compaction") {
           return;
@@ -160,20 +144,12 @@ export async function runQueuedCandidate(
         }
       },
     });
-    notedUsage = rememberModelResultUsage(result.meta?.agentMeta?.usage);
+    const notedUsage = charger.noteResultUsage(result.meta?.agentMeta?.usage);
     host.recordWarnings(resolveBootstrapWarningSignaturesSeen(result.meta?.systemPromptReport));
-    chargeOnce(result.meta?.agentMeta?.usage ?? notedUsage);
+    charger.chargeOnce(result.meta?.agentMeta?.usage ?? notedUsage);
     return result;
   } catch (err) {
-    if (!(err instanceof TaskBudgetExceededError)) {
-      try {
-        chargeOnce(usageRetainedForCandidateCharge(notedUsage, err));
-      } catch (chargeErr) {
-        if (chargeErr instanceof TaskBudgetExceededError) {
-          throw chargeErr;
-        }
-      }
-    }
+    charger.chargeOnFailure(err);
     throw err;
   }
 }

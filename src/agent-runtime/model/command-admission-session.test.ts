@@ -8,6 +8,8 @@ const m = vi.hoisted(() => ({
   remember: vi.fn(),
   build: vi.fn(),
   credit: vi.fn(),
+  runWithModelFallback: vi.fn(),
+  recordCreditUsage: vi.fn(),
 }));
 vi.mock("./command-commercial-gate.js", () => ({
   acquireAgentCommandCommercialRun: m.acquire,
@@ -18,6 +20,12 @@ vi.mock("../../gateway/governance/spawn-snapshot-handoff.js", () => ({
   rememberRunModelSet: m.remember,
   buildRunModelSetSnapshot: m.build,
   snapshotCreditReportingFromGate: m.credit,
+}));
+vi.mock("../../agents/model-fallback.js", () => ({
+  runWithModelFallback: m.runWithModelFallback,
+}));
+vi.mock("../../gateway/billing/record-credit-usage.js", () => ({
+  recordCreditUsage: m.recordCreditUsage,
 }));
 beforeEach(() => {
   vi.resetAllMocks();
@@ -73,4 +81,103 @@ it.each(["denied", "skipped"])("%s never releases an unheld slot", async (status
   await s.dispose();
   expect(m.release).not.toHaveBeenCalled();
   expect(m.forget).not.toHaveBeenCalled();
+});
+
+it("enforces disposed guard, platformModelsMode/selectorStrategy snapshot parity, infer, and recordUsage", async () => {
+  m.acquire.mockResolvedValue({
+    status: "acquired",
+    enterpriseId: "tenant-snap",
+    authorizationDecisionId: "auth-snap",
+    subscriptionId: "sub-snap",
+    modelGate: {
+      tenantId: "tenant-snap",
+      allowlist: ["openai/gpt-5.2"],
+      effectiveRouting: { mode: "aor_enhanced", selectorStrategy: "bandit" },
+      creditReporting: { enterpriseId: "tenant-snap", policyId: "policy-snap" },
+    },
+  });
+  m.runWithModelFallback.mockImplementation(
+    async (input: { run: (p: string, mod: string) => Promise<unknown> }) => ({
+      result: await input.run("openai", "gpt-5.2"),
+      provider: "openai",
+      model: "gpt-5.2",
+      attempts: [],
+    }),
+  );
+  m.recordCreditUsage.mockResolvedValue({
+    recorded: true,
+    deduped: false,
+    creditsCharged: 1,
+    tier: "test",
+    providerCostCents: 0,
+    tenantRevenueCents: 0,
+  });
+
+  const s = createCommandAdmissionSession(
+    {
+      runId: "run-snap",
+      isSubagentLane: false,
+      entry: "E2",
+    },
+    { runWithModelFallback: m.runWithModelFallback },
+  );
+  await expect(
+    s.infer({
+      cfg: {},
+      provider: "openai",
+      model: "gpt-5.2",
+      taskText: "t",
+      run: async () => "no",
+    }),
+  ).rejects.toThrow(/not prepared/);
+
+  await s.acquire({ runId: "run-snap", sessionAgentId: "main", entry: "E2" });
+  expect(m.build).toHaveBeenCalledWith(
+    expect.objectContaining({
+      platformModelsMode: "aor_enhanced",
+      selectorStrategy: "bandit",
+    }),
+  );
+
+  const out = await s.infer({
+    cfg: {},
+    provider: "openai",
+    model: "gpt-5.2",
+    taskText: "hello",
+    run: async () => "ok",
+  });
+  expect(out.result).toBe("ok");
+  expect(m.runWithModelFallback).toHaveBeenCalledOnce();
+
+  await s.recordUsage({
+    provider: "openai",
+    model: "gpt-5.2",
+    toolCallCount: 0,
+    toolClasses: [],
+    fallbackAttemptsRaw: [],
+  });
+  expect(m.recordCreditUsage).toHaveBeenCalledOnce();
+
+  await s.dispose();
+  await expect(s.acquire({ runId: "run-snap", sessionAgentId: "main" })).rejects.toThrow(
+    /disposed/,
+  );
+  await expect(
+    s.infer({
+      cfg: {},
+      provider: "openai",
+      model: "gpt-5.2",
+      taskText: "t",
+      run: async () => "no",
+    }),
+  ).rejects.toThrow(/not prepared/);
+  expect(() =>
+    s.recordUsage({
+      provider: "openai",
+      model: "gpt-5.2",
+      toolCallCount: 0,
+      toolClasses: [],
+      fallbackAttemptsRaw: [],
+    }),
+  ).toThrow(/authorized/);
 });

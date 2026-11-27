@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sanitizeChatHistoryMessagesForTest } from "../../gateway/server-methods/chat.js";
+import { sanitizeChatHistoryMessagesForTest } from "../../gateway/queries/chat-history.js";
 import { stripInlineDirectiveTagsForDisplay } from "../../utils/directive-tags.js";
 import fixtures from "./assistant-scratchpad.jd-fixtures.json" with { type: "json" };
 import {

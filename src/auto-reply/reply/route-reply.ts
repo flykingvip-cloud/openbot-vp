@@ -1,4 +1,5 @@
 import type { TaskActionBoundary } from "../../agent-runtime/contracts/task-binding.js";
+import { dispatchOutboundDelivery } from "../../agent-runtime/delivery/index.js";
 /**
  * Provider-agnostic reply router.
  *
@@ -145,7 +146,8 @@ export async function routeReply(params: RouteReplyParams): Promise<RouteReplyRe
       agentId: resolvedAgentId,
       sessionKey: params.sessionKey,
     });
-    const results = await deliverOutboundPayloads({
+    const { lastMessageId } = await dispatchOutboundDelivery({
+      deliver: deliverOutboundPayloads,
       cfg,
       channel: channelId,
       to,
@@ -170,8 +172,7 @@ export async function routeReply(params: RouteReplyParams): Promise<RouteReplyRe
           : undefined,
     });
 
-    const last = results.at(-1);
-    return { ok: true, messageId: last?.messageId };
+    return { ok: true, messageId: lastMessageId };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return {

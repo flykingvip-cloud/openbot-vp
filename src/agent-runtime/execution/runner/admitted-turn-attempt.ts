@@ -18,8 +18,8 @@ import { createTurnOutcomeRecorder } from "../outcomes/index.js";
 import { createAdmittedCandidateInvoker } from "./admitted-candidate.js";
 import type { AdmittedTurnHost } from "./admitted-turn-host.js";
 import type { AdmittedTurnLoopState } from "./admitted-turn-state.js";
-import { createExecutionLifecycle } from "./execution-lifecycle.js";
 import type { AgentRunLoopResult, AgentTurnExecutionParams } from "./turn-contract.js";
+import type { UnifiedTurnExecutionLifecycle } from "./unified-lifecycle.js";
 
 export type AdmittedTurnAttemptOutcome =
   | { action: "break" }
@@ -30,7 +30,7 @@ export async function runAdmittedTurnAttempt(args: {
   host: AdmittedTurnHost;
   runId: string;
   state: AdmittedTurnLoopState;
-  controlledExecution: ReturnType<typeof createExecutionLifecycle>;
+  controlledExecution: UnifiedTurnExecutionLifecycle;
   assertOriginalTaskCurrent: () => void;
   assertTipBudgetAllowsModelCall: () => void;
   chargeTipBudgetAfterModelCall: (opts: {

@@ -9,17 +9,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GovernanceDecision } from "../../gateway/governance/decision.js";
 
 const { appendMock } = vi.hoisted(() => ({ appendMock: vi.fn() }));
-vi.mock("../../gateway/governance/shadow-sink.js", () => ({
-  appendGovernanceShadowDecision: appendMock,
-}));
+vi.mock("../../gateway/governance/shadow-sink.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../gateway/governance/shadow-sink.js")>();
+  return {
+    ...actual,
+    appendGovernanceShadowDecision: appendMock,
+  };
+});
 
 vi.mock("../../agents/bootstrap-budget.js", () => ({
   resolveBootstrapWarningSignaturesSeen: vi.fn().mockReturnValue([]),
 }));
 
-vi.mock("../../agents/compaction.js", () => ({
-  estimateMessagesTokens: vi.fn().mockReturnValue(1),
-}));
+vi.mock("../../agents/compaction.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../agents/compaction.js")>();
+  return {
+    ...actual,
+    estimateMessagesTokens: vi.fn().mockReturnValue(1),
+  };
+});
 
 vi.mock("../../agents/model-selection.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../agents/model-selection.js")>();
@@ -29,12 +37,16 @@ vi.mock("../../agents/model-selection.js", async (importOriginal) => {
   };
 });
 
-vi.mock("../../agent-runtime/execution/index.js", () => ({
-  runEmbeddedPiAgent: vi.fn().mockResolvedValue({
-    payloads: [],
-    meta: { durationMs: 10 },
-  }),
-}));
+vi.mock("../../agent-runtime/execution/index.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../agent-runtime/execution/index.js")>();
+  return {
+    ...actual,
+    runEmbeddedPiAgent: vi.fn().mockResolvedValue({
+      payloads: [],
+      meta: { durationMs: 10 },
+    }),
+  };
+});
 
 vi.mock("../../agents/sandbox.js", () => ({
   resolveSandboxConfigForAgent: vi.fn().mockReturnValue({ workspaceAccess: "rw" }),

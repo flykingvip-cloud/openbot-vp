@@ -33,6 +33,19 @@ export {
 export { deliverQueuedReply } from "./dispatch/queued-reply.js";
 
 export {
+  deliverWithIdempotentReceipt,
+  type IdempotentReceiptDeliveryResult,
+} from "./dispatch/idempotent-delivery.js";
+export {
+  dispatchOutboundDelivery,
+  isTransientOutboundDeliveryError,
+  retryTransientOutboundDelivery,
+  summarizeOutboundDeliveryError,
+  type OutboundDeliveryRetryInfo,
+  type OutboundDispatchResult,
+} from "./dispatch/outbound-dispatch.js";
+
+export {
   writeAcceptedArtifactQueueFile,
   sendAcceptedArtifactBridge,
 } from "./accepted-artifact-send.js";

@@ -9,16 +9,16 @@ import { resolvePreferredOpenClawTmpDir } from "openclaw/plugin-sdk/llm-task";
 // So we resolve internal imports dynamically with src-first, dist-fallback.
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/llm-task";
 
-type RunEmbeddedPiAgentFn = (params: Record<string, unknown>) => Promise<unknown>;
+type RunControlledAuxiliaryTurnFn = (params: Record<string, unknown>) => Promise<unknown>;
 
-async function loadRunEmbeddedPiAgent(): Promise<RunEmbeddedPiAgentFn> {
+async function loadRunControlledAuxiliaryTurn(): Promise<RunControlledAuxiliaryTurnFn> {
   // Source checkout (tests/dev)
   try {
-    const mod = await import("../../../src/agents/pi-embedded-runner.js");
+    const mod = await import("../../../src/agent-runtime/execution/index.js");
     // oxlint-disable-next-line typescript/no-explicit-any
-    if (typeof (mod as any).runEmbeddedPiAgent === "function") {
+    if (typeof (mod as any).runControlledAuxiliaryTurn === "function") {
       // oxlint-disable-next-line typescript/no-explicit-any
-      return (mod as any).runEmbeddedPiAgent;
+      return (mod as any).runControlledAuxiliaryTurn;
     }
   } catch {
     // ignore
@@ -27,13 +27,13 @@ async function loadRunEmbeddedPiAgent(): Promise<RunEmbeddedPiAgentFn> {
   // Bundled install (built)
   // NOTE: there is no src/ tree in a packaged install. Prefer a stable internal entrypoint.
   const distExtensionApi = "../../../dist/extensionAPI.js";
-  const mod = (await import(distExtensionApi)) as { runEmbeddedPiAgent?: unknown };
+  const mod = (await import(distExtensionApi)) as { runControlledAuxiliaryTurn?: unknown };
   // oxlint-disable-next-line typescript/no-explicit-any
-  const fn = (mod as any).runEmbeddedPiAgent;
+  const fn = (mod as any).runControlledAuxiliaryTurn;
   if (typeof fn !== "function") {
-    throw new Error("Internal error: runEmbeddedPiAgent not available");
+    throw new Error("Internal error: runControlledAuxiliaryTurn not available");
   }
-  return fn as RunEmbeddedPiAgentFn;
+  return fn as RunControlledAuxiliaryTurnFn;
 }
 
 function stripCodeFences(s: string): string {
@@ -190,9 +190,9 @@ export function createLlmTaskTool(api: OpenClawPluginApi) {
         const sessionId = `llm-task-${Date.now()}`;
         const sessionFile = path.join(tmpDir, "session.json");
 
-        const runEmbeddedPiAgent = await loadRunEmbeddedPiAgent();
+        const runControlledAuxiliaryTurn = await loadRunControlledAuxiliaryTurn();
 
-        const result = await runEmbeddedPiAgent({
+        const result = await runControlledAuxiliaryTurn({
           sessionId,
           sessionFile,
           workspaceDir: api.config?.agents?.defaults?.workspace ?? process.cwd(),

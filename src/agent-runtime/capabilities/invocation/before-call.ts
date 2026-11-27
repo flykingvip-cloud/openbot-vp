@@ -24,6 +24,8 @@ export type HookContext = {
   authorizeStoredResultRead?: (
     params: unknown,
   ) => Promise<"allowed" | "denied" | "unverifiable"> | "allowed" | "denied" | "unverifiable";
+  /** Ownership / fencing verification evaluated before any irreversible external effect. */
+  fencingCheck?: () => Promise<void> | void;
   beforeEffect?: (params: unknown) => Promise<void> | void;
   taskBoundary?: TaskActionBoundary;
   agentId?: string;
@@ -43,6 +45,50 @@ type HookOutcome = { blocked: true; reason: string } | { blocked: false; params:
 const log = createSubsystemLogger("agents/tools");
 const BEFORE_TOOL_CALL_WRAPPED = Symbol("beforeToolCallWrapped");
 const RESULT_REPLAY_GUARD = Symbol("toolResultReplayGuard");
+
+export type EffectGateInput = {
+  taskBoundary?: TaskActionBoundary;
+  isAuthorityStillGranted?: () => Promise<boolean> | boolean;
+  fencingCheck?: () => Promise<void> | void;
+  beforeEffect?: (params: unknown) => Promise<void> | void;
+};
+
+/**
+ * Canonical beforeEffect gate combining task-boundary, ownership/fencing, and
+ * live authority verification. Fails closed on any stale, paused, or revoked state.
+ */
+export function createBeforeEffectGate(
+  input: EffectGateInput,
+): ((params: unknown) => Promise<void>) | undefined {
+  if (
+    !input.taskBoundary &&
+    !input.isAuthorityStillGranted &&
+    !input.fencingCheck &&
+    !input.beforeEffect
+  ) {
+    return undefined;
+  }
+  return async (params: unknown) => {
+    if (input.taskBoundary) {
+      const refusal = checkTaskActionBoundary(input.taskBoundary);
+      if (refusal) {
+        throw new Error(refusal);
+      }
+    }
+    if (input.fencingCheck) {
+      await input.fencingCheck();
+    }
+    if (input.isAuthorityStillGranted) {
+      const granted = await input.isAuthorityStillGranted();
+      if (!granted) {
+        throw new Error("Tool execution denied (authority_revoked).");
+      }
+    }
+    if (input.beforeEffect) {
+      await input.beforeEffect(params);
+    }
+  };
+}
 
 /** A stored success is reusable only under the current trusted execution scope. */
 export async function assertToolResultReplayAllowed(
@@ -284,11 +330,10 @@ export function wrapToolWithBeforeToolCallHook(
       }
       if (!outcome.blocked) {
         try {
+          await ctx?.fencingCheck?.();
           await ctx?.beforeEffect?.(outcome.params);
         } catch (error) {
-          throw trustedToolAdmissionRefusal(
-            error instanceof Error ? error.message : "Admission refused",
-          );
+          throw trustedToolAdmissionRefusal(error instanceof Error ? error : "Admission refused");
         }
         // Authority resolution can await too; owner control and cancellation still win.
         if (signal?.aborted) {
@@ -381,6 +426,8 @@ export function wrapToolWithBeforeToolCallHook(
       if (decision !== "allowed") {
         throw new Error(`Stored result read authorization ${decision ?? "unverifiable"}`);
       }
+      await ctx?.fencingCheck?.();
+      await ctx?.beforeEffect?.(params);
       const after = ctx?.taskBoundary ? checkTaskActionBoundary(ctx.taskBoundary) : undefined;
       if (after) {
         throw new Error(after);

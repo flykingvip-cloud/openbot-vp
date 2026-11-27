@@ -1,4 +1,3 @@
-import { resolveBootstrapWarningSignaturesSeen } from "../../../agents/bootstrap-budget.js";
 import { buildEmbeddedRunContexts } from "../../../auto-reply/reply/agent-runner-utils.js";
 import { createBlockReplyDeliveryHandler } from "../../../auto-reply/reply/reply-delivery.js";
 import type { ReplyPayload } from "../../../auto-reply/types.js";
@@ -7,23 +6,22 @@ import { createConversationTurnToolObserver } from "../../../conversation-task/l
 import { defaultShadowStoreRoot } from "../../../conversation-task/runtime-bootstrap.js";
 import { resolveCronStorePath } from "../../../cron/store.js";
 import { emitChatInboundStage } from "../../../gateway/chat-inbound-stage-events.js";
-import { resolveEnterpriseEmbeddedTransport } from "../../../gateway/enterprise-model/embedded-transport.js";
-import { inheritExecutionIdentityRunFields } from "../../../gateway/execution-identity-context.js";
-import { resolveAgentRunEntitlementScope } from "../../../gateway/model-entitlement/resolve-agent-run-scope.js";
 import { logVerbose } from "../../../globals.js";
 import { getExecApprovalReplyMetadata } from "../../../infra/exec-approval-reply.js";
 import { APPROVE_CARD_CTA } from "../../../shared/text/assistant-scratchpad.js";
-import {
-  rememberModelResultUsage,
-  TaskBudgetExceededError,
-  usageRetainedForCandidateCharge,
-} from "../../../task-outcome/runtime-from-runner.js";
 import {
   isMarkdownCapableMessageChannel,
   resolveMessageChannel,
 } from "../../../utils/message-channel.js";
 import { buildEmbeddedRunBaseParams } from "../preparation/index.js";
 import type { AdmittedCandidateHost } from "./admitted-candidate.js";
+import {
+  buildBootstrapWarningParams,
+  createCandidateUsageCharger,
+  inheritExecutionIdentityRunFields,
+  resolveBootstrapWarningSignaturesSeen,
+  resolveCandidateEmbeddedTransport,
+} from "./candidate-core.js";
 import { readEmbeddedFailureUsage } from "./embedded-failure-usage.js";
 import { runEmbeddedPiAgent } from "./embedded-run.js";
 import type { AgentTurnExecutionParams } from "./turn-contract.js";
@@ -71,7 +69,7 @@ export function invokeAdmittedCandidateEmbedded(args: {
   return (async () => {
     // ent/<connection>/<upstream> is a tenant catalog id, not a registry provider.
     // Without this remap the runner throws Unknown model before any reply.
-    const transport = await resolveEnterpriseEmbeddedTransport({
+    const { transportFields } = await resolveCandidateEmbeddedTransport({
       provider,
       model,
       tenantId:
@@ -81,12 +79,7 @@ export function invokeAdmittedCandidateEmbedded(args: {
         params.sessionCtx.GatewayClientSessionEnterpriseId?.trim() ||
         params.sessionCtx.CollaborationGroupOwnerEntitlement?.tenantId?.trim() ||
         "",
-      resolveTenantId: async () => {
-        const scope = await resolveAgentRunEntitlementScope({
-          agentId: params.followupRun.run.agentId,
-        });
-        return scope?.tenantId;
-      },
+      agentId: params.followupRun.run.agentId,
     });
     const modelStartedAtMs = Date.now();
     let firstTokenEmitted = false;
@@ -128,25 +121,14 @@ export function invokeAdmittedCandidateEmbedded(args: {
       storeRoot: defaultShadowStoreRoot(),
       cronStorePath: resolveCronStorePath(params.followupRun.run.config.cron?.store),
     });
-    let notedEmbeddedUsage: unknown;
-    let embeddedCharged = false;
     const executionTerminal = createCandidateTerminal(host);
-    const chargeEmbeddedOnce = (usage?: unknown) => {
-      if (embeddedCharged) {
-        return;
-      }
-      embeddedCharged = true;
-      try {
-        host.chargeTipBudgetAfterModelCall({ provider, model, usage });
-      } catch (chargeErr) {
-        if (chargeErr instanceof TaskBudgetExceededError) {
-          throw chargeErr;
-        }
+    const charger = createCandidateUsageCharger({
+      onCharge: (usage) => host.chargeTipBudgetAfterModelCall({ provider, model, usage }),
+      onNonBudgetChargeError: (chargeErr) =>
         logVerbose(
           `tip budget mid-run charge failed: ${chargeErr instanceof Error ? chargeErr.message : String(chargeErr)}`,
-        );
-      }
-    };
+        ),
+    });
     try {
       host.assertOriginalTaskCurrent();
       const result = await runEmbeddedPiAgent({
@@ -159,14 +141,7 @@ export function invokeAdmittedCandidateEmbedded(args: {
         groupSpace: params.sessionCtx.GroupSpace?.trim() ?? undefined,
         ...senderContext,
         ...runBaseParams,
-        provider: transport.provider,
-        model: transport.model,
-        ...(transport.providerAuthOverride
-          ? { providerAuthOverride: transport.providerAuthOverride }
-          : {}),
-        ...(transport.enterpriseRuntimeModelId
-          ? { enterpriseRuntimeModelId: transport.enterpriseRuntimeModelId }
-          : {}),
+        ...transportFields,
         ...inheritExecutionIdentityRunFields({
           ...params.followupRun.run,
           gatewayClientUser: host.identity.user,
@@ -301,9 +276,7 @@ export function invokeAdmittedCandidateEmbedded(args: {
           : undefined,
         shouldEmitToolResult: params.shouldEmitToolResult,
         shouldEmitToolOutput: params.shouldEmitToolOutput,
-        bootstrapPromptWarningSignaturesSeen: host.getBootstrapWarnings(),
-        bootstrapPromptWarningSignature:
-          host.getBootstrapWarnings()[host.getBootstrapWarnings().length - 1],
+        ...buildBootstrapWarningParams(host.getBootstrapWarnings()),
         onToolResult: onToolResult
           ? (() => {
               // Serialize tool result delivery to preserve message ordering.
@@ -343,7 +316,7 @@ export function invokeAdmittedCandidateEmbedded(args: {
             })()
           : undefined,
       });
-      notedEmbeddedUsage = rememberModelResultUsage(result.meta?.agentMeta?.usage);
+      const notedEmbeddedUsage = charger.noteResultUsage(result.meta?.agentMeta?.usage);
       host.setBootstrapWarnings(
         resolveBootstrapWarningSignaturesSeen(result.meta?.systemPromptReport),
       );
@@ -358,7 +331,7 @@ export function invokeAdmittedCandidateEmbedded(args: {
         ok: terminal === "completed",
       });
       emitModelStage("assistant_persisted", { source: "session_manager" });
-      chargeEmbeddedOnce(notedEmbeddedUsage);
+      charger.chargeOnce(notedEmbeddedUsage);
       executionTerminal.finish(terminal);
       return result;
     } catch (err) {
@@ -367,11 +340,10 @@ export function invokeAdmittedCandidateEmbedded(args: {
         ok: false,
       });
       const retained = readEmbeddedFailureUsage(err, { runId, provider, model });
-      if (!(err instanceof TaskBudgetExceededError) && (!isAbortError(err) || retained)) {
-        chargeEmbeddedOnce(
-          retained?.usage ?? usageRetainedForCandidateCharge(notedEmbeddedUsage, err),
-        );
-      }
+      charger.chargeOnFailure(err, {
+        retainedUsage: retained?.usage,
+        skipCharge: isAbortError(err) && !retained,
+      });
       executionTerminal.finish(params.opts?.abortSignal?.aborted ? "cancelled" : "failed");
       throw err;
     }

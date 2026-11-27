@@ -17,6 +17,7 @@ import {
 import * as embeddedModule from "../agents/pi-embedded.js";
 import type { OpenBotConfig } from "../config/config.js";
 import * as configModule from "../config/config.js";
+import * as agentRunGovernance from "../gateway/billing/agent-run-governance.js";
 import { readSessionMessages } from "../gateway/session-utils.fs.js";
 import { onAgentEvent } from "../infra/agent-events.js";
 import type { RuntimeEnv } from "../runtime.js";
@@ -674,5 +675,78 @@ describe("agentCommand ACP CLI turn preflight observe", () => {
     } finally {
       spy.mockRestore();
     }
+  });
+});
+
+describe("ACP controlled execution lifecycle enforcement", () => {
+  it("blocks ACP turn before AcpSessionManager.runTurn when commercial preparation denies", async () => {
+    await withTempHome(async (home) => {
+      const storePath = path.join(home, "sessions.json");
+      mockConfig(home, storePath);
+      const sessionKey = "agent:codex:acp:test";
+      writeAcpSessionStore(storePath);
+      const runTurn = vi.fn(async () => {});
+      getAcpSessionManagerSpy.mockReturnValue({
+        resolveSession: () => resolveReadySession(sessionKey),
+        runTurn,
+      } as unknown as ReturnType<typeof acpManagerModule.getAcpSessionManager>);
+
+      const acquireSpy = vi
+        .spyOn(agentRunGovernance, "tryAcquireEnterpriseAgentRun")
+        .mockResolvedValue({
+          acquired: false,
+          skipped: false,
+          reason: "NO_SUBSCRIPTION",
+          message: "commercial quota denied",
+        });
+      const releaseSpy = vi
+        .spyOn(agentRunGovernance, "releaseEnterpriseAgentRun")
+        .mockResolvedValue(undefined);
+      try {
+        await expect(agentCommand({ message: "ping", sessionKey }, runtime)).rejects.toThrow(
+          /commercial quota denied/,
+        );
+        expect(runTurn).not.toHaveBeenCalled();
+        expect(releaseSpy).not.toHaveBeenCalled();
+      } finally {
+        acquireSpy.mockRestore();
+        releaseSpy.mockRestore();
+      }
+    });
+  });
+
+  it("blocks ACP turn before AcpSessionManager.runTurn when abortSignal is aborted and still disposes lease once", async () => {
+    await withTempHome(async (home) => {
+      const storePath = path.join(home, "sessions.json");
+      mockConfig(home, storePath);
+      const sessionKey = "agent:codex:acp:test";
+      writeAcpSessionStore(storePath);
+      const runTurn = vi.fn(async () => {});
+      getAcpSessionManagerSpy.mockReturnValue({
+        resolveSession: () => resolveReadySession(sessionKey),
+        runTurn,
+      } as unknown as ReturnType<typeof acpManagerModule.getAcpSessionManager>);
+
+      const controller = new AbortController();
+      const acquireSpy = vi
+        .spyOn(agentRunGovernance, "tryAcquireEnterpriseAgentRun")
+        .mockImplementation(async () => {
+          controller.abort();
+          return { acquired: true, skipped: false, enterpriseId: "tenant-acp" };
+        });
+      const releaseSpy = vi
+        .spyOn(agentRunGovernance, "releaseEnterpriseAgentRun")
+        .mockResolvedValue(undefined);
+      try {
+        await expect(
+          agentCommand({ message: "ping", sessionKey, abortSignal: controller.signal }, runtime),
+        ).rejects.toThrow();
+        expect(runTurn).not.toHaveBeenCalled();
+        expect(releaseSpy).toHaveBeenCalledOnce();
+      } finally {
+        acquireSpy.mockRestore();
+        releaseSpy.mockRestore();
+      }
+    });
   });
 });

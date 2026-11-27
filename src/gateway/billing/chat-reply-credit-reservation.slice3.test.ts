@@ -8,7 +8,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createExecutionLifecycle } from "../../agent-runtime/execution/runner/execution-lifecycle.js";
+import { createUnifiedExecutionLifecycle } from "../../agent-runtime/execution/runner/unified-lifecycle.js";
 import { bindAdmittedTurnHost } from "../../agent-runtime/wiring/admitted-turn-host.js";
 import { DEFAULT_OVERAGE_POLICY } from "../package-entitlement/normalize-entitlement.js";
 import { upsertCreditWeight } from "../resource-catalog/credit-weights-store.js";
@@ -148,7 +148,7 @@ function createChatLifecycle(runId: string) {
     model: BILLABLE_MODEL,
     attempts: [],
   }));
-  return { host, lifecycle: createExecutionLifecycle(runId, host) };
+  return { host, lifecycle: createUnifiedExecutionLifecycle({ mode: "turn", runId, host }) };
 }
 
 function inferenceRequest(run: () => Promise<unknown>, signal?: AbortSignal) {

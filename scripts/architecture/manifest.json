@@ -736,16 +736,17 @@
     "from": "src/gateway/supervisor/worker-executor.ts",
     "denyImportsFrom": [
       "src/agent-runtime/execution/runner/**",
-      "src/agent-runtime/execution/runner/controlled-execution",
-      "src/agent-runtime/execution/runner/execution-scope",
-      "src/agent-runtime/execution/runner/supervisor-lifecycle",
-      "src/agent-runtime/model/authorized-session",
-      "src/agent-runtime/model/command-admission-session",
-      "src/agents/cli-runner",
-      "src/agents/model-fallback",
-      "src/agents/pi-embedded"
+      "src/agent-runtime/execution/runner/controlled-execution.ts",
+      "src/agent-runtime/execution/runner/execution-scope.ts",
+      "src/agent-runtime/execution/runner/supervisor-lifecycle.ts",
+      "src/agent-runtime/execution/runner/unified-lifecycle.ts",
+      "src/agent-runtime/model/authorized-session.ts",
+      "src/agent-runtime/model/command-admission-session.ts",
+      "src/agents/cli-runner.ts",
+      "src/agents/model-fallback.ts",
+      "src/agents/pi-embedded.ts"
     ],
-    "description": "Supervisor worker dispatch admits work items through execution/index createSupervisorWorkItemLifecycle and runs CLI via runCliAgent; it cannot assemble prepare/infer privately or revive legacy facades."
+    "description": "Supervisor worker dispatch admits work items through execution/index createUnifiedExecutionLifecycle and runs CLI via runCliAgent; it cannot assemble prepare/infer privately or revive legacy facades."
   },
   {
     "name": "runtime-hooks-model-public-entry",
@@ -771,11 +772,13 @@
     "name": "runtime-command-host-controlled-execution",
     "from": "src/commands/agent.ts",
     "denyImportsFrom": [
-      "src/agent-runtime/model/authorized-session",
-      "src/agent-runtime/model/command-admission-session",
-      "src/agents/model-fallback",
-      "src/agent-runtime/execution/runner/execution-scope",
-      "src/agent-runtime/execution/runner/controlled-execution"
+      "src/agent-runtime/model/authorized-session.ts",
+      "src/agent-runtime/model/command-admission-session.ts",
+      "src/agents/model-fallback.ts",
+      "src/agent-runtime/execution/runner/execution-scope.ts",
+      "src/agent-runtime/execution/runner/controlled-execution.ts",
+      "src/agent-runtime/execution/runner/unified-lifecycle.ts",
+      "src/agent-runtime/execution/runner/command-lifecycle.ts"
     ],
     "description": "Command host consumes the controlled execution use-case via execution/index lifecycle factories; it cannot assemble prepare/infer ports privately."
   },
@@ -783,37 +786,42 @@
     "name": "runtime-cron-host-controlled-execution",
     "from": "src/cron/isolated-agent/run.ts",
     "denyImportsFrom": [
-      "src/agent-runtime/model/authorized-session",
-      "src/agent-runtime/model/command-admission-session",
-      "src/agents/model-fallback",
-      "src/agent-runtime/execution/runner/execution-scope",
-      "src/agent-runtime/execution/runner/controlled-execution"
+      "src/agent-runtime/model/authorized-session.ts",
+      "src/agent-runtime/model/command-admission-session.ts",
+      "src/agents/model-fallback.ts",
+      "src/agent-runtime/execution/runner/execution-scope.ts",
+      "src/agent-runtime/execution/runner/controlled-execution.ts",
+      "src/agent-runtime/execution/runner/unified-lifecycle.ts",
+      "src/agent-runtime/execution/runner/execution-lifecycle.ts"
     ],
-    "description": "Cron host consumes createExecutionLifecycle from execution/index; it cannot skip preparation by calling model fallback directly."
+    "description": "Cron host consumes createUnifiedExecutionLifecycle from execution/index; it cannot skip preparation by calling model fallback directly."
   },
   {
     "name": "runtime-followup-host-controlled-execution",
     "from": "src/auto-reply/reply/followup-runner.ts",
     "denyImportsFrom": [
-      "src/agent-runtime/model/authorized-session",
-      "src/agent-runtime/model/command-admission-session",
-      "src/agents/model-fallback",
-      "src/agent-runtime/execution/runner/execution-scope",
-      "src/agent-runtime/execution/runner/controlled-execution"
+      "src/agent-runtime/model/authorized-session.ts",
+      "src/agent-runtime/model/command-admission-session.ts",
+      "src/agents/model-fallback.ts",
+      "src/agent-runtime/execution/runner/execution-scope.ts",
+      "src/agent-runtime/execution/runner/controlled-execution.ts",
+      "src/agent-runtime/execution/runner/unified-lifecycle.ts",
+      "src/agent-runtime/execution/runner/execution-lifecycle.ts"
     ],
-    "description": "Followup host consumes createExecutionLifecycle from execution/index; it cannot assemble a parallel prepare/infer loop."
+    "description": "Followup host consumes createUnifiedExecutionLifecycle from execution/index; it cannot assemble a parallel prepare/infer loop."
   },
   {
     "name": "runtime-chat-host-controlled-execution",
     "from": "src/auto-reply/reply/agent-runner.ts",
     "denyImportsFrom": [
-      "src/agent-runtime/model/authorized-session",
-      "src/agent-runtime/model/command-admission-session",
-      "src/agents/model-fallback",
-      "src/agent-runtime/execution/runner/execution-scope",
-      "src/agent-runtime/execution/runner/controlled-execution",
-      "src/agent-runtime/execution/runner/execution-lifecycle",
-      "src/agent-runtime/execution/runner/admitted-turn"
+      "src/agent-runtime/model/authorized-session.ts",
+      "src/agent-runtime/model/command-admission-session.ts",
+      "src/agents/model-fallback.ts",
+      "src/agent-runtime/execution/runner/execution-scope.ts",
+      "src/agent-runtime/execution/runner/controlled-execution.ts",
+      "src/agent-runtime/execution/runner/execution-lifecycle.ts",
+      "src/agent-runtime/execution/runner/admitted-turn.ts",
+      "src/agent-runtime/execution/runner/unified-lifecycle.ts"
     ],
     "description": "Chat host enters admitted execution through the public execution API / reply wiring; it cannot deep-import lifecycle internals or model fallback."
   },
@@ -824,7 +832,11 @@
       "src/agent-runtime/execution/runner/execution-scope",
       "src/agent-runtime/execution/runner/controlled-execution",
       "src/agent-runtime/model/authorized-session",
-      "src/agent-runtime/model/command-admission-session"
+      "src/agent-runtime/model/command-admission-session",
+      "src/agent-runtime/execution/runner/embedded-run.ts",
+      "src/agents/pi-embedded.ts",
+      "src/agents/pi-embedded-runner.ts",
+      "src/agents/model-fallback.ts"
     ],
     "description": "Memory flush is auxiliary inference via shared model governance; it cannot open work-item controlled execution or commercial admission sessions."
   },
@@ -837,7 +849,11 @@
       "src/agent-runtime/model/authorized-session",
       "src/agent-runtime/model/command-admission-session",
       "src/agents/pi-embedded",
-      "src/agents/cli-runner"
+      "src/agents/cli-runner",
+      "src/agent-runtime/execution/runner/embedded-run.ts",
+      "src/agents/pi-embedded.ts",
+      "src/agents/pi-embedded-runner.ts",
+      "src/agents/model-fallback.ts"
     ],
     "description": "Slug filename generation is auxiliary inference via shared model governance; it cannot open work-item admission or legacy embedded facades."
   },
@@ -849,7 +865,8 @@
       "src/agent-runtime/execution/runner/embedded-run.ts",
       "src/agent-runtime/execution/runner/admitted-turn.attempt-host.test.ts",
       "src/agent-runtime/execution/runner/admitted-turn.test.ts",
-      "src/agent-runtime/execution/runner/execution-lifecycle.test.ts"
+      "src/agent-runtime/execution/runner/execution-lifecycle.test.ts",
+      "src/agent-runtime/execution/runner/unified-lifecycle.test.ts"
     ],
     "description": "Execution settles with injected ports; only the embedded-run loop may bind the fixed payload formatting adapter from wiring."
   },
@@ -864,5 +881,166 @@
       "src/agents/skills/**"
     ],
     "description": "Pure system prompt rendering consumes captured facts. Workspace, registry and skill source reads remain in hosts; no hidden second source compiler."
+  },
+  {
+    "name": "runtime-unified-lifecycle-public-entry",
+    "from": "src/**",
+    "denyImportsFrom": [
+      "src/agent-runtime/execution/runner/unified-lifecycle.ts",
+      "src/agent-runtime/execution/runner/execution-lifecycle.ts",
+      "src/agent-runtime/execution/runner/command-lifecycle.ts",
+      "src/agent-runtime/execution/runner/supervisor-lifecycle.ts"
+    ],
+    "exemptFiles": [
+      "src/agent-runtime/execution/index.ts",
+      "src/agent-runtime/execution/runner/admitted-turn.ts",
+      "src/agent-runtime/execution/runner/admitted-turn-attempt.ts",
+      "src/agent-runtime/execution/runner/execution-lifecycle.ts",
+      "src/agent-runtime/execution/runner/command-lifecycle.ts",
+      "src/agent-runtime/execution/runner/supervisor-lifecycle.ts",
+      "src/agent-runtime/execution/runner/admitted-turn.test.ts",
+      "src/agent-runtime/execution/runner/execution-lifecycle.test.ts",
+      "src/agent-runtime/execution/runner/command-lifecycle.test.ts",
+      "src/agent-runtime/execution/runner/supervisor-lifecycle.test.ts",
+      "src/agent-runtime/execution/runner/unified-lifecycle.test.ts",
+      "src/gateway/billing/chat-reply-credit-reservation.slice3.test.ts"
+    ],
+    "description": "Callers must consume createUnifiedExecutionLifecycle via execution/index, never deep-import unified-lifecycle.ts or legacy lifecycle wrappers (except intentional internal bindings and tests)."
+  },
+  {
+    "name": "runtime-execution-lifecycle-wrapper-only",
+    "from": "src/agent-runtime/execution/runner/execution-lifecycle.ts",
+    "denyImportsFrom": [
+      "src/agent-runtime/execution/runner/controlled-execution.ts",
+      "src/agent-runtime/execution/runner/execution-scope.ts",
+      "src/agents/model-fallback.ts",
+      "src/agent-runtime/model/**"
+    ],
+    "description": "Deprecated execution-lifecycle wrapper delegates to unified-lifecycle only."
+  },
+  {
+    "name": "runtime-command-lifecycle-wrapper-only",
+    "from": "src/agent-runtime/execution/runner/command-lifecycle.ts",
+    "denyImportsFrom": [
+      "src/agent-runtime/execution/runner/controlled-execution.ts",
+      "src/agent-runtime/execution/runner/execution-scope.ts",
+      "src/agents/model-fallback.ts",
+      "src/agent-runtime/model/index.ts",
+      "src/agent-runtime/model/command-admission-session.ts",
+      "src/agent-runtime/model/authorized-session.ts",
+      "src/agent-runtime/model/**"
+    ],
+    "description": "Deprecated command-lifecycle wrapper delegates to unified-lifecycle only and cannot call runWithModelFallback or createControlledExecutionUseCase directly."
+  },
+  {
+    "name": "runtime-supervisor-lifecycle-wrapper-only",
+    "from": "src/agent-runtime/execution/runner/supervisor-lifecycle.ts",
+    "denyImportsFrom": [
+      "src/agent-runtime/execution/runner/controlled-execution.ts",
+      "src/agent-runtime/execution/runner/execution-scope.ts",
+      "src/agents/model-fallback.ts",
+      "src/agent-runtime/model/**"
+    ],
+    "description": "Deprecated supervisor-lifecycle wrapper delegates to unified-lifecycle only."
+  },
+  {
+    "name": "runtime-command-admission-session-uses-authorized-core",
+    "from": "src/agent-runtime/model/command-admission-session.ts",
+    "denyImportsFrom": [
+      "src/agent-runtime/model/admission-lease.ts",
+      "src/agents/model-fallback.ts"
+    ],
+    "description": "Command admission session delegates lease, snapshot, infer, and usage state to authorized-session."
+  },
+  {
+    "name": "runtime-extension-api-controlled-auxiliary",
+    "from": "src/extensionAPI.ts",
+    "denyImportsFrom": [
+      "src/agent-runtime/execution/runner/embedded-run.ts",
+      "src/agents/pi-embedded.ts",
+      "src/agents/pi-embedded-runner.ts",
+      "src/agents/model-fallback.ts"
+    ],
+    "description": "extensionAPI routes auxiliary turns through execution/index runControlledAuxiliaryTurn rather than direct embedded or fallback runners."
+  },
+  {
+    "name": "runtime-extensions-controlled-auxiliary",
+    "from": "extensions/**",
+    "denyImportsFrom": [
+      "src/agent-runtime/execution/runner/embedded-run.ts",
+      "src/agents/pi-embedded.ts",
+      "src/agents/pi-embedded-runner.ts",
+      "src/agents/model-fallback.ts"
+    ],
+    "description": "Extensions must not bypass the unified execution lifecycle by directly importing embedded-run, pi-embedded, pi-embedded-runner, or model-fallback."
+  },
+  {
+    "name": "legacy-lifecycle-retirement",
+    "from": "src/**",
+    "denyImportsFrom": [
+      "src/agent-runtime/execution/runner/execution-lifecycle.ts",
+      "src/agent-runtime/execution/runner/command-lifecycle.ts",
+      "src/agent-runtime/execution/runner/supervisor-lifecycle.ts"
+    ],
+    "exemptFiles": [
+      "src/agent-runtime/execution/index.ts",
+      "src/agent-runtime/execution/runner/execution-lifecycle.test.ts",
+      "src/agent-runtime/execution/runner/command-lifecycle.test.ts",
+      "src/agent-runtime/execution/runner/supervisor-lifecycle.test.ts"
+    ],
+    "description": "Retired legacy lifecycle tombstones (Phase 4) must not be imported outside their own tombstone tests and execution/index compat re-exports."
+  },
+  {
+    "name": "gateway-queries-read-only-boundary",
+    "from": "src/gateway/queries/**",
+    "denyImportsFrom": [
+      "src/agent-runtime/**",
+      "src/gateway/server-chat.ts",
+      "src/gateway/server-methods/chat-transcript-inject.ts"
+    ],
+    "description": "Gateway query modules are read-only and must not import agent-runtime or control-plane mutation/dispatch handlers."
+  },
+  {
+    "name": "gateway-queries-chat-history-boundary",
+    "from": "src/**",
+    "denyImportsFrom": ["src/gateway/server-methods/chat.ts"],
+    "exemptFiles": [
+      "src/gateway/queries/chat-history.ts",
+      "src/gateway/server-methods.ts",
+      "src/gateway/operator-shared-session-heal.test.ts",
+      "src/gateway/chat-group-interaction-isolation.s1b.test.ts",
+      "src/gateway/chat-interaction-failure.s1-process.test.ts",
+      "src/gateway/chat-interaction-failure.s1-dispatch-chain.test.ts",
+      "src/gateway/collaboration-learning/r6-wake-handler-chain.gateway.test.ts",
+      "src/gateway/server-methods/chat.aside-dialogue-history.test.ts",
+      "src/gateway/server-methods/chat.restore.test.ts",
+      "src/gateway/server-methods/chat.control-channel-multiline-digest.test.ts",
+      "src/gateway/server-methods/chat-archives.security.test.ts",
+      "src/gateway/server-methods/chat.task-status-order.test.ts",
+      "src/gateway/server-methods/chat.deliverable-chip-survive-sanitize.test.ts",
+      "src/gateway/server-methods/chat.history-tool-result.test.ts",
+      "src/gateway/server-methods/chat.control-channel-history.test.ts",
+      "src/gateway/server-methods/daibai-guide-history.test.ts",
+      "src/gateway/server-methods/chat.history-image-omit.test.ts",
+      "src/gateway/server-methods/chat.deliverable-persist-reload.test.ts",
+      "src/gateway/server-methods/server-methods.test.ts",
+      "src/gateway/server-methods/chat.history-cursor.test.ts",
+      "src/gateway/server-methods/chat.abort-persistence.test.ts",
+      "src/gateway/server-methods/chat.active-run-history.test.ts",
+      "src/gateway/server-methods/chat.directive-tags.test.ts",
+      "src/gateway/server-methods/chat.group-transcript.test.ts",
+      "src/gateway/server-methods/chat.group-write-acl.test.ts",
+      "src/gateway/server-methods/chat.history-d3.test.ts",
+      "src/gateway/server-methods/chat.history-employee-isolation.test.ts",
+      "src/gateway/server-methods/chat.mentions.test.ts",
+      "src/gateway/server-methods/chat.ogui-decision-history.test.ts",
+      "src/gateway/server-methods/chat.owner-pause-abort.test.ts",
+      "src/gateway/server-methods/chat.pack1-replay.test.ts",
+      "src/gateway/server-methods/chat.transcript-authorization.test.ts",
+      "src/gateway/server-methods/chat.transcript-cwd.test.ts",
+      "src/gateway/server-methods/task-activity-rpc.test.ts",
+      "src/gateway/server-methods/task-dependency-resume.test.ts"
+    ],
+    "description": "New consumers must import chat-history query helpers from src/gateway/queries/ rather than directly importing src/gateway/server-methods/chat.ts."
   }
 ]

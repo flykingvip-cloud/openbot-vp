@@ -1,5 +1,6 @@
-import { type Context, complete } from "@earendil-works/pi-ai/compat";
+import type { Context } from "@earendil-works/pi-ai/compat";
 import { Type } from "@sinclair/typebox";
+import { invokeAuxiliaryCompletion } from "../../agent-runtime/model/index.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import { resolveGovernanceModeFromEnv } from "../../gateway/governance/mode.js";
 import { lookupRunModelAllowlist } from "../../gateway/governance/spawn-snapshot-handoff.js";
@@ -270,7 +271,7 @@ async function runImagePrompt(params: {
       }
 
       const context = buildImageContext(params.prompt, params.images);
-      const message = await complete(model, context, {
+      const message = await invokeAuxiliaryCompletion(model, context, {
         apiKey,
         maxTokens: resolveImageToolMaxTokens(model.maxTokens),
       });

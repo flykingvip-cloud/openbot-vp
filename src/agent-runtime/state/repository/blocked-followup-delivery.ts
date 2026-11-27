@@ -9,6 +9,11 @@ import type {
 } from "../../../auto-reply/reply/followup-workspace-change.js";
 import { FOLLOWUP_WORKSPACE_RETRY_CAP } from "../../../auto-reply/reply/followup-workspace-change.js";
 import { withDirectoryLock, writeJsonDurable } from "./durable-json.js";
+import {
+  assertFencingGenerationMatch,
+  assertMonotonicFencingGeneration,
+  nextFencingGeneration,
+} from "./fencing.js";
 
 export const BLOCKED_FOLLOWUP_DELIVERY_DIRNAME = "blocked-followup-deliveries";
 export const DEFAULT_FOLLOWUP_RECOVERY_RETRY_CAP = FOLLOWUP_WORKSPACE_RETRY_CAP;
@@ -121,6 +126,8 @@ export type BlockedFollowupDeliveryRecord = {
   workspaceBinding?: BlockedFollowupWorkspaceSnapshot;
   claim?: FollowupRecoveryClaim;
   deliveryIdempotencyKey?: string;
+  /** Storage-level monotonic fencing generation for stale-writer rejection. */
+  fencingGeneration?: number;
 };
 
 const STATUSES = new Set<FollowupRecoveryStatus>([
@@ -624,15 +631,35 @@ async function mutateFollowupRecordUnderLock(
   mutate: (
     current: BlockedFollowupDeliveryRecord | undefined,
   ) => BlockedFollowupDeliveryRecord | undefined,
+  options?: { expectedFencingGeneration?: number },
 ): Promise<BlockedFollowupDeliveryRecord | undefined> {
   const dir = blockedFollowupDeliveryDir(persistRoot);
   return withDirectoryLock(dir, encodeURIComponent(recordId), async () => {
     const current = findBlockedFollowupDelivery(persistRoot, { id: recordId });
+    const currentGen = current?.fencingGeneration ?? 0;
+    if (options?.expectedFencingGeneration !== undefined) {
+      assertFencingGenerationMatch({
+        expectedGeneration: options.expectedFencingGeneration,
+        currentGeneration: currentGen,
+        resource: `blocked-followup-delivery:${recordId}`,
+      });
+    }
     const next = mutate(current);
     if (!next) {
       return current;
     }
-    return writeRecord(persistRoot, next);
+    if (next.fencingGeneration !== undefined) {
+      assertMonotonicFencingGeneration({
+        currentGeneration: currentGen,
+        nextGeneration: next.fencingGeneration,
+        resource: `blocked-followup-delivery:${recordId}`,
+      });
+    }
+    const stamped: BlockedFollowupDeliveryRecord = {
+      ...next,
+      fencingGeneration: nextFencingGeneration(Math.max(currentGen, next.fencingGeneration ?? 0)),
+    };
+    return writeRecord(persistRoot, stamped);
   });
 }
 
@@ -708,6 +735,7 @@ export async function markFollowupRecoveryClaimEnqueued(input: {
   persistRoot: string;
   record: BlockedFollowupDeliveryRecord;
   claimToken: string;
+  expectedFencingGeneration?: number;
 }): Promise<BlockedFollowupDeliveryRecord> {
   const nowMs = Date.now();
   const updated = await mutateFollowupRecordUnderLock(
@@ -740,6 +768,9 @@ export async function markFollowupRecoveryClaimEnqueued(input: {
         },
       };
     },
+    input.expectedFencingGeneration !== undefined
+      ? { expectedFencingGeneration: input.expectedFencingGeneration }
+      : undefined,
   );
   return updated ?? input.record;
 }
@@ -748,6 +779,7 @@ export async function releaseFollowupRecoveryClaim(input: {
   persistRoot: string;
   record: BlockedFollowupDeliveryRecord;
   claimToken?: string;
+  expectedFencingGeneration?: number;
 }): Promise<BlockedFollowupDeliveryRecord> {
   const nowMs = Date.now();
   const updated = await mutateFollowupRecordUnderLock(
@@ -777,6 +809,9 @@ export async function releaseFollowupRecoveryClaim(input: {
         },
       };
     },
+    input.expectedFencingGeneration !== undefined
+      ? { expectedFencingGeneration: input.expectedFencingGeneration }
+      : undefined,
   );
   return updated ?? input.record;
 }

@@ -23,8 +23,8 @@ import { runAdmittedTurnRecovery } from "./admitted-turn-recovery.js";
 import type { AdmittedTurnLoopState } from "./admitted-turn-state.js";
 import { assertControlledExecutionStages } from "./controlled-execution.js";
 import type { EmbeddedPiRunResult } from "./embedded-result.js";
-import { createExecutionLifecycle } from "./execution-lifecycle.js";
 import type { AgentRunLoopResult, AgentTurnExecutionParams } from "./turn-contract.js";
+import { createUnifiedExecutionLifecycle } from "./unified-lifecycle.js";
 
 /**
  * Chat scene adapter over the unique controlled execution use-case.
@@ -256,7 +256,7 @@ export async function runAdmittedTurn(
     host.observability.registerRunReplyLanguage(runId, params.opts?.expectedReplyLanguage ?? null);
   }
 
-  const controlledExecution = createExecutionLifecycle(runId, host);
+  const controlledExecution = createUnifiedExecutionLifecycle({ mode: "turn", runId, host });
   assertControlledExecutionStages(controlledExecution, "Chat admitted turn");
   const ownedTaskId = params.followupRun.run.taskCompletionBinding?.taskId?.trim() ?? "";
   if (ownedTaskId) {

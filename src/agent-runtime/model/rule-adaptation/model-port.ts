@@ -16,7 +16,13 @@ import type {
   ShadowDiagnosticSink,
   ShadowUsageAccountingStatus,
 } from "../../contracts/rule-adaptation-shadow.js";
-import { createAuthorizedModelSession, type ModelSessionPorts } from "../index.js";
+import {
+  createAuthorizedModelSession,
+  invokeAuxiliaryCompletion,
+  type AuxiliaryMessage,
+  type AuxiliaryModel,
+  type ModelSessionPorts,
+} from "../index.js";
 import { asModelUsage, zeroUsage } from "./budget.js";
 import {
   invokeLimitedCompletion,
@@ -379,22 +385,21 @@ export function createHostShadowCompletion(
     provider: string,
     model: string,
   ) => Promise<{
-    model: import("@earendil-works/pi-ai/compat").Model<import("@earendil-works/pi-ai/compat").Api>;
+    model: AuxiliaryModel;
     apiKey?: string;
   }>,
 ): ShadowModelCompleteFn {
   return async (input) => {
-    const { complete } = await import("@earendil-works/pi-ai/compat");
     const { Type } = await import("@sinclair/typebox");
     const candidate = await resolveCandidate(
       input.selectedProvider ?? "",
       input.selectedModel ?? "",
     );
-    const response = await complete(
+    const response = await invokeAuxiliaryCompletion(
       candidate.model,
       {
         systemPrompt: input.system,
-        messages: input.messages.map((message): import("@earendil-works/pi-ai/compat").Message => {
+        messages: input.messages.map((message): AuxiliaryMessage => {
           if (message.role === "tool") {
             if (!message.toolCallId || !message.toolName) {
               throw new Error("Missing shadow tool correlation");

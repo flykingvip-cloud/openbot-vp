@@ -4,9 +4,13 @@ vi.mock("../../agents/bootstrap-budget.js", () => ({
   resolveBootstrapWarningSignaturesSeen: vi.fn().mockReturnValue([]),
 }));
 
-vi.mock("../../agents/compaction.js", () => ({
-  estimateMessagesTokens: vi.fn().mockReturnValue(1),
-}));
+vi.mock("../../agents/compaction.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../agents/compaction.js")>();
+  return {
+    ...actual,
+    estimateMessagesTokens: vi.fn().mockReturnValue(1),
+  };
+});
 
 vi.mock("../../agents/model-fallback.js", () => ({
   runWithModelFallback: vi
@@ -20,12 +24,16 @@ vi.mock("../../agents/model-selection.js", () => ({
   isCliProvider: vi.fn().mockReturnValue(false),
 }));
 
-vi.mock("../../agent-runtime/execution/index.js", () => ({
-  runEmbeddedPiAgent: vi.fn().mockResolvedValue({
-    payloads: [],
-    meta: { durationMs: 10 },
-  }),
-}));
+vi.mock("../../agent-runtime/execution/index.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../agent-runtime/execution/index.js")>();
+  return {
+    ...actual,
+    runEmbeddedPiAgent: vi.fn().mockResolvedValue({
+      payloads: [],
+      meta: { durationMs: 10 },
+    }),
+  };
+});
 
 vi.mock("../../agents/sandbox.js", () => ({
   resolveSandboxConfigForAgent: vi.fn().mockReturnValue({ workspaceAccess: "rw" }),

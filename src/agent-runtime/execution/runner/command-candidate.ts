@@ -1,6 +1,4 @@
 /** Original command candidate adapter; no task admission or outer fallback loop. */
-import { resolveBootstrapWarningSignaturesSeen } from "../../../agents/bootstrap-budget.js";
-import { recordCliBackendUsage } from "../../../agents/cli-backend-usage-attribution.js";
 import { getCliSessionId, setCliSessionId } from "../../../agents/cli-session.js";
 import { FailoverError } from "../../../agents/failover-error.js";
 import { isCliProvider, normalizeProviderId } from "../../../agents/model-selection.js";
@@ -8,17 +6,21 @@ import type { buildWorkspaceSkillSnapshot } from "../../../agents/skills.js";
 import type { ThinkLevel, VerboseLevel } from "../../../auto-reply/thinking.js";
 import type { loadConfig } from "../../../config/config.js";
 import type { SessionEntry } from "../../../config/sessions.js";
-import { resolveEnterpriseEmbeddedTransport } from "../../../gateway/enterprise-model/embedded-transport.js";
 import type { ExecutionIdentityRunFields } from "../../../gateway/execution-identity-context.js";
-import { inheritExecutionIdentityRunFields } from "../../../gateway/execution-identity-context.js";
-import { resolveAgentRunEntitlementScope } from "../../../gateway/model-entitlement/resolve-agent-run-scope.js";
 import { createSubsystemLogger } from "../../../logging/subsystem.js";
 import { rememberModelResultUsage } from "../../../task-outcome/runtime-from-runner.js";
 import type { resolveMessageChannel } from "../../../utils/message-channel.js";
 import type { AgentRunContext } from "../../contracts/command.js";
-import { resolveCliRunCredential } from "../../model/index.js";
 import { persistCommandSessionEntry } from "../../state/index.js";
-import { runCliAgent } from "./cli-run.js";
+import {
+  buildBootstrapWarningParams,
+  inheritExecutionIdentityRunFields,
+  recordCliCandidateUsageAttribution,
+  resolveBootstrapWarningSignaturesSeen,
+  resolveCandidateEmbeddedTransport,
+  resolveCliRunCredential,
+  runCliAgent,
+} from "./candidate-core.js";
 import type { RunEmbeddedPiAgentParams } from "./embedded-request.js";
 import { runEmbeddedPiAgent } from "./embedded-run.js";
 const log = createSubsystemLogger("commands/agent");
@@ -81,11 +83,9 @@ export function runCommandCandidate(params: {
     body: params.body,
     isFallbackRetry: params.isFallbackRetry,
   });
-  const bootstrapPromptWarningSignaturesSeen = resolveBootstrapWarningSignaturesSeen(
-    params.sessionEntry?.systemPromptReport,
+  const bootstrapWarningParams = buildBootstrapWarningParams(
+    resolveBootstrapWarningSignaturesSeen(params.sessionEntry?.systemPromptReport),
   );
-  const bootstrapPromptWarningSignature =
-    bootstrapPromptWarningSignaturesSeen[bootstrapPromptWarningSignaturesSeen.length - 1];
   if (isCliProvider(params.providerOverride, params.cfg)) {
     return (async () => {
       const cliSessionId = getCliSessionId(params.sessionEntry, params.providerOverride);
@@ -114,8 +114,7 @@ export function runCommandCandidate(params: {
           abortSignal: params.opts.abortSignal,
           extraSystemPrompt: params.opts.extraSystemPrompt,
           cliSessionId: nextCliSessionId,
-          bootstrapPromptWarningSignaturesSeen,
-          bootstrapPromptWarningSignature,
+          ...bootstrapWarningParams,
           images: params.isFallbackRetry ? undefined : params.opts.images,
           streamParams: params.opts.streamParams,
           ...(credentialEnv ? { credentialEnv } : {}),
@@ -197,16 +196,12 @@ export function runCommandCandidate(params: {
         .then((result) => {
           rememberModelResultUsage(result.meta?.agentMeta?.usage);
           // UsageAttribution（Task 9）：成功完成（首次或会话过期重试后）写一次归因。
-          if (usageAttr) {
-            void recordCliBackendUsage({
-              tenantId: usageAttr.tenantId,
-              userId: usageAttr.userId,
-              backendId: params.providerOverride,
-              credentialId: usageAttr.credentialId,
-              model: params.modelOverride,
-              executionId: params.runId,
-            });
-          }
+          recordCliCandidateUsageAttribution({
+            usageAttr,
+            provider: params.providerOverride,
+            model: params.modelOverride,
+            executionId: params.runId,
+          });
           return result;
         });
     })();
@@ -219,21 +214,12 @@ export function runCommandCandidate(params: {
   // Remap ent/* → upstream provider + SecretRef before the embedded runner
   // (which only understands catalog/provider models).
   return (async () => {
-    const transport = await resolveEnterpriseEmbeddedTransport({
+    const { transportFields } = await resolveCandidateEmbeddedTransport({
       provider: params.providerOverride,
       model: params.modelOverride,
       tenantId: params.opts.gatewayClientSessionTenantId,
-      resolveTenantId: async () => {
-        const scope = await resolveAgentRunEntitlementScope({
-          agentId: params.sessionAgentId,
-        });
-        return scope?.tenantId;
-      },
+      agentId: params.sessionAgentId,
     });
-    const embeddedProvider = transport.provider;
-    const embeddedModel = transport.model;
-    const providerAuthOverride = transport.providerAuthOverride;
-    const enterpriseRuntimeModelId = transport.enterpriseRuntimeModelId;
     return runEmbeddedPiAgent({
       sessionId: params.sessionId,
       sessionKey: params.sessionKey,
@@ -259,10 +245,7 @@ export function runCommandCandidate(params: {
       prompt: effectivePrompt,
       images: params.isFallbackRetry ? undefined : params.opts.images,
       clientTools: params.opts.clientTools,
-      provider: embeddedProvider,
-      model: embeddedModel,
-      ...(providerAuthOverride ? { providerAuthOverride } : {}),
-      ...(enterpriseRuntimeModelId ? { enterpriseRuntimeModelId } : {}),
+      ...transportFields,
       authProfileId,
       authProfileIdSource: authProfileId
         ? params.sessionEntry?.authProfileOverrideSource
@@ -279,8 +262,7 @@ export function runCommandCandidate(params: {
       agentDir: params.agentDir,
       allowTransientCooldownProbe: params.allowTransientCooldownProbe,
       onAgentEvent: params.onAgentEvent,
-      bootstrapPromptWarningSignaturesSeen,
-      bootstrapPromptWarningSignature,
+      ...bootstrapWarningParams,
       ...inheritExecutionIdentityRunFields(params.opts),
     });
   })();

@@ -3,7 +3,7 @@ import { deliverQueuedReply } from "../../agent-runtime/delivery/index.js";
 import {
   assertControlledExecutionStages,
   runQueuedCandidate,
-  createExecutionLifecycle,
+  createUnifiedExecutionLifecycle,
 } from "../../agent-runtime/execution/index.js";
 import type { EmbeddedPiRunResult } from "../../agent-runtime/execution/index.js";
 import { checkTaskActionBoundary } from "../../agent-runtime/state/index.js";
@@ -772,7 +772,11 @@ export function createFollowupRunner(params: {
       }
     }
     // Followup scene adapter: queue/OGUI/delivery stay here; stage order is controlled.
-    const controlledExecution = createExecutionLifecycle(runId, bindAdmittedTurnHost());
+    const controlledExecution = createUnifiedExecutionLifecycle({
+      mode: "turn",
+      runId,
+      host: bindAdmittedTurnHost(),
+    });
     assertControlledExecutionStages(controlledExecution, "Followup host");
     let oguiResume:
       | { storePath: string; sessionKey: string; decisionId: string; resumeRef: string }

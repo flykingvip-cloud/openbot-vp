@@ -3402,16 +3402,15 @@ function broadcastChatFinal(params: {
     });
     params.context.nodeSendToSession(params.sessionKey, "chat", payload);
   };
-  if (params.prepared?.idempotencyKey && params.prepared.record) {
-    const delivered = deliverPreparedChatFinal({ prepared: params.prepared, send });
-    if (!delivered.ok) {
+  deliverPreparedChatFinal({
+    prepared: params.prepared,
+    send,
+    onFailure: () => {
       params.context.logGateway?.warn?.(
         `chat deliverable broadcast failed (${params.runId}); analysis text kept, delivery left pending recovery`,
       );
-    }
-  } else {
-    send();
-  }
+    },
+  });
   params.context.agentRunSeq.delete(params.runId);
   // Delivery is not consent to save a knowledge copy. Explicit user save
   // remains on save-and-archive; a final broadcast must have no capture writes.

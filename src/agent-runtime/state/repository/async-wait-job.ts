@@ -13,6 +13,7 @@ import {
   readFileUnlocked,
   writeFileUnlocked,
 } from "./async-wait-job-store.js";
+import { assertFencingGenerationMatch, assertMonotonicFencingGeneration } from "./fencing.js";
 
 /**
  * Atomic read → decide → write under the per-job lock.
@@ -77,6 +78,7 @@ export function transitionAsyncWaitJobIntent(
   sessionFile: string,
   jobId: string,
   decide: (current: AsyncWaitJobIntent | undefined) => AsyncWaitJobIntent | undefined | "keep",
+  options?: { expectedFencingGeneration?: number },
 ): AsyncWaitJobIntent | undefined {
   const file = sessionFile.trim();
   const id = jobId.trim();
@@ -86,6 +88,15 @@ export function transitionAsyncWaitJobIntent(
   const target = fileFor(file, id);
   return withFileLockSync(target, SESSION_TASK_BOARD_LOCK_OPTIONS, () => {
     const current = readFileUnlocked(target);
+    const currentClaimGen = current?.recovery?.claimGeneration ?? 0;
+    const currentFencingGen = Math.max(current?.fencingGeneration ?? 0, currentClaimGen);
+    if (options?.expectedFencingGeneration !== undefined) {
+      assertFencingGenerationMatch({
+        expectedGeneration: options.expectedFencingGeneration,
+        currentGeneration: currentFencingGen,
+        resource: `async-wait-job:${id}`,
+      });
+    }
     const decided = decide(current);
     if (decided === "keep") {
       return current;
@@ -96,7 +107,29 @@ export function transitionAsyncWaitJobIntent(
       }
       return undefined;
     }
-    const next = normalizeIntent({ ...decided, version: 2 });
+    const normalized = normalizeIntent({ ...decided, version: 2 });
+    const nextClaimGen = normalized.recovery?.claimGeneration ?? 0;
+    assertMonotonicFencingGeneration({
+      currentGeneration: currentClaimGen,
+      nextGeneration: nextClaimGen,
+      resource: `async-wait-job:${id}.claimGeneration`,
+    });
+    const nextFencingGen = Math.max(
+      currentFencingGen,
+      nextClaimGen,
+      normalized.fencingGeneration ?? 0,
+    );
+    if (normalized.fencingGeneration !== undefined) {
+      assertMonotonicFencingGeneration({
+        currentGeneration: currentFencingGen,
+        nextGeneration: normalized.fencingGeneration,
+        resource: `async-wait-job:${id}.fencingGeneration`,
+      });
+    }
+    const next: AsyncWaitJobIntent = {
+      ...normalized,
+      fencingGeneration: nextFencingGen,
+    };
     writeFileUnlocked(file, next);
     if (current && (current.taskId !== next.taskId || current.jobId !== next.jobId)) {
       unindexAsyncWaitJobIntent(current.taskId, current.jobId);
@@ -136,7 +169,7 @@ export function recordAsyncWaitJobIntent(input: {
   ) {
     return undefined;
   }
-  return transitionAsyncWaitJobIntent(sessionFile, jobId, () => ({
+  return transitionAsyncWaitJobIntent(sessionFile, jobId, (current) => ({
     version: 2,
     jobId,
     sessionKey,
@@ -147,7 +180,10 @@ export function recordAsyncWaitJobIntent(input: {
     constraints: [...(input.constraints ?? [])],
     startedAt: input.startedAt,
     status: "waiting",
-    recovery: { stage: "none", claimGeneration: 0 },
+    recovery: {
+      stage: "none",
+      claimGeneration: current?.recovery?.claimGeneration ?? 0,
+    },
     ...(typeof input.pid === "number" && Number.isFinite(input.pid) ? { pid: input.pid } : {}),
     ...(input.command?.trim() ? { command: input.command.trim().slice(0, 500) } : {}),
     ...(input.trustedIdentity ? { trustedIdentity: { ...input.trustedIdentity } } : {}),

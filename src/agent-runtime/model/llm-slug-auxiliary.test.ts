@@ -8,6 +8,19 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../execution/index.js", () => ({
   runEmbeddedPiAgent: (...args: unknown[]) => mocks.runEmbedded(...args),
+  createUnifiedExecutionLifecycle: (opts: {
+    runId: string;
+    purpose: string;
+    parentRunId?: string;
+  }) => {
+    const gov = mocks.resolveGov({ purpose: opts.purpose, parentRunId: opts.parentRunId });
+    return {
+      prepare: async () => ({ kind: "ready" as const }),
+      infer: async (input: { run: (p: string, m: string) => Promise<unknown> }) =>
+        mocks.runFallback({ ...gov, runId: opts.runId, run: input.run }),
+      dispose: async () => {},
+    };
+  },
 }));
 
 vi.mock("./index.js", () => ({

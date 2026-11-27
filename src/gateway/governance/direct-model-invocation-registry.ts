@@ -60,7 +60,17 @@ export const DIRECT_MODEL_INVOCATION_REGISTRY: readonly DirectModelInvocationEnt
       "src/agent-runtime/model/authorized-session.ts",
       "src/observation/reasoning-model-resolver.ts",
     ],
-    note: "Default-off metadata hypotheses through commercial admission, governed fallback, usage accounting and finally disposal; no task/session writes.",
+    note: "Default-off metadata hypotheses and shared auxiliary completion boundary through commercial admission, governed fallback, usage accounting and finally disposal; no task/session writes.",
+  },
+  {
+    id: "embedded-attempt-visible-reply-rewrite",
+    file: "src/agent-runtime/execution/runner/embedded-attempt-stream.ts",
+    invocation: "pi-complete",
+    caller: "registerVisibleReplyRewriter",
+    inventoryIds: ["E1", "E14", "E1f", "E4", "E2", "E3", "E7", "E1m"],
+    disposition: "instrumented",
+    evidenceFiles: ["src/agent-runtime/model/authorized-session.ts"],
+    note: "Visible-reply rewriter inside an already-admitted embedded attempt; uses the attempt resolved credential and stays within the parent E1/E14/E1f/E4/E2/E3/E7/E1m envelope.",
   },
   {
     id: "interaction-completion",

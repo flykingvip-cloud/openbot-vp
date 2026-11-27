@@ -2,8 +2,8 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { ContractEndedError } from "../../../gateway/billing/billing-period.js";
 import { bindAdmittedTurnHost } from "../../wiring/admitted-turn-host.js";
 import { CONTROLLED_EXECUTION_STAGE_ORDER, runAdmittedTurn } from "../index.js";
-import { createExecutionLifecycle } from "./execution-lifecycle.js";
 import type { AgentTurnExecutionParams } from "./turn-contract.js";
+import { createUnifiedExecutionLifecycle } from "./unified-lifecycle.js";
 const mocks = vi.hoisted(() => ({ invoke: vi.fn(), create: vi.fn() }));
 vi.mock("./admitted-candidate.js", () => ({
   createAdmittedCandidateInvoker: (...args: unknown[]) => {
@@ -191,7 +191,11 @@ it("rejects a current-turn admission invalidated before startup without running 
 
 it("chat lifecycle factory exposes the frozen controlled execution stage order", () => {
   const host = bindAdmittedTurnHost();
-  const lifecycle = createExecutionLifecycle("chat-stage-order", host);
+  const lifecycle = createUnifiedExecutionLifecycle({
+    mode: "turn",
+    runId: "chat-stage-order",
+    host,
+  });
   expect(lifecycle.stages).toBe(CONTROLLED_EXECUTION_STAGE_ORDER);
 });
 

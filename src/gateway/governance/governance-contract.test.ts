@@ -70,9 +70,8 @@ const EXPECTED_REGISTERED_GAPS: string[] = [
 /** Enterprise-scope model paths that must pass `governanceMode` (plan §4 / P3-3). */
 const ENTERPRISE_MODEL_CALLER_IDS = [
   "auto-reply",
-  "memory-flush",
-  "llm-slug-generator",
-  "agent-command",
+  // agent-command converged onto authorized-session.ts (auto-reply row) in Slice 2A.
+  // memory-flush and llm-slug-generator converged onto authorized-session.ts in Slice 2B-1.
   "image-tool",
   "pdf-tool",
 ] as const;
@@ -277,14 +276,14 @@ describe("§5 execution entry inventory", () => {
       expect(e16?.symbols).toEqual(["runCliAgent", "recordCliBackendUsage"]);
       const agent = SOURCE_TEXT.get("src/commands/agent.ts");
       expect(agent).toBeDefined();
-      expect(agent).toContain("createCommandExecutionLifecycle");
+      expect(agent).toContain("createUnifiedExecutionLifecycle");
       expect(SOURCE_TEXT.get("src/agent-runtime/model/command-admission-session.ts")).toContain(
         "await acquireAgentCommandCommercialRun",
       );
-      expect(SOURCE_TEXT.get("src/agent-runtime/execution/runner/command-candidate.ts")).toContain(
+      expect(SOURCE_TEXT.get("src/agent-runtime/execution/runner/candidate-core.ts")).toContain(
         "runCliAgent",
       );
-      expect(SOURCE_TEXT.get("src/agent-runtime/execution/runner/command-candidate.ts")).toContain(
+      expect(SOURCE_TEXT.get("src/agent-runtime/execution/runner/candidate-core.ts")).toContain(
         "recordCliBackendUsage",
       );
       // Gate is acquired in agentCommandInternal before runWithModelFallback → runAgentAttempt → runCliAgent.
@@ -556,8 +555,8 @@ describe("§4.8 model caller registry", () => {
  */
 describe("direct model invocation registry (§4.8 blind spot)", () => {
   const PI_COMPAT_IMPORT = "@earendil-works/pi-ai/compat";
-  // `complete(` as a bare call, not `.complete(` or `onComplete(`.
-  const COMPLETE_CALL = /(?<![A-Za-z0-9_$.])complete\s*\(/;
+  // `complete(` or `completeSimple(` as a bare call, not `.complete(` or `onComplete(`.
+  const COMPLETE_CALL = /(?<![A-Za-z0-9_$.])(?:complete|completeSimple)\s*\(/;
 
   it("has unique ids and valid dispositions", () => {
     const ids = DIRECT_MODEL_INVOCATION_REGISTRY.map((entry) => entry.id);

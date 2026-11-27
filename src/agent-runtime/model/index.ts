@@ -5,9 +5,18 @@ export {
   type AuxiliaryModelGovernance,
 } from "./auxiliary-model-governance.js";
 
-export { createAuthorizedModelSession, type ModelSessionPorts } from "./authorized-session.js";
+export {
+  createAuthorizedModelSession,
+  createCommandModelSession,
+  type ModelSessionPorts,
+  type CommandModelSessionPorts,
+} from "./authorized-session.js";
 export type { InteractionPreparationPorts } from "./authorized-session.js";
-export type { ModelInferenceInput, ModelInferenceResult } from "./authorized-session.js";
+export type {
+  ModelInferenceInput,
+  ModelInferenceResult,
+  SessionUsageRecordInput,
+} from "./authorized-session.js";
 export { invokeInteractionCompletion } from "./interaction-completion.js";
 export {
   resolveInteractionResourceWaitMs,
@@ -78,4 +87,11 @@ export {
   resolveAgentCommandModelGovernance,
 } from "./command-governance.js";
 
-export { invokeMetadataCompletion } from "./metadata-completion.js";
+export {
+  invokeAuxiliaryCompletion,
+  invokeAuxiliarySimpleCompletion,
+  invokeMetadataCompletion,
+  type AuxiliaryMessage,
+  type AuxiliaryModel,
+  type AuxiliaryModelApi,
+} from "./metadata-completion.js";

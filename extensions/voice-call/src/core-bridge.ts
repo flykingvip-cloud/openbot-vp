@@ -25,7 +25,7 @@ type CoreAgentDeps = {
     provider?: string;
     model?: string;
   }) => string;
-  runEmbeddedPiAgent: (params: {
+  runControlledAuxiliaryTurn: (params: {
     sessionId: string;
     sessionKey?: string;
     messageProvider?: string;
@@ -128,7 +128,7 @@ async function importCoreExtensionAPI(): Promise<{
   DEFAULT_PROVIDER: string;
   resolveAgentIdentity: CoreAgentDeps["resolveAgentIdentity"];
   resolveThinkingDefault: CoreAgentDeps["resolveThinkingDefault"];
-  runEmbeddedPiAgent: CoreAgentDeps["runEmbeddedPiAgent"];
+  runControlledAuxiliaryTurn: CoreAgentDeps["runEmbeddedPiAgent"];
   resolveAgentTimeoutMs: CoreAgentDeps["resolveAgentTimeoutMs"];
   ensureAgentWorkspace: CoreAgentDeps["ensureAgentWorkspace"];
   resolveStorePath: CoreAgentDeps["resolveStorePath"];

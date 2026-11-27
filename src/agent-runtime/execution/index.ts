@@ -6,6 +6,23 @@ export type {
 } from "./recovery/stall-continuation.js";
 
 export { runAdmittedTurn } from "./runner/admitted-turn.js";
+export {
+  createUnifiedExecutionLifecycle,
+  runControlledAuxiliaryTurn,
+  type UnifiedExecutionLifecycle,
+  type UnifiedExecutionLifecycleOptions,
+  type UnifiedTurnExecutionLifecycle,
+  type UnifiedCommandExecutionLifecycle,
+  type UnifiedWorkItemExecutionLifecycle,
+  type UnifiedAuxiliaryExecutionLifecycle,
+  type UnifiedTurnLifecycleOptions,
+  type UnifiedCommandLifecycleOptions,
+  type UnifiedWorkItemLifecycleOptions,
+  type UnifiedAuxiliaryLifecycleOptions,
+  type SupervisorWorkItemAdmission,
+  type SupervisorWorkItemLifecyclePorts,
+} from "./runner/unified-lifecycle.js";
+/** @deprecated Use `createUnifiedExecutionLifecycle`. */
 export { createExecutionLifecycle } from "./runner/execution-lifecycle.js";
 export {
   CONTROLLED_EXECUTION_STAGE_ORDER,
@@ -14,11 +31,10 @@ export {
   type ControlledExecutionStage,
   type ControlledExecutionUseCase,
 } from "./runner/controlled-execution.js";
+/** @deprecated Use `createUnifiedExecutionLifecycle`. */
 export { createCommandExecutionLifecycle } from "./runner/command-lifecycle.js";
-export {
-  createSupervisorWorkItemLifecycle,
-  type SupervisorWorkItemAdmission,
-} from "./runner/supervisor-lifecycle.js";
+/** @deprecated Use `createUnifiedExecutionLifecycle`. */
+export { createSupervisorWorkItemLifecycle } from "./runner/supervisor-lifecycle.js";
 export type { AgentTurnExecutionParams, AgentRunLoopResult } from "./runner/turn-contract.js";
 
 export { runCommandCandidate } from "./runner/command-candidate.js";

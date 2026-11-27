@@ -151,3 +151,11 @@ export {
   resolveBlockedFollowupDeliveryPersistRoot,
 } from "./repository/blocked-followup-delivery.js";
 export type { FollowupDeliveryResumeSnapshot } from "./repository/blocked-followup-delivery.js";
+export {
+  StaleFencingGenerationError,
+  isValidFencingGeneration,
+  normalizeFencingGeneration,
+  assertFencingGenerationMatch,
+  assertMonotonicFencingGeneration,
+  nextFencingGeneration,
+} from "./repository/fencing.js";

@@ -8,7 +8,11 @@ import {
   readToolOperation,
   withToolOperationAdmission,
 } from "../../state/repository/tool-operation.js";
-import { assertToolResultReplayAllowed, wrapToolWithBeforeToolCallHook } from "../index.js";
+import {
+  assertToolResultReplayAllowed,
+  createBeforeEffectGate,
+  wrapToolWithBeforeToolCallHook,
+} from "../index.js";
 
 const state = vi.hoisted(() => ({
   failOpaque: false,
@@ -301,4 +305,54 @@ it("preserves ordinary unjournaled hook-error continuation without opaque persis
   await expect(tool.execute("ordinary", {})).resolves.toBeDefined();
   expect(hookEffects).toBe(1);
   expect(execute).toHaveBeenCalledTimes(1);
+});
+
+it("createBeforeEffectGate fails closed on paused task boundary, stale fencing, and revoked authority", async () => {
+  let fencingStale = false;
+  let granted = true;
+  const gate = createBeforeEffectGate({
+    taskBoundary: {} as never,
+    fencingCheck: () => {
+      if (fencingStale) {
+        throw new Error("stale fencingGeneration");
+      }
+    },
+    isAuthorityStillGranted: async () => granted,
+  });
+  expect(gate).toBeDefined();
+  await expect(gate!({})).resolves.toBeUndefined();
+
+  state.refusal = "owner paused";
+  await expect(gate!({})).rejects.toThrow("owner paused");
+  state.refusal = undefined;
+
+  fencingStale = true;
+  await expect(gate!({})).rejects.toThrow("stale fencingGeneration");
+  fencingStale = false;
+
+  granted = false;
+  await expect(gate!({})).rejects.toThrow("authority_revoked");
+});
+
+it("fencingCheck fails closed on both execute and stored-result replay", async () => {
+  let fencingValid = true;
+  const execute = vi.fn().mockResolvedValue({ content: [], details: { status: "ok" } });
+  const tool = wrapToolWithBeforeToolCallHook(
+    { name: "write", execute } as unknown as AnyAgentTool,
+    {
+      fencingCheck: () => {
+        if (!fencingValid) {
+          throw new Error("stale fencingGeneration");
+        }
+      },
+      authorizeStoredResultRead: () => "allowed",
+    },
+  );
+  await expect(tool.execute("ok", {})).resolves.toBeDefined();
+  expect(execute).toHaveBeenCalledTimes(1);
+
+  fencingValid = false;
+  await expect(tool.execute("stale-exec", {})).rejects.toThrow("stale fencingGeneration");
+  expect(execute).toHaveBeenCalledTimes(1);
+  await expect(assertToolResultReplayAllowed(tool, {})).rejects.toThrow("stale fencingGeneration");
 });

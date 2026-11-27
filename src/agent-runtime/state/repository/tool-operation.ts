@@ -6,6 +6,7 @@ import { writeJsonAtomic } from "../../../infra/json-files.js";
 import { acquireFileLock } from "../../../plugin-sdk/file-lock.js";
 import type { WaitCondition } from "../../contracts/execution-protocol.js";
 import type { PersistedOperation } from "../../contracts/operation.js";
+import { assertFencingGenerationMatch, nextFencingGeneration } from "./fencing.js";
 
 /** No automatic retries: lack of a result is not proof the external write failed. */
 export class ToolOperationOutcomeUnknownError extends Error {
@@ -76,6 +77,7 @@ export async function executeClaimedToolOperation<T>(params: {
   operationId: string;
   run: () => Promise<T> | T;
   nowMs?: number;
+  expectedFencingGeneration?: number;
 }): Promise<T> {
   const key = path.join(await fs.realpath(path.dirname(params.file)), path.basename(params.file));
   const previous = admissionTails.get(key) ?? Promise.resolve();
@@ -108,9 +110,17 @@ async function executeOwnedToolOperation<T>(params: {
   operationId: string;
   run: () => Promise<T> | T;
   nowMs?: number;
+  expectedFencingGeneration?: number;
 }): Promise<T> {
   const scope = admissionScope.getStore();
   const prior = await readToolOperation<T>(params.file);
+  if (params.expectedFencingGeneration !== undefined) {
+    assertFencingGenerationMatch({
+      expectedGeneration: params.expectedFencingGeneration,
+      currentGeneration: prior?.fencingGeneration ?? 0,
+      resource: `tool-operation:${params.operationId}`,
+    });
+  }
   if (prior) {
     if (prior.operationId !== params.operationId) {
       throw new Error("Operation journal identity mismatch");
@@ -135,6 +145,7 @@ async function executeOwnedToolOperation<T>(params: {
     operationId: params.operationId,
     state: "prepared",
     attemptId,
+    fencingGeneration: nextFencingGeneration(prior?.fencingGeneration),
     scopeFingerprint: scope?.fingerprint,
     refusals: prior?.refusals ?? [],
     startedAtMs: params.nowMs ?? Date.now(),
@@ -231,6 +242,7 @@ async function executeOwnedToolOperation<T>(params: {
 export async function reconcileClaimedToolOperation<T>(params: {
   file: string;
   operationId: string;
+  expectedFencingGeneration?: number;
   query: () => Promise<
     { kind: "confirmed"; evidenceId: string; result: T } | { kind: "unknown"; reason: string }
   >;
@@ -238,6 +250,13 @@ export async function reconcileClaimedToolOperation<T>(params: {
   const record = await readToolOperation<T>(params.file);
   if (!record || record.operationId !== params.operationId) {
     throw new Error("Operation journal identity mismatch");
+  }
+  if (params.expectedFencingGeneration !== undefined) {
+    assertFencingGenerationMatch({
+      expectedGeneration: params.expectedFencingGeneration,
+      currentGeneration: record.fencingGeneration ?? 0,
+      resource: `tool-operation:${params.operationId}`,
+    });
   }
   if (record.state === "succeeded") {
     return { kind: "confirmed", result: record.result as T };
