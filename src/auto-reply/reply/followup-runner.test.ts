@@ -1,12 +1,21 @@
 import fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { loadSessionStore, saveSessionStore, type SessionEntry } from "../../config/sessions.js";
 import { createExecutionIdentityContext } from "../../gateway/execution-identity-context.js";
 import type { FollowupRun } from "./queue.js";
 import { createMockTypingController } from "./test-helpers.js";
 
+const recoveryTransport = vi.hoisted(() => ({ calls: 0 }));
+vi.mock("../../channels/plugins/outbound/load.js", () => ({
+  loadChannelOutboundAdapter: async (channel: string) => ({
+    sendText: async () => {
+      recoveryTransport.calls++;
+      return { channel, messageId: "proof-real-shape-receipt" };
+    },
+  }),
+}));
 const runEmbeddedPiAgentMock = vi.fn();
 const routeReplyMock = vi.fn();
 const isRoutableChannelMock = vi.fn();
@@ -964,4 +973,200 @@ it.each(["paused", "focus changed", "new attempt"] as const)(
 vi.mock("../../agent-runtime/execution/runner/embedded-run.js", async () => {
   const { runEmbeddedPiAgent } = await import("../../agents/pi-embedded.js");
   return { runEmbeddedPiAgent };
+});
+
+describe("delivery-only followup and boot share the same pending identity", () => {
+  let root: string;
+  beforeEach(async () => {
+    root = await fs.mkdtemp(path.join(tmpdir(), "followup-boot-proof-"));
+    runEmbeddedPiAgentMock.mockReset();
+    recoveryTransport.calls = 0;
+  });
+  afterEach(async () => {
+    const pending = await import("../../task-outcome/pending-delivery.js");
+    pending.clearAwaitingDeliveriesForTests(path.join(root, "task-outcomes"));
+    const boot = await import("../../task-outcome/consumer-boot.js");
+    boot.stopTaskOutcomeRuntimeDrainForTests();
+    await fs.rm(root, { recursive: true, force: true });
+  });
+
+  async function seed() {
+    const board = await import("../../conversation-task/session-task-board.js");
+    const { prepareVisibleDelivery } = await import("../../agent-runtime/delivery/index.js");
+    const { recordRunnerTurnOutcome } = await import("../../task-outcome/runtime-from-runner.js");
+    const { promotePendingDeliveryIntents } = await import("../../task-outcome/consumer-boot.js");
+    const sessionFile = path.join(root, "session.jsonl");
+    await fs.writeFile(sessionFile, "");
+    const runId = "followup-boot-run";
+    const taskId = "followup-boot-outcome";
+    const binding = {
+      taskId: "followup-board-task",
+      executionAttempt: runId,
+      deliverableVersion: "v1",
+    };
+    board.mutateSessionTaskBoard(sessionFile, () => ({
+      board: {
+        ...board.emptySessionTaskBoard(),
+        current: {
+          ...binding,
+          title: "proof",
+          goalText: "proof",
+          unfinished: true,
+          createdAtMs: 1,
+          stop: { summary: "waiting", workspacePaths: [] },
+        },
+      },
+      value: undefined,
+    }));
+    const cfg = {
+      agents: { list: [{ id: "proof", agentDir: root }] },
+      channels: { telegram: { enabled: true, defaultTo: "111" } },
+    };
+    const persistRoot = path.join(root, "task-outcomes");
+    const payloads = [{ text: "original payload" }];
+    const deliveryId = `delivery:${runId}:visible`;
+    await expect(
+      prepareVisibleDelivery({
+        resolvePersistRoot: () => persistRoot,
+        agentId: "proof",
+        runId,
+        outcomeTaskId: taskId,
+        sessionFile,
+        sessionKey: "agent:proof:main",
+        completionBinding: binding,
+        contract: {
+          id: "proof",
+          version: "1",
+          kind: "document",
+          requiredValidators: ["check"],
+          acceptanceVerified: true,
+        },
+        payloads,
+        target: { channel: "telegram", to: "111" },
+        authorization: {
+          subjectRef: "proof-user",
+          sessionKey: "agent:proof:main",
+          channel: "telegram",
+          to: "111",
+        },
+        commitOutcome: async (_success, opts) => {
+          await recordRunnerTurnOutcome(cfg, "proof", {
+            success: true,
+            runId,
+            taskId,
+            scope: {
+              kind: "personal",
+              personalDomainId: "personal:proof",
+              subjectRef: "proof-user",
+              authzScopeRef: "proof",
+            },
+            acceptance: opts.acceptance,
+            delivery: opts.delivery,
+            deliveryId: opts.deliveryId,
+          });
+          throw new Error("persisted-before-publish");
+        },
+        publishPending: () => {
+          throw new Error("unexpected publish");
+        },
+      }),
+    ).rejects.toThrow("persisted-before-publish");
+    promotePendingDeliveryIntents({ persistRoot, agentId: "proof" });
+    const queued = createQueuedRun({
+      asyncWaitDeliveryOnly: true,
+      asyncWaitDeliveryPayloads: payloads,
+      asyncWaitRecoveryBind: {
+        jobId: "proof-job",
+        claimToken: "proof-claim",
+        boundRunId: runId,
+        boundDeliveryId: deliveryId,
+      },
+      originatingChannel: "telegram",
+      originatingTo: "111",
+      run: {
+        agentId: "proof",
+        sessionKey: "agent:proof:main",
+        sessionFile,
+        workspaceDir: root,
+        config: cfg,
+        taskCompletionBinding: binding,
+        messageProvider: "telegram",
+      },
+    });
+    const runner = createFollowupRunner({
+      typing: createMockTypingController(),
+      typingMode: "instant",
+      sessionKey: "agent:proof:main",
+      defaultModel: "anthropic/claude",
+      opts: {},
+    });
+    return { cfg, persistRoot, queued, runner, runId, taskId, deliveryId };
+  }
+
+  it("normal delivery-only followup sends once without invoking the model", async () => {
+    const s = await seed();
+    await s.runner(s.queued);
+    expect(recoveryTransport.calls).toBe(1);
+    expect(routeReplyMock).not.toHaveBeenCalled();
+    expect(runEmbeddedPiAgentMock).not.toHaveBeenCalled();
+  });
+
+  it("does not resend a pending identity whose real claim already has unknown disposition", async () => {
+    const s = await seed();
+    const { claimAwaitingDeliverySend } = await import("../../task-outcome/pending-delivery.js");
+    const claim = await claimAwaitingDeliverySend({
+      persistRoot: s.persistRoot,
+      runId: s.runId,
+      taskId: s.taskId,
+      deliveryId: s.deliveryId,
+    });
+    expect(claim.ok).toBe(true);
+    const { deliverRecoveredAwaitingSends } = await import("../../task-outcome/consumer-boot.js");
+    const bootSend = vi.fn(async () => [{ messageId: "never" }]);
+    await deliverRecoveredAwaitingSends({
+      cfg: s.cfg,
+      persistRoot: s.persistRoot,
+      agentId: "proof",
+      sendPendingVisible: bootSend,
+    });
+    await s.runner(s.queued);
+    expect(bootSend).not.toHaveBeenCalled();
+    expect(recoveryTransport.calls).toBe(0);
+    expect(routeReplyMock).not.toHaveBeenCalled();
+    expect(runEmbeddedPiAgentMock).not.toHaveBeenCalled();
+  });
+
+  it("allows only one send while boot holds the real claim for the same identity", async () => {
+    const s = await seed();
+    const { deliverRecoveredAwaitingSends } = await import("../../task-outcome/consumer-boot.js");
+    let entered!: () => void;
+    let release!: () => void;
+    const sending = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const finish = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const bootSend = vi.fn(async () => {
+      entered();
+      await finish;
+      return [{ messageId: "boot-receipt" }];
+    });
+    const boot = deliverRecoveredAwaitingSends({
+      cfg: s.cfg,
+      persistRoot: s.persistRoot,
+      agentId: "proof",
+      sendPendingVisible: bootSend,
+    });
+    await sending;
+    try {
+      await s.runner(s.queued);
+    } finally {
+      release();
+    }
+    await boot;
+    expect(bootSend.mock.calls.length + recoveryTransport.calls).toBe(1);
+    expect(routeReplyMock).not.toHaveBeenCalled();
+    expect(runEmbeddedPiAgentMock).not.toHaveBeenCalled();
+  });
 });
