@@ -7,6 +7,7 @@ import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import type { HookContext } from "../agent-runtime/capabilities/index.js";
 import {
   assertToolResultReplayAllowed,
+  getToolStoredResultHostReadBinding,
   isToolWrappedWithBeforeToolCallHook,
   runBeforeToolCallHook,
 } from "../agent-runtime/capabilities/index.js";
@@ -15,6 +16,7 @@ import {
   withToolOperationAdmission,
   commitToolOperationWriteIntent,
 } from "../agent-runtime/state/repository/tool-operation.js";
+import { withStoredResultReadContext } from "../agent-runtime/state/stored-result-read-binding.js";
 import { checkTaskActionBoundary } from "../agent-runtime/state/task-action.js";
 import type { OpenBotConfig } from "../config/config.js";
 import { runDeliveryToolSideEffect } from "../gateway/collaboration-dispatch/delivery-tool-side-effect.js";
@@ -192,88 +194,92 @@ export function toToolDefinitions(
       execute: async (...args: ToolExecuteArgs): Promise<AgentToolResult<unknown>> => {
         const { toolCallId, params, onUpdate, signal } = splitToolExecuteArgs(args);
         let executeParams = params;
-        try {
-          let effectInvoked = false;
-          const scheduled = await withToolOperationAdmission(
-            JSON.stringify([options?.deliveryToolSideEffect ?? null, normalizedName, params]),
-            () =>
-              runDeliveryToolSideEffect({
-                schedule: options?.deliveryToolSideEffect,
-                toolName: name,
-                cfg: options?.cfg,
-                bag: options?.privateRunBag,
-                run: async () => {
-                  effectInvoked = true;
-                  if (!beforeHookWrapped) {
-                    const hookOutcome = await runBeforeToolCallHook({
-                      toolName: name,
-                      params,
-                      toolCallId,
-                    });
-                    if (hookOutcome.blocked) {
-                      throw new Error(hookOutcome.reason);
+        const run = async (): Promise<AgentToolResult<unknown>> => {
+          try {
+            let effectInvoked = false;
+            const scheduled = await withToolOperationAdmission(
+              JSON.stringify([options?.deliveryToolSideEffect ?? null, normalizedName, params]),
+              () =>
+                runDeliveryToolSideEffect({
+                  schedule: options?.deliveryToolSideEffect,
+                  toolName: name,
+                  cfg: options?.cfg,
+                  bag: options?.privateRunBag,
+                  run: async () => {
+                    effectInvoked = true;
+                    if (!beforeHookWrapped) {
+                      const hookOutcome = await runBeforeToolCallHook({
+                        toolName: name,
+                        params,
+                        toolCallId,
+                      });
+                      if (hookOutcome.blocked) {
+                        throw new Error(hookOutcome.reason);
+                      }
+                      executeParams = hookOutcome.params;
                     }
-                    executeParams = hookOutcome.params;
-                  }
-                  if (!beforeHookWrapped) {
-                    signal?.throwIfAborted();
-                    await commitToolOperationWriteIntent();
-                    signal?.throwIfAborted();
-                  }
-                  return tool.execute(toolCallId, executeParams, signal, onUpdate);
-                },
-              }),
-          );
-          if (scheduled.skipped) {
-            return jsonResult({
-              status: "skipped",
-              tool: normalizedName,
-              reason: "durable_side_effect_already_claimed",
-              key: scheduled.key,
+                    if (!beforeHookWrapped) {
+                      signal?.throwIfAborted();
+                      await commitToolOperationWriteIntent();
+                      signal?.throwIfAborted();
+                    }
+                    return tool.execute(toolCallId, executeParams, signal, onUpdate);
+                  },
+                }),
+            );
+            if (scheduled.skipped) {
+              return jsonResult({
+                status: "skipped",
+                tool: normalizedName,
+                reason: "durable_side_effect_already_claimed",
+                key: scheduled.key,
+              });
+            }
+            if (!effectInvoked) {
+              await assertToolResultReplayAllowed(tool, executeParams, signal);
+            }
+            const rawResult = scheduled.value;
+            const result = normalizeToolExecutionResult({
+              toolName: normalizedName,
+              result: rawResult,
             });
-          }
-          if (!effectInvoked) {
-            await assertToolResultReplayAllowed(tool, executeParams, signal);
-          }
-          const rawResult = scheduled.value;
-          const result = normalizeToolExecutionResult({
-            toolName: normalizedName,
-            result: rawResult,
-          });
-          return result;
-        } catch (err) {
-          if (signal?.aborted) {
-            throw err;
-          }
-          const name =
-            err && typeof err === "object" && "name" in err
-              ? String((err as { name?: unknown }).name)
-              : "";
-          if (name === "AbortError") {
-            throw err;
-          }
-          if (err instanceof ToolOperationOutcomeUnknownError) {
-            return jsonResult({
-              status: "waiting",
-              tool: normalizedName,
-              operationId: err.operationId,
-              waitCondition: err.waitCondition,
-              retryAllowed: false,
-              reason: "external_operation_requires_reconciliation",
-            });
-          }
-          const described = describeToolExecutionError(err);
-          if (described.stack && described.stack !== described.message) {
-            logDebug(`tools: ${normalizedName} failed stack:\n${described.stack}`);
-          }
-          logError(`[tools] ${normalizedName} failed: ${described.message}`);
+            return result;
+          } catch (err) {
+            if (signal?.aborted) {
+              throw err;
+            }
+            const name =
+              err && typeof err === "object" && "name" in err
+                ? String((err as { name?: unknown }).name)
+                : "";
+            if (name === "AbortError") {
+              throw err;
+            }
+            if (err instanceof ToolOperationOutcomeUnknownError) {
+              return jsonResult({
+                status: "waiting",
+                tool: normalizedName,
+                operationId: err.operationId,
+                waitCondition: err.waitCondition,
+                retryAllowed: false,
+                reason: "external_operation_requires_reconciliation",
+              });
+            }
+            const described = describeToolExecutionError(err);
+            if (described.stack && described.stack !== described.message) {
+              logDebug(`tools: ${normalizedName} failed stack:\n${described.stack}`);
+            }
+            logError(`[tools] ${normalizedName} failed: ${described.message}`);
 
-          return jsonResult({
-            status: "error",
-            tool: normalizedName,
-            error: described.message,
-          });
-        }
+            return jsonResult({
+              status: "error",
+              tool: normalizedName,
+              error: described.message,
+            });
+          }
+        };
+        const hostReadBinding = getToolStoredResultHostReadBinding(tool);
+        return hostReadBinding ? withStoredResultReadContext(hostReadBinding, run) : run();
       },
     } satisfies ToolDefinition;
   });
