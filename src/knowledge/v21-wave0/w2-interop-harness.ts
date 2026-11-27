@@ -9,6 +9,7 @@ import {
   createAiExecutionTraceHeaderPropagator,
   type AiExecutionTraceHeaders,
 } from "./ai-execution-trace-header-propagator.js";
+import { canonicalJsonText, canonicalSha256Hex } from "./canonical-json.js";
 import {
   REVOCATION_PURGE_CHANNELS,
   computeChannelReceiptHash,
@@ -235,4 +236,59 @@ export function buildFourChannelReceipt(input: {
     ...body,
     receipt_hash: computeRevocationPurgeReceiptHash(body),
   };
+}
+
+/** Official X-V21-* request-header names (case-insensitive on parse). */
+export function parseXv21RequestHeaders(
+  headers: Record<string, string>,
+): Partial<AiExecutionTraceHeaders> {
+  const lookup = new Map<string, string>();
+  for (const [key, value] of Object.entries(headers)) {
+    lookup.set(key.toLowerCase(), value);
+  }
+  const out: Record<string, unknown> = {};
+  for (const key of AI_EXECUTION_TRACE_HEADER_KEYS) {
+    const raw = lookup.get(X_V21_HEADER_NAMES[key].toLowerCase());
+    if (raw === undefined) {
+      continue;
+    }
+    if (key === "policy_generation") {
+      const n = Number(raw);
+      if (Number.isInteger(n) && n >= 1) {
+        out.policy_generation = n;
+      }
+    } else if (raw.trim()) {
+      out[key] = raw;
+    }
+  }
+  return out as Partial<AiExecutionTraceHeaders>;
+}
+
+/**
+ * Default-off X-V21-* request-header loopback: project official headers
+ * then parse them back. Not registered on Gateway routes.
+ */
+export function loopbackXv21RequestHeaders(headers: AiExecutionTraceHeaders): {
+  outgoing: Record<string, string>;
+  parsed: Partial<AiExecutionTraceHeaders>;
+} {
+  const outgoing = projectXv21Headers(headers);
+  return { outgoing, parsed: parseXv21RequestHeaders(outgoing) };
+}
+
+/**
+ * Canonical JSON loopback: encode, UTF-8 parse, re-encode. The second
+ * canonicalization must be byte-identical to the first.
+ */
+export function loopbackCanonicalJson(value: unknown): {
+  text: string;
+  sha256: string;
+  parsed: unknown;
+  textAfterParse: string;
+} {
+  const text = canonicalJsonText(value);
+  const sha256 = canonicalSha256Hex(value);
+  const parsed = JSON.parse(text) as unknown;
+  const textAfterParse = canonicalJsonText(parsed);
+  return { text, sha256, parsed, textAfterParse };
 }
