@@ -1,0 +1,818 @@
+{
+  "canonicalization": {
+    "algorithm": "sha256",
+    "hex": "64 lowercase hex characters",
+    "probes": [
+      {
+        "canonical_json": "{\"alpha\":{\"beta\":true,\"delta\":false},\"list\":[\"b\",\"a\"],\"zebra\":1}",
+        "id": "P1-KEY-ORDER-NESTED",
+        "input": {
+          "alpha": {
+            "beta": true,
+            "delta": false
+          },
+          "list": [
+            "b",
+            "a"
+          ],
+          "zebra": 1
+        },
+        "sha256": "58aaf48738701117b6880e6adec31277e4943d7b8d44e527ccec0b7a871d2f36"
+      },
+      {
+        "canonical_json": "{\"empty\":null,\"msg\":\"撤权回执\",\"ok\":true}",
+        "id": "P2-UNICODE-ENSURE-ASCII-FALSE",
+        "input": {
+          "empty": null,
+          "msg": "撤权回执",
+          "ok": true
+        },
+        "sha256": "8ef9b8d621ad05c115173d7afae5ffffaeda29b9ca73ce009e6140190dfac4a4"
+      },
+      {
+        "canonical_json": "{\"channel\":\"primary_storage_acl\",\"status\":\"success\",\"subject_id\":\"syn_mem_1\",\"tenant_id\":\"syn_org\"}",
+        "id": "P3-SUCCESS-CHANNEL-INPUT",
+        "input": {
+          "channel": "primary_storage_acl",
+          "status": "success",
+          "subject_id": "syn_mem_1",
+          "tenant_id": "syn_org"
+        },
+        "sha256": "4229072f8311e69ceaedaf177218c2864f31fbc7e59c2c3b5704eb05fd08ec6b"
+      },
+      {
+        "canonical_json": "{\"channel\":\"agent_history_cogniweave\",\"status\":\"timeout\",\"tenant_id\":\"syn_org\"}",
+        "id": "P4-TIMEOUT-CHANNEL-INPUT",
+        "input": {
+          "channel": "agent_history_cogniweave",
+          "status": "timeout",
+          "tenant_id": "syn_org"
+        },
+        "sha256": "dfc7a5ab9698ff82c2defd1ade99e19477a5f10206e001a7147337b0dfcadec2"
+      }
+    ],
+    "python_stdlib": "json.dumps(obj, sort_keys=True, separators=(\",\", \":\"), ensure_ascii=False).encode(\"utf-8\")",
+    "rule": "Reuse the existing Python rule in sandbox.v21_reuse_v1.revocation (canonical_json_bytes / FourChannelRevocation._hash). Serialize the hash input as JSON with recursively sorted object keys (json.dumps sort_keys=True at every nesting level), compact separators (',' and ':' with no spaces), and ensure_ascii=False so non-ASCII is emitted as raw UTF-8 rather than backslash-u escapes; standard JSON escaping still applies to quotes, backslashes, and control characters; arrays keep their original order; booleans and null are lowercase true/false/null; integers are unquoted decimal JSON numbers; the JSON text has no leading, trailing, or interior decorative whitespace and no trailing newline. SHA-256 is taken over those exact UTF-8 bytes (no BOM) and encoded as 64 lowercase hex characters. A channel success hash input is {channel, tenant_id, subject_id, status}; a channel failed or timeout hash input is {channel, tenant_id, status} (subject_id omitted); a missing channel has no receipt_hash in the current Python store. The returned channel object placed in the parent channels array is {channel, status, receipt_hash, hash_algorithm} and does not repeat tenant_id or subject_id. The top-level receipt_hash hashes the full receipt object with only the top-level receipt_hash key removed — nested channel receipt_hash and hash_algorithm fields stay inside the parent hash input. TypeScript must produce identical UTF-8 bytes and identical hex digests.",
+    "source": "sandbox.v21_reuse_v1.revocation.canonical_json_bytes / canonical_sha256_hex (same function as FourChannelRevocation._hash)"
+  },
+  "catalog_seed": [
+    {
+      "classification": "internal",
+      "concept_ids": [
+        "concept.invoice"
+      ],
+      "dsn": "postgresql://example.invalid/db",
+      "password": "REDACTED-NOT-A-REAL-SECRET",
+      "policy_clause_ids": [
+        "policy.retention"
+      ],
+      "semantic_object_key": "semobj:openbot:finance.invoice",
+      "tenant_id": "syn_org"
+    }
+  ],
+  "experimental_v3_enabled_default": false,
+  "fixture_id": "W2_INTEROP_GOLDEN_V1",
+  "formal_acceptance": false,
+  "formal_t01_t27": "NOT_RUN_NOT_ACCEPTED",
+  "groups": [
+    {
+      "cases": [
+        {
+          "expect": "accept",
+          "expected": {
+            "dim": 8,
+            "provider": {
+              "handle": "slot:embed",
+              "track": "openbot_models_embed_proxy"
+            },
+            "tenant_id": "syn_org",
+            "vectors": [
+              [
+                0.2901960784313726,
+                0.5803921568627451,
+                0.44313725490196076,
+                0.7176470588235294,
+                0.8,
+                0.7294117647058823,
+                0.396078431372549,
+                0.24705882352941178
+              ],
+              [
+                0.0,
+                0.6627450980392157,
+                0.8117647058823529,
+                0.9254901960784314,
+                0.27058823529411763,
+                0.6274509803921569,
+                0.12941176470588237,
+                0.2
+              ]
+            ],
+            "vectors_canonical_json": "[[0.2901960784313726,0.5803921568627451,0.44313725490196076,0.7176470588235294,0.8,0.7294117647058823,0.396078431372549,0.24705882352941178],[0.0,0.6627450980392157,0.8117647058823529,0.9254901960784314,0.27058823529411763,0.6274509803921569,0.12941176470588237,0.2]]"
+          },
+          "id": "G1-POS-EMBED-LOOPBACK",
+          "input": {
+            "inputs": [
+              "syn alpha",
+              "syn beta"
+            ],
+            "policy_generation": 7,
+            "provider": {
+              "handle": "slot:embed",
+              "track": "openbot_models_embed_proxy"
+            },
+            "tenant_id": "syn_org"
+          },
+          "notes": "Default EmbeddingRerankAdapterClient uses an in-process loopback (default-off: no implicit network, no credentials). Vectors are SHA-256(utf-8 text).digest()[0:8] / 255.0."
+        },
+        {
+          "expect": "reject",
+          "expected": {
+            "error": "CREDENTIAL_FORBIDDEN"
+          },
+          "id": "G1-NEG-EMBED-IMPLICIT-NETWORK",
+          "input": {
+            "inputs": [
+              "see https://example.invalid/embed"
+            ],
+            "policy_generation": 7,
+            "provider": {
+              "handle": "slot:embed",
+              "track": "openbot_models_embed_proxy"
+            },
+            "tenant_id": "syn_org"
+          },
+          "notes": "Any http/https/wss/ftp URL token in the payload is rejected before a transport call."
+        }
+      ],
+      "id": "G1_MODELS_EMBED",
+      "title": "models.embed default-off / injectable client; no implicit network"
+    },
+    {
+      "cases": [
+        {
+          "expect": "accept",
+          "expected": {
+            "final_bound": {
+              "agent_id": "syn_agent",
+              "cost_attribution": {
+                "component": "ikc",
+                "quantity": 1,
+                "system": "knowledge_sdk",
+                "units": "calls"
+              },
+              "extra": "hop2",
+              "plan_id": "syn_plan",
+              "policy_generation": 7,
+              "run_id": "syn_run",
+              "tenant_id": "syn_org",
+              "trace_id": "syn_trace",
+              "user_id": "syn_user"
+            },
+            "headers": {
+              "X-V21-Agent-Id": "syn_agent",
+              "X-V21-Plan-Id": "syn_plan",
+              "X-V21-Policy-Generation": "7",
+              "X-V21-Run-Id": "syn_run",
+              "X-V21-Tenant-Id": "syn_org",
+              "X-V21-Trace-Id": "syn_trace",
+              "X-V21-User-Id": "syn_user"
+            },
+            "hop_count": 3,
+            "key_order": [
+              "tenant_id",
+              "user_id",
+              "agent_id",
+              "trace_id",
+              "run_id",
+              "plan_id",
+              "policy_generation"
+            ],
+            "seven_keys": {
+              "agent_id": "syn_agent",
+              "plan_id": "syn_plan",
+              "policy_generation": 7,
+              "run_id": "syn_run",
+              "tenant_id": "syn_org",
+              "trace_id": "syn_trace",
+              "user_id": "syn_user"
+            }
+          },
+          "id": "G2-POS-SEVEN-KEY-HOP",
+          "input": {
+            "hop_payloads": [
+              {
+                "extra": "hop2"
+              }
+            ],
+            "trace": {
+              "agent_id": "syn_agent",
+              "cost_attribution": {
+                "component": "ikc",
+                "quantity": 1,
+                "system": "knowledge_sdk",
+                "units": "calls"
+              },
+              "plan_id": "syn_plan",
+              "policy_generation": 7,
+              "run_id": "syn_run",
+              "tenant_id": "syn_org",
+              "trace_id": "syn_trace",
+              "user_id": "syn_user"
+            }
+          },
+          "notes": "Three in-process hops (context accept, header projection, propagate/bind) must carry the official seven keys in TRACE_KEYS order plus cost_attribution."
+        },
+        {
+          "expect": "reject",
+          "expected": {
+            "error": "VALIDATION_ERROR"
+          },
+          "id": "G2-NEG-MISSING-RUN-ID",
+          "input": {
+            "trace": {
+              "agent_id": "syn_agent",
+              "cost_attribution": {
+                "component": "ikc",
+                "quantity": 1,
+                "system": "knowledge_sdk",
+                "units": "calls"
+              },
+              "plan_id": "syn_plan",
+              "policy_generation": 7,
+              "tenant_id": "syn_org",
+              "trace_id": "syn_trace",
+              "user_id": "syn_user"
+            }
+          },
+          "notes": "A missing official key fails closed before any hop."
+        }
+      ],
+      "id": "G2_AI_EXECUTION_TRACE",
+      "title": "AIExecutionTrace seven-key context hop"
+    },
+    {
+      "cases": [
+        {
+          "expect": "accept",
+          "expected": {
+            "classification": "internal",
+            "concept_ids": [
+              "concept.invoice"
+            ],
+            "disk_writes": 0,
+            "policy_clause_ids": [
+              "policy.retention"
+            ],
+            "redacted_fields": [
+              "dsn",
+              "password"
+            ],
+            "semantic_object_key": "semobj:openbot:finance.invoice",
+            "tenant_id": "syn_org",
+            "writable": false
+          },
+          "id": "G3-POS-READONLY-REDACTED",
+          "input": {
+            "semantic_object_key": "semobj:openbot:finance.invoice",
+            "tenant_id": "syn_org"
+          },
+          "notes": "Read-only memory projection. Seeded connector/credential fields are redacted. disk_writes stays 0; the adapter never opens a filesystem path."
+        },
+        {
+          "expect": "reject",
+          "expected": {
+            "disk_writes": 0,
+            "error": "SEMANTIC_WRITE_FORBIDDEN"
+          },
+          "id": "G3-NEG-WRITE-FORBIDDEN",
+          "input": {
+            "operation": "write",
+            "payload": {
+              "dsn": "postgresql://example.invalid/db",
+              "semantic_object_key": "semobj:openbot:finance.invoice",
+              "tenant_id": "syn_org"
+            }
+          },
+          "notes": "Any write/mutate path raises SEMANTIC_WRITE_FORBIDDEN and still performs zero disk writes."
+        }
+      ],
+      "id": "G3_SEMANTIC_OBJECT_CATALOG",
+      "title": "SemanticObjectCatalogReadAdapter read-only, zero write-to-disk"
+    },
+    {
+      "cases": [
+        {
+          "expect": "accept",
+          "expected": {
+            "accepted": true,
+            "channels": [
+              {
+                "canonical_json": "{\"channel\":\"primary_storage_acl\",\"status\":\"success\",\"subject_id\":\"syn_mem_1\",\"tenant_id\":\"syn_org\"}",
+                "channel": "primary_storage_acl",
+                "channel_receipt": {
+                  "channel": "primary_storage_acl",
+                  "hash_algorithm": "sha256",
+                  "receipt_hash": "4229072f8311e69ceaedaf177218c2864f31fbc7e59c2c3b5704eb05fd08ec6b",
+                  "status": "success"
+                },
+                "hash_input": {
+                  "channel": "primary_storage_acl",
+                  "status": "success",
+                  "subject_id": "syn_mem_1",
+                  "tenant_id": "syn_org"
+                },
+                "receipt_hash": "4229072f8311e69ceaedaf177218c2864f31fbc7e59c2c3b5704eb05fd08ec6b",
+                "status": "success"
+              },
+              {
+                "canonical_json": "{\"channel\":\"vector_fts_index\",\"status\":\"success\",\"subject_id\":\"syn_mem_1\",\"tenant_id\":\"syn_org\"}",
+                "channel": "vector_fts_index",
+                "channel_receipt": {
+                  "channel": "vector_fts_index",
+                  "hash_algorithm": "sha256",
+                  "receipt_hash": "adfd9e7f8b3abb5ae76f7d9c7b871e1d81b4c204477e613ca45e06ef47a99c3d",
+                  "status": "success"
+                },
+                "hash_input": {
+                  "channel": "vector_fts_index",
+                  "status": "success",
+                  "subject_id": "syn_mem_1",
+                  "tenant_id": "syn_org"
+                },
+                "receipt_hash": "adfd9e7f8b3abb5ae76f7d9c7b871e1d81b4c204477e613ca45e06ef47a99c3d",
+                "status": "success"
+              },
+              {
+                "canonical_json": "{\"channel\":\"cache_materialized_snapshot\",\"status\":\"success\",\"subject_id\":\"syn_mem_1\",\"tenant_id\":\"syn_org\"}",
+                "channel": "cache_materialized_snapshot",
+                "channel_receipt": {
+                  "channel": "cache_materialized_snapshot",
+                  "hash_algorithm": "sha256",
+                  "receipt_hash": "9137ae3f5b4ae7c74a0cb64e106011e0c7f2fa583740543dc5b048a59c880e2f",
+                  "status": "success"
+                },
+                "hash_input": {
+                  "channel": "cache_materialized_snapshot",
+                  "status": "success",
+                  "subject_id": "syn_mem_1",
+                  "tenant_id": "syn_org"
+                },
+                "receipt_hash": "9137ae3f5b4ae7c74a0cb64e106011e0c7f2fa583740543dc5b048a59c880e2f",
+                "status": "success"
+              },
+              {
+                "canonical_json": "{\"channel\":\"agent_history_cogniweave\",\"status\":\"success\",\"subject_id\":\"syn_mem_1\",\"tenant_id\":\"syn_org\"}",
+                "channel": "agent_history_cogniweave",
+                "channel_receipt": {
+                  "channel": "agent_history_cogniweave",
+                  "hash_algorithm": "sha256",
+                  "receipt_hash": "70cd036eab03798c678375cdda80a28c7b40fb385144c7e47f150d91430545a0",
+                  "status": "success"
+                },
+                "hash_input": {
+                  "channel": "agent_history_cogniweave",
+                  "status": "success",
+                  "subject_id": "syn_mem_1",
+                  "tenant_id": "syn_org"
+                },
+                "receipt_hash": "70cd036eab03798c678375cdda80a28c7b40fb385144c7e47f150d91430545a0",
+                "status": "success"
+              }
+            ],
+            "parent_canonical_json": "{\"channels\":[{\"channel\":\"primary_storage_acl\",\"hash_algorithm\":\"sha256\",\"receipt_hash\":\"4229072f8311e69ceaedaf177218c2864f31fbc7e59c2c3b5704eb05fd08ec6b\",\"status\":\"success\"},{\"channel\":\"vector_fts_index\",\"hash_algorithm\":\"sha256\",\"receipt_hash\":\"adfd9e7f8b3abb5ae76f7d9c7b871e1d81b4c204477e613ca45e06ef47a99c3d\",\"status\":\"success\"},{\"channel\":\"cache_materialized_snapshot\",\"hash_algorithm\":\"sha256\",\"receipt_hash\":\"9137ae3f5b4ae7c74a0cb64e106011e0c7f2fa583740543dc5b048a59c880e2f\",\"status\":\"success\"},{\"channel\":\"agent_history_cogniweave\",\"hash_algorithm\":\"sha256\",\"receipt_hash\":\"70cd036eab03798c678375cdda80a28c7b40fb385144c7e47f150d91430545a0\",\"status\":\"success\"}],\"hash_algorithm\":\"sha256\",\"policy_generation\":4,\"purged\":true,\"subject_id\":\"syn_mem_1\",\"task_id\":\"syn_task_w2_ok\",\"tenant_id\":\"syn_org\"}",
+            "purged": true,
+            "receipt": {
+              "channels": [
+                {
+                  "channel": "primary_storage_acl",
+                  "hash_algorithm": "sha256",
+                  "receipt_hash": "4229072f8311e69ceaedaf177218c2864f31fbc7e59c2c3b5704eb05fd08ec6b",
+                  "status": "success"
+                },
+                {
+                  "channel": "vector_fts_index",
+                  "hash_algorithm": "sha256",
+                  "receipt_hash": "adfd9e7f8b3abb5ae76f7d9c7b871e1d81b4c204477e613ca45e06ef47a99c3d",
+                  "status": "success"
+                },
+                {
+                  "channel": "cache_materialized_snapshot",
+                  "hash_algorithm": "sha256",
+                  "receipt_hash": "9137ae3f5b4ae7c74a0cb64e106011e0c7f2fa583740543dc5b048a59c880e2f",
+                  "status": "success"
+                },
+                {
+                  "channel": "agent_history_cogniweave",
+                  "hash_algorithm": "sha256",
+                  "receipt_hash": "70cd036eab03798c678375cdda80a28c7b40fb385144c7e47f150d91430545a0",
+                  "status": "success"
+                }
+              ],
+              "hash_algorithm": "sha256",
+              "policy_generation": 4,
+              "purged": true,
+              "receipt_hash": "f4055894fdebb0fc55ae563aaed03ab6f4162b53c4eeab31ad479f6c6707b476",
+              "subject_id": "syn_mem_1",
+              "task_id": "syn_task_w2_ok",
+              "tenant_id": "syn_org"
+            },
+            "receipt_hash": "f4055894fdebb0fc55ae563aaed03ab6f4162b53c4eeab31ad479f6c6707b476"
+          },
+          "id": "G4-POS-FOUR-CHANNEL-SUCCESS",
+          "input": {
+            "failures": {},
+            "policy_generation": 4,
+            "subject_id": "syn_mem_1",
+            "task_id": "syn_task_w2_ok",
+            "tenant_id": "syn_org"
+          },
+          "notes": "All four channels success; purged=true. receipt_hash and each channel receipt_hash are the hard Sync-W2-1 / W2-Gate-1 expected values."
+        },
+        {
+          "expect": "accept",
+          "expected": {
+            "accepted": true,
+            "channels": [
+              {
+                "canonical_json": "{\"channel\":\"primary_storage_acl\",\"status\":\"success\",\"subject_id\":\"syn_mem_1\",\"tenant_id\":\"syn_org\"}",
+                "channel": "primary_storage_acl",
+                "channel_receipt": {
+                  "channel": "primary_storage_acl",
+                  "hash_algorithm": "sha256",
+                  "receipt_hash": "4229072f8311e69ceaedaf177218c2864f31fbc7e59c2c3b5704eb05fd08ec6b",
+                  "status": "success"
+                },
+                "hash_input": {
+                  "channel": "primary_storage_acl",
+                  "status": "success",
+                  "subject_id": "syn_mem_1",
+                  "tenant_id": "syn_org"
+                },
+                "receipt_hash": "4229072f8311e69ceaedaf177218c2864f31fbc7e59c2c3b5704eb05fd08ec6b",
+                "status": "success"
+              },
+              {
+                "canonical_json": "{\"channel\":\"vector_fts_index\",\"status\":\"success\",\"subject_id\":\"syn_mem_1\",\"tenant_id\":\"syn_org\"}",
+                "channel": "vector_fts_index",
+                "channel_receipt": {
+                  "channel": "vector_fts_index",
+                  "hash_algorithm": "sha256",
+                  "receipt_hash": "adfd9e7f8b3abb5ae76f7d9c7b871e1d81b4c204477e613ca45e06ef47a99c3d",
+                  "status": "success"
+                },
+                "hash_input": {
+                  "channel": "vector_fts_index",
+                  "status": "success",
+                  "subject_id": "syn_mem_1",
+                  "tenant_id": "syn_org"
+                },
+                "receipt_hash": "adfd9e7f8b3abb5ae76f7d9c7b871e1d81b4c204477e613ca45e06ef47a99c3d",
+                "status": "success"
+              },
+              {
+                "canonical_json": "{\"channel\":\"cache_materialized_snapshot\",\"status\":\"success\",\"subject_id\":\"syn_mem_1\",\"tenant_id\":\"syn_org\"}",
+                "channel": "cache_materialized_snapshot",
+                "channel_receipt": {
+                  "channel": "cache_materialized_snapshot",
+                  "hash_algorithm": "sha256",
+                  "receipt_hash": "9137ae3f5b4ae7c74a0cb64e106011e0c7f2fa583740543dc5b048a59c880e2f",
+                  "status": "success"
+                },
+                "hash_input": {
+                  "channel": "cache_materialized_snapshot",
+                  "status": "success",
+                  "subject_id": "syn_mem_1",
+                  "tenant_id": "syn_org"
+                },
+                "receipt_hash": "9137ae3f5b4ae7c74a0cb64e106011e0c7f2fa583740543dc5b048a59c880e2f",
+                "status": "success"
+              },
+              {
+                "canonical_json": "{\"channel\":\"agent_history_cogniweave\",\"status\":\"timeout\",\"tenant_id\":\"syn_org\"}",
+                "channel": "agent_history_cogniweave",
+                "channel_receipt": {
+                  "channel": "agent_history_cogniweave",
+                  "hash_algorithm": "sha256",
+                  "receipt_hash": "dfc7a5ab9698ff82c2defd1ade99e19477a5f10206e001a7147337b0dfcadec2",
+                  "status": "timeout"
+                },
+                "hash_input": {
+                  "channel": "agent_history_cogniweave",
+                  "status": "timeout",
+                  "tenant_id": "syn_org"
+                },
+                "receipt_hash": "dfc7a5ab9698ff82c2defd1ade99e19477a5f10206e001a7147337b0dfcadec2",
+                "status": "timeout"
+              }
+            ],
+            "parent_canonical_json": "{\"channels\":[{\"channel\":\"primary_storage_acl\",\"hash_algorithm\":\"sha256\",\"receipt_hash\":\"4229072f8311e69ceaedaf177218c2864f31fbc7e59c2c3b5704eb05fd08ec6b\",\"status\":\"success\"},{\"channel\":\"vector_fts_index\",\"hash_algorithm\":\"sha256\",\"receipt_hash\":\"adfd9e7f8b3abb5ae76f7d9c7b871e1d81b4c204477e613ca45e06ef47a99c3d\",\"status\":\"success\"},{\"channel\":\"cache_materialized_snapshot\",\"hash_algorithm\":\"sha256\",\"receipt_hash\":\"9137ae3f5b4ae7c74a0cb64e106011e0c7f2fa583740543dc5b048a59c880e2f\",\"status\":\"success\"},{\"channel\":\"agent_history_cogniweave\",\"hash_algorithm\":\"sha256\",\"receipt_hash\":\"dfc7a5ab9698ff82c2defd1ade99e19477a5f10206e001a7147337b0dfcadec2\",\"status\":\"timeout\"}],\"hash_algorithm\":\"sha256\",\"policy_generation\":4,\"purged\":false,\"subject_id\":\"syn_mem_1\",\"task_id\":\"syn_task_w2_timeout\",\"tenant_id\":\"syn_org\"}",
+            "purged": false,
+            "receipt": {
+              "channels": [
+                {
+                  "channel": "primary_storage_acl",
+                  "hash_algorithm": "sha256",
+                  "receipt_hash": "4229072f8311e69ceaedaf177218c2864f31fbc7e59c2c3b5704eb05fd08ec6b",
+                  "status": "success"
+                },
+                {
+                  "channel": "vector_fts_index",
+                  "hash_algorithm": "sha256",
+                  "receipt_hash": "adfd9e7f8b3abb5ae76f7d9c7b871e1d81b4c204477e613ca45e06ef47a99c3d",
+                  "status": "success"
+                },
+                {
+                  "channel": "cache_materialized_snapshot",
+                  "hash_algorithm": "sha256",
+                  "receipt_hash": "9137ae3f5b4ae7c74a0cb64e106011e0c7f2fa583740543dc5b048a59c880e2f",
+                  "status": "success"
+                },
+                {
+                  "channel": "agent_history_cogniweave",
+                  "hash_algorithm": "sha256",
+                  "receipt_hash": "dfc7a5ab9698ff82c2defd1ade99e19477a5f10206e001a7147337b0dfcadec2",
+                  "status": "timeout"
+                }
+              ],
+              "hash_algorithm": "sha256",
+              "policy_generation": 4,
+              "purged": false,
+              "receipt_hash": "6e8c7f178ec452b590e0d0f06defa0a2c21c0fac5c6a672a356a02b31470f0d0",
+              "subject_id": "syn_mem_1",
+              "task_id": "syn_task_w2_timeout",
+              "tenant_id": "syn_org"
+            },
+            "receipt_hash": "6e8c7f178ec452b590e0d0f06defa0a2c21c0fac5c6a672a356a02b31470f0d0"
+          },
+          "id": "G4-POS-CHANNEL-TIMEOUT-NOT-PURGED",
+          "input": {
+            "failures": {
+              "agent_history_cogniweave": "timeout"
+            },
+            "policy_generation": 4,
+            "subject_id": "syn_mem_1",
+            "task_id": "syn_task_w2_timeout",
+            "tenant_id": "syn_org"
+          },
+          "notes": "agent_history_cogniweave times out; purged=false. Channel timeout hash input omits subject_id. The receipt still has a verifiable top-level receipt_hash."
+        }
+      ],
+      "id": "G4_COGNIWEAVE_REVOCATION",
+      "title": "CogniWeave four-channel RevocationPurgeReceipt canonical JSON and receipt_hash"
+    },
+    {
+      "cases": [
+        {
+          "expect": "accept",
+          "expected": {
+            "mode": "A",
+            "query_kind": "object_get"
+          },
+          "id": "G5-POS-MODE-A",
+          "input": {
+            "declaration": {
+              "freshness_ts": "2026-11-27T00:00:00Z",
+              "masking_receipt": {
+                "hash_algorithm": "sha256",
+                "profile": "standard",
+                "receipt_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "receipt_id": "syn_mask_1"
+              },
+              "mode": "A",
+              "policy_generation": 3,
+              "query_kind": "object_get",
+              "tenant_id": "syn_org",
+              "tombstone": {
+                "active": false,
+                "revoked_at": null
+              },
+              "user_delegation_handle": "deleg:user_token_slot"
+            },
+            "query": null
+          },
+          "notes": "Allowlisted Mode A object_get control sample."
+        },
+        {
+          "expect": "accept",
+          "expected": {
+            "mode": "B",
+            "query_kind": "structured_select"
+          },
+          "id": "G5-POS-MODE-B",
+          "input": {
+            "declaration": {
+              "freshness_ts": "2026-11-27T00:00:00Z",
+              "masking_receipt": {
+                "hash_algorithm": "sha256",
+                "profile": "standard",
+                "receipt_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "receipt_id": "syn_mask_1"
+              },
+              "mode": "B",
+              "policy_generation": 3,
+              "query_kind": "structured_select",
+              "row_level_predicate": {
+                "field": "org_id",
+                "op": "eq",
+                "value": "syn_org"
+              },
+              "service_credential_handle": "svc:tenant_warehouse",
+              "tenant_id": "syn_org",
+              "tombstone": {
+                "active": false,
+                "revoked_at": null
+              }
+            },
+            "query": null
+          },
+          "notes": "Allowlisted Mode B structured_select control sample."
+        },
+        {
+          "expect": "accept",
+          "expected": {
+            "mode": "C",
+            "query_kind": "snapshot_read"
+          },
+          "id": "G5-POS-MODE-C",
+          "input": {
+            "declaration": {
+              "freshness_ts": "2026-11-27T00:00:00Z",
+              "masking_receipt": {
+                "hash_algorithm": "sha256",
+                "profile": "standard",
+                "receipt_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "receipt_id": "syn_mask_1"
+              },
+              "mode": "C",
+              "policy_generation": 3,
+              "query_kind": "snapshot_read",
+              "snapshot_id": "syn_snap_1",
+              "tenant_id": "syn_org",
+              "tombstone": {
+                "active": false,
+                "revoked_at": null
+              }
+            },
+            "query": null
+          },
+          "notes": "Allowlisted Mode C snapshot_read control sample."
+        },
+        {
+          "expect": "reject",
+          "expected": {
+            "error": "UNAUTHORIZED"
+          },
+          "id": "G5-NEG-TOMBSTONE",
+          "input": {
+            "declaration": {
+              "freshness_ts": "2026-11-27T00:00:00Z",
+              "masking_receipt": {
+                "hash_algorithm": "sha256",
+                "profile": "standard",
+                "receipt_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "receipt_id": "syn_mask_1"
+              },
+              "mode": "A",
+              "policy_generation": 3,
+              "query_kind": "object_get",
+              "tenant_id": "syn_org",
+              "tombstone": {
+                "active": true,
+                "revoked_at": "2026-11-27T00:00:00Z"
+              },
+              "user_delegation_handle": "deleg:user_token_slot"
+            },
+            "query": null
+          },
+          "notes": "Active tombstone fails closed with UNAUTHORIZED."
+        },
+        {
+          "expect": "reject",
+          "expected": {
+            "error": "TEXT_TO_SQL_FORBIDDEN"
+          },
+          "id": "G5-NEG-TEXT-TO-SQL-SQL",
+          "input": {
+            "declaration": {
+              "freshness_ts": "2026-11-27T00:00:00Z",
+              "masking_receipt": {
+                "hash_algorithm": "sha256",
+                "profile": "standard",
+                "receipt_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "receipt_id": "syn_mask_1"
+              },
+              "mode": "A",
+              "policy_generation": 3,
+              "query_kind": "object_get",
+              "tenant_id": "syn_org",
+              "tombstone": {
+                "active": false,
+                "revoked_at": null
+              },
+              "user_delegation_handle": "deleg:user_token_slot"
+            },
+            "query": {
+              "sql": "SELECT * FROM t"
+            }
+          },
+          "notes": "Free SQL is rejected; no Text-to-SQL executor exists in this sandbox."
+        },
+        {
+          "expect": "reject",
+          "expected": {
+            "error": "TEXT_TO_SQL_FORBIDDEN"
+          },
+          "id": "G5-NEG-TEXT-TO-SQL-FLAG",
+          "input": {
+            "declaration": {
+              "freshness_ts": "2026-11-27T00:00:00Z",
+              "masking_receipt": {
+                "hash_algorithm": "sha256",
+                "profile": "standard",
+                "receipt_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "receipt_id": "syn_mask_1"
+              },
+              "mode": "A",
+              "policy_generation": 3,
+              "query_kind": "object_get",
+              "tenant_id": "syn_org",
+              "tombstone": {
+                "active": false,
+                "revoked_at": null
+              },
+              "user_delegation_handle": "deleg:user_token_slot"
+            },
+            "query": {
+              "text_to_sql": true
+            }
+          },
+          "notes": "text_to_sql query flag is rejected."
+        },
+        {
+          "expect": "reject",
+          "expected": {
+            "error": "TEXT_TO_SQL_FORBIDDEN"
+          },
+          "id": "G5-NEG-TEXT-TO-SQL-KIND",
+          "input": {
+            "declaration": {
+              "freshness_ts": "2026-11-27T00:00:00Z",
+              "masking_receipt": {
+                "hash_algorithm": "sha256",
+                "profile": "standard",
+                "receipt_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "receipt_id": "syn_mask_1"
+              },
+              "mode": "A",
+              "policy_generation": 3,
+              "query_kind": "text_to_sql",
+              "tenant_id": "syn_org",
+              "tombstone": {
+                "active": false,
+                "revoked_at": null
+              },
+              "user_delegation_handle": "deleg:user_token_slot"
+            },
+            "query": null
+          },
+          "notes": "query_kind=text_to_sql is rejected before schema validation."
+        },
+        {
+          "expect": "reject",
+          "expected": {
+            "error": "MODE_UNMATCHED"
+          },
+          "id": "G5-NEG-MODE-UNMATCHED",
+          "input": {
+            "declaration": {
+              "freshness_ts": "2026-11-27T00:00:00Z",
+              "masking_receipt": {
+                "hash_algorithm": "sha256",
+                "profile": "standard",
+                "receipt_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "receipt_id": "syn_mask_1"
+              },
+              "mode": "D",
+              "policy_generation": 3,
+              "query_kind": "object_get",
+              "tenant_id": "syn_org",
+              "tombstone": {
+                "active": false,
+                "revoked_at": null
+              },
+              "user_delegation_handle": "deleg:user_token_slot"
+            },
+            "query": null
+          },
+          "notes": "Mode D is not in {A,B,C} and fails closed."
+        }
+      ],
+      "id": "G5_CONTROLLED_DATA_BRIDGE",
+      "title": "ControlledDataBridge Mode A/B/C Fail-Closed denials (tombstone / Text-to-SQL; no free Text-to-SQL)"
+    }
+  ],
+  "mount_production_http": "forbidden",
+  "slice": "W2A-1",
+  "wave": "Wave-V21-2"
+}

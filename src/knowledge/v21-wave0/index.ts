@@ -29,6 +29,9 @@ export {
   COGNIWEAVE_CHANNEL_4,
   REVOCATION_PURGE_CHANNELS,
   REVOCATION_PURGE_RECEIPT_ENABLED_DEFAULT,
+  computeChannelReceiptHash,
   computeRevocationPurgeReceiptHash,
   createRevocationPurgeReceiptValidator,
 } from "./revocation-purge-receipt.js";
+
+export { canonicalJsonBytes, canonicalJsonText, canonicalSha256Hex } from "./canonical-json.js";

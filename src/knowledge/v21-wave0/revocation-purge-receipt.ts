@@ -7,7 +7,7 @@
  * Channel order and purged invariant follow the pinned Team A contract
  * (memory-resource-bridge.schema.json / check.ts). Pin files are not modified.
  */
-import { createHash } from "node:crypto";
+import { canonicalSha256Hex } from "./canonical-json.js";
 
 export const REVOCATION_PURGE_RECEIPT_ENABLED_DEFAULT = false;
 export const COGNIWEAVE_CHANNEL_4 = "agent_history_cogniweave" as const;
@@ -92,25 +92,39 @@ function isChannelReceipt(value: unknown): value is ChannelReceipt {
 }
 
 /** Deterministic sha256 over the receipt body excluding receipt_hash itself. */
+/**
+ * Parent receipt_hash: SHA-256 (lowercase hex) of canonical JSON of the
+ * receipt object after dropping only the top-level `receipt_hash` key.
+ * In-channel `receipt_hash` fields still count.
+ */
 export function computeRevocationPurgeReceiptHash(
-  receipt: Omit<RevocationPurgeReceipt, "receipt_hash">,
+  receipt: Omit<RevocationPurgeReceipt, "receipt_hash"> | RevocationPurgeReceipt,
 ): string {
-  const body = {
-    task_id: receipt.task_id,
-    tenant_id: receipt.tenant_id,
-    subject_id: receipt.subject_id,
-    policy_generation: receipt.policy_generation,
-    channels: receipt.channels.map((channel) => ({
-      channel: channel.channel,
-      status: channel.status,
-      receipt_hash: channel.receipt_hash,
-      hash_algorithm: channel.hash_algorithm,
-      ...(channel.completed_at ? { completed_at: channel.completed_at } : {}),
-    })),
-    purged: receipt.purged,
-    hash_algorithm: receipt.hash_algorithm,
+  const { receipt_hash: _ignored, ...rest } = receipt as RevocationPurgeReceipt & {
+    receipt_hash?: string;
   };
-  return createHash("sha256").update(JSON.stringify(body), "utf8").digest("hex");
+  return canonicalSha256Hex(rest);
+}
+
+/**
+ * Channel receipt_hash. Success input is {channel, tenant_id, subject_id, status}.
+ * failed / timeout omit subject_id. Keys are recursively sorted by canonical JSON.
+ */
+export function computeChannelReceiptHash(input: {
+  channel: string;
+  status: string;
+  tenant_id: string;
+  subject_id?: string;
+}): string {
+  const body: Record<string, unknown> = {
+    channel: input.channel,
+    status: input.status,
+    tenant_id: input.tenant_id,
+  };
+  if (input.status === "success") {
+    body.subject_id = input.subject_id;
+  }
+  return canonicalSha256Hex(body);
 }
 
 export function createRevocationPurgeReceiptValidator(options?: { enabled?: boolean }) {

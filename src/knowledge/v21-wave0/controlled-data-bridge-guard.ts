@@ -16,7 +16,7 @@ export type ControlledDataBridgeDeclaration = {
   tombstone?: unknown;
   user_delegation_handle?: string;
   service_credential_handle?: string;
-  row_level_predicate?: string;
+  row_level_predicate?: unknown;
   snapshot_id?: string;
   query_kind?: string;
 };
@@ -25,20 +25,49 @@ export type ControlledDataBridgeDecision =
   | { allowed: false; code: "BRIDGE_LOCKED"; mode?: ControlledDataBridgeMode }
   | { allowed: false; code: "MODE_UNMATCHED" }
   | { allowed: false; code: "VALIDATION_ERROR" }
-  | { allowed: false; code: "TEXT_TO_SQL_FORBIDDEN" };
+  | { allowed: false; code: "TEXT_TO_SQL_FORBIDDEN" }
+  | { allowed: false; code: "UNAUTHORIZED"; mode?: ControlledDataBridgeMode };
 
 function isMode(value: unknown): value is ControlledDataBridgeMode {
   return value === "A" || value === "B" || value === "C";
 }
 
+function queryDeclaresTextToSql(query: unknown): boolean {
+  if (!query || typeof query !== "object" || Array.isArray(query)) {
+    return false;
+  }
+  const record = query as Record<string, unknown>;
+  if (record.text_to_sql === true || record.textToSql === true) {
+    return true;
+  }
+  if (typeof record.sql === "string" && record.sql.length > 0) {
+    return true;
+  }
+  return false;
+}
+
+function tombstoneIsActive(declaration: ControlledDataBridgeDeclaration): boolean {
+  const tombstone = declaration.tombstone;
+  if (!tombstone || typeof tombstone !== "object") {
+    return false;
+  }
+  return (tombstone as { active?: unknown }).active === true;
+}
+
 export function evaluateControlledDataBridge(
   declaration: ControlledDataBridgeDeclaration,
+  query?: unknown,
 ): ControlledDataBridgeDecision {
-  if (declaration.query_kind === "text_to_sql") {
+  // Text-to-SQL, unmatched modes, and an active tombstone stay rejected
+  // even if a later wave unlocks the bridge. Production remains locked.
+  if (declaration.query_kind === "text_to_sql" || queryDeclaresTextToSql(query)) {
     return { allowed: false, code: "TEXT_TO_SQL_FORBIDDEN" };
   }
   if (!isMode(declaration.mode)) {
     return { allowed: false, code: "MODE_UNMATCHED" };
+  }
+  if (tombstoneIsActive(declaration)) {
+    return { allowed: false, code: "UNAUTHORIZED", mode: declaration.mode };
   }
   if (
     !declaration.tenant_id?.trim() ||

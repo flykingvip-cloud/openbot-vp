@@ -107,6 +107,23 @@ function walkKeys(value: unknown, keys: string[] = []): string[] {
   return keys;
 }
 
+const NETWORK_URL_TOKEN = /\b(?:https?|wss|ftp):\/\//i;
+
+function containsNetworkUrlToken(value: unknown): boolean {
+  if (typeof value === "string") {
+    return NETWORK_URL_TOKEN.test(value);
+  }
+  if (Array.isArray(value)) {
+    return value.some((item) => containsNetworkUrlToken(item));
+  }
+  if (value && typeof value === "object") {
+    return Object.values(value as Record<string, unknown>).some((child) =>
+      containsNetworkUrlToken(child),
+    );
+  }
+  return false;
+}
+
 function isValidRequest(request: ModelsEmbedRequest): boolean {
   if (!request.tenant_id?.trim()) {
     return false;
@@ -137,6 +154,9 @@ export function createControlledModelsEmbedProxy(options?: {
         return { ok: false, reason: "PROXY_DISABLED" };
       }
       if (walkKeys(request).some((key) => FORBIDDEN_CREDENTIAL_KEYS.has(key))) {
+        return { ok: false, reason: "CREDENTIAL_FORBIDDEN" };
+      }
+      if (containsNetworkUrlToken(request)) {
         return { ok: false, reason: "CREDENTIAL_FORBIDDEN" };
       }
       if (!isValidRequest(request)) {
