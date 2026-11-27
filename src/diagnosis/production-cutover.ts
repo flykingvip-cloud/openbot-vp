@@ -40,10 +40,23 @@ export const DIAGNOSIS_PRODUCTION_CUTOVER_SCHEMA_VERSION = 1 as const;
 
 export const DIAGNOSIS_DAIBAI_DELIVERY_ENABLED = DIAGNOSIS_WRITE_POLICY.daibaiDelivery;
 export const DIAGNOSIS_REMEDIATION_EXECUTION_ENABLED = false;
+/** Canary transport pin only (tenant `001`, session `diagnosis:canary:daibai`).
+ * Not a live Path B grant: DIAGNOSIS_DAIBAI_DELIVERY_ENABLED still follows the
+ * closed-by-default write policy. Not a recorded cutover approval either;
+ * `daibai_delivery_allowlist` stays on DIAGNOSIS_PRODUCTION_PENDING_CUTOVER_APPROVALS
+ * until a human cutover approval is recorded.
+ */
 export const DIAGNOSIS_P24_5_DAIBAI_ALLOWLISTED = true;
 export const DIAGNOSIS_P24_5_LIVE_SESSION_KEY = "diagnosis:canary:daibai" as const;
 export const DIAGNOSIS_P24_5_CANARY_TENANT = "001" as const;
 
+/** `default` is the designed-safe / rollback baseline. This pack keeps every
+ * default false (enforced by production-cutover and preflight tests).
+ * `value` is the current compile-time or write-policy-resolved state.
+ * After O1.1, adapters and reportApi values are true; daibaiDelivery follows
+ * write-policy (code default closed); remediation stays false.
+ * Do not read `default: false` as a claim that `value` is false.
+ */
 export const DIAGNOSIS_PRODUCTION_GATES = {
   adapters: {
     name: "DIAGNOSIS_PRODUCTION_ADAPTERS_ENABLED",
