@@ -3,6 +3,7 @@
  *
  * Safe defaults:
  * - OPENBOT_SKILL_AUTO_EVOLUTION unset / invalid / off → disabled
+ * - OPENBOT_SKILL_AUTO_ALLOW_AGENTS unset / empty / whitespace-only / parse-empty → allow no agents
  * - Mutations require governance mode === "auto" AND skill-auto explicitly on
  * - Never auto-approves candidates (human RPC / operator.approvals only)
  * - Only advances jobs with explicit autoInstallIntent ownership
@@ -10,7 +11,7 @@
  *
  * Env:
  * - OPENBOT_SKILL_AUTO_EVOLUTION=on|off  (default: off)
- * - OPENBOT_SKILL_AUTO_ALLOW_AGENTS=id1,id2  (optional allowlist)
+ * - OPENBOT_SKILL_AUTO_ALLOW_AGENTS=id1,id2  (allowlist; empty/unset = allow none)
  * - OPENBOT_SKILL_AUTO_MIN_* thresholds (re-checked on every retry)
  */
 
@@ -110,16 +111,17 @@ function minSuccessRate(): number {
   return Number.isFinite(n) && n > 0 && n <= 1 ? n : DEFAULT_MIN_SUCCESS_RATE;
 }
 
-function agentAllowlist(): Set<string> | null {
+function agentAllowlist(): Set<string> {
   const raw = (process.env.OPENBOT_SKILL_AUTO_ALLOW_AGENTS ?? "").trim();
   if (!raw) {
-    return null;
+    return new Set();
   }
-  const ids = raw
-    .split(/[,;\s]+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  return ids.length > 0 ? new Set(ids) : null;
+  return new Set(
+    raw
+      .split(/[,;\s]+/)
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );
 }
 
 function emptyResult(enabled: boolean, mutationsAllowed: boolean): SkillAutoEvolutionResult {
@@ -156,10 +158,7 @@ function persistJob(jobs: Record<string, SkillAutoInstallJob>, job: SkillAutoIns
 
 function isAgentAllowed(agentId: string): boolean {
   const allow = agentAllowlist();
-  if (!allow) {
-    return true;
-  }
-  return allow.has(agentId);
+  return allow.size > 0 && allow.has(agentId);
 }
 
 function isInstalledOnAgent(agentId: string, skillId: string): boolean {

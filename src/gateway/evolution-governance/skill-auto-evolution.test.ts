@@ -40,6 +40,10 @@ const {
 const { writeGovernancePersistedState, readGovernancePersistedState } =
   await import("./persistent-store.js");
 
+function allowAgents(...ids: string[]): void {
+  process.env.OPENBOT_SKILL_AUTO_ALLOW_AGENTS = ids.join(",");
+}
+
 function seedCandidate(agentId: string) {
   const hash = structureHashFromText("# Auto evo\n1. a\n- b");
   const out = structureHashFromText("# Out\n- ok");
@@ -96,6 +100,7 @@ describe("skill auto-evolution", () => {
   });
 
   it("does not auto-approve or install without autoInstallIntent", () => {
+    allowAgents("robot-no-intent");
     const candidate = seedCandidate("robot-no-intent");
     approvePatternCandidate(candidate.candidateId, {
       approvedBy: "ops-1",
@@ -132,6 +137,7 @@ describe("skill auto-evolution", () => {
   });
 
   it("assist mode records an install intent for a ready job without installing it", () => {
+    allowAgents("robot-assist-ready");
     const candidate = seedCandidate("robot-assist-ready");
     approvePatternCandidate(candidate.candidateId, {
       approvedBy: "ops",
@@ -177,6 +183,7 @@ describe("skill auto-evolution", () => {
   });
 
   it("after human approve+intent: publish → finalize → install when dual gates on", () => {
+    allowAgents("robot-auto");
     const candidate = seedCandidate("robot-auto");
     approvePatternCandidate(candidate.candidateId, {
       approvedBy: "ops",
@@ -198,6 +205,7 @@ describe("skill auto-evolution", () => {
   });
 
   it("does not take over historical published drafts without a job", () => {
+    allowAgents("robot-manual-pub");
     const candidate = seedCandidate("robot-manual-pub");
     approvePatternCandidate(candidate.candidateId, {
       approvedBy: "ops",
@@ -219,6 +227,7 @@ describe("skill auto-evolution", () => {
   });
 
   it("retries only owned incomplete jobs after re-validation", () => {
+    allowAgents("robot-retry");
     const candidate = seedCandidate("robot-retry");
     approvePatternCandidate(candidate.candidateId, {
       approvedBy: "ops",
@@ -257,6 +266,7 @@ describe("skill auto-evolution", () => {
   });
 
   it("cancel aborts incomplete job and prevents further install", () => {
+    allowAgents("robot-cancel");
     const candidate = seedCandidate("robot-cancel");
     approvePatternCandidate(candidate.candidateId, {
       approvedBy: "ops",
@@ -278,6 +288,7 @@ describe("skill auto-evolution", () => {
   });
 
   it("re-validation cancels job when quality gates no longer met", () => {
+    allowAgents("robot-reval");
     const candidate = seedCandidate("robot-reval");
     approvePatternCandidate(candidate.candidateId, {
       approvedBy: "ops",
@@ -302,6 +313,7 @@ describe("skill auto-evolution", () => {
   });
 
   it("re-validation cancels when approvedBy is missing", () => {
+    allowAgents("robot-no-approver");
     const candidate = seedCandidate("robot-no-approver");
     approvePatternCandidate(candidate.candidateId, {
       approvedBy: "ops",
@@ -325,6 +337,8 @@ describe("skill auto-evolution", () => {
   });
 
   it("re-validation cancels on job/candidate ownership mismatch", () => {
+    // Include the corrupted job agent so the ownership check, not the allowlist, is under test.
+    allowAgents("robot-own", "wrong-agent");
     const candidate = seedCandidate("robot-own");
     approvePatternCandidate(candidate.candidateId, {
       approvedBy: "ops",
@@ -387,6 +401,75 @@ describe("skill auto-evolution", () => {
     expect(
       readGovernancePersistedState().skillAutoJobs?.[candidate.candidateId]?.cancelReason,
     ).toBe("ownership-mismatch");
+  });
+
+  it("denies every agent when the allowlist is unset (fail-closed)", () => {
+    const candidate = seedCandidate("robot-empty-allow");
+    approvePatternCandidate(candidate.candidateId, {
+      approvedBy: "ops",
+      autoInstallIntent: true,
+    });
+    const enrolled = enrollSkillAutoInstall({
+      candidateId: candidate.candidateId,
+      enrolledBy: "ops",
+    });
+    expect(enrolled).toEqual(
+      expect.objectContaining({ ok: false, reason: "agent-not-allowlisted" }),
+    );
+
+    const pass = runSkillAutoEvolutionPass();
+    expect(pass.mutationsAllowed).toBe(true);
+    expect(pass.published).toBe(0);
+    expect(pass.installed).toBe(0);
+    expect(pass.skipped).toBeGreaterThanOrEqual(1);
+    expect(listRobotSkillAssets("robot-empty-allow")).toEqual([]);
+  });
+
+  it("denies every agent when the allowlist is empty or parse-empty", () => {
+    for (const raw of ["", "   ", ",", ",;,"]) {
+      process.env.OPENBOT_SKILL_AUTO_ALLOW_AGENTS = raw;
+      const candidate = seedCandidate(`robot-parse-empty-${JSON.stringify(raw)}`);
+      approvePatternCandidate(candidate.candidateId, {
+        approvedBy: "ops",
+        autoInstallIntent: true,
+      });
+      const enrolled = enrollSkillAutoInstall({
+        candidateId: candidate.candidateId,
+        enrolledBy: "ops",
+      });
+      expect(enrolled).toEqual(
+        expect.objectContaining({ ok: false, reason: "agent-not-allowlisted" }),
+      );
+    }
+  });
+
+  it("installs only agents named on the allowlist", () => {
+    allowAgents("robot-allowed");
+    const allowed = seedCandidate("robot-allowed");
+    const denied = seedCandidate("robot-denied");
+    approvePatternCandidate(allowed.candidateId, {
+      approvedBy: "ops",
+      autoInstallIntent: true,
+    });
+    approvePatternCandidate(denied.candidateId, {
+      approvedBy: "ops",
+      autoInstallIntent: true,
+    });
+
+    const deniedEnroll = enrollSkillAutoInstall({
+      candidateId: denied.candidateId,
+      enrolledBy: "ops",
+    });
+    expect(deniedEnroll).toEqual(
+      expect.objectContaining({ ok: false, reason: "agent-not-allowlisted" }),
+    );
+
+    const pass = runSkillAutoEvolutionPass();
+    expect(pass.installed).toBeGreaterThanOrEqual(1);
+    expect(pass.skillIds.length).toBeGreaterThanOrEqual(1);
+    const skillId = pass.skillIds[0];
+    expect(listRobotSkillAssets("robot-allowed").some((r) => r.id === skillId)).toBe(true);
+    expect(listRobotSkillAssets("robot-denied")).toEqual([]);
   });
 
   it("no-ops when skill auto is off", () => {
