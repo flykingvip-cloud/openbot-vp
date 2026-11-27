@@ -26,6 +26,8 @@ export type PersistedOperation<T = unknown> = {
   startedAtMs: number;
   completedAtMs?: number;
   result?: T;
+  /** Host-only stored-result read binding; never taken from model parameters. */
+  hostReadBinding?: string;
   wait?: { condition: WaitCondition; nextQueryAtMs: number; attempts: number };
 };
 
