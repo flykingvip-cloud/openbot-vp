@@ -62,15 +62,29 @@
           "type": "integer"
         },
         "system": {
-          "enum": ["openbot", "knowledge_sdk", "aor", "cogniweave"],
+          "enum": [
+            "openbot",
+            "knowledge_sdk",
+            "aor",
+            "cogniweave"
+          ],
           "type": "string"
         },
         "units": {
-          "enum": ["tokens", "ms", "calls"],
+          "enum": [
+            "tokens",
+            "ms",
+            "calls"
+          ],
           "type": "string"
         }
       },
-      "required": ["system", "component", "units", "quantity"],
+      "required": [
+        "system",
+        "component",
+        "units",
+        "quantity"
+      ],
       "type": "object"
     },
     "policy_generation": {

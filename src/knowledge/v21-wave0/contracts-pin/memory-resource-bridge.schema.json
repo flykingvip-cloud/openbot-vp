@@ -21,7 +21,11 @@
           "type": "integer"
         },
         "reason_code": {
-          "enum": ["ACCESS_REVOKED", "OWNER_DISABLED", "POLICY_GENERATION_STALE"],
+          "enum": [
+            "ACCESS_REVOKED",
+            "OWNER_DISABLED",
+            "POLICY_GENERATION_STALE"
+          ],
           "type": "string"
         },
         "tenant_id": {
@@ -63,11 +67,21 @@
           "type": "string"
         },
         "status": {
-          "enum": ["success", "failed", "timeout", "missing"],
+          "enum": [
+            "success",
+            "failed",
+            "timeout",
+            "missing"
+          ],
           "type": "string"
         }
       },
-      "required": ["channel", "status", "receipt_hash", "hash_algorithm"],
+      "required": [
+        "channel",
+        "status",
+        "receipt_hash",
+        "hash_algorithm"
+      ],
       "type": "object"
     },
     "MemoryDiscoveryMetadata": {

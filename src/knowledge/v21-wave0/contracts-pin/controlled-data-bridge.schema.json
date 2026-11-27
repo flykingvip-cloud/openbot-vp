@@ -33,7 +33,11 @@
           "type": "integer"
         },
         "query_kind": {
-          "enum": ["structured_select", "object_get", "snapshot_read"],
+          "enum": [
+            "structured_select",
+            "object_get",
+            "snapshot_read"
+          ],
           "type": "string"
         },
         "tenant_id": {
@@ -173,7 +177,11 @@
       },
       "query_kind": {
         "description": "structured_select is a named allowlisted query, never free-form Text-to-SQL.",
-        "enum": ["structured_select", "object_get", "snapshot_read"],
+        "enum": [
+          "structured_select",
+          "object_get",
+          "snapshot_read"
+        ],
         "type": "string"
       },
       "tenant_id": {
@@ -191,7 +199,11 @@
           "const": "sha256"
         },
         "profile": {
-          "enum": ["none", "standard", "strict"],
+          "enum": [
+            "none",
+            "standard",
+            "strict"
+          ],
           "type": "string"
         },
         "receipt_hash": {
@@ -203,7 +215,12 @@
           "type": "string"
         }
       },
-      "required": ["receipt_id", "profile", "hash_algorithm", "receipt_hash"],
+      "required": [
+        "receipt_id",
+        "profile",
+        "hash_algorithm",
+        "receipt_hash"
+      ],
       "type": "object"
     },
     "policy_generation": {
@@ -216,11 +233,19 @@
       "additionalProperties": false,
       "properties": {
         "field": {
-          "enum": ["org_id", "tenant_id", "owner_id", "classification"],
+          "enum": [
+            "org_id",
+            "tenant_id",
+            "owner_id",
+            "classification"
+          ],
           "type": "string"
         },
         "op": {
-          "enum": ["eq", "in"],
+          "enum": [
+            "eq",
+            "in"
+          ],
           "type": "string"
         },
         "value": {
@@ -229,7 +254,11 @@
           "type": "string"
         }
       },
-      "required": ["field", "op", "value"],
+      "required": [
+        "field",
+        "op",
+        "value"
+      ],
       "type": "object"
     },
     "tombstone": {
@@ -240,10 +269,16 @@
         },
         "revoked_at": {
           "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         }
       },
-      "required": ["active", "revoked_at"],
+      "required": [
+        "active",
+        "revoked_at"
+      ],
       "type": "object"
     }
   },

@@ -30,6 +30,7 @@ const formatIgnoredPrefixes = [
   ".kiro/specs/gateway-plugins-monolith-decomposition/baseline/",
   "docs/zh-CN/",
   "packages/constitutional-contracts/",
+  "src/knowledge/v21-wave0/contracts-pin/",
   "apps/",
   "assets/",
   "dist/",
