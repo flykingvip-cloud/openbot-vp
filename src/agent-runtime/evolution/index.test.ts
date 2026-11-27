@@ -8,7 +8,7 @@ describe("isEvolutionEnabled", () => {
     delete process.env.OPENBOT_EVOLUTION_SOME_NEW_FLAG;
   });
 
-  it('defaults "unified-lifecycle" to true', () => {
+  it('treats retired "unified-lifecycle" as the remaining trunk path', () => {
     expect(isEvolutionEnabled("unified-lifecycle")).toBe(true);
   });
 
@@ -16,25 +16,26 @@ describe("isEvolutionEnabled", () => {
     expect(isEvolutionEnabled("nonexistent-flag")).toBe(false);
   });
 
-  it("env override can disable a default-on flag", () => {
+  it("does not honor OPENBOT_EVOLUTION_UNIFIED_LIFECYCLE as a kill switch", () => {
     process.env.OPENBOT_EVOLUTION_UNIFIED_LIFECYCLE = "0";
-    expect(isEvolutionEnabled("unified-lifecycle")).toBe(false);
+    expect(isEvolutionEnabled("unified-lifecycle")).toBe(true);
   });
 
-  it("env override can enable a flag", () => {
+  it("ignores OPENBOT_EVOLUTION_UNIFIED_LIFECYCLE=1 as well", () => {
     process.env.OPENBOT_EVOLUTION_UNIFIED_LIFECYCLE = "1";
     expect(isEvolutionEnabled("unified-lifecycle")).toBe(true);
   });
 
-  it("legacy OPENCLAW_ prefix is honored", () => {
-    process.env.OPENCLAW_EVOLUTION_UNIFIED_LIFECYCLE = "0";
-    expect(isEvolutionEnabled("unified-lifecycle")).toBe(false);
-  });
-
-  it("OPENBOT_ takes precedence over OPENCLAW_", () => {
-    process.env.OPENBOT_EVOLUTION_UNIFIED_LIFECYCLE = "1";
+  it("does not honor the legacy OPENCLAW_ prefix as a kill switch", () => {
     process.env.OPENCLAW_EVOLUTION_UNIFIED_LIFECYCLE = "0";
     expect(isEvolutionEnabled("unified-lifecycle")).toBe(true);
+  });
+
+  it("still honors env overrides for live (non-retired) flags", () => {
+    process.env.OPENBOT_EVOLUTION_SOME_NEW_FLAG = "1";
+    expect(isEvolutionEnabled("some-new-flag")).toBe(true);
+    process.env.OPENBOT_EVOLUTION_SOME_NEW_FLAG = "0";
+    expect(isEvolutionEnabled("some-new-flag")).toBe(false);
   });
 });
 
@@ -43,14 +44,14 @@ describe("listEvolutionFlags", () => {
     delete process.env.OPENBOT_EVOLUTION_UNIFIED_LIFECYCLE;
   });
 
-  it("returns all known flags with resolved values", () => {
+  it("does not advertise retired unified-lifecycle as a live flag", () => {
     const flags = listEvolutionFlags();
-    expect(flags).toHaveProperty("unified-lifecycle", true);
+    expect(flags).not.toHaveProperty("unified-lifecycle");
   });
 
-  it("reflects env overrides", () => {
+  it("is unaffected by OPENBOT_EVOLUTION_UNIFIED_LIFECYCLE", () => {
     process.env.OPENBOT_EVOLUTION_UNIFIED_LIFECYCLE = "0";
     const flags = listEvolutionFlags();
-    expect(flags["unified-lifecycle"]).toBe(false);
+    expect(flags).not.toHaveProperty("unified-lifecycle");
   });
 });
