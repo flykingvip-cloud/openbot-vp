@@ -5,7 +5,7 @@
   "files": [
     {
       "path": "README.md",
-      "sha256": "fa1f205290076cdfe09262ba62a8b30a422909b3b39a1cc5a139e4487bcf18d2"
+      "sha256": "ff178c5db940ef3630549a4bffe865b9f4f13af3d1089b7527ae122e912ae395"
     },
     {
       "path": "ai-execution-trace.schema.json",
@@ -65,7 +65,7 @@
     },
     {
       "path": "status.json",
-      "sha256": "05301377f06be4d68e1dbbdcea294c26f97dd21f1e826a20b83b2055c90559f4"
+      "sha256": "bcb4c217186937df327bc9be5a08f747319f470317966711e7ccd0532da33684"
     },
     {
       "path": "tsconfig.json",
@@ -73,8 +73,8 @@
     },
     {
       "path": "validate.py",
-      "sha256": "b550bdc250a2d3f8182650296ffcfd69667a4bb415e7d0d9f9fc98795cfa4fbe"
+      "sha256": "3f376ad2d76bd1c2d1139af62d503efaa253c8e8d33258c88549ab51637243e0"
     }
   ],
-  "status": "DRAFT_WAVE_V21_0_NOT_FROZEN"
+  "status": "FROZEN_V21_REUSE_V1"
 }

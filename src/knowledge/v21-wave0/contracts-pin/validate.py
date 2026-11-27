@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stdlib validator and deterministic SHA-256 manifest builder for Wave-V21-0 contracts."""
+"""Stdlib validator and deterministic SHA-256 manifest builder for frozen v21-reuse-v1 contracts."""
 from __future__ import annotations
 import hashlib, json, re, sys
 from pathlib import Path
@@ -199,12 +199,18 @@ def manifest_entries(root=ROOT):
     return entries
 
 
+FROZEN_STATUS = 'FROZEN_V21_REUSE_V1'
+
+
 def write_manifest(root=ROOT):
     entries = manifest_entries(root)
+    status = json.loads((root / 'status.json').read_text())
+    if status.get('status') != FROZEN_STATUS:
+        raise SystemExit('status.json is not ' + FROZEN_STATUS)
     payload = {
         'algorithm': 'sha256',
         'canonicalization': 'POSIX path, stable sort, SHA-256 of raw file bytes, no newline rewriting; exclude manifest, node_modules, ts-generated, package-lock.json, __pycache__, *.pyc, and dotfiles',
-        'status': 'DRAFT_WAVE_V21_0_NOT_FROZEN',
+        'status': FROZEN_STATUS,
         'files': [{'path': path, 'sha256': digest} for path, digest in entries],
         'file_count': len(entries),
     }
@@ -239,7 +245,7 @@ def main():
     results = run_vectors()
     manifest, manifest_sha = write_manifest()
     summary = dict(
-        status='DRAFT_CONTRACTS_VALIDATED_NOT_FORMAL_ACCEPTANCE',
+        status='FROZEN_V21_REUSE_V1_VALIDATED_NOT_FORMAL_ACCEPTANCE',
         vectors=len(results),
         positive=sum(1 for r in results if r['expect'] == 'accept'),
         negative=sum(1 for r in results if r['expect'] == 'reject'),

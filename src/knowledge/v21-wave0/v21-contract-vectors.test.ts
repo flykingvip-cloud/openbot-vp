@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { evaluateVector, type Vector } from "./contract-vector-runner.js";
 
 const PIN_DIR = join(dirname(fileURLToPath(import.meta.url)), "contracts-pin");
-const EXPECTED_MANIFEST_SHA256 = "6da567e0f376fee7b6b2b033e6666cbd5eba7bc3d67b93089e49e6edb759906d";
+const EXPECTED_MANIFEST_SHA256 = "212537fd41bd4cc4d9d7343cacafaea225ee98b6586df716bf036a397cb2a382";
 const VECTOR_FILES = [
   "model-adapter.vectors.json",
   "controlled-data-bridge.vectors.json",

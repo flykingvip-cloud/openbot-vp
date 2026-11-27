@@ -1,6 +1,6 @@
 {
   "work_item": "WAVE-V21-0-VA-1",
-  "status": "DRAFT_WAVE_V21_0_NOT_FROZEN",
+  "status": "FROZEN_V21_REUSE_V1",
   "schema_v7_ddl_authorized": false,
   "schema_v8_v9_ddl_authorized": false,
   "final_alignment_frozen": false,

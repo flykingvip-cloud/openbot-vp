@@ -1,4 +1,8 @@
-# contracts/v21-reuse-v1 — DRAFT_WAVE_V21_0_NOT_FROZEN
+# contracts/v21-reuse-v1 — FROZEN_V21_REUSE_V1
+
+Wave-V21-1 W1A-1 promoted this pack from `DRAFT_WAVE_V21_0_NOT_FROZEN` to `FROZEN_V21_REUSE_V1`.
+Schema v7/v8/v9 DDL, final alignment freeze, and production cutover remain unauthorized.
+Formal T-01–T-27 is still `NOT_RUN_NOT_ACCEPTED`. `/v3/*` stays unmounted in the production HTTP app.
 
 Isolated Wave-V21-0 contract pack. This directory is NOT part of the historical M1 frozen 28-asset tree and must not rewrite `verify_frozen.py` hashes or `m1-freeze-manifest.json`.
 
