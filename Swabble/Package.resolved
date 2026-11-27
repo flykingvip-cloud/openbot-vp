@@ -1,13 +1,13 @@
 {
-  "originHash" : "5b0808280fb91476bad80d58d914d3e505a6591be788f7ee76dea6eef0ba4bfc",
+  "originHash" : "04c19c85ebd8599689e4511bee1bbb7c93b8af579c650e42cf092b9c504a063a",
   "pins" : [
     {
       "identity" : "commander",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/steipete/Commander.git",
       "state" : {
-        "revision" : "3f5a3cb1f19ce7ca79fdc2111a09dfb3da200c1c",
-        "version" : "0.3.0"
+        "revision" : "e8572b84fae01c250d2d54396825a1adf052cb51",
+        "version" : "0.3.1"
       }
     },
     {
@@ -24,8 +24,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-testing",
       "state" : {
-        "revision" : "288a2328ff846444543d58054a9dec00b1a91efc",
-        "version" : "6.4.2"
+        "revision" : "ba0861fb203553caf2e21dd0479d2c0169307021",
+        "version" : "6.4.3"
       }
     }
   ],
