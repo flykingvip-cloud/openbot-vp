@@ -111,12 +111,14 @@ describe("control-plane Application shadow (E5)", () => {
     setEffectVerifyMsForTests(null);
     setEvolutionGovernanceModeForTests("auto");
     setSkillAutoEvolutionForTests(true);
+    delete process.env.OPENBOT_SKILL_AUTO_ALLOW_AGENTS;
   });
 
   afterEach(() => {
     setGovernanceKillSwitch(false);
     setEvolutionGovernanceModeForTests(null);
     setSkillAutoEvolutionForTests(null);
+    delete process.env.OPENBOT_SKILL_AUTO_ALLOW_AGENTS;
     setEffectVerifyMsForTests(null);
     resetControlPlaneApplicationShadowForTests();
     resetPatternDetectionStoreForTests();
@@ -187,6 +189,7 @@ describe("control-plane Application shadow (E5)", () => {
   });
 
   it("skill-auto install writes a matching shadow while the live path still installs", () => {
+    process.env.OPENBOT_SKILL_AUTO_ALLOW_AGENTS = "robot-e5-auto";
     const candidate = seedSkillCandidate("robot-e5-auto");
     approvePatternCandidate(candidate.candidateId, {
       approvedBy: "ops",
@@ -207,6 +210,7 @@ describe("control-plane Application shadow (E5)", () => {
   });
 
   it("assist skill-auto does not install and writes no executed skill shadow", () => {
+    process.env.OPENBOT_SKILL_AUTO_ALLOW_AGENTS = "robot-e5-assist";
     setEvolutionGovernanceModeForTests("assist");
     const candidate = seedSkillCandidate("robot-e5-assist");
     approvePatternCandidate(candidate.candidateId, {

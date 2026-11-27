@@ -26,7 +26,7 @@
 1. 后台 **从不** 调用 `approvePatternCandidate`；审批必须经 `pattern-detection.approve`（operator.approvals）。
 2. 非法 env 值 **fail-closed**（关）。
 3. skill-auto=on 但治理仍是 assist → **不安装**（返回 `mutations-require-governance-auto`）。
-4. 可选 allowlist：`OPENBOT_SKILL_AUTO_ALLOW_AGENTS=agent1,agent2`。
+4. Agent allowlist 为必填：`OPENBOT_SKILL_AUTO_ALLOW_AGENTS=agent1,agent2`；未设、空值或解析后为空时 **不允许任何 agent**（fail-closed）。
 5. 安装过程写 durable `skillAutoJobs`（pending_publish → draft_created → finalized → installed / failed / cancelled），下轮可补偿重试。
 6. **只处理**有 `skillAutoJobs` 归属或候选 `autoInstallIntent=true` 的记录；**不会**接管历史上人工 publish 的 draft。
 7. 重试前重新校验：审批状态、质量阈值、策略版本、agent allowlist；失败则 **cancel** 作业。
@@ -46,7 +46,7 @@ Kill switch：`evolution-governance.set-kill-switch` 同时阻断治理动作与
 ```bash
 export OPENBOT_EVOLUTION_GOVERNANCE_MODE=auto
 export OPENBOT_SKILL_AUTO_EVOLUTION=on
-# 强烈建议限制 Agent
+# 必填：空名单不允许任何 agent
 export OPENBOT_SKILL_AUTO_ALLOW_AGENTS=prod-bot-a,prod-bot-b
 ```
 
@@ -56,7 +56,7 @@ export OPENBOT_SKILL_AUTO_ALLOW_AGENTS=prod-bot-a,prod-bot-b
 - Actions 页可勾选 **批准后自动安装**（`autoInstallIntent`），并可 **登记/取消** skill-auto 作业、查看 `skillAutoJobs`
 - critical 扫描阻断已启用（skill-auto 路径比 CLI warn-and-continue 更严）
 - 安装后进入 `health_watch`：样本足够且成功率低于阈值时自动 disable → `rolled_back`
-- 租户/RBAC 与 shared-agent 写门禁已就位；全量生产开启前仍建议限制 `OPENBOT_SKILL_AUTO_ALLOW_AGENTS`
+- 租户/RBAC 与 shared-agent 写门禁已就位；开启 skill-auto 前必须设置非空的 `OPENBOT_SKILL_AUTO_ALLOW_AGENTS`，空名单不会放行全部 agent
 
 ## 常用 RPC
 
