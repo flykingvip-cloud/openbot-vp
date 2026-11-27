@@ -1,5 +1,8 @@
 import { createReadTool } from "@earendil-works/pi-coding-agent";
-import { wrapToolWithBeforeToolCallHook } from "../agent-runtime/capabilities/index.js";
+import {
+  resolveStoredResultReadHook,
+  wrapToolWithBeforeToolCallHook,
+} from "../agent-runtime/capabilities/index.js";
 import type { TaskCompletionBinding } from "../agent-runtime/contracts/task-binding.js";
 import { captureTaskActionBoundary } from "../agent-runtime/state/task-action.js";
 import type { OpenBotConfig } from "../config/config.js";
@@ -881,6 +884,13 @@ export function createOpenClawCodingTools(options?: {
   // hiding browser on a public-fetch turn.
   const policyFilteredCapabilities = withProviderSafeNames.map((tool) => tool.name);
   const effectAuthority = createChatSendWriteAuthorityRecheck(options);
+  const storedResultRead = resolveStoredResultReadHook({
+    sessionKey: options?.sessionKey,
+    sessionId: options?.sessionId,
+    runId: options?.runId,
+    taskId: options?.taskExecutionBinding?.taskId,
+    executionAttempt: options?.taskExecutionBinding?.executionAttempt,
+  });
   const taskBoundary =
     options?.sessionFile && options.taskExecutionBinding
       ? captureTaskActionBoundary(options.sessionFile, options.taskExecutionBinding)
@@ -897,6 +907,8 @@ export function createOpenClawCodingTools(options?: {
               }
             }
           : undefined,
+      authorizeStoredResultRead: storedResultRead.authorizeStoredResultRead,
+      hostReadBinding: storedResultRead.hostReadBinding,
       agentId,
       sessionKey: options?.sessionKey,
       sessionId: options?.sessionId,

@@ -6,6 +6,10 @@ import { writeJsonAtomic } from "../../../infra/json-files.js";
 import { acquireFileLock } from "../../../plugin-sdk/file-lock.js";
 import type { WaitCondition } from "../../contracts/execution-protocol.js";
 import type { PersistedOperation } from "../../contracts/operation.js";
+import {
+  exposeStoredHostReadBinding,
+  stampHostReadBindingOnSuccess,
+} from "../stored-result-read-binding.js";
 import { assertFencingGenerationMatch, nextFencingGeneration } from "./fencing.js";
 
 /** No automatic retries: lack of a result is not proof the external write failed. */
@@ -129,6 +133,7 @@ async function executeOwnedToolOperation<T>(params: {
       if (prior.scopeFingerprint !== scope?.fingerprint) {
         throw new Error("Operation replay scope mismatch");
       }
+      exposeStoredHostReadBinding(prior.hostReadBinding);
       return prior.result as T;
     }
     // A crashed prepared owner is NOT evidence of a completed admission refusal.
@@ -198,11 +203,13 @@ async function executeOwnedToolOperation<T>(params: {
       await writeJsonAtomic(params.file, { ...record, state: "unknown", result });
       return result;
     }
+    const hostReadBinding = stampHostReadBindingOnSuccess(record.hostReadBinding);
     await writeJsonAtomic(params.file, {
       ...record,
       state: "succeeded",
       completedAtMs: Date.now(),
       result,
+      ...(hostReadBinding ? { hostReadBinding } : {}),
     });
     return result;
   } catch (error) {

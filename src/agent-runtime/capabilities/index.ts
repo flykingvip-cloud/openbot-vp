@@ -2,6 +2,7 @@
 export {
   assertToolResultReplayAllowed,
   createBeforeEffectGate,
+  getToolStoredResultHostReadBinding,
   runBeforeToolCallHook,
   wrapToolWithBeforeToolCallHook,
   isToolWrappedWithBeforeToolCallHook,
@@ -9,6 +10,11 @@ export {
   __testing,
 } from "./invocation/before-call.js";
 export type { EffectGateInput, HookContext } from "./invocation/before-call.js";
+export {
+  createAuthorizeStoredResultRead,
+  resolveStoredResultReadHook,
+} from "./invocation/authorize-stored-result-read.js";
+export type { StoredResultReadDecision } from "./invocation/authorize-stored-result-read.js";
 export { declareCapability } from "./catalog.js";
 export type { CapabilityDeclaration } from "../contracts/capability.js";
 

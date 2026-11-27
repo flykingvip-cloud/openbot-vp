@@ -24,6 +24,11 @@ export type HookContext = {
   authorizeStoredResultRead?: (
     params: unknown,
   ) => Promise<"allowed" | "denied" | "unverifiable"> | "allowed" | "denied" | "unverifiable";
+  /**
+   * Host-only stored-result read binding attached by the trusted tool factory.
+   * Never taken from model parameters. Survives later enumerable wraps.
+   */
+  hostReadBinding?: string;
   /** Ownership / fencing verification evaluated before any irreversible external effect. */
   fencingCheck?: () => Promise<void> | void;
   beforeEffect?: (params: unknown) => Promise<void> | void;
@@ -45,6 +50,7 @@ type HookOutcome = { blocked: true; reason: string } | { blocked: false; params:
 const log = createSubsystemLogger("agents/tools");
 const BEFORE_TOOL_CALL_WRAPPED = Symbol("beforeToolCallWrapped");
 const RESULT_REPLAY_GUARD = Symbol("toolResultReplayGuard");
+const STORED_RESULT_HOST_READ_BINDING = Symbol("storedResultHostReadBinding");
 
 export type EffectGateInput = {
   taskBoundary?: TaskActionBoundary;
@@ -438,7 +444,19 @@ export function wrapToolWithBeforeToolCallHook(
     value: true,
     enumerable: true,
   });
+  if (ctx?.hostReadBinding?.trim()) {
+    Object.defineProperty(wrappedTool, STORED_RESULT_HOST_READ_BINDING, {
+      enumerable: true,
+      value: ctx.hostReadBinding.trim(),
+    });
+  }
   return wrappedTool;
+}
+
+export function getToolStoredResultHostReadBinding(tool: AnyAgentTool): string | undefined {
+  const taggedTool = tool as unknown as Record<symbol, unknown>;
+  const binding = taggedTool[STORED_RESULT_HOST_READ_BINDING];
+  return typeof binding === "string" && binding.trim() ? binding.trim() : undefined;
 }
 
 export function isToolWrappedWithBeforeToolCallHook(tool: AnyAgentTool): boolean {
