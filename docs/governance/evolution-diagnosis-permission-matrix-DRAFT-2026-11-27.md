@@ -1,0 +1,147 @@
+# DRAFT — Evolution / Diagnosis governance permission matrix and auto-adjust whitelist
+
+**Status: DRAFT FOR REVIEW. This is not production policy.**
+
+This page inventories what the current tree already does. It does **not** create a new governance engine, flip a flag, widen a production whitelist, or authorize any new capability. Merging this document must not be treated as approval to enable anything, to set `OPENBOT_GOVERNANCE_*_MODE=enforced`, or to change `OPENBOT_EVOLUTION_*` / `OPENBOT_DIAGNOSIS_*` defaults.
+
+Baseline for this draft: `origin/main` `d20d7f7cd45199da0b68d9623336d4e69c999223` (2026-11-27 20:51:21 +0800 Asia/Shanghai). Live host environment values were **not** re-read for this draft; code defaults must not be substituted for deployed config (see `docs/audits/2026-11-01-closed-loop-isolation-contract.md`).
+
+Related existing material (reused, not replaced):
+
+- Process-only governance admission, still never a code-default change: [`enforced-admission-checklist.md`](./enforced-admission-checklist.md), [`shadow-staging-runbook.md`](./shadow-staging-runbook.md)
+- Diagnosis × evolution confirmation doors (design, 2026-09-19): [`docs/design/openbot-diagnosis-evolution-fusion-plan-2026-09-19.md`](../design/openbot-diagnosis-evolution-fusion-plan-2026-09-19.md) §3.5
+- Diagnosis write policy: `src/diagnosis/write-policy.ts`
+- Evolution flag map: `src/agent-runtime/evolution/index.ts`
+- Evolution governance mode: `src/gateway/evolution-governance/mode.ts`
+- Soft/observe digital-employee loop: `src/gateway/evolution-control/soft-observe-dh-loop.ts`
+- Skill auto-evolution: `src/gateway/evolution-governance/skill-auto-evolution.ts`
+- Production cutover gates and canary constants: `src/diagnosis/production-cutover.ts`
+
+`docs/notes/openbot-batch3-version-permission-2026-10-21.md` is a **collaboration todolist** permission matrix (submit / accept / self_advance). It is not this Evolution / diagnosis matrix and is not extended here.
+
+This draft is filed under `docs/governance/` because that folder already holds process documents that explicitly refuse to change repository defaults. It is **not** added to `docs/docs.json` navigation, so it is not published as product documentation.
+
+---
+
+## 1. How to read this draft
+
+Each of the four permission classes below is a **write or mutation** class on the current Evolution / diagnosis paths. Fields:
+
+| Field | Meaning in this draft |
+| ----- | --------------------- |
+| Owner | Who the *code* currently treats as the actor or named approver. Not a newly assigned RACI. |
+| Scope | What the class may touch when its gates are open, and the current closed/open default. |
+| Version | The schema, payload, or policy version the path already binds, if any. |
+| Whitelist | The allowlist or canary pin the path actually uses today. Absence of a list is recorded; this draft does not invent a wider one. |
+
+Read-only diagnosis (tick, report query, adapters) is noted only where it could be mistaken for a write grant.
+
+---
+
+## 2. Four permission classes (current tree)
+
+### Class A — Self-evolution prescription confirm
+
+Maps to fusion-plan door A (`confirm_diagnose_prescription` / internal alias `confirm_diagnose_evolution`). Confirm writes a cron job; it does not trust a model-resubmitted schedule, wake text, or target (`src/diagnosis/diagnose-evolution-prescription.ts`).
+
+| Field | Current fact |
+| ----- | ------------ |
+| Owner | **本人确认:** `callerUserId === targetOwnerId` and `caller.tenantId === prescription.tenantId`. **代理确认:** an `APPROVED` grant bound to the same tenant, `targetPrincipal = targetOwnerId`, `targetAgent = targetAgentId`, and `allowedActions` including `schedule_diagnosis_prescription`. Enterprise-admin / steward role alone is not enough. Working-DNA `evolution-grant:` grants are rejected (`wdna_grant_forbidden`). Missing `callerUserId` fails closed. |
+| Scope | Four A-class purposes only: `identity`, `memory`, `learn_capability`, `review_tasks`. Startup gates: `OPENBOT_DIAGNOSIS_WRITES_ENABLED === "true"` **and** `OPENBOT_DIAGNOSIS_SELF_EVOLUTION_CONFIRM_ENABLED === "true"` (`resolveDiagnosisWritePolicy` in `src/diagnosis/write-policy.ts`). Any other master value (`1`, `TRUE`, empty) is closed. Changing the policy requires a gateway restart. Timed diagnosis tick forces `allowSelfEvolutionConfirm: false` even if a process later opens the env gates (`src/diagnosis/diagnose-tick.ts`). **Code default: closed** (`selfEvolutionConfirm: false`). |
+| Version | `EVOLUTION_PRESCRIPTION_SCHEMA_VERSION = 1`, `EVOLUTION_PRESCRIPTION_PAYLOAD_VERSION = 1` (`src/diagnosis/diagnose-professional-protocol.ts`). Confirm must resubmit `prescriptionContentHash`; confirm receipts record that hash. Prescription TTL is 24 hours. |
+| Whitelist | No separate production tenant/agent allowlist for this class. The dual env gate *is* the enablement control, and it is off. This draft does not propose adding tenants or agents. |
+
+### Class B — Diagnosis conversation delivery
+
+Injects a diagnosis action receipt into an existing conversation (`src/diagnosis/diagnose-action-dispatch.ts`, gated by `DIAGNOSIS_WRITE_POLICY.conversationDelivery`). Generic handoff with `omitReceipt: true` is out of this class and remains ungated by the write policy.
+
+| Field | Current fact |
+| ----- | ------------ |
+| Owner | No named approver in `DIAGNOSIS_PRODUCTION_GATES`. Enablement is process-env (platform operator sets both flags) plus the runtime caller context already required by dispatch (tenant / requester). This missing named owner is a gap, not a license to invent one in code. |
+| Scope | Receipt delivery only. Startup gates: master `OPENBOT_DIAGNOSIS_WRITES_ENABLED === "true"` **and** `OPENBOT_DIAGNOSIS_CONVERSATION_DELIVERY_ENABLED === "true"`. Tick forces `allowConversationDelivery: false`. **Code default: closed.** |
+| Version | Write policy itself has **no** schema or policy version (startup snapshot only). Requested-by records on the tick path use `schemaVersion: 1`, which is not a version pin for this write class. |
+| Whitelist | None in code beyond the dual env gate. This draft does not add a tenant or session allowlist, and does not treat the Da Bai canary pin as a conversation-delivery grant. |
+
+### Class C — Da Bai diagnosis delivery
+
+Live Da Bai transport and conversation live-chat binding (`src/diagnosis/production-cutover.ts`, `DIAGNOSIS_WRITE_POLICY.daibaiDelivery`).
+
+| Field | Current fact |
+| ----- | ------------ |
+| Owner | `DIAGNOSIS_PRODUCTION_GATES.daibaiDelivery.approver` is `platform_security+enterprise_admin`. Audit receipt in that table is still `pending_human_approval`. |
+| Scope | Enablement still requires master write approval **and** `OPENBOT_DIAGNOSIS_DAIBAI_DELIVERY_ENABLED === "true"`. **Code default: closed.** Even if that gate were opened, transport also requires a registered `chat.send` bridge, `DIAGNOSIS_CANARY_POLICY.started` (compile-time `true`), the canary session key, and the canary tenant. `pendingHumanApprovals` still lists `daibai_delivery_allowlist`. The cutover pack remains `rehearsalOnly: true`, `approvedForProductionCutover: false`. |
+| Version | `DIAGNOSIS_PRODUCTION_CUTOVER_SCHEMA_VERSION = 1`, increment `P11`. |
+| Whitelist | Compile-time canary pin: tenant `001`, session key `diagnosis:canary:daibai`, and `DIAGNOSIS_P24_5_DAIBAI_ALLOWLISTED = true`. That flag means the *transport helper* already treats this canary identity as allowlisted **if** the write gate is opened; it is **not** a live delivery grant, because `DIAGNOSIS_DAIBAI_DELIVERY_ENABLED` still follows the closed write policy. Tests in `src/diagnosis/write-policy.test.ts` show Path B remains unavailable despite `allowlisted: true`. This draft does **not** widen the tenant, session, or allowlist flag. |
+
+### Class D — Remediation execution and control-plane Apply
+
+Two tightly related mutation doors: the diagnosis remediation executor, and Evolution control-plane Apply / Verify.
+
+| Field | Current fact |
+| ----- | ------------ |
+| Owner | Remediation: `DIAGNOSIS_PRODUCTION_GATES.remediationExecution.approver` is `platform_security+enterprise_admin+employee`. Control-plane Apply / Verify: `decideEvolutionApplyAuthorization` in `src/gateway/evolution-control/apply-authorization.ts`. Platform identity is not tenant write authority without a delegation grant. Enterprise-admin may apply in-tenant enterprise objects, but member objects need a grant. A member may operate only an owned digital human; `apply` at `active` scope still needs an explicit grant. Diagnosis-sourced `active` / `shadow` Apply also requires an `improved` experiment with `applyApproval === "pending_apply_approval"` (`src/gateway/evolution-control/diagnosis-apply-gate.ts`). Opening an experiment from Da Bai requires a gateway session holding `operator.approvals` (fusion plan §3.5; covered by existing control-plane tests). |
+| Scope | `DIAGNOSIS_REMEDIATION_EXECUTION_ENABLED` is **hardcoded `false`** (not an env flag). `resolveProductionRemediationExecutor` returns the unavailable executor when closed; if forced open it still requires `allowlisted: true` and then fails with `remediation_live_executor_undeployed` ("P11 must not open a live remediation executor"). Soft/observe canary Apply is a separate loop (see §3) and is not this production executor. |
+| Version | Cutover schema v1 / increment P11 for the remediation gate. Authority grants carry `expiresAt` and `allowedActions` (`shadow` / `canary` / `active` / `apply` / `verify`). Skill-auto jobs, if ever enabled, snapshot `PATTERN_APPROVAL_POLICY_VERSION = "skill-auto-v1"` (`src/gateway/pattern-detection/store.ts`). |
+| Whitelist | Production remediation has no live executor and requires an explicit allowlist argument that this tree never supplies on a live path. `pendingHumanApprovals` still lists `remediation_executor_allowlist`. This draft does not introduce that list. |
+
+---
+
+## 3. Auto-adjust whitelist (draft inventory, not an enablement)
+
+"Auto-adjust" here means a process that can advance or mutate Evolution / diagnosis state without a fresh human click on that step. This table records **current** defaults and the **draft review posture**. It does not turn anything on and does not widen any list.
+
+| Mechanism | Current default in tree | Current whitelist / pin | Draft review posture (no change in this PR) |
+| --------- | ----------------------- | ----------------------- | ------------------------------------------- |
+| Diagnosis write policy (Classes A–C) | All three capabilities `false` unless both exact env flags are `"true"` | No extra agent list; Da Bai canary pin as in Class C | Keep closed. Do not treat canary constants as a production grant. |
+| Diagnosis remediation (Class D) | Hardcoded off; live executor undeployed | Explicit allowlist required; none deployed | Keep closed. Do not add an executor allowlist in repo defaults or this draft. |
+| `OPENBOT_EVOLUTION_GOVERNANCE_MODE` | `assist` (detect + anomalies/pending only; **does not mutate runtime**). `auto` may limit/pause/redirect/recover, but is still not a blanket Apply grant (`src/gateway/evolution-governance/mode.ts`). Production record language historically says `assist` (no global auto) in `deploy/production/RELEASE_RECORD.md`. | No tenant allowlist | Keep `assist` as the code default. Do not commit `auto`. |
+| `OPENBOT_SKILL_AUTO_EVOLUTION` | Off unless `on` / `1` / `true` / `yes`. Mutations also require governance mode `auto`, a live pipeline, no kill switch, human approval (never auto-approve), and an explicit `autoInstallIntent`. | `OPENBOT_SKILL_AUTO_ALLOW_AGENTS` is optional. **Empty list currently means all agents are eligible** if mutations are otherwise allowed (`isAgentAllowed` returns `true` when the set is `null`). Thresholds default to min independent 3, confidence 0.7, success rate 0.7. Policy version `skill-auto-v1`. | Keep the flag off. If a later review ever considers opening it, empty-allowlist-equals-all-agents should be treated as a fail-open gap, not as an approved production whitelist. This draft does not add agent ids. |
+| `OPENBOT_EVOLUTION_SOFT_OBSERVE_DH` | **Default on** (`unset` / `on` / `1` / `true` / empty → enabled; `off` / `0` / `false` → off; other values fail closed). Independent of governance mode `assist`. Soft means canary scope only, never active production cutover; does not enable `LIVE_INVOKE`, Fabric default-on, or Phase-D-enforce; system/platform domain proposals are skipped. | Surface allowlist is the in-code set `agent.working-dna` and `capability.skill-installation` (`SOFT_OBSERVE_DH_SURFACES`). Principal is `soft-observe-dh-loop`. | Call out as a **default-on canary auto-advance** that already exists. It is not an approved production cutover, and this draft does not expand the surface set or lift scope from `canary` to `active`. Whether the code default should later move to off is a review item, not a change here. |
+| Diagnosis tick `OPENBOT_DIAGNOSIS_TICK` | On unless set to `0`. Interval 15 minutes. Read-only `diagnose()`. | Not a write allowlist. Tick hard-disables conversation delivery and self-evolution confirm. | Keep write-side forced off. Default-on tick is not a delivery or confirm grant. |
+
+Draft whitelist summary, for review only:
+
+1. Production write classes A–D stay closed; no new tenant, session, agent, or executor entries.
+2. Do not interpret `DIAGNOSIS_P24_5_DAIBAI_ALLOWLISTED = true` or canary tenant `001` as a live delivery approval.
+3. Do not treat an empty `OPENBOT_SKILL_AUTO_ALLOW_AGENTS` as a safe default if skill-auto is ever considered.
+4. Soft-observe stays limited to the two named surfaces and `canary` scope; default-on is a review item, not a production-policy ratification.
+5. `unified-lifecycle` is **not** part of this auto-adjust whitelist (see §4).
+
+---
+
+## 4. Separate review item — `unified-lifecycle` default-on
+
+This is **not** an approved production policy, and it is not one of the four write classes above.
+
+Current tree:
+
+- `EVOLUTION_DEFAULTS` in `src/agent-runtime/evolution/index.ts` sets `"unified-lifecycle": true`.
+- Override is `OPENBOT_EVOLUTION_UNIFIED_LIFECYCLE` (or legacy `OPENCLAW_EVOLUTION_UNIFIED_LIFECYCLE`) with `"1"` / `"0"`. Unknown flags default to `false`.
+- Tests in `src/agent-runtime/evolution/index.test.ts` assert the default is `true`.
+- `isEvolutionEnabled("unified-lifecycle")` is **not consulted** by current `createUnifiedExecutionLifecycle(...)` call sites. Those callers import the unified lifecycle directly and run it unconditionally (for example `src/auto-reply/reply/agent-runner-memory.ts`, `src/commands/agent.ts`, `src/gateway/supervisor/worker-executor.ts`, `src/hooks/llm-slug-generator.ts`; also `src/auto-reply/reply/followup-runner.ts` on current `main`). Setting the env var to `"0"` would change `isEvolutionEnabled` / `listEvolutionFlags` only; it would not by itself switch those callers back to a legacy lifecycle.
+
+Review questions (not resolved by this draft, and not implemented here):
+
+1. Should a compile-time default of `true` stand, given that the flag is currently unwired as a kill switch?
+2. If a kill switch is still required, the flag needs a real call-site gate; documenting `default-on` is not that gate.
+3. Do not fold `unified-lifecycle` into the auto-adjust whitelist or into Classes A–D. It is an execution-path convergence flag, not a diagnosis write grant.
+
+---
+
+## 5. Gaps this draft could not fill from existing materials
+
+- **Live environment values** for `OPENBOT_DIAGNOSIS_*`, `OPENBOT_EVOLUTION_GOVERNANCE_MODE`, `OPENBOT_SKILL_AUTO_*`, `OPENBOT_EVOLUTION_SOFT_OBSERVE_DH`, and `OPENBOT_EVOLUTION_UNIFIED_LIFECYCLE` were not read from production hosts in this pass.
+- **Class B has no named production approver** and no tenant allowlist in `DIAGNOSIS_PRODUCTION_GATES` or `write-policy.ts`.
+- **Write policy has no version field.** Prescription and cutover schemas are versioned; the env snapshot is not.
+- **`DIAGNOSIS_PRODUCTION_GATES` metadata vs values:** `adapters` and `reportApi` still declare `default: false` in the gate table, but `DIAGNOSIS_PRODUCTION_ADAPTERS_ENABLED` and `DIAGNOSIS_REPORT_API_DEPLOYED` are currently `true` in `src/diagnosis/report-query-production-adapters.ts` and `src/diagnosis/report-query-deploy.ts`. Those are read-side flags, not write classes A–D, and this draft does not change them. The table-vs-value mismatch should be reviewed separately.
+- **Pending approval name `daibai_delivery_allowlist`** coexists with `DIAGNOSIS_P24_5_DAIBAI_ALLOWLISTED = true`. The code treats the canary identity as already allowlisted for the transport helper; the pending-approval list still names the allowlist. This draft does not resolve which document is authoritative for a future human approval.
+- This draft does not re-audit every Evolution RPC surface or every `OPENBOT_GOVERNANCE_*` model-entitlement allowlist. Those remain under the existing shadow / admission process docs.
+
+---
+
+## 6. Explicit non-goals
+
+- No new engine, feature flag, or runtime branch.
+- No change to `src/diagnosis/write-policy.ts`, `src/agent-runtime/evolution/index.ts`, production env examples, or `deploy/production/releases.jsonl`.
+- No widening of `DIAGNOSIS_P24_5_*`, `SOFT_OBSERVE_DH_SURFACES`, or `OPENBOT_SKILL_AUTO_ALLOW_AGENTS`.
+- No ratification of `unified-lifecycle` default-on or of soft-observe default-on as production policy.
