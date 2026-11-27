@@ -128,7 +128,7 @@ async function importCoreExtensionAPI(): Promise<{
   DEFAULT_PROVIDER: string;
   resolveAgentIdentity: CoreAgentDeps["resolveAgentIdentity"];
   resolveThinkingDefault: CoreAgentDeps["resolveThinkingDefault"];
-  runControlledAuxiliaryTurn: CoreAgentDeps["runEmbeddedPiAgent"];
+  runControlledAuxiliaryTurn: CoreAgentDeps["runControlledAuxiliaryTurn"];
   resolveAgentTimeoutMs: CoreAgentDeps["resolveAgentTimeoutMs"];
   ensureAgentWorkspace: CoreAgentDeps["ensureAgentWorkspace"];
   resolveStorePath: CoreAgentDeps["resolveStorePath"];
