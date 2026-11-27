@@ -614,6 +614,46 @@ function autoSuppliedProductGranted(params: {
   );
 }
 
+/**
+ * Same visibility-policy + seat-grant check used by feed page reads.
+ * Lineage explain reuses this so knowing a lineage/object id is not enough.
+ */
+export function canAccessEnterpriseFeedProjection(params: {
+  store: EnterpriseDataStore;
+  tenantId: string;
+  projectionId: string;
+  context: KnowledgeSourceContext;
+}): boolean {
+  const bindings = listEnterpriseKnowledgeProjectionBindings({
+    store: params.store,
+    tenantId: params.tenantId,
+    enabled: true,
+  });
+  const binding = findBindingForProjection(bindings, params.projectionId);
+  const visibility = evaluateProjectionVisibility({
+    store: params.store,
+    tenantId: params.tenantId,
+    projectionId: params.projectionId,
+    visibilityPolicyId: binding?.visibilityPolicyId,
+    context: params.context,
+  });
+  const grants = params.context.seatId
+    ? listSeatActionGrants({
+        store: params.store,
+        tenantId: params.tenantId,
+        seatId: params.context.seatId,
+      })
+    : [];
+  const granted = autoSuppliedProductGranted({
+    store: params.store,
+    tenantId: params.tenantId,
+    projectionId: params.projectionId,
+    context: params.context,
+    grants,
+  });
+  return visibility.visible && granted && visibility.accessState === "accessible";
+}
+
 export function loadEnterpriseKnowledgeFeed(params: {
   store: EnterpriseDataStore;
   context: KnowledgeSourceContext;

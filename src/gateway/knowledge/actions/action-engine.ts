@@ -10,6 +10,11 @@ import {
 } from "../governance/chunk-governance-store.js";
 import type { GovernanceTaskType } from "../governance/types.js";
 import { openKnowledgeIndex, resolveKnowledgeIndexDbPath } from "../kb-index.js";
+import {
+  authorizeKnowledgeBaseAccess,
+  clientKnowledgeEmail,
+  createKnowledgeBaseAccessCache,
+} from "../knowledge-access-gate.js";
 import { loadKnowledgeBundle, knowledgeRecommendationsFromBundle } from "../router.js";
 import type {
   KnowledgeActionSuggestion,
@@ -252,6 +257,28 @@ export async function buildKnowledgeActionSuggestions(params: {
   limit?: number;
 }): Promise<KnowledgeActionSuggestion[]> {
   const limit = Math.min(Math.max(params.limit ?? 4, 1), 12);
+  const context = await resolveKnowledgeSourceContext(params.client);
+  const email = clientKnowledgeEmail(params.client);
+  if (!context.userId) {
+    return [];
+  }
+  const requestedKbId = params.knowledgeBaseId?.trim() || null;
+  if (requestedKbId) {
+    const authorized = authorizeKnowledgeBaseAccess({
+      knowledgeBaseId: requestedKbId,
+      context,
+      email,
+      permission: "read",
+    });
+    if (!authorized) {
+      return [];
+    }
+  }
+  const canRead = createKnowledgeBaseAccessCache({
+    context,
+    email,
+    permission: "read",
+  });
   const governanceActions =
     (await withUserKnowledgeIndex(params.client, (db) =>
       buildGovernanceActionSuggestions({
@@ -274,6 +301,15 @@ export async function buildKnowledgeActionSuggestions(params: {
   });
 
   const merged = [...archiveActions, ...governanceActions, ...relationActions]
+    .filter((action) => {
+      const kbId = action.context?.knowledgeBaseId?.trim();
+      if (!kbId) {
+        // Suggestions that are not KB-scoped (e.g. deliverable-only) stay
+        // if they were already produced under the caller's workbench scope.
+        return !requestedKbId;
+      }
+      return canRead(kbId);
+    })
     .toSorted((left, right) => right.score - left.score)
     .slice(0, limit);
 

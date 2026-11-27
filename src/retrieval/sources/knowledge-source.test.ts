@@ -158,7 +158,7 @@ describe("knowledge-source", () => {
     expect(results.length).toBeGreaterThan(0);
   });
 
-  it("lets a bound robot read a private knowledge base in the same tenant", async () => {
+  it("requires user authorization even for a tenant-matched bound robot", async () => {
     const kb = await seedIndexedKb({
       title: "Robot Memo",
       ownerId: "user-owner",
@@ -181,7 +181,7 @@ describe("knowledge-source", () => {
       agentId: "bot-9",
     };
     const hits = await source.search("MK-FrostKoi-2026", robot, { kbScope: [kb.id] });
-    expect(hits.length).toBeGreaterThan(0);
+    expect(hits).toEqual([]);
     expect(await source.search("MK-FrostKoi-2026", outsider, { kbScope: [kb.id] })).toEqual([]);
   });
 });

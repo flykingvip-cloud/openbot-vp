@@ -167,7 +167,7 @@ describe("knowledge-base-permissions", () => {
     expect(canWriteKnowledgeBase({ knowledgeBase: kb, actor })).toBe(false);
   });
 
-  it("grants read to a tenant-matched robot listed on the knowledge base", () => {
+  it("denies a tenant-matched bound robot when the user lacks access", () => {
     const kb = createKnowledgeBase(
       {
         title: "Robot KB",
@@ -183,7 +183,7 @@ describe("knowledge-base-permissions", () => {
       email: "bot-seat@example.com",
       agentId: "bot-skill",
     });
-    expect(canReadKnowledgeBase({ knowledgeBase: kb, actor })).toBe(true);
+    expect(canReadKnowledgeBase({ knowledgeBase: kb, actor })).toBe(false);
     expect(canWriteKnowledgeBase({ knowledgeBase: kb, actor })).toBe(false);
   });
 
@@ -204,5 +204,100 @@ describe("knowledge-base-permissions", () => {
       agentId: "bot-skill",
     });
     expect(canReadKnowledgeBase({ knowledgeBase: kb, actor })).toBe(false);
+  });
+  it.each([
+    {
+      name: "authorized owner and bound agent",
+      userId: "owner",
+      tenantId: "tenant",
+      agentId: "bound",
+      allowed: true,
+    },
+    {
+      name: "nonmember with bound agent",
+      userId: "other",
+      tenantId: "tenant",
+      agentId: "bound",
+      allowed: false,
+    },
+    {
+      name: "authorized owner with unbound agent",
+      userId: "owner",
+      tenantId: "tenant",
+      agentId: "unbound",
+      allowed: false,
+    },
+    {
+      name: "owner in a different tenant",
+      userId: "owner",
+      tenantId: "other",
+      agentId: "bound",
+      allowed: false,
+    },
+    { name: "missing user", userId: null, tenantId: "tenant", agentId: "bound", allowed: false },
+    { name: "missing tenant", userId: "owner", tenantId: null, agentId: "bound", allowed: false },
+  ])("intersects user and agent access: $name", ({ userId, tenantId, agentId, allowed }) => {
+    const kb = createKnowledgeBase(
+      {
+        title: "Intersection",
+        ownerId: "owner",
+        tenantId: "tenant",
+        visibility: "private",
+        robotIds: ["bound"],
+      },
+      storePath(),
+    );
+    expect(
+      canReadKnowledgeBase({
+        knowledgeBase: kb,
+        actor: { userId, tenantId, agentId },
+        members: [],
+      }),
+    ).toBe(allowed);
+    const revoked = { ...kb, robotIds: [] };
+    expect(
+      canReadKnowledgeBase({
+        knowledgeBase: revoked,
+        actor: { userId, tenantId, agentId },
+        members: [],
+      }),
+    ).toBe(false);
+  });
+  it("uses stable member IDs for agent reads and denies revoked or email-only grants", () => {
+    const kb = createKnowledgeBase(
+      {
+        title: "Stable identity",
+        ownerId: "owner",
+        tenantId: "tenant",
+        visibility: "private",
+        robotIds: ["bound"],
+      },
+      storePath(),
+    );
+    const actor = {
+      userId: "reader",
+      tenantId: "tenant",
+      agentId: "bound",
+      email: "same@example.com",
+    };
+    const member = {
+      memberId: "member",
+      knowledgeBaseId: kb.id,
+      userId: "reader",
+      email: "old@example.com",
+      role: "viewer" as const,
+      status: "active" as const,
+      invitedByUserId: "owner",
+      createdAtMs: 1,
+    };
+    expect(canReadKnowledgeBase({ knowledgeBase: kb, actor, members: [member] })).toBe(true);
+    expect(canReadKnowledgeBase({ knowledgeBase: kb, actor, members: [] })).toBe(false);
+    expect(
+      canReadKnowledgeBase({
+        knowledgeBase: kb,
+        actor,
+        members: [{ ...member, userId: undefined, email: actor.email }],
+      }),
+    ).toBe(false);
   });
 });
