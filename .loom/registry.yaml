@@ -23,6 +23,29 @@ tasks:
     ownerHistory: []
     since: "2026-11-27"
     metadata: {}
+  - id: stored-result-read-acl-20261127
+    owner: grok-bot
+    intent:
+      - "Register the five stored-result read ACL files that landed in #357 but were left unregistered: authorizeStoredResultRead, host-only stored-result-read binding, and their tests."
+    paths:
+      - src/agent-runtime/capabilities/invocation/authorize-stored-result-read.ts
+      - src/agent-runtime/capabilities/invocation/authorize-stored-result-read.test.ts
+      - src/agent-runtime/state/stored-result-read-binding.ts
+      - src/agent-runtime/state/stored-result-read-binding.test.ts
+      - src/agents/pi-tools.stored-result-read-acl.test.ts
+    state: active
+    sessions:
+      - id: stored-result-read-acl-20261127
+        taskId: stored-result-read-acl-20261127
+        ide: cursor
+        agent: grok-bot
+        status: active
+        lastSignalAt: "2026-11-27T14:56:00Z"
+        metadata:
+          authorization: User-authorized registry-only registration of five #357 stored-result read ACL paths after #358 merged; inserted after recovery-send-unification-20261127.
+    ownerHistory: []
+    since: "2026-11-27"
+    metadata: {}
   - id: fix-conversation-send-auto-bind-task
     owner: architecture-executor
     intent:
@@ -16259,6 +16282,19 @@ landingStreams:
       task: recovery-send-unification-20261127
       agent: grok-bot
       purpose: "Exact 5-file recovered-send unification: post-claim recheck, followup delegation to deliverRecoveredAwaitingSends, exact runId filter; keep unified lifecycle."
+  - id: stored-result-read-acl-20261127
+    landingPolicy: serial
+    paths:
+      - src/agent-runtime/capabilities/invocation/authorize-stored-result-read.ts
+      - src/agent-runtime/capabilities/invocation/authorize-stored-result-read.test.ts
+      - src/agent-runtime/state/stored-result-read-binding.ts
+      - src/agent-runtime/state/stored-result-read-binding.test.ts
+      - src/agents/pi-tools.stored-result-read-acl.test.ts
+    canLandWith: []
+    metadata:
+      task: stored-result-read-acl-20261127
+      agent: grok-bot
+      purpose: "Exact 5-file stored-result read ACL registration from #357: authorize-stored-result-read, stored-result-read-binding, and tests."
   - id: fix-conversation-send-auto-bind-task
     landingPolicy: serial
     paths:
