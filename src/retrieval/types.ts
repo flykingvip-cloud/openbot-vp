@@ -17,6 +17,11 @@ export type RetrievalContext = {
   /** Bound robot/agent id — used for knowledgeBase.robotIds reads. */
   agentId?: string | null;
   /**
+   * Caller email for the human membership key inside canReadKnowledgeBase.
+   * Optional; omitted contexts still fail closed for email-keyed membership.
+   */
+  email?: string | null;
+  /**
    * Reserved for document/section-level visibility. Only knowledge-base-level
    * scoping is enforced in the current phase; finer scopes are schema-reserved.
    */

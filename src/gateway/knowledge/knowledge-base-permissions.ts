@@ -36,11 +36,38 @@ function retrievalContextFromActor(actor: KnowledgeBasePermissionActor): Retriev
   };
 }
 
+export function permissionActorFromRetrievalContext(
+  ctx: RetrievalContext,
+): KnowledgeBasePermissionActor {
+  return {
+    userId: ctx.userId,
+    tenantId: ctx.tenantId,
+    email: ctx.email ?? null,
+    departmentId: ctx.departmentId ?? null,
+    roleCode: ctx.roleCodes?.[0] ?? null,
+    ...(ctx.agentId?.trim() ? { agentId: ctx.agentId.trim() } : {}),
+  };
+}
+
 function activeMemberRole(
   knowledgeBase: KnowledgeBase,
   actor: KnowledgeBasePermissionActor,
   members: KnowledgeBaseMemberRecord[] = listKnowledgeBaseMembers(knowledgeBase.id),
 ): KnowledgeBaseMemberRole | null {
+  // Agent execution cannot convert an email invitation into stable user authority.
+  if (actor.agentId?.trim()) {
+    if (!actor.userId?.trim()) {
+      return null;
+    }
+    return (
+      members.find(
+        (member) =>
+          member.knowledgeBaseId === knowledgeBase.id &&
+          member.status === "active" &&
+          member.userId === actor.userId,
+      )?.role ?? null
+    );
+  }
   const email = normalizeEmail(actor.email);
   if (!email) {
     return null;
@@ -55,32 +82,34 @@ function activeMemberRole(
   );
 }
 
-function canReadViaRobotBinding(
-  knowledgeBase: KnowledgeBase,
-  actor: KnowledgeBasePermissionActor,
-): boolean {
-  const agentId = actor.agentId?.trim();
-  if (!agentId || !knowledgeBase.robotIds.includes(agentId)) {
-    return false;
-  }
-  if (actor.userId && knowledgeBase.ownerId === actor.userId) {
-    return true;
-  }
-  const actorTenant = canonicalizeTenantId(actor.tenantId);
-  const kbTenant = canonicalizeTenantId(knowledgeBase.tenantId);
-  return Boolean(actorTenant && kbTenant && actorTenant === kbTenant);
-}
-
+/**
+ * Sole fail-closed authoritative knowledge-base read gate (POLICY-PRE02).
+ * Grants access to the owner, an active member, or (as a fallback only)
+ * a caller who passes {@link isKnowledgeBaseVisible} for team/enterprise
+ * tenant visibility. Callers must not treat isKnowledgeBaseVisible itself
+ * as the authoritative read gate.
+ */
 export function canReadKnowledgeBase(params: {
   knowledgeBase: KnowledgeBase;
   actor: KnowledgeBasePermissionActor;
   members?: KnowledgeBaseMemberRecord[];
 }): boolean {
   const { knowledgeBase, actor } = params;
-  if (actor.userId && knowledgeBase.ownerId === actor.userId) {
-    return true;
+  // Agent binding only narrows a trusted user's access; it never grants membership.
+  if (actor.agentId?.trim()) {
+    const actorTenant = canonicalizeTenantId(actor.tenantId);
+    const kbTenant = canonicalizeTenantId(knowledgeBase.tenantId);
+    if (
+      !actor.userId?.trim() ||
+      !actorTenant ||
+      !kbTenant ||
+      actorTenant !== kbTenant ||
+      !knowledgeBase.robotIds.includes(actor.agentId.trim())
+    ) {
+      return false;
+    }
   }
-  if (canReadViaRobotBinding(knowledgeBase, actor)) {
+  if (actor.userId && knowledgeBase.ownerId === actor.userId) {
     return true;
   }
   if (activeMemberRole(knowledgeBase, actor, params.members)) {

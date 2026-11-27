@@ -6,6 +6,10 @@ import { getGovernanceSummary } from "../governance/chunk-governance-store.js";
 import type { GovernanceSummary } from "../governance/types.js";
 import { openKnowledgeIndex, resolveKnowledgeIndexDbPath } from "../kb-index.js";
 import {
+  clientKnowledgeEmail,
+  resolveReadableKnowledgeBaseScope,
+} from "../knowledge-access-gate.js";
+import {
   runKnowledgeRuntimeEngine,
   type KnowledgeRuntimeSelection,
 } from "../resolve/resolve-engine.js";
@@ -36,7 +40,7 @@ export type KnowledgeRuntimeContext = {
   governance: GovernanceSummary | null;
 };
 
-async function loadGovernanceSummaryForUser(
+export async function loadGovernanceSummaryForUser(
   client: GatewayClient | null,
   kbId?: string | null,
 ): Promise<GovernanceSummary | null> {
@@ -51,9 +55,14 @@ async function loadGovernanceSummaryForUser(
   if (!fs.existsSync(dbPath)) {
     return null;
   }
+  const scope = resolveReadableKnowledgeBaseScope({
+    context,
+    email: clientKnowledgeEmail(client),
+    knowledgeBaseId: kbId?.trim() || undefined,
+  });
   const index = await openKnowledgeIndex({ dbPath, vectorEnabled: false });
   try {
-    return getGovernanceSummary(index.db, kbId?.trim() || undefined);
+    return getGovernanceSummary(index.db, scope.kbId, scope.allowedKbIds);
   } finally {
     index.close();
   }

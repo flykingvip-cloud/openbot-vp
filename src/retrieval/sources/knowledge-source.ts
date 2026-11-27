@@ -55,6 +55,7 @@ export function createKnowledgeRetrievalSource(deps: KnowledgeSourceDeps = {}): 
       const actor = {
         userId: ctx.userId,
         tenantId: ctx.tenantId,
+        email: ctx.email ?? null,
         agentId: ctx.agentId ?? null,
         departmentId: ctx.departmentId ?? null,
         roleCode: ctx.roleCodes?.[0] ?? null,

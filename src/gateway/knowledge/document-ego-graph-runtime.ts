@@ -11,7 +11,9 @@ import {
   parseDocumentObjectId,
 } from "./document-ego-graph.js";
 import { openKnowledgeIndex, resolveKnowledgeIndexDbPath } from "./kb-index.js";
-import { getKnowledgeBase } from "./knowledge-base-store.js";
+import { authorizeKnowledgeBaseAccess } from "./knowledge-access-gate.js";
+import { getKnowledgeBase, listKnowledgeBases } from "./knowledge-base-store.js";
+import type { KnowledgeSourceContext } from "./sources/types.js";
 import type { KnowledgeObject, RelationshipGraph } from "./types.js";
 
 export async function buildDocumentEgoGraphForKnowledgeBase(params: {
@@ -153,22 +155,41 @@ export async function loadDocumentKnowledgeObjectByObjectId(params: {
   objectId: string;
   knowledgeBaseId?: string | null;
   indexRoot?: string;
+  context?: KnowledgeSourceContext | null;
+  email?: string | null;
 }): Promise<KnowledgeObject | null> {
   const docId = parseDocumentObjectId(params.objectId);
   if (!docId) {
     return null;
   }
+  if (!params.context?.userId) {
+    return null;
+  }
+  const canRead = (knowledgeBaseId: string) =>
+    Boolean(
+      authorizeKnowledgeBaseAccess({
+        knowledgeBaseId,
+        context: params.context!,
+        email: params.email,
+        permission: "read",
+      }),
+    );
   const kbId = params.knowledgeBaseId?.trim();
   if (kbId) {
+    if (!canRead(kbId)) {
+      return null;
+    }
     return loadDocumentKnowledgeObject({
       knowledgeBaseId: kbId,
       docId,
       indexRoot: params.indexRoot,
     });
   }
-  // Without kbId, scan known bases for a matching documentId ownership.
-  const { listKnowledgeBases } = await import("./knowledge-base-store.js");
+  // Without kbId, scan only knowledge bases the caller can already read.
   for (const base of listKnowledgeBases()) {
+    if (!canRead(base.id)) {
+      continue;
+    }
     if (base.documentIds.includes(docId) || (base.recycledDocumentIds ?? []).includes(docId)) {
       return loadDocumentKnowledgeObject({
         knowledgeBaseId: base.id,

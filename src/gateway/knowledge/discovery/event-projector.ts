@@ -11,6 +11,7 @@ import {
 } from "../governance/chunk-governance-store.js";
 import type { GovernanceTaskType } from "../governance/types.js";
 import { openKnowledgeIndex, resolveKnowledgeIndexDbPath } from "../kb-index.js";
+import { clientKnowledgeEmail, createKnowledgeBaseAccessCache } from "../knowledge-access-gate.js";
 import { listRecentKnowledgeLineageCommits } from "../knowledge-lineage-store.js";
 import type { KnowledgeDiscoveryEvent, KnowledgeDiscoveryEventType } from "./types.js";
 
@@ -238,7 +239,20 @@ export async function listKnowledgeDiscoveryEvents(params: {
     sinceMs,
   });
 
-  return [...indexEvents, ...deliverableEvents]
-    .toSorted((left, right) => right.timestamp - left.timestamp)
-    .slice(0, limit);
+  const canRead = createKnowledgeBaseAccessCache({
+    context,
+    email: clientKnowledgeEmail(params.client),
+    permission: "read",
+  });
+  const visibleEvents = [...indexEvents, ...deliverableEvents].filter((event) => {
+    const kbId = event.relatedKnowledge.kbId?.trim();
+    if (kbId) {
+      return canRead(kbId);
+    }
+    // Deliverable events are already scoped to the caller's user/group seats.
+    // Other events without a kbId fail closed.
+    return event.eventSource === "deliverable";
+  });
+
+  return visibleEvents.toSorted((left, right) => right.timestamp - left.timestamp).slice(0, limit);
 }

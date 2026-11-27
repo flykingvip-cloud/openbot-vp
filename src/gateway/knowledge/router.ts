@@ -1,4 +1,5 @@
 import type { KnowledgeEvidence } from "../../retrieval/types.js";
+import { EnterpriseDataStoreError } from "../enterprise-data/connector-action-store.js";
 import { loadEnterpriseDataStore } from "../enterprise-data/store.js";
 import type { GatewayClient } from "../server-methods/types.js";
 import { resolveControlPlaneStorePathForClient } from "../tenant-context.js";
@@ -12,9 +13,11 @@ import {
   knowledgeObjectMatchesQuery,
   preferEnterpriseFeedMatches,
 } from "./enterprise-data-query.js";
+import { canAccessEnterpriseFeedProjection } from "./feed/enterprise-feed-adapter.js";
 import { summarizeKnowledgeFeed } from "./feed/knowledge-feed-adapter.js";
 import type { KnowledgeFeedItem as FeedItem } from "./feed/types.js";
 import { filterRelationshipGraph } from "./graph-builder.js";
+import { authorizeKnowledgeBaseAccess, clientKnowledgeEmail } from "./knowledge-access-gate.js";
 import {
   anyAccessibleKnowledgeBaseHasIndexedChunks,
   retrievalContextFromKnowledgeSourceContext,
@@ -167,6 +170,17 @@ export async function knowledgeRelationships(
 ): Promise<RelationshipGraph> {
   const focusDocumentId = params.focusDocumentId?.trim() || null;
   let knowledgeBaseId = params.knowledgeBaseId?.trim() || null;
+  const context = await resolveKnowledgeSourceContext(client);
+  const email = clientKnowledgeEmail(client);
+  const canReadKb = (id: string) =>
+    Boolean(
+      authorizeKnowledgeBaseAccess({
+        knowledgeBaseId: id,
+        context,
+        email,
+        permission: "read",
+      }),
+    );
   const bundle = await loadKnowledgeBundle(client);
   const kbGraph = knowledgeRelationshipsFromBundle(bundle, {
     query: params.query,
@@ -175,6 +189,9 @@ export async function knowledgeRelationships(
   // Folder / space select: library document panorama for that KB (enterprise
   // shared readable spaces included — index opens via the KB owner path).
   if (!focusDocumentId && knowledgeBaseId) {
+    if (!canReadKb(knowledgeBaseId)) {
+      return capRelationshipGraph(kbGraph, "summary");
+    }
     const { buildKnowledgeBaseLibraryGraphForKnowledgeBase } =
       await import("./document-ego-graph-runtime.js");
     const library = await buildKnowledgeBaseLibraryGraphForKnowledgeBase({
@@ -199,6 +216,9 @@ export async function knowledgeRelationships(
   if (!knowledgeBaseId) {
     const { listKnowledgeBases } = await import("./knowledge-base-store.js");
     for (const base of listKnowledgeBases()) {
+      if (!canReadKb(base.id)) {
+        continue;
+      }
       if (
         base.documentIds.includes(focusDocumentId) ||
         (base.recycledDocumentIds ?? []).includes(focusDocumentId)
@@ -209,6 +229,9 @@ export async function knowledgeRelationships(
     }
   }
   if (!knowledgeBaseId) {
+    return capRelationshipGraph(kbGraph, "summary");
+  }
+  if (!canReadKb(knowledgeBaseId)) {
     return capRelationshipGraph(kbGraph, "summary");
   }
   const { buildDocumentEgoGraphForKnowledgeBase } = await import("./document-ego-graph-runtime.js");
@@ -247,9 +270,12 @@ export async function knowledgeObject(
   if (params.objectId.startsWith("obj:doc:")) {
     const { loadDocumentKnowledgeObjectByObjectId } =
       await import("./document-ego-graph-runtime.js");
+    const context = await resolveKnowledgeSourceContext(client);
     const docObject = await loadDocumentKnowledgeObjectByObjectId({
       objectId: params.objectId,
       knowledgeBaseId: params.knowledgeBaseId ?? null,
+      context,
+      email: clientKnowledgeEmail(client),
     });
     if (docObject) {
       return docObject;
@@ -279,9 +305,12 @@ export async function knowledgeObjectForNode(
     const objectId = nodeId.slice("node:".length);
     const { loadDocumentKnowledgeObjectByObjectId } =
       await import("./document-ego-graph-runtime.js");
+    const context = await resolveKnowledgeSourceContext(client);
     const docObject = await loadDocumentKnowledgeObjectByObjectId({
       objectId,
       knowledgeBaseId: options?.knowledgeBaseId ?? null,
+      context,
+      email: clientKnowledgeEmail(client),
     });
     if (docObject) {
       return docObject;
@@ -461,12 +490,22 @@ export async function knowledgeLineageExplain(
   const store = await loadEnterpriseDataStore(
     await resolveControlPlaneStorePathForClient(client, TENANT_ENTERPRISE_DATA_FILE),
   );
-  return explainKnowledgeLineage({
+  const explain = explainKnowledgeLineage({
     store,
     tenantId: context.tenantId,
     objectId: params.objectId,
     lineageId: params.lineageId,
   });
+  const accessible = canAccessEnterpriseFeedProjection({
+    store,
+    tenantId: context.tenantId,
+    projectionId: explain.projectionId,
+    context,
+  });
+  if (!accessible) {
+    throw new EnterpriseDataStoreError("LINEAGE_NOT_FOUND", "Knowledge lineage record not found.");
+  }
+  return explain;
 }
 
 export async function knowledgeCognitiveBundle(

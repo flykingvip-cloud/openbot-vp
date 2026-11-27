@@ -36,6 +36,31 @@ import type { FileRevision } from "../../vault-sync/types.js";
 import { ErrorCodes, errorShape } from "../protocol/index.js";
 import type { GatewayRequestHandlers, RespondFn } from "./types.js";
 
+/** Vault membership is not authority to write a separate knowledge base. */
+async function requireTargetKnowledgeWrite(
+  client: Parameters<typeof resolveVaultSyncActor>[0],
+  knowledgeBaseId: string,
+): Promise<void> {
+  const { resolveKnowledgeSourceContext } = await import("../knowledge/context.js");
+  const { resolveAuthorizedKnowledgeBase } =
+    await import("../knowledge/knowledge-base-permissions.js");
+  const context = await resolveKnowledgeSourceContext(
+    client as Parameters<typeof resolveKnowledgeSourceContext>[0],
+  );
+  if (!context.userId || !context.tenantId || !knowledgeBaseId) {
+    throw new VaultSyncAuthError("forbidden", "target knowledge base write denied");
+  }
+  const base = resolveAuthorizedKnowledgeBase({
+    knowledgeBaseId,
+    actor: { userId: context.userId, tenantId: context.tenantId },
+    permission: "write",
+  });
+  const { canonicalizeTenantId } = await import("../tenant-canonicalization.js");
+  if (!base || canonicalizeTenantId(base.tenantId) !== canonicalizeTenantId(context.tenantId)) {
+    throw new VaultSyncAuthError("forbidden", "target knowledge base write denied");
+  }
+}
+
 function resolveControlPlaneRoot(): string {
   return resolveVaultSyncControlPlaneRoot();
 }
@@ -1400,6 +1425,7 @@ export const vaultSyncHandlers: GatewayRequestHandlers = {
     }
     try {
       requireVaultMemberAccess(client, vaultId);
+      await requireTargetKnowledgeWrite(client, knowledgeBaseId);
       const { setVaultKnowledgeBaseBinding } = await import("../../vault-sync/vault-kb-binding.js");
       const binding = setVaultKnowledgeBaseBinding({
         vaultId,
@@ -1430,6 +1456,16 @@ export const vaultSyncHandlers: GatewayRequestHandlers = {
     const persistBinding = params.persistBinding !== false;
     try {
       requireVaultMemberAccess(client, vaultId);
+      const { getVaultKnowledgeBaseBinding } = await import("../../vault-sync/vault-kb-binding.js");
+      const targetKnowledgeBaseId =
+        knowledgeBaseId ||
+        getVaultKnowledgeBaseBinding(vaultId, resolveControlPlaneRoot())?.knowledgeBaseId ||
+        "";
+      await requireTargetKnowledgeWrite(client, targetKnowledgeBaseId);
+      // RPC callers cannot turn a vault grant into an arbitrary host-root scan.
+      if (rootPath) {
+        throw new VaultSyncAuthError("forbidden", "RPC root override denied");
+      }
       if (knowledgeBaseId && persistBinding) {
         const { setVaultKnowledgeBaseBinding } =
           await import("../../vault-sync/vault-kb-binding.js");
@@ -1443,7 +1479,7 @@ export const vaultSyncHandlers: GatewayRequestHandlers = {
       const { runVaultSyncRuntimeReindex } = await import("../vault-sync-runtime-hook.js");
       const summary = await runVaultSyncRuntimeReindex({
         vaultId,
-        knowledgeBaseId: knowledgeBaseId || null,
+        knowledgeBaseId: targetKnowledgeBaseId,
         rootPath: rootPath || null,
         touchedRelativePaths: touchedRelativePaths.length > 0 ? touchedRelativePaths : ["."],
         log: createSubsystemLogger("vault-sync-runtime"),

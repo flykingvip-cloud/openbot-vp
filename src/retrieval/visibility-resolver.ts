@@ -2,9 +2,10 @@
  * Visibility Resolver — permission gate for retrieval.
  *
  * Physical database isolation (per-user / per-tenant db files) is NOT a substitute
- * for permission checks: the calling layer can still over-reach. Every retrieval
- * entry point must resolve the caller's accessible knowledge bases through this
- * resolver before issuing any `WHERE kb_id IN (...)` query.
+ * for permission checks: the calling layer can still over-reach. This helper
+ * is the tenant/owner visibility primitive used as a fallback inside
+ * {@link canReadKnowledgeBase}. It is not the authoritative read gate;
+ * product read paths must go through canReadKnowledgeBase.
  */
 import type { RetrievalContext } from "./types.js";
 
@@ -18,10 +19,13 @@ export type VisibilityKnowledgeBase = {
 };
 
 /**
- * Decide whether a caller may read a single knowledge base.
+ * Visibility primitive (not the authoritative read gate).
  * - private: owner only
  * - team / enterprise: same tenant (department/role scoping reserved)
  * - tenant-less team/enterprise: falls back to owner check
+ *
+ * Active private-KB members are intentionally not included here; they are
+ * granted by canReadKnowledgeBase's membership check.
  *
  * Tenant ids are compared after trimming so incidental whitespace drift never
  * hides a legitimately shared team/enterprise base from a same-tenant member.
@@ -43,7 +47,7 @@ export function isKnowledgeBaseVisible(
   return Boolean(ctx.userId) && ctx.userId === kb.ownerId;
 }
 
-/** Resolve the set of knowledge base ids the caller may read. */
+/** Visibility-only id filter. Not the authoritative read gate. */
 export function resolveAccessibleKnowledgeBases(
   ctx: RetrievalContext,
   candidates: VisibilityKnowledgeBase[],

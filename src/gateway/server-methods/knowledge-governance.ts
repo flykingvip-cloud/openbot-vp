@@ -13,6 +13,12 @@ import { buildGovernanceTaskIssueGraph } from "../knowledge/governance/graph/tas
 import { resolveGovernanceTask } from "../knowledge/governance/resolution/task-resolver.js";
 import type { GovernanceTaskStatus } from "../knowledge/governance/types.js";
 import { openKnowledgeIndex, resolveKnowledgeIndexDbPath } from "../knowledge/kb-index.js";
+import {
+  authorizeKnowledgeBaseAccess,
+  clientKnowledgeEmail,
+  createKnowledgeBaseAccessCache,
+  resolveReadableKnowledgeBaseScope,
+} from "../knowledge/knowledge-access-gate.js";
 import { ErrorCodes, errorShape } from "../protocol/index.js";
 import { exactMember, stringValue } from "./request-params.js";
 import type { GatewayRequestHandlers, RespondFn } from "./types.js";
@@ -64,7 +70,15 @@ export async function getUserGovernanceSummary(
   client: Parameters<GatewayRequestHandlers[string]>[0]["client"],
   kbId?: string,
 ): Promise<import("../knowledge/governance/types.js").GovernanceSummary> {
-  return withUserKnowledgeIndex(client, (db) => getGovernanceSummary(db, kbId));
+  const context = await resolveKnowledgeSourceContext(client);
+  const scope = resolveReadableKnowledgeBaseScope({
+    context,
+    email: clientKnowledgeEmail(client),
+    knowledgeBaseId: kbId,
+  });
+  return withUserKnowledgeIndex(client, (db) =>
+    getGovernanceSummary(db, scope.kbId, scope.allowedKbIds),
+  );
 }
 
 export const knowledgeGovernanceHandlers: GatewayRequestHandlers = {
@@ -72,7 +86,15 @@ export const knowledgeGovernanceHandlers: GatewayRequestHandlers = {
     const record = params && typeof params === "object" ? params : {};
     const kbId = stringParam(record.kbId);
     try {
-      const summary = await withUserKnowledgeIndex(client, (db) => getGovernanceSummary(db, kbId));
+      const context = await resolveKnowledgeSourceContext(client);
+      const scope = resolveReadableKnowledgeBaseScope({
+        context,
+        email: clientKnowledgeEmail(client),
+        knowledgeBaseId: kbId,
+      });
+      const summary = await withUserKnowledgeIndex(client, (db) =>
+        getGovernanceSummary(db, scope.kbId, scope.allowedKbIds),
+      );
       respond(true, { summary });
     } catch (error) {
       respondGovernanceError(respond, error);
@@ -85,8 +107,20 @@ export const knowledgeGovernanceHandlers: GatewayRequestHandlers = {
     const status = parseTaskStatus(record.status) ?? undefined;
     const limit = numberParam(record.limit, 50);
     try {
+      const context = await resolveKnowledgeSourceContext(client);
+      const scope = resolveReadableKnowledgeBaseScope({
+        context,
+        email: clientKnowledgeEmail(client),
+        knowledgeBaseId: kbId,
+      });
       const tasks = await withUserKnowledgeIndex(client, (db) =>
-        listGovernanceTasks({ db, kbId, status, limit }),
+        listGovernanceTasks({
+          db,
+          kbId: scope.kbId,
+          status,
+          limit,
+          allowedKbIds: scope.allowedKbIds,
+        }),
       );
       respond(true, { tasks });
     } catch (error) {
@@ -114,17 +148,36 @@ export const knowledgeGovernanceHandlers: GatewayRequestHandlers = {
       if (!context.userId) {
         throw new Error("user context required");
       }
-      const updated = await withUserKnowledgeIndex(client, (db) =>
-        resolveGovernanceTask({
+      const email = clientKnowledgeEmail(client);
+      const updated = await withUserKnowledgeIndex(client, (db) => {
+        const task = getGovernanceTaskById(db, taskId);
+        if (!task) {
+          return false;
+        }
+        const writable = authorizeKnowledgeBaseAccess({
+          knowledgeBaseId: task.kbId,
+          context,
+          email,
+          permission: "write",
+        });
+        if (!writable) {
+          return false;
+        }
+        // Optional kbId/domainScope is accepted only when it matches the
+        // already write-authorized task KB. Never let a caller retarget scope.
+        if (kbId && kbId !== task.kbId) {
+          return false;
+        }
+        return resolveGovernanceTask({
           db,
           taskId,
           status,
           expertId: context.userId!,
           comment,
-          domainScope: kbId,
+          domainScope: task.kbId,
           canonicalClaimId,
-        }),
-      );
+        });
+      });
       if (!updated) {
         respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "task not found"));
         return;
@@ -169,12 +222,21 @@ export const knowledgeGovernanceHandlers: GatewayRequestHandlers = {
       : undefined;
     const limit = numberParam(record.limit, 100);
     try {
+      const context = await resolveKnowledgeSourceContext(client);
+      const canRead = createKnowledgeBaseAccessCache({
+        context,
+        email: clientKnowledgeEmail(client),
+        permission: "read",
+      });
       const claims = await withUserKnowledgeIndex(client, (db) => {
         if (chunkIds && chunkIds.length > 0) {
-          return listClaimsForChunks(db, chunkIds);
+          return listClaimsForChunks(db, chunkIds).filter((claim) => canRead(claim.kbId));
         }
         if (!kbId) {
           throw new Error("kbId or chunkIds required");
+        }
+        if (!canRead(kbId)) {
+          return [];
         }
         return listClaimsByKb({ db, kbId, normalizedKey, limit });
       });

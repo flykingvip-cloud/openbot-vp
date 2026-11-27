@@ -49,7 +49,47 @@ export function incrementGovernanceLlmUsageLocal(params: {
 export function getGovernanceLlmUsageStats(
   db: DatabaseSync,
   kbId?: string,
+  allowedKbIds?: readonly string[],
 ): GovernanceLlmUsageStats {
+  const scoped =
+    allowedKbIds == null
+      ? null
+      : kbId
+        ? allowedKbIds.includes(kbId)
+          ? [kbId]
+          : []
+        : [...allowedKbIds];
+  if (scoped && scoped.length === 0) {
+    return { ...EMPTY_STATS };
+  }
+  if (scoped && scoped.length > 0) {
+    const row = db
+      .prepare(
+        `SELECT
+           COALESCE(SUM(llm_call_count), 0) AS llm_call_count,
+           COALESCE(SUM(input_tokens), 0) AS input_tokens,
+           COALESCE(SUM(output_tokens), 0) AS output_tokens,
+           COALESCE(SUM(credits_charged), 0) AS credits_charged,
+           MAX(last_call_at) AS last_call_at
+         FROM governance_llm_usage
+         WHERE kb_id IN (${scoped.map(() => "?").join(", ")})`,
+      )
+      .get(...scoped) as {
+      llm_call_count: number;
+      input_tokens: number;
+      output_tokens: number;
+      credits_charged: number;
+      last_call_at: number | null;
+    };
+    return {
+      llmCallCount: row.llm_call_count,
+      inputTokens: row.input_tokens,
+      outputTokens: row.output_tokens,
+      totalTokens: row.input_tokens + row.output_tokens,
+      creditsCharged: row.credits_charged,
+      lastCallAt: row.last_call_at,
+    };
+  }
   if (kbId) {
     const row = db
       .prepare(

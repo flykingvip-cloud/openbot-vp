@@ -1,0 +1,67 @@
+{
+  "contract_status": "draft-pending-m1-freeze",
+  "runtime_captured": false,
+  "evidence_kind": "offline_algorithm_vector_only",
+  "source_documents": [
+    "08_TEAM_A_DELTA_SIGNOFF_AND_MIN_SLICE.md#2.1",
+    "09_WAVE1P5_CONSOLIDATED_EXECUTION_DIRECTIVE.md#2.1"
+  ],
+  "cases": [
+    {
+      "id": "ascii_crlf_spaces",
+      "raw": "Hello   World\r\nSecond\t\tLine  ",
+      "normalized": "Hello World Second Line",
+      "hash_algorithm": "sha256",
+      "raw_hash": "a27c8568f35e7f804719d7954a18f69660688ce7213c4a82e64b0994ec8c4c10",
+      "semantic_hash": "93323898fe464b358b40c355435557990e4fa485b6af037aa8e250855d263666"
+    },
+    {
+      "id": "nfd_vs_nfc_cafe",
+      "raw": "Café  SOP\n\nSection 1",
+      "normalized": "Café SOP Section 1",
+      "hash_algorithm": "sha256",
+      "raw_hash": "90fb2235a6b58557c38e7526cac118a9f6fc823d25bdc05b8a4276cf320b68c3",
+      "semantic_hash": "fe6bc5bd32490b0900d38679f27d70eae9676a09dd8d8dc2ff03875cd4d0ab9b"
+    },
+    {
+      "id": "cjk_ideographic_space_nbsp",
+      "raw": "临床　试验 方案\r\n第 1 条",
+      "normalized": "临床 试验 方案 第 1 条",
+      "hash_algorithm": "sha256",
+      "raw_hash": "3794b356e5c30ab5852d1ed7dcbfb61a7da58be90c4829ea85998efc26161596",
+      "semantic_hash": "b146965424f24ede249ab66f1a19303b9c49547978e7c9ae103bd6079c7d5bf7"
+    },
+    {
+      "id": "empty_whitespace_only",
+      "raw": " \t\r\n　 ",
+      "normalized": "",
+      "hash_algorithm": "sha256",
+      "raw_hash": "d893894e6472c8bc8991e94ab694f7cb86d3773afca23310f8ab3fa472d74f83",
+      "semantic_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "py_ctrl_separators_001c_001f",
+      "raw": "A\u001cB\u001dC\u001eD\u001fE",
+      "normalized": "A B C D E",
+      "hash_algorithm": "sha256",
+      "raw_hash": "1902c113c19f820c2edeea205b85f7e6b786194f0f56575e78442a8fc772aada",
+      "semantic_hash": "f527687229a42ecd273f976a7c0b7ddde0050230e3729c77a41c1d59c54eabb3"
+    },
+    {
+      "id": "py_nel_0085",
+      "raw": "Line1Line2",
+      "normalized": "Line1 Line2",
+      "hash_algorithm": "sha256",
+      "raw_hash": "c7e544aa69e9821c6be96cb3cb9db2b136fe9efda6444fe42786362183db7220",
+      "semantic_hash": "9f30309951a3b354c1750172c5cbd4172c8c5b25d16a9ffbb37c164d071c1f6c"
+    },
+    {
+      "id": "bom_feff_preserved_in_python",
+      "raw": "﻿Title﻿Body",
+      "normalized": "﻿Title﻿Body",
+      "hash_algorithm": "sha256",
+      "raw_hash": "0ce2b52edb11ced21d072bf80a55d2c281c1637f3982398e6db313beaab61153",
+      "semantic_hash": "0ce2b52edb11ced21d072bf80a55d2c281c1637f3982398e6db313beaab61153"
+    }
+  ]
+}

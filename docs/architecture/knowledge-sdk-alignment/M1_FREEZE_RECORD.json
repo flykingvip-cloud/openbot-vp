@@ -1,0 +1,28 @@
+{
+  "record_type": "M1_CONTRACT_FREEZE",
+  "status": "FROZEN",
+  "effective_date": "2026-11-25",
+  "sdk_commit": "07f5d39f05ef4c7952be48b83025b9c86ea2458e",
+  "source_manifest_sha256": "32592fec4f0a5483cdc348d468617704ce3ab93f19c1826dce692cd8656e2e0a",
+  "authorization_source": "Direct human user message in this chat dated 2026-11-25",
+  "signer_claims": {
+    "project_owner": true,
+    "architecture_owner": true,
+    "team_a_control_plane_concurrence": "expressly confirmed by user; no separate Team A signature invented"
+  },
+  "team_b_evidence": "TEAM_B_INDEPENDENT_REVIEW.md",
+  "scope": "contract principles and approved minimum slice only",
+  "runtime_readiness_claimed": false,
+  "allowed_actions": ["archive M1 freeze"],
+  "not_authorized": [
+    "Wave2/M2 runtime development",
+    "M3 integration",
+    "production shadow",
+    "historical migration",
+    "production cutover",
+    "main or v2.0.0 tag modification"
+  ],
+  "ci_exception": "Owner expressly accepts Team A alternative verification for exact SDK SHA; not four-green CI claim",
+  "latency_waiver": "5775d424 original scope only",
+  "historical_sdk_manifest_preserved": true
+}
