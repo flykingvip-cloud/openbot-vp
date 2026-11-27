@@ -60,3 +60,60 @@ describe("AIExecutionTraceHeaderPropagator", () => {
     }
   });
 });
+
+function headersFromOutgoing(outgoing: Record<string, string>) {
+  return {
+    tenant_id: outgoing["x-openbot-tenant-id"],
+    user_id: outgoing["x-openbot-user-id"],
+    agent_id: outgoing["x-openbot-agent-id"],
+    trace_id: outgoing["x-openbot-trace-id"],
+    run_id: outgoing["x-openbot-run-id"],
+    plan_id: outgoing["x-openbot-plan-id"],
+    policy_generation: Number(outgoing["x-openbot-policy-generation"]),
+  };
+}
+
+describe("AIExecutionTraceHeaderPropagator Gateway ↔ AOR ↔ Knowledge Adapter hops", () => {
+  it("is default-off across Gateway, AOR Backend, and Knowledge Adapter hops", () => {
+    const gateway = createAiExecutionTraceHeaderPropagator();
+    const aor = createAiExecutionTraceHeaderPropagator();
+    const adapter = createAiExecutionTraceHeaderPropagator();
+    expect(gateway.enabled).toBe(false);
+    expect(aor.enabled).toBe(false);
+    expect(adapter.enabled).toBe(false);
+    expect(gateway.propagate(complete).ok).toBe(false);
+    expect(aor.propagate(complete).ok).toBe(false);
+    expect(adapter.propagate(complete).ok).toBe(false);
+  });
+
+  it("when enabled, the official seven keys survive Gateway → AOR Backend → Knowledge Adapter and fail closed if a hop drops a key", () => {
+    const gateway = createAiExecutionTraceHeaderPropagator({ enabled: true });
+    const aor = createAiExecutionTraceHeaderPropagator({ enabled: true });
+    const adapter = createAiExecutionTraceHeaderPropagator({ enabled: true });
+
+    const fromGateway = gateway.propagate(complete);
+    expect(fromGateway.ok).toBe(true);
+    if (!fromGateway.ok) {
+      return;
+    }
+    const fromAor = aor.propagate(headersFromOutgoing(fromGateway.outgoing));
+    expect(fromAor.ok).toBe(true);
+    if (!fromAor.ok) {
+      return;
+    }
+    const fromAdapter = adapter.propagate(headersFromOutgoing(fromAor.outgoing));
+    expect(fromAdapter.ok).toBe(true);
+    if (fromAdapter.ok) {
+      expect(fromAdapter.headers).toEqual(complete);
+      expect(Object.keys(fromAdapter.headers)).toEqual([...AI_EXECUTION_TRACE_HEADER_KEYS]);
+    }
+
+    const dropped = { ...complete, trace_id: "" };
+    const brokenHop = aor.propagate(dropped);
+    expect(brokenHop.ok).toBe(false);
+    if (!brokenHop.ok) {
+      expect(brokenHop.reason).toBe("MISSING_OR_INVALID_HEADER");
+      expect(brokenHop.missing).toContain("trace_id");
+    }
+  });
+});

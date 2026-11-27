@@ -16,3 +16,19 @@ export {
   SEMANTIC_OBJECT_STORE_FILENAME,
   createSemanticObjectCatalogReadAdapter,
 } from "./semantic-object-catalog-read-adapter.js";
+export {
+  MODELS_EMBED_PROVIDER_TRACK,
+  MODELS_EMBED_PROXY_ENABLED_DEFAULT,
+  createControlledModelsEmbedProxy,
+} from "./models-embed-proxy.js";
+export {
+  createSemanticObjectStoreCatalogReader,
+  redactSemanticObjectRecord,
+} from "./semantic-object-catalog-read-adapter.js";
+export {
+  COGNIWEAVE_CHANNEL_4,
+  REVOCATION_PURGE_CHANNELS,
+  REVOCATION_PURGE_RECEIPT_ENABLED_DEFAULT,
+  computeRevocationPurgeReceiptHash,
+  createRevocationPurgeReceiptValidator,
+} from "./revocation-purge-receipt.js";
