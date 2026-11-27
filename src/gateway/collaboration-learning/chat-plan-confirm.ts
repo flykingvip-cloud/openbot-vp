@@ -68,9 +68,12 @@ export function parseChatPlanConfirmIntent(message: string): ChatPlanConfirmInte
   if (CONFIRM_RE.test(text)) {
     return { kind: "confirm" };
   }
-  // Soft containments: only short mixed confirm attempts stay ambiguous.
-  // Long @mention / task / 监管催促 payloads are ordinary chat (not planConfirm).
-  if (/确认/.test(text) && text.length > 24) {
+  // Soft containments: only mixed messages anchored on a plan-confirm attempt stay ambiguous.
+  // Ordinary group prose containing "确认" (e.g. "测试确认", "请确认分工") is not planConfirm.
+  const hasPlanConfirmAnchor =
+    /^(?:确认|同意|按此|就按|confirm\b)/iu.test(text) ||
+    /(?:确认|同意)\s*(?:计划|执行|方案|todolist|看板)/iu.test(text);
+  if (/确认/.test(text) && text.length > 24 && hasPlanConfirmAnchor) {
     if (isOperationalNonPlanConfirmMessage(text)) {
       return { kind: "not_confirm" };
     }

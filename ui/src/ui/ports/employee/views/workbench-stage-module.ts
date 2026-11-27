@@ -773,6 +773,13 @@ function renderSystemSettingsPage(
                         },
                         onLoadRobotEnterpriseIdentities: (agentId) =>
                           settings.onLoadRobotEnterpriseIdentities?.(agentId),
+                        dataSurface: settings.myBotDetail?.dataSurface ?? null,
+                        onEnsureRobotData: (agentId) =>
+                          settings.myBotDetail?.onEnsureDataSurface?.(agentId),
+                        capabilityAtlas: settings.myBotDetail?.capabilityAtlas ?? null,
+                        onEnsureCapabilityAtlas: (agentId) =>
+                          settings.myBotDetail?.onEnsureCapabilityAtlas?.(agentId),
+                        onOpenRobotDataItem: (item) => settings.myBotDetail?.onOpenDataItem?.(item),
                         ownedRobotDeleteBusyId: settings.ownedRobotDeleteBusyId,
                         ownedRobotDeleteError: settings.ownedRobotDeleteError,
                         ownedRobotDeleteDisposition: settings.ownedRobotDeleteDisposition,

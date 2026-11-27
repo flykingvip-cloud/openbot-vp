@@ -523,6 +523,7 @@ export function buildGatewayCronService(params: {
   });
   registerScheduledTaskCronPort({
     add: (job) => cron.add(job),
+    list: async (opts) => cron.list({ includeDisabled: opts?.includeDisabled ?? true }),
   });
 
   return { cron, storePath, cronEnabled };

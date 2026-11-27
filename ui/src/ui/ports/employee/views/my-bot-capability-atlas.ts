@@ -615,12 +615,12 @@ export async function ensureRobotCapabilityAtlas(
       loaded: true,
       error: "未连接，暂时读不到能力与知识。",
     });
-    render();
+    queueMicrotask(render);
     return;
   }
   const client = host.client;
   atlases.set(id, { ...(current ?? emptyAtlas(id, true)), loading: true, error: null });
-  render();
+  queueMicrotask(render);
   const job = loadRobotCapabilityAtlas(client, id)
     .then((atlas) => {
       atlases.set(id, atlas);
@@ -640,6 +640,30 @@ export async function ensureRobotCapabilityAtlas(
   await job;
 }
 
+const ATLAS_RPC_TIMEOUT_MS = 5000;
+
+function requestAtlasWithTimeout(
+  client: AtlasClient,
+  method: string,
+  params?: unknown,
+): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`capability atlas rpc timeout: ${method}`));
+    }, ATLAS_RPC_TIMEOUT_MS);
+    client.request(method, params).then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err: unknown) => {
+        clearTimeout(timer);
+        reject(err);
+      },
+    );
+  });
+}
+
 async function loadRobotCapabilityAtlas(
   client: AtlasClient,
   agentId: string,
@@ -653,13 +677,13 @@ async function loadRobotCapabilityAtlas(
     memoryResult,
     standingResult,
   ] = await Promise.allSettled([
-    client.request("skills.status", { agentId }),
-    client.request("robot-skills.list", { agentId }),
-    client.request("knowledge.base.list", {}),
-    client.request("personal-skills.list", {}),
-    client.request("pattern-detection.list-candidates", { agentId }),
-    client.request("data.memory.list", { agentId, statusView: "active" }),
-    client.request("agents.files.get", { agentId, name: "MEMORY.md" }),
+    requestAtlasWithTimeout(client, "skills.status", { agentId }),
+    requestAtlasWithTimeout(client, "robot-skills.list", { agentId }),
+    requestAtlasWithTimeout(client, "knowledge.base.list", {}),
+    requestAtlasWithTimeout(client, "personal-skills.list", {}),
+    requestAtlasWithTimeout(client, "pattern-detection.list-candidates", { agentId }),
+    requestAtlasWithTimeout(client, "data.memory.list", { agentId, statusView: "active" }),
+    requestAtlasWithTimeout(client, "agents.files.get", { agentId, name: "MEMORY.md" }),
   ]);
   const statusPayload = statusResult.status === "fulfilled" ? asRecord(statusResult.value) : null;
   const runtimeSkills = Array.isArray(statusPayload?.skills) ? statusPayload.skills : [];

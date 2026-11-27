@@ -43,6 +43,13 @@ describe("parseChatPlanConfirmIntent", () => {
     expect(parseChatPlanConfirmIntent("确认计划，另外把范围改成商业化").kind).toBe("ambiguous");
   });
 
+  it("does not intercept ordinary group prose containing 确认", () => {
+    expect(
+      parseChatPlanConfirmIntent("请协作小组简要汇总当前小组成员分工，并给出一条简短协作测试确认。")
+        .kind,
+    ).toBe("not_confirm");
+  });
+
   it("does not intercept long @mention / 监管催促 / task payloads as planConfirm", () => {
     const nudge =
       "@bot @panda 监管催促：请合稿并刷新 ACCEPTANCE；NIGHT-20261028-ops-manual 已宿主合入，请确认页数。";

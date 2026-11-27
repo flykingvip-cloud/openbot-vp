@@ -38,6 +38,7 @@ const SERVICE_UNAVAILABLE =
 
 export type ScheduledTaskCronPort = {
   add: (job: CronJobCreate) => Promise<CronJob>;
+  list?: (opts?: { includeDisabled?: boolean }) => Promise<CronJob[]>;
 };
 
 let scheduledTaskCronPort: ScheduledTaskCronPort | null = null;
@@ -249,4 +250,51 @@ export async function createOwnerScheduledTask(
     },
   };
   return await port.add(jobCreate);
+}
+
+/**
+ * List cron jobs owned by the signed-in caller (read-only).
+ * Never returns jobs owned by other users or tenants.
+ */
+export async function listOwnerScheduledTasks(
+  params: OwnerScheduledTaskIdentity & {
+    includeDisabled?: boolean;
+    agentId?: string;
+  },
+): Promise<CronJob[]> {
+  const client = buildKnowledgeReplyGatewayClient({
+    gatewayClientUser: params.gatewayClientUser,
+    gatewayClientSessionDomain: params.gatewayClientSessionDomain,
+    gatewayClientPlatformUserId: params.gatewayClientPlatformUserId,
+    gatewayClientSessionEnterpriseId: params.gatewayClientSessionEnterpriseId,
+    gatewayClientSessionMembershipId: params.gatewayClientSessionMembershipId,
+  });
+  if (!client) {
+    throw new ToolAuthorizationError(OWNER_REQUIRED);
+  }
+  const actor = await resolveEmployeeWorkbenchActor(client);
+  const ownerId = actor?.userId?.trim() ?? "";
+  if (!actor || !ownerId) {
+    throw new ToolAuthorizationError(OWNER_REQUIRED);
+  }
+  const port = scheduledTaskCronPort;
+  if (!port || typeof port.list !== "function") {
+    throw new ToolInputError(SERVICE_UNAVAILABLE);
+  }
+  const tenantId = actor.tenantId?.trim() || undefined;
+  const filterAgentId = params.agentId?.trim() ? normalizeAgentId(params.agentId) : undefined;
+  const jobs = await port.list({ includeDisabled: params.includeDisabled ?? true });
+  return jobs.filter((job) => {
+    const jobOwner = job.ownership?.ownerId?.trim();
+    if (jobOwner !== ownerId) {
+      return false;
+    }
+    if (tenantId && job.ownership?.tenantId && job.ownership.tenantId.trim() !== tenantId) {
+      return false;
+    }
+    if (filterAgentId && normalizeAgentId(job.agentId ?? "") !== filterAgentId) {
+      return false;
+    }
+    return true;
+  });
 }
