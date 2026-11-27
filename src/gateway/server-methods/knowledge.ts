@@ -220,7 +220,7 @@ import {
 } from "../knowledge/sources/local-folder-watcher.js";
 import { loadPersonalKnowledgeObjectBySkillId } from "../knowledge/sources/personal-source.js";
 import {
-  getApiSourceCatalog,
+  getAuthorizedApiSourceCatalog,
   invokeApiSource,
   syncApiSourceCatalog,
 } from "../knowledge/sources/source-api-runtime.js";
@@ -3634,7 +3634,18 @@ export const knowledgeHandlers: GatewayRequestHandlers = {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "sourceId required"));
       return;
     }
-    const catalog = getApiSourceCatalog(sourceId);
+    const clientUser = clientUserEmail(client);
+    const binding = listKnowledgeSourceBindings().find((item) => item.id === sourceId);
+    const authorizedIds = new Set<string>();
+    if (binding?.knowledgeBaseId) {
+      const kb = authorizedKnowledgeBase(binding.knowledgeBaseId, context, clientUser, "read");
+      if (kb) {
+        authorizedIds.add(kb.id);
+      }
+    }
+    const catalog = getAuthorizedApiSourceCatalog(sourceId, context, {
+      authorizedKnowledgeBaseIds: authorizedIds.size > 0 ? authorizedIds : undefined,
+    });
     respond(true, { catalog });
   },
 

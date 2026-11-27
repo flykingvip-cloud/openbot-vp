@@ -16128,6 +16128,23 @@ landingStreams:
       - src/retrieval/sources/knowledge-source.test.ts
       - src/gateway/server-methods/vault-sync.ts
       - src/gateway/server-methods/vault-sync.test.ts
+      - src/gateway/knowledge/knowledge-access-gate.ts
+      - src/gateway/knowledge/actions/action-engine.ts
+      - src/gateway/knowledge/discovery/event-projector.ts
+      - src/gateway/knowledge/document-ego-graph-runtime.ts
+      - src/gateway/knowledge/feed/enterprise-feed-adapter.ts
+      - src/gateway/knowledge/governance/chunk-governance-store.ts
+      - src/gateway/knowledge/governance/usage/governance-llm-usage-store.ts
+      - src/gateway/knowledge/router-document-focus.test.ts
+      - src/gateway/knowledge/router-library-panorama.test.ts
+      - src/gateway/knowledge/router.ts
+      - src/gateway/knowledge/runtime/knowledge-runtime-context.ts
+      - src/gateway/knowledge/sources/source-api-runtime.ts
+      - src/gateway/knowledge/lineage/lineage-explain-acl.test.ts
+      - src/gateway/server-methods/knowledge-governance.ts
+      - src/gateway/server-methods/knowledge.ts
+      - src/gateway/server-methods/space-acl-13-gaps.test.ts
+      - .loom/registry.yaml
     canLandWith: []
     metadata:
       legacyTitle: User-authorized M2-B isolated contract adapter and safety remediation
@@ -37002,4 +37019,140 @@ sharedPaths:
       retained, including knowledge-vault-sync:cursor-vault-sync,
       main-recovery-routing, and pi-sdk-family-migration-v3:cursor. No
       whole-task takeover.
+    reviewAfter: 2026-12-31
+  - glob: src/gateway/knowledge/knowledge-access-gate.ts
+    landerTask: knowledge-sdk-alignment:codex-knowledge
+    reason: Owner widget t21s2 AUTH-V21-03 authorized a local-only fix of 13
+      residual ACL gaps on branch codex/openbot/space-acl-13-gaps-fix.
+      Exact-file landing; predecessor owners, paths, and session history
+      are retained. exclusive:false; no exclusive takeover; this branch
+      is not pushed in this authorization.
+    reviewAfter: 2026-12-31
+  - glob: src/gateway/knowledge/actions/action-engine.ts
+    landerTask: knowledge-sdk-alignment:codex-knowledge
+    reason: Owner widget t21s2 AUTH-V21-03 authorized a local-only fix of 13
+      residual ACL gaps on branch codex/openbot/space-acl-13-gaps-fix.
+      Exact-file landing; predecessor owners, paths, and session history
+      are retained. exclusive:false; no exclusive takeover; this branch
+      is not pushed in this authorization.
+    reviewAfter: 2026-12-31
+  - glob: src/gateway/knowledge/discovery/event-projector.ts
+    landerTask: knowledge-sdk-alignment:codex-knowledge
+    reason: Owner widget t21s2 AUTH-V21-03 authorized a local-only fix of 13
+      residual ACL gaps on branch codex/openbot/space-acl-13-gaps-fix.
+      Exact-file landing; predecessor owners, paths, and session history
+      are retained. exclusive:false; no exclusive takeover; this branch
+      is not pushed in this authorization.
+    reviewAfter: 2026-12-31
+  - glob: src/gateway/knowledge/document-ego-graph-runtime.ts
+    landerTask: knowledge-sdk-alignment:codex-knowledge
+    reason: Owner widget t21s2 AUTH-V21-03 authorized a local-only fix of 13
+      residual ACL gaps on branch codex/openbot/space-acl-13-gaps-fix.
+      Exact-file landing; predecessor owners, paths, and session history
+      are retained. exclusive:false; no exclusive takeover; this branch
+      is not pushed in this authorization.
+    reviewAfter: 2026-12-31
+  - glob: src/gateway/knowledge/feed/enterprise-feed-adapter.ts
+    landerTask: knowledge-sdk-alignment:codex-knowledge
+    reason: Owner widget t21s2 AUTH-V21-03 authorized a local-only fix of 13
+      residual ACL gaps on branch codex/openbot/space-acl-13-gaps-fix.
+      Exact-file landing; predecessor owners, paths, and session history
+      are retained. exclusive:false; no exclusive takeover; this branch
+      is not pushed in this authorization.
+    reviewAfter: 2026-12-31
+  - glob: src/gateway/knowledge/governance/chunk-governance-store.ts
+    landerTask: knowledge-sdk-alignment:codex-knowledge
+    reason: Owner widget t21s2 AUTH-V21-03 authorized a local-only fix of 13
+      residual ACL gaps on branch codex/openbot/space-acl-13-gaps-fix.
+      Exact-file landing; predecessor owners, paths, and session history
+      are retained. exclusive:false; no exclusive takeover; this branch
+      is not pushed in this authorization.
+    reviewAfter: 2026-12-31
+  - glob: src/gateway/knowledge/governance/usage/governance-llm-usage-store.ts
+    landerTask: knowledge-sdk-alignment:codex-knowledge
+    reason: Owner widget t21s2 AUTH-V21-03 authorized a local-only fix of 13
+      residual ACL gaps on branch codex/openbot/space-acl-13-gaps-fix.
+      Exact-file landing; predecessor owners, paths, and session history
+      are retained. exclusive:false; no exclusive takeover; this branch
+      is not pushed in this authorization.
+    reviewAfter: 2026-12-31
+  - glob: src/gateway/knowledge/router-document-focus.test.ts
+    landerTask: knowledge-sdk-alignment:codex-knowledge
+    reason: Owner widget t21s2 AUTH-V21-03 authorized a local-only fix of 13
+      residual ACL gaps on branch codex/openbot/space-acl-13-gaps-fix.
+      Exact-file landing; predecessor owners, paths, and session history
+      are retained. exclusive:false; no exclusive takeover; this branch
+      is not pushed in this authorization.
+    reviewAfter: 2026-12-31
+  - glob: src/gateway/knowledge/router-library-panorama.test.ts
+    landerTask: knowledge-sdk-alignment:codex-knowledge
+    reason: Owner widget t21s2 AUTH-V21-03 authorized a local-only fix of 13
+      residual ACL gaps on branch codex/openbot/space-acl-13-gaps-fix.
+      Exact-file landing; predecessor owners, paths, and session history
+      are retained. exclusive:false; no exclusive takeover; this branch
+      is not pushed in this authorization.
+    reviewAfter: 2026-12-31
+  - glob: src/gateway/knowledge/router.ts
+    landerTask: knowledge-sdk-alignment:codex-knowledge
+    reason: Owner widget t21s2 AUTH-V21-03 authorized a local-only fix of 13
+      residual ACL gaps on branch codex/openbot/space-acl-13-gaps-fix.
+      Exact-file landing; predecessor owners, paths, and session history
+      are retained. exclusive:false; no exclusive takeover; this branch
+      is not pushed in this authorization.
+    reviewAfter: 2026-12-31
+  - glob: src/gateway/knowledge/runtime/knowledge-runtime-context.ts
+    landerTask: knowledge-sdk-alignment:codex-knowledge
+    reason: Owner widget t21s2 AUTH-V21-03 authorized a local-only fix of 13
+      residual ACL gaps on branch codex/openbot/space-acl-13-gaps-fix.
+      Exact-file landing; predecessor owners, paths, and session history
+      are retained. exclusive:false; no exclusive takeover; this branch
+      is not pushed in this authorization.
+    reviewAfter: 2026-12-31
+  - glob: src/gateway/knowledge/sources/source-api-runtime.ts
+    landerTask: knowledge-sdk-alignment:codex-knowledge
+    reason: Owner widget t21s2 AUTH-V21-03 authorized a local-only fix of 13
+      residual ACL gaps on branch codex/openbot/space-acl-13-gaps-fix.
+      Exact-file landing; predecessor owners, paths, and session history
+      are retained. exclusive:false; no exclusive takeover; this branch
+      is not pushed in this authorization.
+    reviewAfter: 2026-12-31
+  - glob: src/gateway/knowledge/lineage/lineage-explain-acl.test.ts
+    landerTask: knowledge-sdk-alignment:codex-knowledge
+    reason: Owner widget t21s2 AUTH-V21-03 authorized a local-only fix of 13
+      residual ACL gaps on branch codex/openbot/space-acl-13-gaps-fix.
+      Exact-file landing; predecessor owners, paths, and session history
+      are retained. exclusive:false; no exclusive takeover; this branch
+      is not pushed in this authorization.
+    reviewAfter: 2026-12-31
+  - glob: src/gateway/server-methods/knowledge-governance.ts
+    landerTask: knowledge-sdk-alignment:codex-knowledge
+    reason: Owner widget t21s2 AUTH-V21-03 authorized a local-only fix of 13
+      residual ACL gaps on branch codex/openbot/space-acl-13-gaps-fix.
+      Exact-file landing; predecessor owners, paths, and session history
+      are retained. exclusive:false; no exclusive takeover; this branch
+      is not pushed in this authorization.
+    reviewAfter: 2026-12-31
+  - glob: src/gateway/server-methods/knowledge.ts
+    landerTask: knowledge-sdk-alignment:codex-knowledge
+    reason: Owner widget t21s2 AUTH-V21-03 authorized a local-only fix of 13
+      residual ACL gaps on branch codex/openbot/space-acl-13-gaps-fix.
+      Exact-file landing; predecessor owners, paths, and session history
+      are retained. exclusive:false; no exclusive takeover; this branch
+      is not pushed in this authorization.
+    reviewAfter: 2026-12-31
+  - glob: src/gateway/server-methods/space-acl-13-gaps.test.ts
+    landerTask: knowledge-sdk-alignment:codex-knowledge
+    reason: Owner widget t21s2 AUTH-V21-03 authorized a local-only fix of 13
+      residual ACL gaps on branch codex/openbot/space-acl-13-gaps-fix.
+      Exact-file landing; predecessor owners, paths, and session history
+      are retained. exclusive:false; no exclusive takeover; this branch
+      is not pushed in this authorization.
+    reviewAfter: 2026-12-31
+  - glob: .loom/registry.yaml
+    landerTask: knowledge-sdk-alignment:codex-knowledge
+    reason: Owner widget t21s2 AUTH-V21-03 authorized a local-only fix of 13
+      residual ACL gaps on branch codex/openbot/space-acl-13-gaps-fix.
+      Exact-file landing; predecessor owners, paths, and session history
+      are retained. exclusive:false; no exclusive takeover; this branch
+      is not pushed in this authorization.
     reviewAfter: 2026-12-31
