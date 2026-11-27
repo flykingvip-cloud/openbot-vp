@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import path from "node:path";
 import { deliverQueuedReply } from "../../agent-runtime/delivery/index.js";
 import {
   assertControlledExecutionStages,
@@ -19,17 +20,15 @@ import {
 } from "../../agent-runtime/state/index.js";
 import {
   findBlockedFollowupDelivery,
-  markFollowupRecoveryDeliveryStarted,
-  markFollowupRecoveryDeliverySent,
   planFollowupRecoveryRetry,
   recordFollowupWorkspaceDecision,
-  recordBlockedFollowupDelivery,
   resolveBlockedFollowupDeliveryPersistRoot,
   type FollowupDeliveryResumeSnapshot,
 } from "../../agent-runtime/state/index.js";
 import { bindAdmittedTurnHost } from "../../agent-runtime/wiring/admitted-turn-host.js";
 import { confirmPendingTurnDelivery } from "../../agent-runtime/wiring/delivery-confirm.js";
 import { replyTurnRuntime } from "../../agent-runtime/wiring/reply-turn.js";
+import { resolveAgentDir } from "../../agents/agent-scope.js";
 import { resolveRunModelFallbacksOverride } from "../../agents/agent-scope.js";
 import { resolveBootstrapWarningSignaturesSeen } from "../../agents/bootstrap-budget.js";
 import { lookupContextTokens } from "../../agents/context.js";
@@ -57,8 +56,10 @@ import { logVerbose } from "../../globals.js";
 import { registerAgentRunContext } from "../../infra/agent-events.js";
 import { defaultRuntime } from "../../runtime.js";
 import { resolveTurnContractFromRunMeta } from "../../task-outcome/chat-entry.js";
+import { deliverRecoveredAwaitingSends } from "../../task-outcome/consumer-boot.js";
 import { ensureFollowupTurnTaskOutcome } from "../../task-outcome/entrypoint-ensure.js";
 import { peekAwaitingDelivery } from "../../task-outcome/pending-delivery.js";
+import { TASK_OUTCOME_STORE_DIRNAME } from "../../task-outcome/runtime-from-runner.js";
 import type { GrowthOutcomeCommitOpts } from "../../task-outcome/runtime-from-runner.js";
 import {
   assertRunnerTurnBudgetAllowsModelCall,
@@ -534,87 +535,41 @@ export function createFollowupRunner(params: {
           queued.asyncWaitRecoveryBind?.boundRunId?.trim() ||
           queued.run.taskCompletionBinding?.executionAttempt?.trim() ||
           "";
-        const pending = lookupRunId
-          ? peekAwaitingDelivery({
-              runId: lookupRunId,
-              ...(queued.asyncWaitRecoveryBind?.boundDeliveryId
-                ? { deliveryId: queued.asyncWaitRecoveryBind.boundDeliveryId }
-                : {}),
-            })
-          : undefined;
-        const deliveryRunId = pending?.runId || lookupRunId || runId;
-        const deliveryId =
-          queued.asyncWaitRecoveryBind?.boundDeliveryId?.trim() ||
-          pending?.deliveryId ||
-          `delivery:${deliveryRunId}:visible`;
-        const taskId = pending?.taskId;
-        // Prefer queued payloads (from durable recovery intent); never a placeholder.
-        let retryPayloads = (queued.asyncWaitDeliveryPayloads ?? []).filter(
-          (p) => p && (p.text || p.mediaUrl || (p.mediaUrls && p.mediaUrls.length > 0)),
+        const agentId = queued.run.agentId?.trim();
+        if (!lookupRunId || !agentId) {
+          logVerbose("async-wait delivery-only retry refused: original identity missing");
+          return;
+        }
+        const persistRoot = path.join(
+          resolveAgentDir(queued.run.config, agentId),
+          TASK_OUTCOME_STORE_DIRNAME,
         );
-        if (retryPayloads.length === 0 && queued.asyncWaitRecoveryBind?.jobId) {
-          const intent = readAsyncWaitJobIntent(
-            queued.run.sessionFile,
-            queued.asyncWaitRecoveryBind.jobId,
-          );
-          retryPayloads = (intent?.recovery?.boundPayloads ?? []).filter(
-            (p) => p && (p.text || p.mediaUrl || (p.mediaUrls && p.mediaUrls.length > 0)),
-          );
+        const pending = peekAwaitingDelivery({ runId: lookupRunId, persistRoot });
+        const expectedDeliveryId = queued.asyncWaitRecoveryBind?.boundDeliveryId?.trim();
+        const expectedBinding = queued.run.taskCompletionBinding;
+        if (
+          !pending ||
+          pending.runId !== lookupRunId ||
+          (expectedDeliveryId && pending.deliveryId !== expectedDeliveryId) ||
+          (expectedBinding &&
+            (!pending.checkedTask ||
+              pending.checkedTask.sessionFile !== queued.run.sessionFile ||
+              pending.checkedTask.binding.taskId !== expectedBinding.taskId ||
+              pending.checkedTask.binding.executionAttempt !== expectedBinding.executionAttempt ||
+              pending.checkedTask.binding.deliverableVersion !==
+                expectedBinding.deliverableVersion))
+        ) {
+          logVerbose("async-wait delivery-only retry refused: original pending identity mismatch");
+          return;
         }
-        if (retryPayloads.length === 0) {
-          logVerbose(
-            "async-wait delivery-only retry refused: original payloads missing — not confirming delivered",
-          );
-          await confirmPendingTurnDelivery({
-            cfg: queued.run.config,
-            runId: deliveryRunId,
-            deliveryId,
-            ...(taskId ? { taskId } : {}),
-            sessionKey: queued.run.sessionKey ?? sessionKey,
-            status: "failed",
-            error: "original_payloads_missing",
-          });
-        } else {
-          const persistRoot = resolveBlockedFollowupDeliveryPersistRoot(queued.run.sessionFile);
-          let record = findBlockedFollowupDelivery(persistRoot, {
-            runId: deliveryRunId,
-            deliveryId,
-            jobId: queued.asyncWaitRecoveryBind?.jobId,
-          });
-          if (!record) {
-            record = await recordBlockedFollowupDelivery({
-              persistRoot,
-              reason: "delivery_receipt_pending",
-              error: "",
-              runId: deliveryRunId,
-              deliveryId,
-              taskId,
-              sessionFile: queued.run.sessionFile,
-              sessionKey: queued.run.sessionKey ?? sessionKey,
-              jobId: queued.asyncWaitRecoveryBind?.jobId,
-              status: "recoverable_wait",
-            });
-          }
-          const dispatching = await markFollowupRecoveryDeliveryStarted({ persistRoot, record });
-          const delivered = await sendFollowupPayloads(retryPayloads, queued, true);
-          let confirmStatus: "delivered" | "failed" | "delivery_unknown" =
-            delivered === "none" ? "failed" : delivered;
-          if (confirmStatus === "failed" || delivered === "none") {
-            // Keep retryable for another delivery-only attempt.
-            confirmStatus = "delivery_unknown";
-          }
-          await confirmPendingTurnDelivery({
-            cfg: queued.run.config,
-            runId: deliveryRunId,
-            deliveryId,
-            ...(taskId ? { taskId } : {}),
-            sessionKey: queued.run.sessionKey ?? sessionKey,
-            status: confirmStatus,
-          });
-          if (confirmStatus === "delivered") {
-            await markFollowupRecoveryDeliverySent({ persistRoot, record: dispatching });
-          }
-        }
+        // Workspace reauthorization above remains mandatory. Pending owns send
+        // rights, original payload/target and receipt confirmation across workers.
+        await deliverRecoveredAwaitingSends({
+          cfg: queued.run.config,
+          persistRoot,
+          agentId,
+          runId: lookupRunId,
+        });
       } catch (err) {
         logVerbose(`async-wait delivery-only retry failed: ${String(err)}`);
       } finally {

@@ -19,7 +19,9 @@ import {
   recoverTaskOutcomeConsumersAtGatewayBoot,
   stopTaskOutcomeRuntimeDrainForTests,
 } from "./consumer-boot.js";
+import { deliverRecoveredAwaitingSends } from "./consumer-boot.js";
 import { OutcomeConsumerRuntime } from "./consumers.js";
+import { withDurableJsonLock } from "./durable-json-file.js";
 import { ChatTaskOutcomeAdapter } from "./entrypoints/chat.js";
 import { clearAwaitingDeliveriesForTests, peekAwaitingDelivery } from "./pending-delivery.js";
 import { TaskOutcomeResultService } from "./result-service.js";
@@ -494,4 +496,93 @@ describe("S4 result persist → notify → delivery receipt", () => {
     await recoverTaskOutcomeConsumersAtGatewayBoot(bootArgs);
     expect(sendCalls).toBe(1);
   });
+
+  it.each(["pause", "version", "authorization"] as const)(
+    "rechecks %s after waiting for the real durable claim lock and never revives its unknown claim",
+    async (change) => {
+      const runId = `s4-claim-${change}`;
+      const taskId = `s4-task-claim-${change}`;
+      const sessionFile = path.join(agentDir, `claim-${change}.jsonl`);
+      const binding = {
+        taskId: `board-claim-${change}`,
+        executionAttempt: runId,
+        deliverableVersion: "v1",
+      };
+      seedBoundBoard(sessionFile, binding);
+      await persistThenCrash({
+        runId,
+        taskId,
+        sessionFile,
+        binding,
+        payloads: [{ text: "original" }],
+        target: { channel: "telegram", to: "111" },
+      });
+      const { promotePendingDeliveryIntents } = await import("./consumer-boot.js");
+      promotePendingDeliveryIntents({ persistRoot: storeRoot, agentId: "bot" });
+      const pendingPath = path.join(
+        storeRoot,
+        "pending-deliveries",
+        `${encodeURIComponent(runId)}.json`,
+      );
+      expect(fs.existsSync(pendingPath)).toBe(true);
+      let unlock!: () => void;
+      let entered!: () => void;
+      const held = new Promise<void>((resolve) => {
+        entered = resolve;
+      });
+      const release = new Promise<void>((resolve) => {
+        unlock = resolve;
+      });
+      const holder = withDurableJsonLock(pendingPath, async () => {
+        entered();
+        await release;
+      });
+      await held;
+      let sendCalls = 0;
+      const sendPendingVisible = async () => {
+        sendCalls++;
+        return [{ messageId: "must-not-send" }];
+      };
+      const delivery = deliverRecoveredAwaitingSends({
+        cfg,
+        persistRoot: storeRoot,
+        agentId: "bot",
+        sendPendingVisible,
+      });
+      // The helper performs its prechecks synchronously before its first await on claim.
+      try {
+        if (change === "authorization") {
+          cfg.channels!.telegram = { ...cfg.channels!.telegram, enabled: false };
+        } else {
+          mutateSessionTaskBoard(sessionFile, (board) => ({
+            board: {
+              ...board,
+              current: board.current
+                ? {
+                    ...board.current,
+                    ...(change === "pause"
+                      ? { wakeSuppress: true }
+                      : { executionAttempt: "later-run", deliverableVersion: "v2" }),
+                  }
+                : board.current,
+            },
+            value: undefined,
+          }));
+        }
+      } finally {
+        unlock();
+      }
+      await holder;
+      await delivery;
+      expect(sendCalls).toBe(0);
+      const pending = peekAwaitingDelivery({ runId, persistRoot: storeRoot });
+      expect(pending?.sendDisposition).toBe("unknown");
+      await recoverTaskOutcomeConsumersAtGatewayBoot({
+        cfg,
+        startRuntimeDrain: false,
+        sendPendingVisible,
+      });
+      expect(sendCalls).toBe(0);
+    },
+  );
 });

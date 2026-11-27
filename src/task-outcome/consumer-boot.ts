@@ -232,16 +232,25 @@ export async function deliverRecoveredAwaitingSends(params: {
   cfg: OpenBotConfig;
   persistRoot: string;
   agentId: string;
+  /** Optional exact run filter; omitted preserves boot batch recovery. */
+  runId?: string;
   sendPendingVisible?: RecoveredVisibleSendPort;
 }): Promise<{ sent: number; blocked: number; unknown: number }> {
   const persistRoot = params.persistRoot.trim();
   const out = { sent: 0, blocked: 0, unknown: 0 };
+  const requestedRunId = params.runId?.trim();
+  if (params.runId !== undefined && !requestedRunId) {
+    return out;
+  }
   if (!persistRoot) {
     return out;
   }
   const store = new DurableTaskOutcomeStore(persistRoot);
   const send = params.sendPendingVisible ?? defaultSendPendingVisible;
   for (const pending of listDurableAwaitingDeliveries(persistRoot)) {
+    if (requestedRunId && pending.runId !== requestedRunId) {
+      continue;
+    }
     let claimedIdentity: { runId: string; deliveryId: string; taskId: string } | undefined;
     try {
       if (pending.sendDisposition !== "not_attempted") {
@@ -302,6 +311,17 @@ export async function deliverRecoveredAwaitingSends(params: {
         deliveryId: claimed.registration.deliveryId,
         taskId: claimed.registration.taskId,
       };
+      // Claim acquisition may wait while task ownership or authorization changes.
+      // Recheck the locked registration immediately before the send port. The
+      // claim is already unknown; refusal must not revive automatic resend.
+      if (
+        !canReuseCurrentBinding(claimed.registration) ||
+        !recheckCurrentOutboundAuthorization({ cfg: params.cfg, pending: claimed.registration })
+          .allow
+      ) {
+        out.blocked += 1;
+        continue;
+      }
       const receipts = await send({
         cfg: params.cfg,
         agentId: params.agentId,

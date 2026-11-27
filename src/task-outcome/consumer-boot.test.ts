@@ -195,4 +195,72 @@ describe("task-outcome consumer boot / runtime drain", () => {
     expect(confirmed.record.lifecycle).toBe("closed");
     expect(confirmed.record.taskJudgement).toBe("success");
   });
+
+  it("filters an exact run without claiming other pending entries and preserves default boot batching", async () => {
+    const { deliverRecoveredAwaitingSends } = await import("./consumer-boot.js");
+    const seed = async (runId: string) => {
+      const taskId = `filter-task:${runId}`;
+      const deliveryId = `delivery:${runId}:visible`;
+      await recordRunnerTurnOutcome(cfg, "bot", {
+        success: true,
+        runId,
+        taskId,
+        scope,
+        acceptance: { status: "passed" },
+        delivery: { status: "pending" },
+        deliveryId,
+      });
+      registerAwaitingDelivery({
+        runId,
+        taskId,
+        deliveryId,
+        agentId: "bot",
+        persistRoot: storeRoot,
+        payloads: [{ text: runId }],
+        target: { channel: "telegram", to: "111" },
+        sendDisposition: "not_attempted",
+        authorization: { subjectRef: "u", channel: "telegram", to: "111" },
+      });
+    };
+    cfg.channels = { telegram: { enabled: true, defaultTo: "111" } };
+    await seed("filter-a");
+    await seed("filter-b");
+    const aPath = path.join(storeRoot, "pending-deliveries", "filter-a.json");
+    const bPath = path.join(storeRoot, "pending-deliveries", "filter-b.json");
+    const beforeA = fs.readFileSync(aPath, "utf8");
+    const beforeB = fs.readFileSync(bPath, "utf8");
+    const sent: string[] = [];
+    const sendPendingVisible = async (input: { runId: string }) => {
+      sent.push(input.runId);
+      return [{ messageId: `receipt:${input.runId}` }];
+    };
+    await deliverRecoveredAwaitingSends({
+      cfg,
+      persistRoot: storeRoot,
+      agentId: "bot",
+      runId: "   ",
+      sendPendingVisible,
+    });
+    expect(sent).toEqual([]);
+    expect(fs.readFileSync(aPath, "utf8")).toBe(beforeA);
+    expect(fs.readFileSync(bPath, "utf8")).toBe(beforeB);
+    await deliverRecoveredAwaitingSends({
+      cfg,
+      persistRoot: storeRoot,
+      agentId: "bot",
+      runId: "filter-a",
+      sendPendingVisible,
+    });
+    expect(sent).toEqual(["filter-a"]);
+    expect(fs.readFileSync(bPath, "utf8")).toBe(beforeB);
+    expect(
+      peekAwaitingDelivery({ runId: "filter-b", persistRoot: storeRoot })?.claimGeneration,
+    ).toBe(JSON.parse(beforeB).claimGeneration);
+    await recoverTaskOutcomeConsumersAtGatewayBoot({
+      cfg,
+      startRuntimeDrain: false,
+      sendPendingVisible,
+    });
+    expect(sent).toEqual(["filter-a", "filter-b"]);
+  });
 });

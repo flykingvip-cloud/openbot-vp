@@ -1,5 +1,28 @@
 version: 1
 tasks:
+  - id: recovery-send-unification-20261127
+    owner: grok-bot
+    intent:
+      - "Unify recovered send: post-claim binding and authorization recheck, followup delivery-only delegation to the unified pending sender, and an exact runId filter, while keeping createUnifiedExecutionLifecycle."
+    paths:
+      - src/task-outcome/consumer-boot.ts
+      - src/task-outcome/consumer-boot.test.ts
+      - src/task-outcome/s4-result-delivery-loop.test.ts
+      - src/auto-reply/reply/followup-runner.ts
+      - src/auto-reply/reply/followup-runner.test.ts
+    state: active
+    sessions:
+      - id: recovery-send-unification-20261127
+        taskId: recovery-send-unification-20261127
+        ide: cursor
+        agent: grok-bot
+        status: active
+        lastSignalAt: "2026-11-27T13:22:00Z"
+        metadata:
+          authorization: User-authorized first-slice recovery-send unification landing on isolated candidate openbot/recovery-send-unification-20261127.
+    ownerHistory: []
+    since: "2026-11-27"
+    metadata: {}
   - id: fix-conversation-send-auto-bind-task
     owner: architecture-executor
     intent:
@@ -16223,6 +16246,19 @@ tasks:
     since: 2026-11-23
     metadata: {}
 landingStreams:
+  - id: recovery-send-unification-20261127
+    landingPolicy: serial
+    paths:
+      - src/task-outcome/consumer-boot.ts
+      - src/task-outcome/consumer-boot.test.ts
+      - src/task-outcome/s4-result-delivery-loop.test.ts
+      - src/auto-reply/reply/followup-runner.ts
+      - src/auto-reply/reply/followup-runner.test.ts
+    canLandWith: []
+    metadata:
+      task: recovery-send-unification-20261127
+      agent: grok-bot
+      purpose: "Exact 5-file recovered-send unification: post-claim recheck, followup delegation to deliverRecoveredAwaitingSends, exact runId filter; keep unified lifecycle."
   - id: fix-conversation-send-auto-bind-task
     landingPolicy: serial
     paths:
