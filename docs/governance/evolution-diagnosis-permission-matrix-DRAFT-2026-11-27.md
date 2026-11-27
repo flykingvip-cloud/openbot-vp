@@ -11,7 +11,7 @@ Related existing material (reused, not replaced):
 - Process-only governance admission, still never a code-default change: [`enforced-admission-checklist.md`](./enforced-admission-checklist.md), [`shadow-staging-runbook.md`](./shadow-staging-runbook.md)
 - Diagnosis × evolution confirmation doors (design, 2026-09-19): [`docs/design/openbot-diagnosis-evolution-fusion-plan-2026-09-19.md`](../design/openbot-diagnosis-evolution-fusion-plan-2026-09-19.md) §3.5
 - Diagnosis write policy: `src/diagnosis/write-policy.ts`
-- Evolution flag map: `src/agent-runtime/evolution/index.ts`
+- Evolution flag helpers (the `unified-lifecycle` key is retired; not a kill switch): `src/agent-runtime/evolution/index.ts`
 - Evolution governance mode: `src/gateway/evolution-governance/mode.ts`
 - Soft/observe digital-employee loop: `src/gateway/evolution-control/soft-observe-dh-loop.ts`
 - Skill auto-evolution: `src/gateway/evolution-governance/skill-auto-evolution.ts`
@@ -109,39 +109,37 @@ Draft whitelist summary, for review only:
 
 ---
 
-## 4. Separate review item — `unified-lifecycle` default-on
+## 4. Retired item — `unified-lifecycle` is not an operator kill switch
 
-This is **not** an approved production policy, and it is not one of the four write classes above.
+This is **not** one of the four write classes above, and retiring the helper is not a production enablement.
 
 Current tree:
 
-- `EVOLUTION_DEFAULTS` in `src/agent-runtime/evolution/index.ts` sets `"unified-lifecycle": true`.
-- Override is `OPENBOT_EVOLUTION_UNIFIED_LIFECYCLE` (or legacy `OPENCLAW_EVOLUTION_UNIFIED_LIFECYCLE`) with `"1"` / `"0"`. Unknown flags default to `false`.
-- Tests in `src/agent-runtime/evolution/index.test.ts` assert the default is `true`.
-- `isEvolutionEnabled("unified-lifecycle")` is **not consulted** by current `createUnifiedExecutionLifecycle(...)` call sites. Those callers import the unified lifecycle directly and run it unconditionally (for example `src/auto-reply/reply/agent-runner-memory.ts`, `src/commands/agent.ts`, `src/gateway/supervisor/worker-executor.ts`, `src/hooks/llm-slug-generator.ts`; also `src/auto-reply/reply/followup-runner.ts` on current `main`). Setting the env var to `"0"` would change `isEvolutionEnabled` / `listEvolutionFlags` only; it would not by itself switch those callers back to a legacy lifecycle.
+- `createUnifiedExecutionLifecycle` is the only remaining execution lifecycle on trunk (Phase 4, #351). The old factories are throw-on-call tombstones; there is no legacy lifecycle to fall back to.
+- Production `createUnifiedExecutionLifecycle(...)` call sites remain unconditional (for example `src/auto-reply/reply/agent-runner-memory.ts`, `src/commands/agent.ts`, `src/gateway/supervisor/worker-executor.ts`, `src/hooks/llm-slug-generator.ts`; also `src/auto-reply/reply/followup-runner.ts` on current `main`).
+- The former helper key `"unified-lifecycle"` is retired in `src/agent-runtime/evolution/index.ts`. `OPENBOT_EVOLUTION_UNIFIED_LIFECYCLE` and legacy `OPENCLAW_EVOLUTION_UNIFIED_LIFECYCLE` have no effect on runtime or on the helpers. `isEvolutionEnabled("unified-lifecycle")` no longer treats those env vars as a disable; `listEvolutionFlags()` does not advertise the key as a live flag.
+- This records current-tree reality. It does not invent a new fail-closed refusal inside `createUnifiedExecutionLifecycle`, does not restore a deleted lifecycle, and does not wire the helper into call sites as a disable switch.
 
-Review questions (not resolved by this draft, and not implemented here):
+Still true, and unchanged here:
 
-1. Should a compile-time default of `true` stand, given that the flag is currently unwired as a kill switch?
-2. If a kill switch is still required, the flag needs a real call-site gate; documenting `default-on` is not that gate.
-3. Do not fold `unified-lifecycle` into the auto-adjust whitelist or into Classes A–D. It is an execution-path convergence flag, not a diagnosis write grant.
+1. Do not fold `unified-lifecycle` into the auto-adjust whitelist or into Classes A–D. It is not a diagnosis write grant.
 
 ---
 
 ## 5. Gaps this draft could not fill from existing materials
 
-- **Live environment values** for `OPENBOT_DIAGNOSIS_*`, `OPENBOT_EVOLUTION_GOVERNANCE_MODE`, `OPENBOT_SKILL_AUTO_*`, `OPENBOT_EVOLUTION_SOFT_OBSERVE_DH`, and `OPENBOT_EVOLUTION_UNIFIED_LIFECYCLE` were not read from production hosts in this pass.
+- **Live environment values** for `OPENBOT_DIAGNOSIS_*`, `OPENBOT_EVOLUTION_GOVERNANCE_MODE`, `OPENBOT_SKILL_AUTO_*`, and `OPENBOT_EVOLUTION_SOFT_OBSERVE_DH` were not read from production hosts in this pass. `OPENBOT_EVOLUTION_UNIFIED_LIFECYCLE` / `OPENCLAW_EVOLUTION_UNIFIED_LIFECYCLE` are retired no-ops (see §4) and are not live kill switches.
 - **Class B named approver and write-policy version — still an Owner decision.** Re-verified on `a7bd5ba11e690e36c084da394094188771d7f435`. `conversationDelivery` exists only on the write-policy snapshot. It is not a `DIAGNOSIS_PRODUCTION_GATES` key and is not in `DIAGNOSIS_ENABLEMENT_STEPS`. No existing enablement or approval document assigns an approver name. The write-policy snapshot is unversioned; tick `requestedBy.schemaVersion: 1` is not a write-policy version. OPE-10 documents this and does **not** invent an approver or a version field.
 - **`DIAGNOSIS_PRODUCTION_GATES` `default` vs `value` for adapters / reportApi — declaration aligned in OPE-10.** This is not a bug in the `default` field. Official tests (`src/diagnosis/production-cutover.test.ts`, `src/diagnosis/production-preflight.test.ts`) require every gate `default === false` and record current state on `value`. `default` is the designed-safe / rollback baseline; `value` is the current compile-time (or write-policy-resolved) state. After O1.1 signed enablement, `DIAGNOSIS_PRODUCTION_ADAPTERS_ENABLED` and `DIAGNOSIS_REPORT_API_DEPLOYED` are `true`. OPE-10 does **not** turn those read-side flags off, and does **not** change `default` to `true`. The stale file header "Default-off" on `src/diagnosis/report-query-production-adapters.ts` is aligned to this distinction. `auditReceipt` remains `pending_human_approval` because the cutover pack is still `approvedForProductionCutover: false`. Whether a separate receipt should be recorded for the O1.1 read-side enablement is an Owner decision, not invented here.
 - **`daibai_delivery_allowlist` vs `DIAGNOSIS_P24_5_DAIBAI_ALLOWLISTED = true` — two layers, pending item kept.** The constant is the canary transport pin (tenant `001`, session `diagnosis:canary:daibai`) used only if the write gate opens. Path B stays closed under the default write policy. The pending name is a human cutover checklist item on `DIAGNOSIS_PRODUCTION_PENDING_CUTOVER_APPROVALS` and in `production-approval-freeze.ts` ("co-approve Da Bai delivery allowlist"). Existing contracts keep the cutover pack rehearsal-only and unapproved. OPE-10 does **not** remove the pending item (that would invent cutover approval) and does **not** widen the pin. Clearing the pending item requires a recorded human cutover approval.
-- This draft does not re-audit every Evolution RPC surface or every `OPENBOT_GOVERNANCE_*` model-entitlement allowlist. Those remain under the existing shadow / admission process docs. Empty `OPENBOT_SKILL_AUTO_ALLOW_AGENTS` is fail-closed on current main (separate slice). The unwired `unified-lifecycle` kill switch remains a separate slice and was not reopened here.
+- This draft does not re-audit every Evolution RPC surface or every `OPENBOT_GOVERNANCE_*` model-entitlement allowlist. Those remain under the existing shadow / admission process docs. Empty `OPENBOT_SKILL_AUTO_ALLOW_AGENTS` is fail-closed on current main (separate slice). The former `unified-lifecycle` helper flag is retired and is not a working kill switch (see §4).
 
 ---
 
 ## 6. Explicit non-goals
 
 - No new engine, feature flag, or runtime branch.
-- No change to write-policy _behavior_ or defaults, evolution flags, production env examples, or `deploy/production/releases.jsonl`. OPE-10 may add declaration comments only.
+- No change to write-policy _behavior_ or defaults, production env examples, or `deploy/production/releases.jsonl`. The `unified-lifecycle` helper retirement is recorded in §4 and is not a write-policy or cutover change. OPE-10 added declaration comments only.
 - No widening of `DIAGNOSIS_P24_5_*`, `SOFT_OBSERVE_DH_SURFACES`, or `OPENBOT_SKILL_AUTO_ALLOW_AGENTS`.
-- No ratification of `unified-lifecycle` default-on or of soft-observe default-on as production policy.
+- No revival of a `unified-lifecycle` kill switch; retirement of that helper is recorded in §4. No ratification of soft-observe default-on as production policy.
 - No invented Class B approver, write-policy version, cutover approval, or audit receipt.
