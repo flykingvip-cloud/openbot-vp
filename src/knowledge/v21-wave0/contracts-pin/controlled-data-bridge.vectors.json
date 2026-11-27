@@ -1,0 +1,318 @@
+{
+  "pack": "controlled-data-bridge",
+  "schema": "controlled-data-bridge.schema.json",
+  "vectors": [
+    {
+      "expect": "accept",
+      "id": "CDB-POS-A",
+      "payload": {
+        "freshness_ts": "2026-11-27T00:00:00Z",
+        "masking_receipt": {
+          "hash_algorithm": "sha256",
+          "profile": "standard",
+          "receipt_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "receipt_id": "syn_mask_1"
+        },
+        "mode": "A",
+        "policy_generation": 3,
+        "query_kind": "object_get",
+        "tenant_id": "syn_org",
+        "tombstone": {
+          "active": false,
+          "revoked_at": null
+        },
+        "user_delegation_handle": "deleg:user_token_slot"
+      },
+      "schema": "ControlledDataBridgeDeclaration"
+    },
+    {
+      "expect": "accept",
+      "id": "CDB-POS-B",
+      "payload": {
+        "freshness_ts": "2026-11-27T00:00:00Z",
+        "masking_receipt": {
+          "hash_algorithm": "sha256",
+          "profile": "standard",
+          "receipt_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "receipt_id": "syn_mask_1"
+        },
+        "mode": "B",
+        "policy_generation": 3,
+        "query_kind": "structured_select",
+        "row_level_predicate": {
+          "field": "org_id",
+          "op": "eq",
+          "value": "syn_org"
+        },
+        "service_credential_handle": "svc:tenant_warehouse",
+        "tenant_id": "syn_org",
+        "tombstone": {
+          "active": false,
+          "revoked_at": null
+        }
+      },
+      "schema": "ControlledDataBridgeDeclaration"
+    },
+    {
+      "expect": "accept",
+      "id": "CDB-POS-C",
+      "payload": {
+        "freshness_ts": "2026-11-27T00:00:00Z",
+        "masking_receipt": {
+          "hash_algorithm": "sha256",
+          "profile": "standard",
+          "receipt_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "receipt_id": "syn_mask_1"
+        },
+        "mode": "C",
+        "policy_generation": 3,
+        "query_kind": "snapshot_read",
+        "snapshot_id": "syn_snap_1",
+        "tenant_id": "syn_org",
+        "tombstone": {
+          "active": false,
+          "revoked_at": null
+        }
+      },
+      "schema": "ControlledDataBridgeDeclaration"
+    },
+    {
+      "code": "MODE_UNMATCHED",
+      "expect": "reject",
+      "id": "CDB-NEG-MODE-D",
+      "payload": {
+        "freshness_ts": "2026-11-27T00:00:00Z",
+        "masking_receipt": {
+          "hash_algorithm": "sha256",
+          "profile": "standard",
+          "receipt_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "receipt_id": "syn_mask_1"
+        },
+        "mode": "D",
+        "policy_generation": 3,
+        "query_kind": "object_get",
+        "tenant_id": "syn_org",
+        "tombstone": {
+          "active": false,
+          "revoked_at": null
+        }
+      },
+      "schema": "ControlledDataBridgeDeclaration"
+    },
+    {
+      "code": "MODE_UNMATCHED",
+      "expect": "reject",
+      "id": "CDB-NEG-MISSING-MODE",
+      "payload": {
+        "freshness_ts": "2026-11-27T00:00:00Z",
+        "masking_receipt": {
+          "hash_algorithm": "sha256",
+          "profile": "standard",
+          "receipt_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "receipt_id": "syn_mask_1"
+        },
+        "policy_generation": 3,
+        "query_kind": "object_get",
+        "tenant_id": "syn_org",
+        "tombstone": {
+          "active": false,
+          "revoked_at": null
+        }
+      },
+      "schema": "ControlledDataBridgeDeclaration"
+    },
+    {
+      "code": "TEXT_TO_SQL_FORBIDDEN",
+      "expect": "reject",
+      "id": "CDB-NEG-TEXT-TO-SQL",
+      "payload": {
+        "freshness_ts": "2026-11-27T00:00:00Z",
+        "masking_receipt": {
+          "hash_algorithm": "sha256",
+          "profile": "standard",
+          "receipt_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "receipt_id": "syn_mask_1"
+        },
+        "mode": "B",
+        "policy_generation": 3,
+        "query_kind": "structured_select",
+        "row_level_predicate": {
+          "field": "org_id",
+          "op": "eq",
+          "value": "syn_org"
+        },
+        "service_credential_handle": "svc:tenant_warehouse",
+        "tenant_id": "syn_org",
+        "text_to_sql": "SELECT * FROM t",
+        "tombstone": {
+          "active": false,
+          "revoked_at": null
+        }
+      },
+      "schema": "ControlledDataBridgeDeclaration"
+    },
+    {
+      "code": "VALIDATION_ERROR",
+      "expect": "reject",
+      "id": "CDB-NEG-B-NO-PREDICATE",
+      "payload": {
+        "freshness_ts": "2026-11-27T00:00:00Z",
+        "masking_receipt": {
+          "hash_algorithm": "sha256",
+          "profile": "standard",
+          "receipt_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "receipt_id": "syn_mask_1"
+        },
+        "mode": "B",
+        "policy_generation": 3,
+        "query_kind": "structured_select",
+        "service_credential_handle": "svc:tenant_warehouse",
+        "tenant_id": "syn_org",
+        "tombstone": {
+          "active": false,
+          "revoked_at": null
+        }
+      },
+      "schema": "ControlledDataBridgeDeclaration"
+    },
+    {
+      "code": "CREDENTIAL_FORBIDDEN",
+      "expect": "reject",
+      "id": "CDB-NEG-B-RAW-SECRET",
+      "payload": {
+        "freshness_ts": "2026-11-27T00:00:00Z",
+        "masking_receipt": {
+          "hash_algorithm": "sha256",
+          "profile": "standard",
+          "receipt_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "receipt_id": "syn_mask_1"
+        },
+        "mode": "B",
+        "password": "hunter2",
+        "policy_generation": 3,
+        "query_kind": "structured_select",
+        "row_level_predicate": {
+          "field": "org_id",
+          "op": "eq",
+          "value": "syn_org"
+        },
+        "service_credential_handle": "svc:tenant_warehouse",
+        "tenant_id": "syn_org",
+        "tombstone": {
+          "active": false,
+          "revoked_at": null
+        }
+      },
+      "schema": "ControlledDataBridgeDeclaration"
+    },
+    {
+      "code": "VALIDATION_ERROR",
+      "expect": "reject",
+      "id": "CDB-NEG-POLICY-NULL",
+      "payload": {
+        "freshness_ts": "2026-11-27T00:00:00Z",
+        "masking_receipt": {
+          "hash_algorithm": "sha256",
+          "profile": "standard",
+          "receipt_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "receipt_id": "syn_mask_1"
+        },
+        "mode": "A",
+        "policy_generation": null,
+        "query_kind": "object_get",
+        "tenant_id": "syn_org",
+        "tombstone": {
+          "active": false,
+          "revoked_at": null
+        },
+        "user_delegation_handle": "deleg:user_token_slot"
+      },
+      "schema": "ControlledDataBridgeDeclaration"
+    },
+    {
+      "code": "VALIDATION_ERROR",
+      "expect": "reject",
+      "id": "CDB-NEG-NO-FRESHNESS",
+      "payload": {
+        "masking_receipt": {
+          "hash_algorithm": "sha256",
+          "profile": "standard",
+          "receipt_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "receipt_id": "syn_mask_1"
+        },
+        "mode": "C",
+        "policy_generation": 3,
+        "query_kind": "snapshot_read",
+        "snapshot_id": "syn_snap_1",
+        "tenant_id": "syn_org",
+        "tombstone": {
+          "active": false,
+          "revoked_at": null
+        }
+      },
+      "schema": "ControlledDataBridgeDeclaration"
+    },
+    {
+      "code": "VALIDATION_ERROR",
+      "expect": "reject",
+      "id": "CDB-NEG-NO-MASK",
+      "payload": {
+        "freshness_ts": "2026-11-27T00:00:00Z",
+        "mode": "A",
+        "policy_generation": 3,
+        "query_kind": "object_get",
+        "tenant_id": "syn_org",
+        "tombstone": {
+          "active": false,
+          "revoked_at": null
+        },
+        "user_delegation_handle": "deleg:user_token_slot"
+      },
+      "schema": "ControlledDataBridgeDeclaration"
+    },
+    {
+      "code": "VALIDATION_ERROR",
+      "expect": "reject",
+      "id": "CDB-NEG-NO-TOMBSTONE",
+      "payload": {
+        "freshness_ts": "2026-11-27T00:00:00Z",
+        "masking_receipt": {
+          "hash_algorithm": "sha256",
+          "profile": "standard",
+          "receipt_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "receipt_id": "syn_mask_1"
+        },
+        "mode": "A",
+        "policy_generation": 3,
+        "query_kind": "object_get",
+        "tenant_id": "syn_org",
+        "user_delegation_handle": "deleg:user_token_slot"
+      },
+      "schema": "ControlledDataBridgeDeclaration"
+    },
+    {
+      "code": "VALIDATION_ERROR",
+      "expect": "reject",
+      "id": "CDB-NEG-POLICY-ZERO",
+      "payload": {
+        "freshness_ts": "2026-11-27T00:00:00Z",
+        "masking_receipt": {
+          "hash_algorithm": "sha256",
+          "profile": "standard",
+          "receipt_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "receipt_id": "syn_mask_1"
+        },
+        "mode": "A",
+        "policy_generation": 0,
+        "query_kind": "object_get",
+        "tenant_id": "syn_org",
+        "tombstone": {
+          "active": false,
+          "revoked_at": null
+        },
+        "user_delegation_handle": "deleg:user_token_slot"
+      },
+      "schema": "ControlledDataBridgeDeclaration"
+    }
+  ]
+}

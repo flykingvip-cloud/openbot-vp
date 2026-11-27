@@ -1,0 +1,185 @@
+{
+  "$defs": {
+    "Channel4InvalidationNotice": {
+      "additionalProperties": false,
+      "properties": {
+        "channel": {
+          "const": "agent_history_cogniweave"
+        },
+        "memory_resource_id": {
+          "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+          "type": "string"
+        },
+        "notice_id": {
+          "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+          "type": "string"
+        },
+        "policy_generation": {
+          "description": "Strict positive safe integer. Reject bool, string, float, null, missing, or out of range.",
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "reason_code": {
+          "enum": ["ACCESS_REVOKED", "OWNER_DISABLED", "POLICY_GENERATION_STALE"],
+          "type": "string"
+        },
+        "tenant_id": {
+          "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "notice_id",
+        "tenant_id",
+        "memory_resource_id",
+        "policy_generation",
+        "channel",
+        "reason_code"
+      ],
+      "type": "object"
+    },
+    "ChannelReceipt": {
+      "additionalProperties": false,
+      "properties": {
+        "channel": {
+          "enum": [
+            "primary_storage_acl",
+            "vector_fts_index",
+            "cache_materialized_snapshot",
+            "agent_history_cogniweave"
+          ],
+          "type": "string"
+        },
+        "completed_at": {
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
+          "type": "string"
+        },
+        "hash_algorithm": {
+          "const": "sha256"
+        },
+        "receipt_hash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "status": {
+          "enum": ["success", "failed", "timeout", "missing"],
+          "type": "string"
+        }
+      },
+      "required": ["channel", "status", "receipt_hash", "hash_algorithm"],
+      "type": "object"
+    },
+    "MemoryDiscoveryMetadata": {
+      "additionalProperties": false,
+      "properties": {
+        "discoverable": {
+          "type": "boolean"
+        },
+        "freshness_ts": {
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9 _-]{0,64}$",
+          "type": "string"
+        },
+        "memory_resource_id": {
+          "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+          "type": "string"
+        },
+        "owner_agent_id": {
+          "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+          "type": "string"
+        },
+        "policy_generation": {
+          "description": "Strict positive safe integer. Reject bool, string, float, null, missing, or out of range.",
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "resource_type": {
+          "const": "agent_memory"
+        },
+        "tenant_id": {
+          "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "resource_type",
+        "memory_resource_id",
+        "owner_agent_id",
+        "policy_generation",
+        "discoverable",
+        "freshness_ts"
+      ],
+      "type": "object"
+    },
+    "RevocationPurgeReceipt": {
+      "additionalProperties": false,
+      "properties": {
+        "channels": {
+          "items": {
+            "$ref": "#/$defs/ChannelReceipt"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": "array"
+        },
+        "hash_algorithm": {
+          "const": "sha256"
+        },
+        "policy_generation": {
+          "description": "Strict positive safe integer. Reject bool, string, float, null, missing, or out of range.",
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "purged": {
+          "type": "boolean"
+        },
+        "receipt_hash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "subject_id": {
+          "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+          "type": "string"
+        },
+        "task_id": {
+          "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+          "type": "string"
+        },
+        "tenant_id": {
+          "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "tenant_id",
+        "subject_id",
+        "policy_generation",
+        "channels",
+        "purged",
+        "hash_algorithm",
+        "receipt_hash"
+      ],
+      "type": "object"
+    },
+    "policy_generation": {
+      "description": "Strict positive safe integer. Reject bool, string, float, null, missing, or out of range.",
+      "maximum": 9007199254740991,
+      "minimum": 1,
+      "type": "integer"
+    }
+  },
+  "$id": "https://knowledge-sdk.local/contracts/v21-reuse-v1/memory-resource-bridge.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Read-only discovery metadata for resource_type=agent_memory. Channel-4 revocation invalidation notice and tamper-evident RevocationPurgeReceipt (M-05). A task is not purged unless all four channels return success receipts.",
+  "status": "DRAFT_WAVE_V21_0_NOT_FROZEN",
+  "title": "V21 Memory Resource Bridge and RevocationPurgeReceipt"
+}

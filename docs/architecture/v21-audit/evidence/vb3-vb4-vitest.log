@@ -1,0 +1,19 @@
+
+ RUN  v4.0.18 /Users/daniel/.codex/worktrees/knowledge-sdk-alignment/openbot
+
+ ✓ src/knowledge/v21-wave0/semantic-object-catalog-read-adapter.test.ts > SemanticObjectCatalogReadAdapter > is default-off and does not call the reader 1ms
+ ✓ src/knowledge/v21-wave0/semantic-object-catalog-read-adapter.test.ts > SemanticObjectCatalogReadAdapter > when explicitly enabled, reads only and filters by object_key 0ms
+ ✓ src/knowledge/v21-wave0/semantic-object-catalog-read-adapter.test.ts > SemanticObjectCatalogReadAdapter > rejects invalid requests even when enabled 0ms
+ ✓ src/knowledge/v21-wave0/controlled-data-bridge-guard.test.ts > ControlledDataBridgeGuard > stays Fail-Closed and unlocked=false 1ms
+ ✓ src/knowledge/v21-wave0/controlled-data-bridge-guard.test.ts > ControlledDataBridgeGuard > rejects unmatched mode and text-to-sql even before lock 0ms
+ ✓ src/knowledge/v21-wave0/controlled-data-bridge-guard.test.ts > ControlledDataBridgeGuard > rejects incomplete Mode B/C declarations 0ms
+ ✓ src/knowledge/v21-wave0/ai-execution-trace-header-propagator.test.ts > AIExecutionTraceHeaderPropagator > is default-off and lists the official seven keys 1ms
+ ✓ src/knowledge/v21-wave0/ai-execution-trace-header-propagator.test.ts > AIExecutionTraceHeaderPropagator > when enabled, accepts snake_case or camelCase and fails closed on gaps 1ms
+ ✓ src/knowledge/v21-wave0/v21-contract-vectors.test.ts > VB-4 OpenBot-side pin and 51-vector compatibility > pins the Team A manifest SHA-256 and 18 file digests 5ms
+ ✓ src/knowledge/v21-wave0/v21-contract-vectors.test.ts > VB-4 OpenBot-side pin and 51-vector compatibility > executes all 51 draft vectors and keeps /v3/spaces out of the OpenAPI draft 1ms
+
+ Test Files  4 passed (4)
+      Tests  10 passed (10)
+   Start at  08:47:36
+   Duration  351ms (transform 820ms, setup 974ms, import 39ms, tests 16ms, environment 0ms)
+

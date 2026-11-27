@@ -1,0 +1,69 @@
+
+ RUN  v4.0.18 /Users/daniel/.codex/worktrees/knowledge-sdk-alignment/openbot
+
+ ✓ src/vault-sync/events.test.ts > vault-sync revision events > does nothing when no sink is registered 1ms
+ ✓ src/vault-sync/events.test.ts > vault-sync revision events > coalesces multiple commits for the same vault into one frame 1ms
+ ✓ src/vault-sync/events.test.ts > vault-sync revision events > auto-flushes after the coalesce window 1ms
+ ✓ src/vault-sync/revision-id.test.ts > computeRevisionId > is stable and idempotent for identical inputs 1ms
+ ✓ src/vault-sync/revision-id.test.ts > computeRevisionId > sorts parent ids so order does not matter 0ms
+ ✓ src/vault-sync/revision-id.test.ts > computeRevisionId > changes when sequence or hash changes 0ms
+ ✓ src/vault-sync/remediation-r2.test.ts > inventory baseline > skips unchanged entries by mtime and size 3ms
+ ✓ src/vault-sync/remediation-r2.test.ts > epoch key derivation > derives different content keys per encryption epoch 1ms
+ ✓ src/vault-sync/store/postgres-metadata-primary.node.test.ts > VaultSync Postgres metadata primary (Wave G) > resolveVaultSyncMetadataPrimary defaults to file 1ms
+ ✓ src/vault-sync/store/postgres-metadata-primary.node.test.ts > VaultSync Postgres metadata primary (Wave G) > requires sql when metadataPrimary=postgres 1ms
+ ✓ src/vault-sync/store/postgres-metadata-primary.node.test.ts > VaultSync Postgres metadata primary (Wave G) > durably writes core metadata to PG and hydrates after file wipe 12ms
+ ✓ src/vault-sync/store/postgres-metadata-primary.node.test.ts > VaultSync Postgres metadata primary (Wave G) > flushMetadataPrimary fails hard when primary PG write rejects 3ms
+ ✓ src/vault-sync/store/postgres-metadata-primary.node.test.ts > VaultSync Postgres metadata primary (Wave G) > mirror read helpers round-trip via injectable SQL 0ms
+ ✓ src/vault-sync/store/revoke-and-rotate.node.test.ts > revokeMemberAndRotateEpoch (Wave M atomic) > atomically revokes, bumps epoch, and applies wraps 15ms
+ ✓ src/vault-sync/store/revoke-and-rotate.node.test.ts > revokeMemberAndRotateEpoch (Wave M atomic) > CAS failure leaves member and epoch unchanged 8ms
+ ✓ src/vault-sync/store/object-store.node.test.ts > VaultSync object store (Wave E) > stores ciphertext bytes in injected memory object store 7ms
+ ✓ src/vault-sync/store/object-store.node.test.ts > VaultSync object store (Wave E) > issues S3 path-style presigned PUT URLs 1ms
+ ✓ src/vault-sync/store/object-store.node.test.ts > VaultSync object store (Wave E) > putAsync/getAsync round-trip via injected fetch 10ms
+ ✓ src/vault-sync/store/object-store.node.test.ts > VaultSync Postgres metadata mirror > ships DDL without plaintext path/content columns 0ms
+ ✓ src/vault-sync/store/object-store.node.test.ts > VaultSync Postgres metadata mirror > mirrors vault + blob + revision into injectable SQL client 0ms
+ ✓ src/vault-sync/store/object-upload-direct.node.test.ts > S3 presigned objectUpload complete (Wave N) > completes without gateway chunk files when client PUTs to presigned URL 23ms
+ ✓ src/vault-sync/team.integration.test.ts > vault-sync team members (P4.1) > enables team, invites, accepts, revokes, and rotates wraps 39ms
+ ✓ src/vault-sync/crypto/member-wrap.test.ts > vault-sync member wrap (P4.1) > wraps BaseKey to member X25519 key and unwraps 28ms
+ ✓ src/vault-sync/crypto/member-wrap.test.ts > vault-sync member wrap (P4.1) > fails closed on wrong private key or AAD identity 25ms
+ ✓ src/vault-sync/crypto/member-wrap.test.ts > vault-sync member wrap (P4.1) > invite-secret wrap round-trips and rejects wrong secret 23ms
+ ✓ src/vault-sync/crypto/crypto.test.ts > vault-sync crypto > derives stable keys for fixed password+salt 48ms
+ ✓ src/vault-sync/crypto/crypto.test.ts > vault-sync crypto > opaquePathId hides plaintext path and is keyed 46ms
+ ✓ src/vault-sync/vault-kb-binding.node.test.ts > vault-kb-binding > persists and reads vault→knowledgeBase binding 2ms
+ ✓ src/vault-sync/blob-upload.integration.test.ts > vault-sync blob upload sessions / quota / rate limit > supports chunked upload with resume and idempotent chunk rewrite 14ms
+ ✓ src/vault-sync/blob-upload.integration.test.ts > vault-sync blob upload sessions / quota / rate limit > enforces quota on upload session create and releases on abort 6ms
+ ✓ src/vault-sync/blob-upload.integration.test.ts > vault-sync blob upload sessions / quota / rate limit > rate-limits upload session creation 4ms
+ ✓ src/vault-sync/blob-upload.integration.test.ts > vault-sync blob upload sessions / quota / rate limit > rejects oversized direct putBlob and uses chunked path from engine 41ms
+ ✓ src/vault-sync/store/postgres-s3-live-env.node.test.ts > VaultSync live smoke env gate (Wave J) > is disabled by default 1ms
+ ✓ src/vault-sync/store/postgres-s3-live-env.node.test.ts > VaultSync live smoke env gate (Wave J) > requires LIVE flag plus DATABASE_URL and S3 credentials 0ms
+ ✓ src/vault-sync/journal/excludes.test.ts > vault-sync selective excludes > always excludes runtime derivatives and editor junk 1ms
+ ✓ src/vault-sync/journal/excludes.test.ts > vault-sync selective excludes > honors media category toggles 0ms
+ ✓ src/vault-sync/journal/excludes.test.ts > vault-sync selective excludes > honors user excludeGlobs 0ms
+ ✓ src/vault-sync/gateway-auth.test.ts > vault-sync gateway auth > uses client.user when authenticated 1ms
+ ✓ src/vault-sync/gateway-auth.test.ts > vault-sync gateway auth > falls back to local-operator when unauthenticated 0ms
+ ✓ src/vault-sync/gateway-auth.test.ts > vault-sync gateway auth > rejects forged param account when session user is set 0ms
+ ✓ src/vault-sync/gateway-auth.test.ts > vault-sync gateway auth > allows matching param account 0ms
+ ✓ src/vault-sync/vault-sync.integration.test.ts > vault-sync control plane + dual device > creates vault, uploads encrypted blob, and does not store plaintext path 37ms
+ ✓ src/vault-sync/vault-sync.integration.test.ts > vault-sync control plane + dual device > idempotent commit does not duplicate history 32ms
+ ✓ src/vault-sync/crypto/crypto.test.ts > vault-sync crypto > encrypt/decrypt round-trip with AAD binding 24ms
+ ✓ src/vault-sync/crypto/crypto.test.ts > vault-sync crypto > fail closed on wrong password (cannot decrypt) 46ms
+ ✓ src/vault-sync/crypto/crypto.test.ts > vault-sync crypto > fail closed on tampered ciphertext 23ms
+ ✓ src/vault-sync/crypto/crypto.test.ts > vault-sync crypto > fail closed on AAD mismatch (wrong revisionId) 23ms
+ ✓ src/vault-sync/crypto/crypto.test.ts > vault-sync crypto > uses unique nonces by default 22ms
+ ✓ src/vault-sync/crypto/crypto.test.ts > vault-sync crypto > deriveBaseKey rejects empty password 0ms
+ ✓ src/vault-sync/vault-sync.integration.test.ts > vault-sync control plane + dual device > device A offline edit syncs to device B 52ms
+ ✓ src/vault-sync/vault-sync.integration.test.ts > vault-sync control plane + dual device > concurrent edits do not silently overwrite — conflict copies 62ms
+ ✓ src/vault-sync/vault-sync.integration.test.ts > vault-sync control plane + dual device > inventory pagination never silently truncates 7ms
+ ✓ src/vault-sync/vault-sync.integration.test.ts > vault-sync control plane + dual device > tombstone delete syncs to peer 55ms
+ ✓ src/vault-sync/vault-sync.integration.test.ts > vault-sync control plane + dual device > restores a tombstoned file from history and peers can pull it 57ms
+ ✓ src/vault-sync/vault-sync.integration.test.ts > vault-sync control plane + dual device > selective sync skips images on push and pull 56ms
+ ✓ src/vault-sync/vault-sync.integration.test.ts > vault-sync control plane + dual device > revokes a device and blocks further sync while peer stays active 78ms
+ ✓ src/vault-sync/vault-sync.integration.test.ts > vault-sync control plane + dual device > bumps encryptionVersion; old revisions stay readable; new commits use new epoch 70ms
+ ✓ src/vault-sync/http-upload.node.test.ts > vault-sync-http > accepts binary chunk PUT with upload token 23ms
+ ✓ src/vault-sync/runtime-reindex-hook.node.test.ts > runVaultSyncRuntimeReindex > returns zero matches when root is missing and no knowledgeBaseId 3620ms
+ ✓ src/vault-sync/runtime-reindex-hook.node.test.ts > runVaultSyncRuntimeReindex > returns zero matches when knowledgeBaseId has no local-folder binding 0ms
+
+ Test Files  18 passed (18)
+      Tests  60 passed (60)
+   Start at  08:47:56
+   Duration  3.99s (transform 7.49s, setup 3.15s, import 4.31s, tests 4.68s, environment 1ms)
+

@@ -1,0 +1,21 @@
+
+ RUN  v4.0.18 /Users/daniel/.codex/worktrees/knowledge-sdk-alignment/openbot
+
+ ✓ src/gateway/server-methods/vault-sync.test.ts > vaultSyncHandlers > creates an e2ee vault without password on gateway 4ms
+ ✓ src/gateway/server-methods/vault-sync.test.ts > vaultSyncHandlers > rejects forged ownerAccountId when client.user is set 1ms
+ ✓ src/gateway/server-methods/vault-sync.test.ts > vaultSyncHandlers > blocks gateway-side sync by default 0ms
+ ✓ src/gateway/server-methods/vault-sync.test.ts > vaultSyncHandlers > enables team vault with password helper only in legacy mode 28ms
+ ✓ src/gateway/server-methods/vault-sync.test.ts > vaultSyncHandlers > requires vault manager to revoke devices 2ms
+ ✓ src/gateway/server-methods/vault-sync.test.ts > vaultSyncHandlers > rejects inventory for non-member 2ms
+ ✓ src/gateway/server-methods/vault-sync.test.ts > vaultSyncHandlers > rejects runtime reindex for non-member 2ms
+ ✓ src/gateway/server-methods/vault-sync.test.ts > vaultSyncHandlers > rejects arbitrary target knowledge base even for vault owner 12ms
+ ✓ src/gateway/server-methods/vault-sync.test.ts > vaultSyncHandlers > binds and reindexes an authorized same-tenant target knowledge base 451ms
+ ✓ src/gateway/server-methods/vault-sync.test.ts > vaultSyncHandlers > rejects a cross-tenant target even when the actor owns that knowledge base 4ms
+ ✓ src/gateway/server-methods/vault-sync.test.ts > vaultSyncHandlers > revalidates a persisted binding on reindex and rejects after the tenant no longer matches 4ms
+ ✓ src/gateway/server-methods/vault-sync.test.ts > vaultSyncHandlers > rejects an RPC rootPath override even for an authorized target knowledge base 3ms
+
+ Test Files  1 passed (1)
+      Tests  12 passed (12)
+   Start at  08:47:51
+   Duration  4.84s (transform 3.10s, setup 202ms, import 4.06s, tests 516ms, environment 0ms)
+

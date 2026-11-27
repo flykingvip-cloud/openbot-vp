@@ -1,0 +1,208 @@
+{
+  "pack": "memory-resource-bridge",
+  "schema": "memory-resource-bridge.schema.json",
+  "vectors": [
+    {
+      "expect": "accept",
+      "id": "MEM-POS-DISC",
+      "payload": {
+        "discoverable": true,
+        "freshness_ts": "2026-11-27T00:00:00Z",
+        "label": "syn memory",
+        "memory_resource_id": "syn_mem_1",
+        "owner_agent_id": "syn_agent",
+        "policy_generation": 4,
+        "resource_type": "agent_memory",
+        "tenant_id": "syn_org"
+      },
+      "schema": "MemoryDiscoveryMetadata"
+    },
+    {
+      "expect": "accept",
+      "id": "MEM-POS-CH4",
+      "payload": {
+        "channel": "agent_history_cogniweave",
+        "memory_resource_id": "syn_mem_1",
+        "notice_id": "syn_note_1",
+        "policy_generation": 4,
+        "reason_code": "ACCESS_REVOKED",
+        "tenant_id": "syn_org"
+      },
+      "schema": "Channel4InvalidationNotice"
+    },
+    {
+      "expect": "accept",
+      "id": "MEM-POS-RECEIPT",
+      "payload": {
+        "channels": [
+          {
+            "channel": "primary_storage_acl",
+            "completed_at": "2026-11-27T00:00:00Z",
+            "hash_algorithm": "sha256",
+            "receipt_hash": "0000000000000000000000000000000000000000000000000000000000000001",
+            "status": "success"
+          },
+          {
+            "channel": "vector_fts_index",
+            "completed_at": "2026-11-27T00:00:00Z",
+            "hash_algorithm": "sha256",
+            "receipt_hash": "0000000000000000000000000000000000000000000000000000000000000002",
+            "status": "success"
+          },
+          {
+            "channel": "cache_materialized_snapshot",
+            "completed_at": "2026-11-27T00:00:00Z",
+            "hash_algorithm": "sha256",
+            "receipt_hash": "0000000000000000000000000000000000000000000000000000000000000003",
+            "status": "success"
+          },
+          {
+            "channel": "agent_history_cogniweave",
+            "completed_at": "2026-11-27T00:00:00Z",
+            "hash_algorithm": "sha256",
+            "receipt_hash": "0000000000000000000000000000000000000000000000000000000000000004",
+            "status": "success"
+          }
+        ],
+        "hash_algorithm": "sha256",
+        "policy_generation": 4,
+        "purged": true,
+        "receipt_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "subject_id": "syn_mem_1",
+        "task_id": "syn_task_1",
+        "tenant_id": "syn_org"
+      },
+      "schema": "RevocationPurgeReceipt"
+    },
+    {
+      "code": "VALIDATION_ERROR",
+      "expect": "reject",
+      "id": "MEM-NEG-WRONG-TYPE",
+      "payload": {
+        "discoverable": true,
+        "freshness_ts": "2026-11-27T00:00:00Z",
+        "memory_resource_id": "syn_mem_1",
+        "owner_agent_id": "syn_agent",
+        "policy_generation": 4,
+        "resource_type": "document",
+        "tenant_id": "syn_org"
+      },
+      "schema": "MemoryDiscoveryMetadata"
+    },
+    {
+      "code": "VALIDATION_ERROR",
+      "expect": "reject",
+      "id": "MEM-NEG-BODY",
+      "payload": {
+        "content": "secret memory body",
+        "discoverable": true,
+        "freshness_ts": "2026-11-27T00:00:00Z",
+        "memory_resource_id": "syn_mem_1",
+        "owner_agent_id": "syn_agent",
+        "policy_generation": 4,
+        "resource_type": "agent_memory",
+        "tenant_id": "syn_org"
+      },
+      "schema": "MemoryDiscoveryMetadata"
+    },
+    {
+      "code": "CHANNEL_INCOMPLETE",
+      "expect": "reject",
+      "id": "MEM-NEG-THREE-CHANNELS",
+      "payload": {
+        "channels": [
+          {
+            "channel": "primary_storage_acl",
+            "completed_at": "2026-11-27T00:00:00Z",
+            "hash_algorithm": "sha256",
+            "receipt_hash": "0000000000000000000000000000000000000000000000000000000000000001",
+            "status": "success"
+          },
+          {
+            "channel": "vector_fts_index",
+            "completed_at": "2026-11-27T00:00:00Z",
+            "hash_algorithm": "sha256",
+            "receipt_hash": "0000000000000000000000000000000000000000000000000000000000000002",
+            "status": "success"
+          },
+          {
+            "channel": "cache_materialized_snapshot",
+            "completed_at": "2026-11-27T00:00:00Z",
+            "hash_algorithm": "sha256",
+            "receipt_hash": "0000000000000000000000000000000000000000000000000000000000000003",
+            "status": "success"
+          }
+        ],
+        "hash_algorithm": "sha256",
+        "policy_generation": 4,
+        "purged": true,
+        "receipt_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "subject_id": "syn_mem_1",
+        "task_id": "syn_task_1",
+        "tenant_id": "syn_org"
+      },
+      "schema": "RevocationPurgeReceipt"
+    },
+    {
+      "code": "CHANNEL_INCOMPLETE",
+      "expect": "reject",
+      "id": "MEM-NEG-PURGED-WITH-FAIL",
+      "payload": {
+        "channels": [
+          {
+            "channel": "primary_storage_acl",
+            "completed_at": "2026-11-27T00:00:00Z",
+            "hash_algorithm": "sha256",
+            "receipt_hash": "0000000000000000000000000000000000000000000000000000000000000001",
+            "status": "success"
+          },
+          {
+            "channel": "vector_fts_index",
+            "completed_at": "2026-11-27T00:00:00Z",
+            "hash_algorithm": "sha256",
+            "receipt_hash": "0000000000000000000000000000000000000000000000000000000000000002",
+            "status": "success"
+          },
+          {
+            "channel": "cache_materialized_snapshot",
+            "completed_at": "2026-11-27T00:00:00Z",
+            "hash_algorithm": "sha256",
+            "receipt_hash": "0000000000000000000000000000000000000000000000000000000000000003",
+            "status": "success"
+          },
+          {
+            "channel": "agent_history_cogniweave",
+            "completed_at": "2026-11-27T00:00:00Z",
+            "hash_algorithm": "sha256",
+            "receipt_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "status": "failed"
+          }
+        ],
+        "hash_algorithm": "sha256",
+        "policy_generation": 4,
+        "purged": true,
+        "receipt_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "subject_id": "syn_mem_1",
+        "task_id": "syn_task_1",
+        "tenant_id": "syn_org"
+      },
+      "schema": "RevocationPurgeReceipt"
+    },
+    {
+      "code": "CREDENTIAL_FORBIDDEN",
+      "expect": "reject",
+      "id": "MEM-NEG-CREDENTIAL",
+      "payload": {
+        "api_key": "k",
+        "discoverable": true,
+        "freshness_ts": "2026-11-27T00:00:00Z",
+        "memory_resource_id": "syn_mem_1",
+        "owner_agent_id": "syn_agent",
+        "policy_generation": 4,
+        "resource_type": "agent_memory",
+        "tenant_id": "syn_org"
+      },
+      "schema": "MemoryDiscoveryMetadata"
+    }
+  ]
+}

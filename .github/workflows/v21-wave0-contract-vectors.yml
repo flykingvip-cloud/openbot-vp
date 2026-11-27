@@ -1,0 +1,22 @@
+# Local Track 2 workflow only. This ruling does not authorize push or PR,
+# so this file is not live on GitHub until a later authorized push.
+name: v21-wave0-contract-vectors
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    paths:
+      - "src/knowledge/v21-wave0/**"
+      - ".github/workflows/v21-wave0-contract-vectors.yml"
+jobs:
+  vectors:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec vitest run --reporter=verbose src/knowledge/v21-wave0

@@ -1,0 +1,88 @@
+{
+  "$defs": {
+    "AIExecutionTrace": {
+      "additionalProperties": false,
+      "properties": {
+        "agent_id": {
+          "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+          "type": "string"
+        },
+        "cost_attribution": {
+          "$ref": "#/$defs/cost_attribution"
+        },
+        "plan_id": {
+          "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+          "type": "string"
+        },
+        "policy_generation": {
+          "description": "Strict positive safe integer. Reject bool, string, float, null, missing, or out of range.",
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "run_id": {
+          "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+          "type": "string"
+        },
+        "tenant_id": {
+          "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+          "type": "string"
+        },
+        "trace_id": {
+          "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+          "type": "string"
+        },
+        "user_id": {
+          "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "user_id",
+        "agent_id",
+        "trace_id",
+        "run_id",
+        "plan_id",
+        "policy_generation",
+        "cost_attribution"
+      ],
+      "type": "object"
+    },
+    "cost_attribution": {
+      "additionalProperties": false,
+      "properties": {
+        "component": {
+          "pattern": "^[a-z0-9_.-]{1,64}$",
+          "type": "string"
+        },
+        "quantity": {
+          "maximum": 1000000000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "system": {
+          "enum": ["openbot", "knowledge_sdk", "aor", "cogniweave"],
+          "type": "string"
+        },
+        "units": {
+          "enum": ["tokens", "ms", "calls"],
+          "type": "string"
+        }
+      },
+      "required": ["system", "component", "units", "quantity"],
+      "type": "object"
+    },
+    "policy_generation": {
+      "description": "Strict positive safe integer. Reject bool, string, float, null, missing, or out of range.",
+      "maximum": 9007199254740991,
+      "minimum": 1,
+      "type": "integer"
+    }
+  },
+  "$id": "https://knowledge-sdk.local/contracts/v21-reuse-v1/ai-execution-trace.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Locked correlation headers across OpenBot, Knowledge SDK, AOR, and CogniWeave.",
+  "status": "DRAFT_WAVE_V21_0_NOT_FROZEN",
+  "title": "V21 Unified AI Execution Trace Envelope"
+}

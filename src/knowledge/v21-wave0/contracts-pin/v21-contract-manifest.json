@@ -1,0 +1,80 @@
+{
+  "algorithm": "sha256",
+  "canonicalization": "POSIX path, stable sort, SHA-256 of raw file bytes, no newline rewriting; exclude manifest, node_modules, ts-generated, package-lock.json, __pycache__, *.pyc, and dotfiles",
+  "file_count": 18,
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "fa1f205290076cdfe09262ba62a8b30a422909b3b39a1cc5a139e4487bcf18d2"
+    },
+    {
+      "path": "ai-execution-trace.schema.json",
+      "sha256": "dc245d3db84c5f856a6c9396761d7bfa2e28e03145054620746fcfe5d39c118c"
+    },
+    {
+      "path": "ai-execution-trace.vectors.json",
+      "sha256": "28765d7c62767d4a311fcf09d4593a9c866bfe39c8548bffa3b662b94a794b46"
+    },
+    {
+      "path": "check.ts",
+      "sha256": "a20ef1457c940693ac3da04fdb59534468a99bddfcf96f05a528393739b9d895"
+    },
+    {
+      "path": "controlled-data-bridge.schema.json",
+      "sha256": "34cd37d7476ff9984e98234cf952ae8818a9d587c696d1d1c6cebf4e0b41c9ae"
+    },
+    {
+      "path": "controlled-data-bridge.vectors.json",
+      "sha256": "34f26575657afca025962af0abe73dcc768faca5c8d1c710b48932e57268a9c6"
+    },
+    {
+      "path": "dto.py",
+      "sha256": "e2183b640542592636eace30d4e041d5957bd0e824ab168e05a5dc540c8ac59b"
+    },
+    {
+      "path": "dto.ts",
+      "sha256": "5cb3c29e612d78e56695b89062a25a6a96d8f75727599e6f1ddc9fa6f7fe3ac3"
+    },
+    {
+      "path": "memory-resource-bridge.schema.json",
+      "sha256": "9e3040a4b8210f850470dcc4d761cde0762873a81226f7ba629873e6f7c2b54c"
+    },
+    {
+      "path": "memory-resource-bridge.vectors.json",
+      "sha256": "0951c4a7276041a45d3d66abb5b36f3e17a0a84341d970b07f9ef636301809c3"
+    },
+    {
+      "path": "model-adapter.schema.json",
+      "sha256": "0ade91232bbdbb15fae8fdecb5893cecf5216e6ac48c943547738f70d29c0ce1"
+    },
+    {
+      "path": "model-adapter.vectors.json",
+      "sha256": "34187a829a9598c70bbac7b4f78200ed8dfa1f485c0092f280ad4f4621543809"
+    },
+    {
+      "path": "openapi-v3-draft.vectors.json",
+      "sha256": "a8c8e54d637119de719e1ecbfbf1321a5ac637e93cbde6587eb01e23518fa716"
+    },
+    {
+      "path": "openapi-v3-draft.yaml",
+      "sha256": "a3f3379f4508a8296ce5d5194c62d055288c2fd36e67d26a5653a38b1d663bf5"
+    },
+    {
+      "path": "package.json",
+      "sha256": "f1d503b03007788a3f42d083ed295b9f239d55aa567cb234d1a3c1d622e52e2a"
+    },
+    {
+      "path": "status.json",
+      "sha256": "05301377f06be4d68e1dbbdcea294c26f97dd21f1e826a20b83b2055c90559f4"
+    },
+    {
+      "path": "tsconfig.json",
+      "sha256": "6353b3138e38ead9550c2a76a43fe3dfafff35d32a0b19732a1467896fe1238c"
+    },
+    {
+      "path": "validate.py",
+      "sha256": "b550bdc250a2d3f8182650296ffcfd69667a4bb415e7d0d9f9fc98795cfa4fbe"
+    }
+  ],
+  "status": "DRAFT_WAVE_V21_0_NOT_FROZEN"
+}
