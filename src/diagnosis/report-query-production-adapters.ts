@@ -1,6 +1,8 @@
 /**
  * Phase 3.8 — production reader / audit / quota adapters.
- * Default-off. Does not flip DIAGNOSIS_REPORT_API_DEPLOYED or register live packs.
+ * Designed-safe default / rollback is off (`DIAGNOSIS_PRODUCTION_GATES.adapters.default`).
+ * Current compile-time value is true (O1.1 step 3: read-only query/get after signed enablement).
+ * Does not flip DIAGNOSIS_REPORT_API_DEPLOYED or register live packs.
  * Reads existing Composite Diagnosis projections only. No Report DB.
  */
 import { DIAGNOSIS_REPORT_API_DEPLOYED } from "./report-query-deploy.js";
