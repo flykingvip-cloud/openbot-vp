@@ -190,8 +190,55 @@ export function renderCurrentIdentityBody(tip: OpenTip): string {
   ].join("\n");
 }
 
+function splitMarkdownTableRow(line: string): string[] {
+  const trimmed = line.trim();
+  const inner = trimmed.startsWith("|") ? trimmed.slice(1) : trimmed;
+  const withoutEnd = inner.endsWith("|") ? inner.slice(0, -1) : inner;
+  return withoutEnd.split("|").map((cell) => cell.trim());
+}
+
+function isMarkdownSeparatorRow(cells: string[]): boolean {
+  return cells.length > 0 && cells.every((cell) => /^:?-+:?$/.test(cell));
+}
+
+/** Pad pipe tables the way oxfmt --write does, so generate --write stays format-clean. */
+export function formatMarkdownTables(markdown: string): string {
+  const lines = markdown.split("\n");
+  const out: string[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    if (!lines[i].startsWith("|")) {
+      out.push(lines[i]);
+      i += 1;
+      continue;
+    }
+    const start = i;
+    while (i < lines.length && lines[i].startsWith("|")) {
+      i += 1;
+    }
+    const parsed = lines.slice(start, i).map(splitMarkdownTableRow);
+    const width = Math.max(...parsed.map((row) => row.length));
+    const colWidths = Array.from({ length: width }, (_, col) =>
+      Math.max(3, ...parsed.map((row) => (row[col] ?? "").length)),
+    );
+    for (const cells of parsed) {
+      const padded = Array.from({ length: width }, (_, col) => {
+        const cell = cells[col] ?? "";
+        if (isMarkdownSeparatorRow(cells)) {
+          return "-".repeat(colWidths[col]);
+        }
+        return cell.padEnd(colWidths[col], " ");
+      });
+      out.push(`| ${padded.join(" | ")} |`);
+    }
+  }
+  return out.join("\n");
+}
+
 export function renderCurrentIdentityBlock(tip: OpenTip): string {
-  return `${BEGIN_MARKER}\n${renderCurrentIdentityBody(tip)}${END_MARKER}\n`;
+  const body = formatMarkdownTables(renderCurrentIdentityBody(tip)).replace(/\n+$/, "\n");
+  // oxfmt wants a blank line after the BEGIN marker and before the END marker.
+  return `${BEGIN_MARKER}\n\n${body}\n${END_MARKER}\n`;
 }
 
 /** Extract raw text between markers (exclusive), or null if markers absent/malformed. */
