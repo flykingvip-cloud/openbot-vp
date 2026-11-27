@@ -91,10 +91,10 @@ Reply with ONLY the slug, nothing else. Examples: "vendor-pitch", "api-design", 
       await lifecycle.dispose();
     }
 
-    const result = fallbackResult.result;
+    const result = fallbackResult.result as { payloads?: Array<{ text?: string }> } | undefined;
 
     // Extract text from payloads
-    if (result.payloads && result.payloads.length > 0) {
+    if (result?.payloads && result.payloads.length > 0) {
       const textPayload = result.payloads[0]?.text;
       if (textPayload) {
         // Clean up the response - extract just the slug

@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   runCliAgent: vi.fn(),
   recordCliBackendUsage: vi.fn(),
   rememberModelResultUsage: vi.fn((u: unknown) => u),
-  usageRetainedForCandidateCharge: vi.fn((noted: unknown) => noted),
+  usageRetainedForCandidateCharge: vi.fn((noted: unknown, _err?: unknown) => noted),
 }));
 
 vi.mock("../../../gateway/enterprise-model/embedded-transport.js", () => ({
@@ -90,10 +90,8 @@ describe("candidate-core", () => {
     const failingCharger = createCandidateUsageCharger({
       onCharge: () => {
         throw new TaskBudgetExceededError("task-1", {
-          dimension: "tokens",
+          dimension: "cost",
           detail: "budget exceeded",
-          limit: 10,
-          observed: 11,
         });
       },
     });
@@ -107,10 +105,8 @@ describe("candidate-core", () => {
     const charger = createCandidateUsageCharger({ onCharge });
     charger.chargeOnFailure(
       new TaskBudgetExceededError("task-1", {
-        dimension: "tokens",
+        dimension: "cost",
         detail: "already over",
-        limit: 10,
-        observed: 11,
       }),
     );
     charger.chargeOnFailure(new Error("aborted"), { skipCharge: true });
