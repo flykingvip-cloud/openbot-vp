@@ -172,4 +172,48 @@ describe("scheduled_task tool", () => {
     });
     expect(add).toHaveBeenCalledTimes(1);
   });
+
+  it("lists only the signed-in owner's scheduled tasks when action=list", async () => {
+    actorState.current = ACTOR;
+    const list = vi.fn(async () => [
+      {
+        id: "job-own",
+        name: "巡检",
+        enabled: true,
+        agentId: "main",
+        sessionKey: "agent:main:main",
+        schedule: { kind: "cron", expr: "0 9 * * *", tz: "Asia/Shanghai" },
+        ownership: { ownerId: "user-1", tenantId: "tenant-a" },
+      },
+      {
+        id: "job-other",
+        name: "他人任务",
+        enabled: true,
+        agentId: "main",
+        sessionKey: "agent:main:main",
+        schedule: { kind: "cron", expr: "0 9 * * *", tz: "Asia/Shanghai" },
+        ownership: { ownerId: "user-2", tenantId: "tenant-a" },
+      },
+    ]);
+    registerScheduledTaskCronPort({
+      add: vi.fn(),
+      list: list as unknown as Parameters<typeof registerScheduledTaskCronPort>[0] extends infer P
+        ? P extends { list?: infer L }
+          ? L
+          : never
+        : never,
+    });
+    const result = await toolFor().execute("call-list", { action: "list" });
+    const details = result.details as {
+      ok: boolean;
+      action: string;
+      count: number;
+      jobs: Array<{ id: string }>;
+    };
+    expect(details.ok).toBe(true);
+    expect(details.action).toBe("list");
+    expect(details.count).toBe(1);
+    expect(details.jobs.map((j) => j.id)).toEqual(["job-own"]);
+    expect(list).toHaveBeenCalledTimes(1);
+  });
 });

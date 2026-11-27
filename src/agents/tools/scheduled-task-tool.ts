@@ -3,6 +3,7 @@ import {
   createOwnerScheduledTask,
   DEFAULT_SCHEDULED_TASK_DAILY_TIME,
   DEFAULT_SCHEDULED_TASK_TIMEZONE,
+  listOwnerScheduledTasks,
 } from "../../cron/owner-scheduled-task.js";
 import type { GatewayClient } from "../../gateway/server-methods/types.js";
 import { jsonResult, readStringParam, ToolInputError } from "./common.js";
@@ -23,7 +24,12 @@ import type { AnyAgentTool } from "./common.js";
  *   HEARTBEAT.md for an exact schedule.
  */
 const ScheduledTaskToolSchema = Type.Object({
-  action: Type.String({ description: "add (create is accepted as an alias)." }),
+  action: Type.String({
+    description: "list (read-only) or add (create is accepted as an alias).",
+  }),
+  includeDisabled: Type.Optional(
+    Type.Boolean({ description: "For action=list: include disabled jobs (default true)." }),
+  ),
   name: Type.Optional(Type.String({ description: "Task name shown in 我的任务." })),
   message: Type.Optional(
     Type.String({ description: "Prompt the scheduled run executes and delivers back." }),
@@ -53,12 +59,15 @@ const ScheduledTaskToolSchema = Type.Object({
   ),
 });
 
-function normalizeAction(raw: string): "add" {
+function normalizeAction(raw: string): "add" | "list" {
   const action = raw.trim().toLowerCase();
+  if (action === "list") {
+    return "list";
+  }
   if (action === "add" || action === "create") {
     return "add";
   }
-  throw new ToolInputError("action must be add");
+  throw new ToolInputError("action must be list or add");
 }
 
 export function createScheduledTaskTool(options?: {
@@ -73,11 +82,37 @@ export function createScheduledTaskTool(options?: {
   return {
     name: "scheduled_task",
     label: "Scheduled Task",
-    description: `Create a system scheduled task in 我的任务 (the same Gateway cron store as the client 定时任务 page and openbot cron). Use this tool instead of running \`openbot cron\` in the shell and instead of writing HEARTBEAT.md. action=add requires name and message. dailyTime defaults to ${DEFAULT_SCHEDULED_TASK_DAILY_TIME} and tz defaults to ${DEFAULT_SCHEDULED_TASK_TIMEZONE}. The job runs as an isolated agent turn and delivers the result to the current conversation. Only the signed-in owner of this agent can create it.`,
+    description: `List or create system scheduled tasks in 我的任务 (the same Gateway cron store as the client 定时任务 page and openbot cron). Use this tool instead of running \`openbot cron\` in the shell and instead of writing HEARTBEAT.md. action=list reads your own scheduled tasks. action=add requires name and message. dailyTime defaults to ${DEFAULT_SCHEDULED_TASK_DAILY_TIME} and tz defaults to ${DEFAULT_SCHEDULED_TASK_TIMEZONE}. The job runs as an isolated agent turn and delivers the result to the current conversation. Only the signed-in owner of this agent can call it.`,
     parameters: ScheduledTaskToolSchema,
     execute: async (_toolCallId, args) => {
       const params = args as Record<string, unknown>;
-      normalizeAction(readStringParam(params, "action", { required: true }));
+      const action = normalizeAction(readStringParam(params, "action", { required: true }));
+      if (action === "list") {
+        const jobs = await listOwnerScheduledTasks({
+          gatewayClientUser: options?.gatewayClientUser,
+          gatewayClientSessionDomain: options?.gatewayClientSessionDomain,
+          gatewayClientPlatformUserId: options?.gatewayClientPlatformUserId,
+          gatewayClientSessionEnterpriseId: options?.gatewayClientSessionEnterpriseId,
+          gatewayClientSessionMembershipId: options?.gatewayClientSessionMembershipId,
+          includeDisabled:
+            typeof params.includeDisabled === "boolean" ? params.includeDisabled : undefined,
+          agentId: readStringParam(params, "agentId"),
+        });
+        return jsonResult({
+          ok: true,
+          action: "list",
+          count: jobs.length,
+          jobs: jobs.map((job) => ({
+            id: job.id,
+            name: job.name,
+            enabled: job.enabled,
+            agentId: job.agentId,
+            sessionKey: job.sessionKey,
+            schedule: job.schedule,
+            state: job.state,
+          })),
+        });
+      }
       const job = await createOwnerScheduledTask({
         agentSessionKey: options?.agentSessionKey,
         requesterAgentIdOverride: options?.requesterAgentIdOverride,

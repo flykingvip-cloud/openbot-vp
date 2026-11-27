@@ -1,5 +1,31 @@
 version: 1
 tasks:
+  - id: fix-systemic-live-test-findings
+    owner: architecture-executor
+    intent:
+      - Fix systemic capability-atlas UI wiring/timeout, plan-confirm anchor, and steward scheduled_task list.
+    paths:
+      - src/agents/tools/scheduled-task-tool.test.ts
+      - src/agents/tools/scheduled-task-tool.ts
+      - src/cron/owner-scheduled-task.ts
+      - src/gateway/collaboration-learning/chat-plan-confirm.test.ts
+      - src/gateway/collaboration-learning/chat-plan-confirm.ts
+      - src/gateway/server-cron.ts
+      - ui/src/ui/ports/employee/views/my-bot-capability-atlas.ts
+      - ui/src/ui/ports/employee/views/workbench-stage-module.ts
+    state: active
+    sessions:
+      - id: systemic-fixes-20261127
+        taskId: fix-systemic-live-test-findings
+        ide: antigravity
+        agent: architecture-executor
+        status: active
+        lastSignalAt: "2026-11-27T07:58:00Z"
+        metadata:
+          authorization: User-authorized systemic fixes landing via PR to main.
+    ownerHistory: []
+    since: "2026-11-27"
+    metadata: {}
   - id: arch-phase-4-control-plane-slim
     owner: architecture-executor
     intent:
@@ -16178,6 +16204,22 @@ tasks:
     since: 2026-11-23
     metadata: {}
 landingStreams:
+  - id: fix-systemic-live-test-findings
+    landingPolicy: serial
+    paths:
+      - src/agents/tools/scheduled-task-tool.test.ts
+      - src/agents/tools/scheduled-task-tool.ts
+      - src/cron/owner-scheduled-task.ts
+      - src/gateway/collaboration-learning/chat-plan-confirm.test.ts
+      - src/gateway/collaboration-learning/chat-plan-confirm.ts
+      - src/gateway/server-cron.ts
+      - ui/src/ui/ports/employee/views/my-bot-capability-atlas.ts
+      - ui/src/ui/ports/employee/views/workbench-stage-module.ts
+    canLandWith: []
+    metadata:
+      task: fix-systemic-live-test-findings
+      agent: architecture-executor
+      purpose: Exact 8-file systemic fixes from 10-scenario live verification.
   - id: arch-phase-4-control-plane-slim
     landingPolicy: serial
     paths:
