@@ -21,8 +21,10 @@ import {
   updatePrivateDependency,
 } from "../../conversation-task/private-dependency-store.js";
 import {
+  commitAdmittedSessionTask,
   evaluateCurrentTaskSend,
   readSessionTaskBoard,
+  startBoundTaskExecution,
 } from "../../conversation-task/session-task-board.js";
 import { extractEmployeeStewardUserId } from "../../diagnosis/diagnose-conversation.js";
 import {
@@ -324,8 +326,48 @@ export function createConversationSendTool(options?: {
             typeof params.successCriteria === "string" ? params.successCriteria : undefined,
         });
       let dependency: Awaited<ReturnType<typeof reservePrivateDependency>> | undefined;
+      let activeBoard = parentBoard;
       if (isDispatch) {
-        const parent = parentBoard.current;
+        if (
+          sessionFile &&
+          actor.tenantId &&
+          senderSessionKey &&
+          !activeBoard.current?.wakeSuppress &&
+          (!activeBoard.current?.unfinished || !activeBoard.current.executionAttempt)
+        ) {
+          const criteria =
+            typeof params.successCriteria === "string" && params.successCriteria.trim()
+              ? params.successCriteria.trim()
+              : `完成派给「${peer.displayName}」的协作任务并返回结果`;
+          if (!activeBoard.current?.unfinished) {
+            const admitted = commitAdmittedSessionTask({
+              sessionFile,
+              requestId: `dispatch:${toolCallId}`,
+              goal: message.slice(0, 200),
+              lifecycle: "long_task",
+              acceptance: [criteria],
+              expectedFocusRevision: activeBoard.focusRevision,
+              expectedWriteEpoch: activeBoard.writeEpoch ?? 0,
+              expectedTaskId: activeBoard.current?.taskId,
+            });
+            if (admitted.kind === "accepted" || admitted.kind === "duplicate") {
+              startBoundTaskExecution(sessionFile, admitted.binding, `attempt:${toolCallId}`);
+              activeBoard = readSessionTaskBoard(sessionFile);
+            }
+          } else if (!activeBoard.current.executionAttempt) {
+            startBoundTaskExecution(
+              sessionFile,
+              {
+                taskId: activeBoard.current.taskId,
+                executionAttempt: activeBoard.current.executionAttempt,
+                deliverableVersion: activeBoard.current.deliverableVersion,
+              },
+              `attempt:${toolCallId}`,
+            );
+            activeBoard = readSessionTaskBoard(sessionFile);
+          }
+        }
+        const parent = activeBoard.current;
         if (
           !sessionFile ||
           !parent?.unfinished ||
@@ -349,7 +391,7 @@ export function createConversationSendTool(options?: {
             sessionFile,
             taskId: parent.taskId,
             executionAttempt: parent.executionAttempt,
-            focusRevision: parentBoard.focusRevision,
+            focusRevision: activeBoard.focusRevision,
           },
           child: { agentId: peer.agentId, sessionKey: peer.sessionKey, runId: "" },
           successCriteria:

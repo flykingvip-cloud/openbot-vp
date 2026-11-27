@@ -1,5 +1,24 @@
 version: 1
 tasks:
+  - id: fix-conversation-send-auto-bind-task
+    owner: architecture-executor
+    intent:
+      - Auto-admit and bind traceable parent task on 1v1 cross-employee dispatch in conversation_send.
+    paths:
+      - src/agents/tools/conversation-send-tool.ts
+    state: active
+    sessions:
+      - id: conversation-send-auto-bind-20261127
+        taskId: fix-conversation-send-auto-bind-task
+        ide: antigravity
+        agent: architecture-executor
+        status: active
+        lastSignalAt: "2026-11-27T09:01:00Z"
+        metadata:
+          authorization: User-authorized Solution A landing via PR to main.
+    ownerHistory: []
+    since: "2026-11-27"
+    metadata: {}
   - id: fix-systemic-live-test-findings
     owner: architecture-executor
     intent:
@@ -16204,6 +16223,15 @@ tasks:
     since: 2026-11-23
     metadata: {}
 landingStreams:
+  - id: fix-conversation-send-auto-bind-task
+    landingPolicy: serial
+    paths:
+      - src/agents/tools/conversation-send-tool.ts
+    canLandWith: []
+    metadata:
+      task: fix-conversation-send-auto-bind-task
+      agent: architecture-executor
+      purpose: Auto-admit and bind traceable parent task on 1v1 cross-employee dispatch.
   - id: fix-systemic-live-test-findings
     landingPolicy: serial
     paths:
