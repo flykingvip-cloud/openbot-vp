@@ -1,10 +1,6 @@
 import fs from "node:fs";
 import { isBuiltinStewardAgent } from "../../agents/builtin-steward/identity.js";
 import type { RetrievalContext } from "../../retrieval/types.js";
-import {
-  isKnowledgeBaseVisible,
-  type VisibilityKnowledgeBase,
-} from "../../retrieval/visibility-resolver.js";
 import { resolveCollaborationGroupIdFromSessionKey } from "../collaboration-learning/shared.js";
 import {
   ownershipProofFromLocalUser,
@@ -247,7 +243,6 @@ import { ErrorCodes, errorShape } from "../protocol/index.js";
 import { readSessionMessages } from "../session-utils.js";
 import { SkillAssetStoreError } from "../skill-lifecycle-store.js";
 import { deletePersonalSkillAsset, getPersonalSkillAssetDetail } from "../skill-lifecycle-store.js";
-import { canonicalizeTenantId } from "../tenant-canonicalization.js";
 import { loadSessionEntryForClient } from "../tenant-context.js";
 import { resolveControlPlaneStorePathForClient } from "../tenant-context.js";
 import { TENANT_ENTERPRISE_DATA_FILE } from "../tenant-store-paths.js";
@@ -418,31 +413,24 @@ function respondKnowledgeBaseError(respond: RespondFn, error: unknown) {
   respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, message));
 }
 
-function knowledgeBaseRetrievalContext(context: {
-  userId: string | null;
-  seatId: string | null;
-  tenantId: string | null;
-  departmentId?: string | null;
-  roleCode?: string | null;
-}): RetrievalContext {
+function knowledgeBaseRetrievalContext(
+  context: {
+    userId: string | null;
+    seatId: string | null;
+    tenantId: string | null;
+    departmentId?: string | null;
+    roleCode?: string | null;
+  },
+  email?: string | null,
+): RetrievalContext {
+  const trimmedEmail = email?.trim() || null;
   return {
     userId: context.userId,
     seatId: context.seatId,
     tenantId: context.tenantId,
     departmentId: context.departmentId ?? null,
     roleCodes: context.roleCode ? [context.roleCode] : undefined,
-  };
-}
-
-function toVisibilityKnowledgeBase(base: KnowledgeBase): VisibilityKnowledgeBase {
-  return {
-    id: base.id,
-    visibility: base.visibility,
-    ownerId: base.ownerId,
-    // Canonicalize the stored tenant id so legacy tenant aliases still match the
-    // (already canonical) caller tenant — otherwise a pre-existing team/enterprise
-    // base could be wrongly hidden from a same-tenant member.
-    tenantId: canonicalizeTenantId(base.tenantId),
+    ...(trimmedEmail ? { email: trimmedEmail } : {}),
   };
 }
 
@@ -2053,17 +2041,14 @@ export const knowledgeHandlers: GatewayRequestHandlers = {
       }
     }
     const actor = knowledgeBasePermissionActor(context, client?.user);
-    // A base is visible when the caller owns it, is an active member, OR it is a
-    // team/enterprise base in the caller's tenant. Tenant visibility means a
-    // brand-new member sees pre-existing shared team/enterprise spaces without
-    // first creating any personal space; explicit membership additionally covers
-    // bases shared individually. Members are only loaded for shared bases — a
-    // private base stays owner-only.
+    // POLICY-PRE02: canReadKnowledgeBase is the sole fail-closed authoritative
+    // read gate (owner, active member, or team/enterprise visibility in the
+    // caller's tenant). isKnowledgeBaseVisible is only a fallback inside that
+    // gate and must not be used as a standalone read check.
     const knowledgeBases = listKnowledgeBases().filter((base) =>
       canReadKnowledgeBase({
         knowledgeBase: base,
         actor,
-        members: base.visibility === "private" ? undefined : listKnowledgeBaseMembers(base.id),
       }),
     );
     respond(true, {
@@ -2089,15 +2074,9 @@ export const knowledgeHandlers: GatewayRequestHandlers = {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "knowledgeBaseId required"));
       return;
     }
-    const knowledgeBase = getKnowledgeBase(kbId);
     const context = await resolveKnowledgeSourceContext(client);
-    if (
-      !knowledgeBase ||
-      !isKnowledgeBaseVisible(
-        knowledgeBaseRetrievalContext(context),
-        toVisibilityKnowledgeBase(knowledgeBase),
-      )
-    ) {
+    const knowledgeBase = authorizedKnowledgeBase(kbId, context, client?.user, "read");
+    if (!knowledgeBase) {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "knowledge base not found"));
       return;
     }
@@ -2111,15 +2090,9 @@ export const knowledgeHandlers: GatewayRequestHandlers = {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "knowledgeBaseId required"));
       return;
     }
-    const knowledgeBase = getKnowledgeBase(kbId);
     const context = await resolveKnowledgeSourceContext(client);
-    if (
-      !knowledgeBase ||
-      !isKnowledgeBaseVisible(
-        knowledgeBaseRetrievalContext(context),
-        toVisibilityKnowledgeBase(knowledgeBase),
-      )
-    ) {
+    const knowledgeBase = authorizedKnowledgeBase(kbId, context, client?.user, "read");
+    if (!knowledgeBase) {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "knowledge base not found"));
       return;
     }
@@ -2267,15 +2240,9 @@ export const knowledgeHandlers: GatewayRequestHandlers = {
       );
       return;
     }
-    const knowledgeBase = getKnowledgeBase(kbId);
     const context = await resolveKnowledgeSourceContext(client);
-    if (
-      !knowledgeBase ||
-      !isKnowledgeBaseVisible(
-        knowledgeBaseRetrievalContext(context),
-        toVisibilityKnowledgeBase(knowledgeBase),
-      )
-    ) {
+    const knowledgeBase = authorizedKnowledgeBase(kbId, context, client?.user, "read");
+    if (!knowledgeBase) {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "knowledge base not found"));
       return;
     }
@@ -2367,15 +2334,9 @@ export const knowledgeHandlers: GatewayRequestHandlers = {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "knowledgeBaseId required"));
       return;
     }
-    const knowledgeBase = getKnowledgeBase(kbId);
     const context = await resolveKnowledgeSourceContext(client);
-    if (
-      !knowledgeBase ||
-      !isKnowledgeBaseVisible(
-        knowledgeBaseRetrievalContext(context),
-        toVisibilityKnowledgeBase(knowledgeBase),
-      )
-    ) {
+    const knowledgeBase = authorizedKnowledgeBase(kbId, context, client?.user, "read");
+    if (!knowledgeBase) {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "knowledge base not found"));
       return;
     }
@@ -2397,15 +2358,9 @@ export const knowledgeHandlers: GatewayRequestHandlers = {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "knowledgeBaseId required"));
       return;
     }
-    const knowledgeBase = getKnowledgeBase(kbId);
     const context = await resolveKnowledgeSourceContext(client);
-    if (
-      !knowledgeBase ||
-      !isKnowledgeBaseVisible(
-        knowledgeBaseRetrievalContext(context),
-        toVisibilityKnowledgeBase(knowledgeBase),
-      )
-    ) {
+    const knowledgeBase = authorizedKnowledgeBase(kbId, context, client?.user, "read");
+    if (!knowledgeBase) {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "knowledge base not found"));
       return;
     }
@@ -2425,15 +2380,9 @@ export const knowledgeHandlers: GatewayRequestHandlers = {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "knowledgeBaseId required"));
       return;
     }
-    const knowledgeBase = getKnowledgeBase(kbId);
     const context = await resolveKnowledgeSourceContext(client);
-    if (
-      !knowledgeBase ||
-      !isKnowledgeBaseVisible(
-        knowledgeBaseRetrievalContext(context),
-        toVisibilityKnowledgeBase(knowledgeBase),
-      )
-    ) {
+    const knowledgeBase = authorizedKnowledgeBase(kbId, context, client?.user, "read");
+    if (!knowledgeBase) {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "knowledge base not found"));
       return;
     }
@@ -2452,15 +2401,9 @@ export const knowledgeHandlers: GatewayRequestHandlers = {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "knowledgeBaseId required"));
       return;
     }
-    const knowledgeBase = getKnowledgeBase(kbId);
     const context = await resolveKnowledgeSourceContext(client);
-    if (
-      !knowledgeBase ||
-      !isKnowledgeBaseVisible(
-        knowledgeBaseRetrievalContext(context),
-        toVisibilityKnowledgeBase(knowledgeBase),
-      )
-    ) {
+    const knowledgeBase = authorizedKnowledgeBase(kbId, context, client?.user, "read");
+    if (!knowledgeBase) {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "knowledge base not found"));
       return;
     }
@@ -2479,15 +2422,9 @@ export const knowledgeHandlers: GatewayRequestHandlers = {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "knowledgeBaseId required"));
       return;
     }
-    const knowledgeBase = getKnowledgeBase(kbId);
     const context = await resolveKnowledgeSourceContext(client);
-    if (
-      !knowledgeBase ||
-      !isKnowledgeBaseVisible(
-        knowledgeBaseRetrievalContext(context),
-        toVisibilityKnowledgeBase(knowledgeBase),
-      )
-    ) {
+    const knowledgeBase = authorizedKnowledgeBase(kbId, context, client?.user, "read");
+    if (!knowledgeBase) {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "knowledge base not found"));
       return;
     }
@@ -2532,15 +2469,9 @@ export const knowledgeHandlers: GatewayRequestHandlers = {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "knowledgeBaseId required"));
       return;
     }
-    const knowledgeBase = getKnowledgeBase(kbId);
     const context = await resolveKnowledgeSourceContext(client);
-    if (
-      !knowledgeBase ||
-      !isKnowledgeBaseVisible(
-        knowledgeBaseRetrievalContext(context),
-        toVisibilityKnowledgeBase(knowledgeBase),
-      )
-    ) {
+    const knowledgeBase = authorizedKnowledgeBase(kbId, context, client?.user, "read");
+    if (!knowledgeBase) {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "knowledge base not found"));
       return;
     }
@@ -3006,7 +2937,7 @@ export const knowledgeHandlers: GatewayRequestHandlers = {
       return;
     }
     const context = await resolveKnowledgeSourceContext(client);
-    const retrievalContext = knowledgeBaseRetrievalContext(context);
+    const retrievalContext = knowledgeBaseRetrievalContext(context, client?.user);
     const { knowledgeBase, evidence, searchMode, substringMatches } =
       await searchScopedKnowledgeBaseWithFallback({
         client,

@@ -36,6 +36,19 @@ function retrievalContextFromActor(actor: KnowledgeBasePermissionActor): Retriev
   };
 }
 
+export function permissionActorFromRetrievalContext(
+  ctx: RetrievalContext,
+): KnowledgeBasePermissionActor {
+  return {
+    userId: ctx.userId,
+    tenantId: ctx.tenantId,
+    email: ctx.email ?? null,
+    departmentId: ctx.departmentId ?? null,
+    roleCode: ctx.roleCodes?.[0] ?? null,
+    ...(ctx.agentId?.trim() ? { agentId: ctx.agentId.trim() } : {}),
+  };
+}
+
 function activeMemberRole(
   knowledgeBase: KnowledgeBase,
   actor: KnowledgeBasePermissionActor,
@@ -69,6 +82,13 @@ function activeMemberRole(
   );
 }
 
+/**
+ * Sole fail-closed authoritative knowledge-base read gate (POLICY-PRE02).
+ * Grants access to the owner, an active member, or (as a fallback only)
+ * a caller who passes {@link isKnowledgeBaseVisible} for team/enterprise
+ * tenant visibility. Callers must not treat isKnowledgeBaseVisible itself
+ * as the authoritative read gate.
+ */
 export function canReadKnowledgeBase(params: {
   knowledgeBase: KnowledgeBase;
   actor: KnowledgeBasePermissionActor;

@@ -16563,6 +16563,12 @@ landingStreams:
       - src/gateway/server-methods/knowledge-governance.ts
       - src/gateway/server-methods/knowledge.ts
       - src/gateway/server-methods/space-acl-13-gaps.test.ts
+      - src/gateway/server-methods/policy-pre02-read-gate.test.ts
+      - src/gateway/knowledge/knowledge-retrieval-runtime.ts
+      - src/retrieval/sources/knowledge-source.ts
+      - src/retrieval/sources/deliverable-source.ts
+      - src/retrieval/types.ts
+      - src/retrieval/visibility-resolver.ts
       - .loom/registry.yaml
     canLandWith: []
     metadata:

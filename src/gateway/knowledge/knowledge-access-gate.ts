@@ -79,9 +79,8 @@ export function createKnowledgeBaseAccessCache(params: {
 }
 
 /**
- * Existing dual read-gate (canReadKnowledgeBase, which already includes
- * isKnowledgeBaseVisible as a fallback) — this helper does not invent a new
- * read policy or collapse the PRE-02 split.
+ * POLICY-PRE02: canReadKnowledgeBase is the sole fail-closed authoritative
+ * read gate. isKnowledgeBaseVisible remains only a fallback inside that gate.
  */
 export function listReadableKnowledgeBaseIds(params: {
   context: KnowledgeSourceContext;
