@@ -18,6 +18,7 @@ export class I18nManager {
   private translations: Partial<Record<Locale, TranslationMap>> = {};
   private subscribers: Set<Subscriber> = new Set();
   private localeReady: Promise<void>;
+  private localeRequest = 0;
 
   constructor() {
     this.localeReady = this.loadLocale();
@@ -61,9 +62,14 @@ export class I18nManager {
   }
 
   public async setLocale(locale: Locale) {
+    const request = ++this.localeRequest;
     const needsTranslationLoad = !this.translations[locale];
     if (this.locale === locale && !needsTranslationLoad) {
       this.syncDocumentLanguage(locale);
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+        localStorage.removeItem(LEGACY_LOCALE_STORAGE_KEY);
+      }
       return;
     }
 
@@ -80,6 +86,10 @@ export class I18nManager {
       }
     }
 
+    // Startup/lazy loads must not overwrite a newer explicit locale selection.
+    if (request !== this.localeRequest) {
+      return;
+    }
     this.locale = locale;
     this.syncDocumentLanguage(locale);
     if (typeof localStorage !== "undefined") {
