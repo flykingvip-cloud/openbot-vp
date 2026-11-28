@@ -80,7 +80,16 @@ const peerClient = { connect: {} as never, user: "peer@example.com" };
 const editorClient = { connect: {} as never, user: "editor@example.com" };
 
 function setContext(next: KnowledgeSourceContext) {
-  contextState.current = next;
+  const { userId, seatId, tenantId } = next;
+  if (userId == null) {
+    throw new Error("setContext requires a non-null userId");
+  }
+  // seatId/tenantId are also string | null on KnowledgeSourceContext; the hoisted
+  // test state is a non-null ACL actor. Narrow them without weakening assertions.
+  if (seatId == null || tenantId == null) {
+    throw new Error("setContext requires non-null seatId and tenantId");
+  }
+  contextState.current = { ...next, userId, seatId, tenantId };
 }
 
 function cleanStore() {

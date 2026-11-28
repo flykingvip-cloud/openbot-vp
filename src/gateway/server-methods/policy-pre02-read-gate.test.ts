@@ -3,7 +3,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { KnowledgeSourceContext } from "../knowledge/sources/types.js";
-import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "./types.js";
+import type {
+  GatewayClient,
+  GatewayRequestHandler,
+  GatewayRequestHandlerOptions,
+} from "./types.js";
 
 const { tmpDir } = vi.hoisted(() => {
   const dir = `/tmp/openbot-policy-pre02-read-gate-${Math.random().toString(36).slice(2)}`;
@@ -74,7 +78,7 @@ function setContext(next: KnowledgeSourceContext) {
 async function invoke(
   method: string,
   params: Record<string, unknown> = {},
-  client: { user: string } = ownerClient,
+  client: GatewayClient = ownerClient,
 ): Promise<InvokeResult> {
   const handler = knowledgeHandlers[method] as GatewayRequestHandler | undefined;
   if (!handler) {
