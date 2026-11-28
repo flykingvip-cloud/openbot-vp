@@ -58,6 +58,18 @@ describe("i18n", () => {
     expect(document.documentElement.lang).toBe("en");
   });
 
+  it("keeps a newer explicit locale when the startup locale finishes later", async () => {
+    localStorage.setItem("openbot.i18n.locale", "zh-CN");
+    const fresh = new I18nManager();
+    fresh.registerTranslation("en", { common: { health: "Health" } });
+    await fresh.setLocale("en");
+    await fresh.whenReady();
+    expect(fresh.getLocale()).toBe("en");
+    expect(fresh.t("common.health")).toBe("Health");
+    expect(document.documentElement.lang).toBe("en");
+    expect(localStorage.getItem("openbot.i18n.locale")).toBe("en");
+  });
+
   it("loads saved non-English locale on startup", async () => {
     localStorage.setItem("openbot.i18n.locale", "zh-CN");
     const fresh = new I18nManager();
@@ -70,6 +82,7 @@ describe("i18n", () => {
   });
 
   it("falls back to the legacy locale key on startup", async () => {
+    localStorage.removeItem("openbot.i18n.locale");
     localStorage.setItem("openclaw.i18n.locale", "zh-CN");
     const fresh = new I18nManager();
 
