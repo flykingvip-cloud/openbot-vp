@@ -89,7 +89,12 @@ function setContext(next: KnowledgeSourceContext) {
   if (seatId == null || tenantId == null) {
     throw new Error("setContext requires non-null seatId and tenantId");
   }
-  contextState.current = { ...next, userId, seatId, tenantId };
+  // Hoisted test state is inferred as hasEnterpriseScope: true. Narrow the
+  // boolean field to the literal true without weakening ACL assertions.
+  if (!next.hasEnterpriseScope) {
+    throw new Error("setContext requires hasEnterpriseScope === true");
+  }
+  contextState.current = { ...next, userId, seatId, tenantId, hasEnterpriseScope: true };
 }
 
 function cleanStore() {
