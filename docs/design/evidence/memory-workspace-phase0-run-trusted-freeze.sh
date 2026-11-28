@@ -16,7 +16,7 @@ SCAN_PATH="docs/design/evidence/memory-workspace-phase0-inventory-scan.mjs"
 
 TRUSTED_INVENTORY_BLOB="${TRUSTED_INVENTORY_BLOB:-4b012d9cdb41a55e9d352f572ad882565776c3ca}"
 TRUSTED_SCAN_BLOB="${TRUSTED_SCAN_BLOB:-dad5eae85de25c25493a8bb23545666e39f81733}"
-TRUSTED_BASELINE_BLOB="${TRUSTED_BASELINE_BLOB:-0c1860caf8c02a2840ccddda0a392f19aeb588a8}"
+TRUSTED_BASELINE_BLOB="${TRUSTED_BASELINE_BLOB:-1c56165faa365ebf1fc60e8bf79095dd6896fea7}"
 
 # Keep extracted scanner inside the repo so `import "typescript"` resolves.
 # Must stay outside node_modules: tsx skips CLI isMain for files there.

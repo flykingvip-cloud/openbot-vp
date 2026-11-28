@@ -14,7 +14,7 @@
   "closesWorkstreams": [],
   "counts": {
     "P1": {
-      "production": 64,
+      "production": 82,
       "test": 8
     },
     "P2": {
@@ -26,7 +26,7 @@
       "test": 10
     },
     "P4": {
-      "production": 1,
+      "production": 2,
       "test": 135
     },
     "P5": {
@@ -42,11 +42,11 @@
       "test": 0
     },
     "P8": {
-      "production": 4,
+      "production": 7,
       "test": 0
     }
   },
-  "productionWriteWatchIndex": 8,
+  "productionWriteWatchIndex": 15,
   "helpers": [
     {
       "name": "resolveAgentWorkspaceDir",
@@ -60,6 +60,13 @@
       "file": "src/agents/builtin-steward/employee-isolation.ts",
       "line": 256,
       "kind": "known-symbol",
+      "profile": "production"
+    },
+    {
+      "name": "resolveEffectiveSandboxWorkspaceDir",
+      "file": "src/agents/sandbox/effective-workspace.ts",
+      "line": 26,
+      "kind": "new-helper",
       "profile": "production"
     },
     {
@@ -77,9 +84,23 @@
       "profile": "production"
     },
     {
+      "name": "resolveRunWorkspaceDir",
+      "file": "src/agents/workspace-run.ts",
+      "line": 95,
+      "kind": "new-helper",
+      "profile": "production"
+    },
+    {
       "name": "resolveDefaultAgentWorkspaceDir",
       "file": "src/agents/workspace.ts",
       "line": 12,
+      "kind": "new-helper",
+      "profile": "production"
+    },
+    {
+      "name": "resolveCollaborationRunWorkspaceDir",
+      "file": "src/auto-reply/reply/runtime-context-assembly.ts",
+      "line": 37,
       "kind": "new-helper",
       "profile": "production"
     },
@@ -94,6 +115,13 @@
       "name": "resolveSessionContinuityWorkspaceDir",
       "file": "src/auto-reply/reply/session-continuity.ts",
       "line": 405,
+      "kind": "new-helper",
+      "profile": "production"
+    },
+    {
+      "name": "resolveSessionContinuityWorkspaceDir",
+      "file": "src/auto-reply/reply/session-continuity.ts",
+      "line": 449,
       "kind": "new-helper",
       "profile": "production"
     },
@@ -129,6 +157,13 @@
       "name": "resolveTenantDataRootWorkspaceDir",
       "file": "src/gateway/tenant-context.ts",
       "line": 953,
+      "kind": "new-helper",
+      "profile": "production"
+    },
+    {
+      "name": "resolveTenantDataRootWorkspaceDir",
+      "file": "src/gateway/tenant-context.ts",
+      "line": 990,
       "kind": "new-helper",
       "profile": "production"
     },
@@ -218,6 +253,19 @@
     {
       "pathId": "P1",
       "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/agent-runtime/state/repository/async-wait-recovery-enqueue.ts",
+      "line": 162,
+      "op": "read",
+      "profile": "production",
+      "deploymentProfile": "unknown",
+      "snippet": "const workspaceDir = trusted?.workspaceDir || resolveAgentWorkspaceDir(cfg, agentId);",
+      "owner": "unassigned",
+      "replacement": "resolveWorkspaceResource handle + WorkspaceDataRole",
+      "retirementPhase": "freeze"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
       "file": "src/agents/agent-scope.test.ts",
       "line": 447,
       "op": "read",
@@ -233,6 +281,19 @@
       "symbol": "resolveAgentWorkspaceDir",
       "file": "src/agents/agent-scope.ts",
       "line": 320,
+      "op": "read",
+      "profile": "production",
+      "deploymentProfile": "unknown",
+      "snippet": "const workspaceDir = normalizePathForComparison(resolveAgentWorkspaceDir(cfg, id));",
+      "owner": "unassigned",
+      "replacement": "resolveWorkspaceResource handle + WorkspaceDataRole",
+      "retirementPhase": "freeze"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/agents/agent-scope.ts",
+      "line": 326,
       "op": "read",
       "profile": "production",
       "deploymentProfile": "unknown",
@@ -461,6 +522,32 @@
       "owner": "unassigned",
       "replacement": "governance Catalog adapter; deny on miss after coverage",
       "retirementPhase": "allowlist-test"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/commands/agent.ts",
+      "line": 282,
+      "op": "read",
+      "profile": "production",
+      "deploymentProfile": "unknown",
+      "snippet": "workspaceDirRaw = resolveAgentWorkspaceDir(cfg, sessionAgentId);",
+      "owner": "unassigned",
+      "replacement": "resolveWorkspaceResource handle + WorkspaceDataRole",
+      "retirementPhase": "freeze"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/commands/agent.ts",
+      "line": 287,
+      "op": "read",
+      "profile": "production",
+      "deploymentProfile": "unknown",
+      "snippet": "workspaceDirRaw = resolveAgentWorkspaceDir(cfg, sessionAgentId);",
+      "owner": "unassigned",
+      "replacement": "resolveWorkspaceResource handle + WorkspaceDataRole",
+      "retirementPhase": "freeze"
     },
     {
       "pathId": "P1",
@@ -777,8 +864,47 @@
     {
       "pathId": "P1",
       "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/data/memory-lifecycle.ts",
+      "line": 29,
+      "op": "read",
+      "profile": "production",
+      "deploymentProfile": "unknown",
+      "snippet": "const workspaceDir = resolveAgentWorkspaceDir(cfg, agentId);",
+      "owner": "unassigned",
+      "replacement": "resolveWorkspaceResource handle + WorkspaceDataRole",
+      "retirementPhase": "freeze"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/data/memory-list.ts",
+      "line": 121,
+      "op": "read",
+      "profile": "production",
+      "deploymentProfile": "unknown",
+      "snippet": "const workspaceDir = resolveAgentWorkspaceDir(cfg, agentId);",
+      "owner": "unassigned",
+      "replacement": "resolveWorkspaceResource handle + WorkspaceDataRole",
+      "retirementPhase": "freeze"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
       "file": "src/gateway/assistant-identity.ts",
       "line": 88,
+      "op": "read",
+      "profile": "production",
+      "deploymentProfile": "unknown",
+      "snippet": "const workspaceDir = params.workspaceDir ?? resolveAgentWorkspaceDir(params.cfg, agentId);",
+      "owner": "unassigned",
+      "replacement": "resolveWorkspaceResource handle + WorkspaceDataRole",
+      "retirementPhase": "freeze"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/gateway/assistant-identity.ts",
+      "line": 92,
       "op": "read",
       "profile": "production",
       "deploymentProfile": "unknown",
@@ -870,6 +996,19 @@
       "symbol": "resolveAgentWorkspaceDir",
       "file": "src/gateway/collaboration-learning/shared.ts",
       "line": 1316,
+      "op": "read",
+      "profile": "production",
+      "deploymentProfile": "unknown",
+      "snippet": "const workspaceDir = resolveAgentWorkspaceDir(resolvedCfg, resolveDefaultAgentId(resolvedCfg));",
+      "owner": "unassigned",
+      "replacement": "resolveWorkspaceResource handle + WorkspaceDataRole",
+      "retirementPhase": "freeze"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/gateway/collaboration-learning/shared.ts",
+      "line": 1935,
       "op": "read",
       "profile": "production",
       "deploymentProfile": "unknown",
@@ -1646,6 +1785,19 @@
       "retirementPhase": "freeze"
     },
     {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/gateway/server-methods/task-context.ts",
+      "line": 104,
+      "op": "read",
+      "profile": "production",
+      "deploymentProfile": "unknown",
+      "snippet": "const workspaceDir = resolveAgentWorkspaceDir(params.cfg, agentId) ?? process.cwd();",
+      "owner": "unassigned",
+      "replacement": "resolveWorkspaceResource handle + WorkspaceDataRole",
+      "retirementPhase": "freeze"
+    },
+    {
       "pathId": "P4",
       "symbol": "buildUserOwnedWorkspaceCatalogEntry",
       "file": "src/gateway/server-methods/tools-catalog-item7-s20.test.ts",
@@ -1689,6 +1841,19 @@
       "symbol": "resolveAgentWorkspaceDir",
       "file": "src/gateway/server.impl.ts",
       "line": 399,
+      "op": "read",
+      "profile": "production",
+      "deploymentProfile": "unknown",
+      "snippet": "const defaultWorkspaceDir = resolveAgentWorkspaceDir(cfgAtStart, defaultAgentId);",
+      "owner": "unassigned",
+      "replacement": "resolveWorkspaceResource handle + WorkspaceDataRole",
+      "retirementPhase": "freeze"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/gateway/server.impl.ts",
+      "line": 415,
       "op": "read",
       "profile": "production",
       "deploymentProfile": "unknown",
@@ -1841,10 +2006,36 @@
       "retirementPhase": "freeze"
     },
     {
+      "pathId": "P4",
+      "symbol": "resolveAuthorizedAgentToolWorkspaceCwd",
+      "file": "src/gateway/tenant-context.ts",
+      "line": 1054,
+      "op": "read",
+      "profile": "production",
+      "deploymentProfile": "ManagedEnterprise",
+      "snippet": "const authorized = resolveAuthorizedAgentToolWorkspaceCwd({",
+      "owner": "unassigned",
+      "replacement": "governance Catalog adapter; deny on miss after coverage",
+      "retirementPhase": "freeze"
+    },
+    {
       "pathId": "P1",
       "symbol": "resolveAgentWorkspaceDir",
       "file": "src/gateway/workbench/pending-tasks-read-model.ts",
       "line": 94,
+      "op": "read",
+      "profile": "production",
+      "deploymentProfile": "unknown",
+      "snippet": "const workspaceDir = resolveAgentWorkspaceDir(cfg, agentId);",
+      "owner": "unassigned",
+      "replacement": "resolveWorkspaceResource handle + WorkspaceDataRole",
+      "retirementPhase": "freeze"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/gateway/workbench/pending-tasks-read-model.ts",
+      "line": 101,
       "op": "read",
       "profile": "production",
       "deploymentProfile": "unknown",
@@ -1930,6 +2121,19 @@
       "owner": "data-governance-v2-p0:cursor-data-governance",
       "replacement": "governance Catalog adapter; deny on miss after coverage",
       "retirementPhase": "allowlist-test"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/gateway/workspace-resolver/formal-deliverable-root.ts",
+      "line": 333,
+      "op": "read",
+      "profile": "production",
+      "deploymentProfile": "ManagedEnterprise",
+      "snippet": "root = resolveAgentWorkspaceDir(cfg, params.agentId);",
+      "owner": "data-governance-v2-p0:cursor-data-governance",
+      "replacement": "resolveWorkspaceResource handle + WorkspaceDataRole",
+      "retirementPhase": "freeze"
     },
     {
       "pathId": "P4",
@@ -3208,6 +3412,19 @@
     {
       "pathId": "P1",
       "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/hooks/llm-slug-generator.ts",
+      "line": 39,
+      "op": "read",
+      "profile": "production",
+      "deploymentProfile": "unknown",
+      "snippet": "const workspaceDir = resolveAgentWorkspaceDir(params.cfg, agentId);",
+      "owner": "unassigned",
+      "replacement": "resolveWorkspaceResource handle + WorkspaceDataRole",
+      "retirementPhase": "freeze"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
       "file": "src/infra/heartbeat-runner.ts",
       "line": 548,
       "op": "read",
@@ -3223,6 +3440,19 @@
       "symbol": "resolveAgentWorkspaceDir",
       "file": "src/infra/heartbeat-runner.ts",
       "line": 687,
+      "op": "read",
+      "profile": "production",
+      "deploymentProfile": "unknown",
+      "snippet": "const workspaceDir = resolveAgentWorkspaceDir(cfg, agentId);",
+      "owner": "unassigned",
+      "replacement": "resolveWorkspaceResource handle + WorkspaceDataRole",
+      "retirementPhase": "freeze"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/infra/heartbeat-runner.ts",
+      "line": 689,
       "op": "read",
       "profile": "production",
       "deploymentProfile": "unknown",
@@ -3287,7 +3517,33 @@
       "pathId": "P1",
       "symbol": "resolveAgentWorkspaceDir",
       "file": "src/memory/backend-config.ts",
+      "line": 424,
+      "op": "index",
+      "profile": "production",
+      "deploymentProfile": "unknown",
+      "snippet": "const workspaceDir = resolveAgentWorkspaceDir(params.cfg, params.agentId);",
+      "owner": "unassigned:WS-C",
+      "replacement": "resolveWorkspaceResource handle + WorkspaceDataRole",
+      "retirementPhase": "freeze"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/memory/backend-config.ts",
       "line": 444,
+      "op": "index",
+      "profile": "production",
+      "deploymentProfile": "unknown",
+      "snippet": "const workspaceDir = resolveAgentWorkspaceDir(params.cfg, params.agentId);",
+      "owner": "unassigned:WS-C",
+      "replacement": "resolveWorkspaceResource handle + WorkspaceDataRole",
+      "retirementPhase": "freeze"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/memory/backend-config.ts",
+      "line": 451,
       "op": "index",
       "profile": "production",
       "deploymentProfile": "unknown",
@@ -3301,6 +3557,19 @@
       "symbol": "resolveAgentWorkspaceDir",
       "file": "src/memory/cogniweave-manager.ts",
       "line": 554,
+      "op": "index",
+      "profile": "production",
+      "deploymentProfile": "unknown",
+      "snippet": "this.workspaceDir = resolveAgentWorkspaceDir(cfg, agentId);",
+      "owner": "unassigned:WS-C",
+      "replacement": "resolveWorkspaceResource handle + WorkspaceDataRole",
+      "retirementPhase": "freeze"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/memory/cogniweave-manager.ts",
+      "line": 563,
       "op": "index",
       "profile": "production",
       "deploymentProfile": "unknown",
@@ -3326,7 +3595,33 @@
       "pathId": "P8",
       "symbol": "syncMemoryFiles",
       "file": "src/memory/manager-sync-ops.ts",
+      "line": 1103,
+      "op": "index",
+      "profile": "production",
+      "deploymentProfile": "unknown",
+      "snippet": "await this.syncMemoryFiles({ needsFullReindex, progress: progress ?? undefined });",
+      "owner": "unassigned:WS-C",
+      "replacement": "derived index binding partitioned by resourceId; v1 multi-root refuse sync",
+      "retirementPhase": "freeze"
+    },
+    {
+      "pathId": "P8",
+      "symbol": "syncMemoryFiles",
+      "file": "src/memory/manager-sync-ops.ts",
       "line": 1252,
+      "op": "index",
+      "profile": "production",
+      "deploymentProfile": "unknown",
+      "snippet": "await this.syncMemoryFiles({ needsFullReindex: true, progress: params.progress });",
+      "owner": "unassigned:WS-C",
+      "replacement": "derived index binding partitioned by resourceId; v1 multi-root refuse sync",
+      "retirementPhase": "freeze"
+    },
+    {
+      "pathId": "P8",
+      "symbol": "syncMemoryFiles",
+      "file": "src/memory/manager-sync-ops.ts",
+      "line": 1293,
       "op": "index",
       "profile": "production",
       "deploymentProfile": "unknown",
@@ -3349,10 +3644,36 @@
       "retirementPhase": "freeze"
     },
     {
+      "pathId": "P8",
+      "symbol": "syncMemoryFiles",
+      "file": "src/memory/manager-sync-ops.ts",
+      "line": 1384,
+      "op": "index",
+      "profile": "production",
+      "deploymentProfile": "unknown",
+      "snippet": "await this.syncMemoryFiles({ needsFullReindex: true, progress: params.progress });",
+      "owner": "unassigned:WS-C",
+      "replacement": "derived index binding partitioned by resourceId; v1 multi-root refuse sync",
+      "retirementPhase": "freeze"
+    },
+    {
       "pathId": "P1",
       "symbol": "resolveAgentWorkspaceDir",
       "file": "src/memory/manager.ts",
       "line": 152,
+      "op": "index",
+      "profile": "production",
+      "deploymentProfile": "unknown",
+      "snippet": "const workspaceDir = resolveAgentWorkspaceDir(cfg, agentId);",
+      "owner": "unassigned:WS-C",
+      "replacement": "resolveWorkspaceResource handle + WorkspaceDataRole",
+      "retirementPhase": "freeze"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/memory/manager.ts",
+      "line": 218,
       "op": "index",
       "profile": "production",
       "deploymentProfile": "unknown",
