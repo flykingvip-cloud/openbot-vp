@@ -12,13 +12,19 @@
 //     namespaceURI even without layout).
 //   - `pnpm -C ui test` runs it in real chromium → the getBBox geometry assertion also runs.
 import { render } from "lit";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, afterEach, describe, expect, it, vi } from "vitest";
+import { i18n } from "../../i18n/index.ts";
+import { en } from "../../i18n/locales/en.ts";
 import { buildHomeGraphViewModel } from "../capability/knowledge-universe/graph-layout.ts";
 import type { RelationshipGraph } from "../capability/knowledge-universe/types.ts";
 import {
   renderKnowledgeUniverseGraphCanvas,
   resetGraphAutoCenterStateForTests,
 } from "./knowledge-universe-graph-canvas.ts";
+beforeAll(async () => {
+  i18n.registerTranslation("en", en);
+  await i18n.setLocale("en");
+});
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
