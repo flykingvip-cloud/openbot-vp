@@ -149,33 +149,48 @@ function resolveConfiguredControlUiRoot() {
   return null;
 }
 
-/**
- * Local gateways often set gateway.controlUi.root to ~/.openbot/control-ui.
- * Vite writes to dist/control-ui; without this copy the running gateway keeps
- * serving a stale bundle (e.g. roster-only @ candidates that never open in
- * assistant / 大白管家 composers).
- */
+// Resolve existing ancestors too, so symlink aliases cannot bypass overlap checks.
+function canonicalPath(value) {
+  const resolved = path.resolve(value);
+  if (fs.existsSync(resolved)) {
+    return fs.realpathSync(resolved);
+  }
+  return path.join(canonicalPath(path.dirname(resolved)), path.basename(resolved));
+}
+
 function syncBuiltControlUiToConfiguredRoot() {
-  const dest = resolveConfiguredControlUiRoot();
-  const src = path.join(repoRoot, "dist", "control-ui");
-  if (!dest) {
+  if (process.env.OPENBOT_CONTROL_UI_SYNC !== "1") {
     return;
   }
-  if (path.resolve(dest) === path.resolve(src)) {
+  const declared = process.env.OPENBOT_CONTROL_UI_SYNC_TARGET?.trim();
+  if (!declared || !path.isAbsolute(declared)) {
+    throw new Error("Explicit sync requires an absolute OPENBOT_CONTROL_UI_SYNC_TARGET");
+  }
+  const dest = canonicalPath(declared);
+  const src = canonicalPath(path.join(repoRoot, "dist", "control-ui"));
+  const overlaps = (a, b) => {
+    const relative = path.relative(a, b);
+    return (
+      relative === "" ||
+      (!relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative))
+    );
+  };
+  if (dest === path.parse(dest).root || overlaps(src, dest) || overlaps(dest, src)) {
+    throw new Error("Unsafe Control UI sync target: root or overlapping paths");
+  }
+  const configured = resolveConfiguredControlUiRoot();
+  if (!configured || canonicalPath(configured) !== dest) {
+    throw new Error("Declared sync target must match gateway.controlUi.root");
+  }
+  const pinPath = path.join(dest, ".control-ui-sync-pin");
+  if (fs.existsSync(pinPath) && process.env.OPENBOT_CONTROL_UI_FORCE_SYNC !== "1") {
+    process.stdout.write(
+      "Skipped Control UI sync — pin active. Set OPENBOT_CONTROL_UI_FORCE_SYNC=1 to override.\n",
+    );
     return;
   }
   if (!fs.existsSync(path.join(src, "index.html"))) {
-    return;
-  }
-  // Optional pin (written by a tip/debug sync) blocks other worktree ui:build
-  // from silently rolling ~/.openbot/control-ui back to an older hashed CSS.
-  const pinPath = path.join(dest, ".control-ui-sync-pin");
-  if (fs.existsSync(pinPath) && process.env.OPENBOT_CONTROL_UI_FORCE_SYNC !== "1") {
-    const pin = fs.readFileSync(pinPath, "utf8").trim();
-    process.stdout.write(
-      `Skipped Control UI sync — pin active (${pin}). Set OPENBOT_CONTROL_UI_FORCE_SYNC=1 to override.\n`,
-    );
-    return;
+    throw new Error("Missing built Control UI index.html");
   }
   fs.cpSync(src, dest, { recursive: true });
   process.stdout.write(`Synced Control UI → gateway.controlUi.root (${dest})\n`);
