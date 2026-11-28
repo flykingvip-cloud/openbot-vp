@@ -95,7 +95,9 @@ describe.skipIf(process.platform === "win32")("isolated build output boundary", 
   }
   const roots: string[] = [];
   afterEach(() => {
-    for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true });
+    for (const root of roots.splice(0)) {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
   it("default build and legacy force flag leave external output untouched", () => {
     const f = fixture();
@@ -138,9 +140,13 @@ describe.skipIf(process.platform === "win32")("isolated build output boundary", 
         mismatch: path.join(f.root, "other"),
         alias: path.join(f.root, "alias"),
       };
-      if (kind === "alias") fs.symlinkSync(src, targets.alias);
+      if (kind === "alias") {
+        fs.symlinkSync(src, targets.alias);
+      }
       const target = targets[kind];
-      if (kind !== "mismatch") f.configure(target);
+      if (kind !== "mismatch") {
+        f.configure(target);
+      }
       const before = fs.readdirSync(path.join(f.root, "dist"), { recursive: true });
       expect(f.run({ ...f.explicit, OPENBOT_CONTROL_UI_SYNC_TARGET: target }).status).not.toBe(0);
       expect(f.content()).toBe("original");
