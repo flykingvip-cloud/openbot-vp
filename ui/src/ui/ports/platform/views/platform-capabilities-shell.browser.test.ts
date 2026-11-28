@@ -594,7 +594,7 @@ describe("platform capability shell rerender", () => {
     // Binding mutations have no RPC yet, so every inline action stays disabled.
     expect(firstRowButtons[0]?.disabled).toBe(true);
     expect(firstRowButtons[1]?.disabled).toBe(true);
-    expect(firstRowButtons[1]?.title).toContain("尚未接入");
+    expect(firstRowButtons[1]?.title).toContain("网关未连接，绑定变更不可执行");
 
     // Switching to "按能力查看" must regroup by capability and update group headers.
     const capabilityViewBtn = Array.from(

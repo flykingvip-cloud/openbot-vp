@@ -280,6 +280,7 @@ describe("port shell integration", () => {
           configuredProviderCount: 1,
           providerIds: ["openai"],
           configuredModelCount: 1,
+          modelsManagementSnapshot: { generatedAt: "2026-11-28T00:00:00.000Z" },
           configuredModelIds: ["gpt-5.4"],
           gatewayCatalogCount: 1,
           gatewayCatalogModels: [],
@@ -382,14 +383,14 @@ describe("port shell integration", () => {
     );
 
     expect(container.textContent).toContain("模型管理");
-    expect(container.textContent).toContain("模型资产");
-    expect(container.textContent).toContain("模型资产");
+    expect(container.textContent).toContain("模型池");
+    expect(container.textContent).toContain("模型池");
     expect(container.textContent).toContain("任务方案");
     expect(container.textContent).toContain("智能路由");
     expect(container.textContent).toContain("使用分析");
     expect(container.textContent).toContain("治理告警");
     expect(container.textContent).toContain("模型管理");
-    expect(container.textContent).toContain("模型资产");
+    expect(container.textContent).toContain("模型池");
     expect(container.textContent).toContain("任务方案");
     expect(container.textContent).toContain("智能路由");
     expect(container.textContent).toContain("使用分析");
@@ -442,6 +443,7 @@ describe("port shell integration", () => {
           configuredProviderCount: 1,
           providerIds: ["openai"],
           configuredModelCount: 1,
+          modelsManagementSnapshot: { generatedAt: "2026-11-28T00:00:00.000Z" },
           configuredModelIds: ["gpt-5.4"],
           gatewayCatalogCount: 1,
           gatewayCatalogModels: [],
@@ -565,7 +567,7 @@ describe("port shell integration", () => {
       container,
     );
 
-    expect(container.textContent).toContain("模型资产");
+    expect(container.textContent).toContain("模型池");
     expect(container.textContent).toContain("所有 Provider");
     expect(
       container.querySelector(".platform-model-assets-search input")?.getAttribute("placeholder"),
@@ -577,7 +579,7 @@ describe("port shell integration", () => {
     expect(container.textContent).toContain("7 日调用");
 
     const detailButton = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.title === "查看详情",
+      (button) => button.textContent?.trim() === "详情",
     );
     detailButton?.dispatchEvent(
       new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }),
@@ -616,6 +618,7 @@ describe("port shell integration", () => {
           configuredProviderCount: 1,
           providerIds: ["openai"],
           configuredModelCount: 1,
+          modelsManagementSnapshot: { generatedAt: "2026-11-28T00:00:00.000Z" },
           configuredModelIds: ["gpt-5.4"],
           gatewayCatalogCount: 1,
           gatewayCatalogModels: [],
@@ -742,8 +745,8 @@ describe("port shell integration", () => {
     const detailOverlay = container.querySelector<HTMLElement>(".model-assets-drawer-overlay");
     expect(detailOverlay).not.toBeNull();
     expect(container.textContent).toContain("模型详情");
-    expect(container.textContent).toContain("配置与治理操作");
-    expect(container.textContent).toContain("加入推荐池");
+    expect(container.textContent).toContain("在此完成接入验证、入池与治理操作");
+    expect(container.textContent).toContain("推荐池（入池）");
     detailOverlay?.dispatchEvent(
       new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }),
     );
@@ -787,6 +790,7 @@ describe("port shell integration", () => {
           configuredProviderCount: 0,
           providerIds: [],
           configuredModelCount: 0,
+          modelsManagementSnapshot: { generatedAt: "2026-11-28T00:00:00.000Z" },
           configuredModelIds: [],
           gatewayCatalogCount: 0,
           gatewayCatalogModels: [],
@@ -884,13 +888,13 @@ describe("port shell integration", () => {
       container,
     );
 
-    expect(container.textContent).toContain("暂无模型资产");
+    expect(container.textContent).toContain("暂无已纳管模型资产");
     expect(container.textContent).toContain("手动添加模型");
-    expect(container.textContent).toContain("验证并入池");
+    expect(container.textContent).toContain("验证连接");
     expect(container.textContent).not.toContain("Model Asset Table");
   });
 
-  it("renders discovered model assets with import action", () => {
+  it("keeps discovered catalog models outside the managed model pool", () => {
     window.history.replaceState({}, "", "/platform/models#platform-models:modelAssets");
     const container = document.createElement("div");
     document.body.append(container);
@@ -928,6 +932,7 @@ describe("port shell integration", () => {
           configuredProviderCount: 1,
           providerIds: ["deepseek"],
           configuredModelCount: 0,
+          modelsManagementSnapshot: { generatedAt: "2026-11-28T00:00:00.000Z" },
           configuredModelIds: [],
           gatewayCatalogCount: 1,
           gatewayCatalogModels: [
@@ -1055,10 +1060,10 @@ describe("port shell integration", () => {
       container,
     );
 
-    expect(container.textContent).toContain("DeepSeek Chat");
-    expect(container.textContent).toContain("真实探测成功");
-    expect(container.textContent).toContain("待入池");
-    expect(container.textContent).toContain("入池");
+    expect(container.textContent).not.toContain("DeepSeek Chat");
+    expect(container.textContent).toContain("暂无已纳管模型资产");
+    expect(container.querySelector('[data-testid="model-pending-connect"]')).toBeNull();
+    expect(container.textContent).toContain("手动添加模型");
     expect(container.textContent).not.toContain("openai/deepseek-chat");
   });
 
@@ -1788,7 +1793,7 @@ describe("port shell integration", () => {
             seatQuota: 5,
             seatUsed: 0,
             seatsRemaining: 5,
-            trialEndsAt: "2026-08-01",
+            trialEndsAt: "2099-08-01",
           },
         ],
         agentCount: 3,
@@ -2032,7 +2037,8 @@ describe("port shell integration", () => {
     );
     render(renderPlatformPortShell(model), container);
     expect(window.location.hash).toContain("app%3Aapp-pending-1");
-    expect(container.textContent).toContain("试用申请详情");
+    expect(container.textContent).toContain("Pending Co");
+    expect(container.textContent).toContain("申请信息");
     expect(container.textContent).toContain("批准申请");
     expect(container.textContent).not.toContain("7 天调用");
 
@@ -2056,7 +2062,7 @@ describe("port shell integration", () => {
     );
     render(renderPlatformPortShell(model), container);
     expect(window.location.hash).toContain("tenant%3Aacme");
-    expect(container.textContent).toContain("租户详情");
+    expect(container.textContent).toContain("基本信息");
     expect(container.textContent).toContain("使用与资源");
     expect(container.textContent).toContain("计费与配额");
     expect(container.textContent).toContain("风险与策略");
@@ -2064,23 +2070,19 @@ describe("port shell integration", () => {
     expect(container.textContent).not.toContain("企业主控台");
     expect(container.textContent).not.toContain("租户运营工作区");
 
-    const viewRisks = Array.from(container.querySelectorAll<HTMLAnchorElement>("a")).find(
-      (link) => link.textContent?.trim() === "查看风险",
+    expect(container.querySelector('[data-testid="tenant-detail-tab-risks"]')).not.toBeNull();
+    container.querySelector<HTMLButtonElement>('[data-testid="tenant-detail-tab-risks"]')!.click();
+    render(renderPlatformPortShell(model), container);
+    const controlsTab = container.querySelector<HTMLButtonElement>(
+      '[data-testid="tenant-detail-subtab-controls"]',
     );
-    const configurePolicy = Array.from(container.querySelectorAll<HTMLAnchorElement>("a")).find(
-      (link) => link.textContent?.trim() === "配置策略",
-    );
-    expect(viewRisks?.getAttribute("href")).toContain(":risks");
-    expect(configurePolicy?.getAttribute("href")).toContain(":controls");
-    configurePolicy?.dispatchEvent(
-      new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }),
-    );
+    expect(controlsTab).not.toBeNull();
+    controlsTab!.click();
     render(renderPlatformPortShell(model), container);
     expect(window.location.hash).toContain(":controls");
     expect(container.textContent).toContain("策略");
-
     container
-      .querySelector<HTMLAnchorElement>('a.platform-tenants__detail-tab[href$=":logs"]')
+      .querySelector<HTMLButtonElement>('[data-testid="tenant-detail-tab-logs"]')
       ?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
     render(renderPlatformPortShell(model), container);
     expect(window.location.hash).toContain(":logs");

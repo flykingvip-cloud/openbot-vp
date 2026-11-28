@@ -350,10 +350,10 @@ describe("pricing-v3 layout (chromium)", () => {
     const { outer, host } = mountPage(1000, { host: "cost-budget-catalog" });
     const grid = host.querySelector(".pricing-v3__grid") as HTMLElement;
     await new Promise((r) => requestAnimationFrame(() => r(undefined)));
-    // 1000px host → 3 cols via container query (960+), not forced 1 or 5.
-    const cols = columnTrackCount(grid);
-    expect(cols).toBeLessThanOrEqual(3);
-    expect(cols).toBeGreaterThanOrEqual(2);
+    // The cost-budget contract intentionally uses a local scroll row at this width.
+    expect(getComputedStyle(grid).display).toBe("flex");
+    expect(getComputedStyle(grid).overflowX).toBe("auto");
+    expect(grid.scrollWidth).toBeGreaterThan(grid.clientWidth);
     expect(noHorizontalOverflow(outer)).toBe(true);
     assertSpecItemsNoOverflow(host);
   });
@@ -439,7 +439,12 @@ describe("pricing-v3 layout (chromium)", () => {
       }
 
       const entCard = host.querySelector('[data-plan-id="ent"]') as HTMLElement;
-      expect(entCard?.textContent).not.toMatch(/Credits/);
+      const creditRow = [...entCard.querySelectorAll(".pricing-v3__spec-item")].find((row) =>
+        row.textContent?.includes("月度 Credits"),
+      );
+      expect(creditRow).toBeTruthy();
+      expect(creditRow?.textContent).toMatch(/—/);
+      expect(creditRow?.textContent).not.toMatch(/\d/);
     });
   }
 });
