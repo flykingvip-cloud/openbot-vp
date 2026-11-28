@@ -9,6 +9,7 @@ import { renderPlatformPortShell } from "./platform/views/platform-shell.ts";
 afterEach(() => {
   document.body.innerHTML = "";
   window.history.replaceState({}, "", "/");
+  vi.restoreAllMocks();
   closePlatformCreateTenantDrawer();
 });
 
@@ -3182,7 +3183,17 @@ describe("port shell integration", () => {
       button.textContent?.includes("保存运行模式"),
     );
     expect(saveButton).not.toBeNull();
+    // Saving a runtime mode requires explicit confirmation in the production UI.
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     saveButton?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    expect(confirm).toHaveBeenCalledWith(
+      "确认保存模型管理运行模式？保存后，模型管理会在下次刷新时按新模式加载。",
+    );
+    expect(onSaveConfig).not.toHaveBeenCalled();
+
+    confirm.mockReturnValue(true);
+    saveButton?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    expect(confirm).toHaveBeenCalledTimes(2);
     expect(onSaveConfig).toHaveBeenCalledTimes(1);
   });
 
