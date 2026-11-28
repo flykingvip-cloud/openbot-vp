@@ -35,6 +35,16 @@ vi.mock("./document-ego-graph-runtime.js", () => ({
   buildDocumentEgoGraphForKnowledgeBase: vi.fn(async () => null),
 }));
 
+vi.mock("./knowledge-access-gate.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./knowledge-access-gate.js")>();
+  return {
+    ...actual,
+    authorizeKnowledgeBaseAccess: vi.fn(({ knowledgeBaseId }: { knowledgeBaseId: string }) =>
+      knowledgeBaseId ? { id: knowledgeBaseId } : null,
+    ),
+  };
+});
+
 import { buildKnowledgeBaseLibraryGraphForKnowledgeBase } from "./document-ego-graph-runtime.js";
 import { knowledgeRelationships } from "./router.js";
 

@@ -17,11 +17,7 @@ import {
   type KnowledgeEvidence,
   type RetrievalContext,
 } from "../../retrieval/types.js";
-import {
-  isKnowledgeBaseVisible,
-  resolveAccessibleKnowledgeBases,
-  type VisibilityKnowledgeBase,
-} from "../../retrieval/visibility-resolver.js";
+import type { VisibilityKnowledgeBase } from "../../retrieval/visibility-resolver.js";
 import type { GatewayClient } from "../server-methods/types.js";
 import { knowledgeDocumentIdFromSkillRef } from "./document-display-title.js";
 import {
@@ -30,6 +26,10 @@ import {
   resolveKnowledgeIndexDbPath,
 } from "./kb-index.js";
 import { resolveKnowledgeIngestEmbeddingProvider } from "./kb-ingest.js";
+import {
+  canReadKnowledgeBase,
+  permissionActorFromRetrievalContext,
+} from "./knowledge-base-permissions.js";
 import {
   getKnowledgeBase,
   listKnowledgeBases,
@@ -71,6 +71,16 @@ export function toVisibilityKnowledgeBase(base: KnowledgeBase): VisibilityKnowle
   };
 }
 
+function canReadKnowledgeBaseFromRetrievalContext(
+  base: KnowledgeBase,
+  retrievalContext: RetrievalContext,
+): boolean {
+  return canReadKnowledgeBase({
+    knowledgeBase: base,
+    actor: permissionActorFromRetrievalContext(retrievalContext),
+  });
+}
+
 export async function resolveKnowledgeBaseHasIndexedChunks(
   base: KnowledgeBase,
   indexRoot?: string,
@@ -98,10 +108,9 @@ export async function anyAccessibleKnowledgeBaseHasIndexedChunks(params: {
 }): Promise<boolean> {
   const bases = listKnowledgeBases({}, params.storePath);
   const accessibleIds = new Set(
-    resolveAccessibleKnowledgeBases(
-      params.retrievalContext,
-      bases.map((base) => toVisibilityKnowledgeBase(base)),
-    ),
+    bases
+      .filter((base) => canReadKnowledgeBaseFromRetrievalContext(base, params.retrievalContext))
+      .map((base) => base.id),
   );
   for (const base of bases) {
     if (!accessibleIds.has(base.id)) {
@@ -163,7 +172,7 @@ export async function searchScopedKnowledgeBaseEvidence(params: {
   const knowledgeBase = getKnowledgeBase(params.knowledgeBaseId, params.storePath);
   if (
     !knowledgeBase ||
-    !isKnowledgeBaseVisible(params.retrievalContext, toVisibilityKnowledgeBase(knowledgeBase))
+    !canReadKnowledgeBaseFromRetrievalContext(knowledgeBase, params.retrievalContext)
   ) {
     return { knowledgeBase: null, evidence: [] };
   }
@@ -244,7 +253,7 @@ export async function searchScopedKnowledgeBaseWithFallback(params: {
     objectIds.add(personalObjectIdForDocument(documentId));
   }
   const limit = Math.min(Math.max(params.maxResults ?? 8, 1), 50);
-  // This KB has already passed resolveAccessibleKnowledgeBases above. Derivative
+  // This KB has already passed canReadKnowledgeBase above. Derivative
   // summaries never widen the authorized candidate set or become body evidence.
   const summaryHits = await recallDocumentRetrievalSummaries({
     knowledgeBase,
@@ -346,7 +355,7 @@ export async function startGatewayKnowledgeRetrieval(params: {
   params.log.info?.("knowledge retrieval source registered on gateway startup");
 }
 
-/** Authorized document navigation candidates across every visible KB. */
+/** Authorized document navigation candidates across every canReadKnowledgeBase-visible KB. */
 export async function searchAuthorizedSummaryCandidates(params: {
   query: string;
   retrievalContext: RetrievalContext;
@@ -354,7 +363,7 @@ export async function searchAuthorizedSummaryCandidates(params: {
 }): Promise<KnowledgeObject[]> {
   const limit = Math.min(Math.max(params.limit ?? 8, 1), 50);
   const bases = listKnowledgeBases().filter((base) =>
-    isKnowledgeBaseVisible(params.retrievalContext, toVisibilityKnowledgeBase(base)),
+    canReadKnowledgeBaseFromRetrievalContext(base, params.retrievalContext),
   );
   const candidates: Array<KnowledgeObject & { score: number }> = [];
   for (const base of bases) {

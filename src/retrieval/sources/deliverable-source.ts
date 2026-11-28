@@ -8,9 +8,10 @@ import {
   retrieveKnowledgeFromIndex,
 } from "../../gateway/knowledge/kb-retrieve.js";
 import {
-  listKnowledgeBases,
-  type KnowledgeBase,
-} from "../../gateway/knowledge/knowledge-base-store.js";
+  canReadKnowledgeBase,
+  permissionActorFromRetrievalContext,
+} from "../../gateway/knowledge/knowledge-base-permissions.js";
+import { listKnowledgeBases } from "../../gateway/knowledge/knowledge-base-store.js";
 import type { EmbeddingProvider } from "../../memory/embeddings.js";
 import { getKnowledgeRetrievalService } from "../retrieval-service.js";
 import {
@@ -20,10 +21,6 @@ import {
   type RetrievalOpts,
   type RetrievalSource,
 } from "../types.js";
-import {
-  resolveAccessibleKnowledgeBases,
-  type VisibilityKnowledgeBase,
-} from "../visibility-resolver.js";
 
 export type DeliverableSourceDeps = {
   storePath?: string;
@@ -31,15 +28,6 @@ export type DeliverableSourceDeps = {
   archiveStorePath?: string;
   embeddingProvider?: EmbeddingProvider | null;
 };
-
-function toVisibilityKnowledgeBase(base: KnowledgeBase): VisibilityKnowledgeBase {
-  return {
-    id: base.id,
-    visibility: base.visibility,
-    ownerId: base.ownerId,
-    tenantId: base.tenantId,
-  };
-}
 
 async function resolveDeliverableDocIds(ctx: RetrievalContext): Promise<Set<string>> {
   if (!ctx.userId) {
@@ -97,11 +85,11 @@ export function createDeliverableRetrievalSource(
       }
 
       const bases = listKnowledgeBases({}, deps.storePath);
+      const actor = permissionActorFromRetrievalContext(ctx);
       const accessibleIds = new Set(
-        resolveAccessibleKnowledgeBases(
-          ctx,
-          bases.map((base) => toVisibilityKnowledgeBase(base)),
-        ),
+        bases
+          .filter((base) => canReadKnowledgeBase({ knowledgeBase: base, actor }))
+          .map((base) => base.id),
       );
       const scopedKbIds = archivedKbIds.filter((kbId) => accessibleIds.has(kbId));
       if (scopedKbIds.length === 0) {

@@ -1,0 +1,134 @@
+{
+  "contract_status": "draft-pending-m1-freeze",
+  "runtime_captured": false,
+  "evidence_kind": "offline_algorithm_vector_only",
+  "source_documents": [
+    "08_TEAM_A_DELTA_SIGNOFF_AND_MIN_SLICE.md#2.2",
+    "09_WAVE1P5_CONSOLIDATED_EXECUTION_DIRECTIVE.md#2.2"
+  ],
+  "cases": [
+    {
+      "id": "sign_8line_post_base_from_08",
+      "method": "POST",
+      "signed_target": "/v1/search",
+      "nonce": "nonce-test-0123456789abcdef",
+      "agent_header_present": true,
+      "purpose_header_present": true,
+      "purpose": "ground_internal_llm",
+      "body_utf8": "{\"query\":\"clinical protocol\",\"kb_id\":\"kb-001\",\"top_k\":5}",
+      "body_sha256": "67bafaa708c0e69fee5a7d91f4fe5b6887991bed828967aeeabd6592f983fc95",
+      "canonical_lines_count": 8,
+      "signature": "b968dc3d58e70523a9818da596703ac7a4c23110a90bd339d64a14a604b4716e"
+    },
+    {
+      "id": "sign_6line_get_raw_query_percent_encoded",
+      "method": "GET",
+      "signed_target": "/v1/documents?kb_id=kb-001&archived_only=true&cursor=abc%2F123",
+      "nonce": "nonce-6line-0123456789abcdef",
+      "agent_header_present": false,
+      "purpose_header_present": false,
+      "body_utf8": "",
+      "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "canonical_lines_count": 6,
+      "signature": "5eab9b43445499e1ae701d898ae3765e015c313d4c0206fba5ccd894c5c84565"
+    },
+    {
+      "id": "sign_8line_post_query_non_ascii_utf8_body",
+      "method": "POST",
+      "signed_target": "/v1/search?locale=zh-CN",
+      "nonce": "nonce-utf8-0123456789abcdef0",
+      "agent_header_present": true,
+      "purpose": "ground_internal_llm",
+      "body_utf8": "{\"kb_id\":\"kb-001\",\"query\":\"临床试验 Café\"}",
+      "body_sha256": "ca1a85aec981ba758df8c1c51aa7112f036337179334c9c22dde09e7c8f9293f",
+      "canonical_lines_count": 8,
+      "signature": "02322bdceb89638d56165548ff1bce4a7e5a7f44da99daf49c0cd4760e4eb728",
+      "purpose_header_present": true
+    },
+    {
+      "id": "sign_8line_purpose_only_empty_agent_line",
+      "method": "GET",
+      "signed_target": "/v1/ready",
+      "nonce": "nonce-purp-0123456789abcdef0",
+      "agent_header_present": false,
+      "purpose": "read",
+      "body_utf8": "",
+      "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "canonical_lines_count": 8,
+      "signature": "30483a24628e1708a8f49125310028f9447c40bf9aefceda815329da858f5e17",
+      "purpose_header_present": true
+    }
+  ],
+  "test_only_secret": "TEST_ONLY_DO_NOT_USE_IN_PROD_0123456789abcdef",
+  "timestamp": "1795478400",
+  "actor_header": "eyJhbmNlc3Rvcl9kZXBhcnRtZW50X2lkcyI6W10sImNsZWFyYW5jZV9sZXZlbCI6IiIsImNsZWFyYW5jZV90YWdzIjpbXSwiZGVwYXJ0bWVudF9pZHMiOlsiZGVwdC1yZCJdLCJtYW5hZ2VkX2RlcGFydG1lbnRfaWRzIjpbXSwib3JnX2lkIjoidGVuYW50LXNhbmRib3gtMDEiLCJvcmdfcm9sZXMiOltdLCJwb2xpY3lfZ2VuZXJhdGlvbiI6IjEiLCJwdWJsaWNfa2JfYWRtaW4iOmZhbHNlLCJyb2xlcyI6WyJtZW1iZXIiXSwic2Vzc2lvbl9pZCI6InNlc3MtdGVzdC0wMDEiLCJ1c2VyX2lkIjoidXNyLTAxOTRmMDAwLTAwMDEifQ==",
+  "agent_header": "eyJhZ2VudF9pZCI6ImFnZW50LW9wZW5ib3QtMDEiLCJvcmdfaWQiOiJ0ZW5hbnQtc2FuZGJveC0wMSJ9",
+  "draft_v2_examples": [
+    {
+      "evidence_kind": "draft_contract_example_only",
+      "runtime_captured": false,
+      "reason": "v2_runtime_prohibited_before_m1_freeze",
+      "method": "POST",
+      "path": "/v2/assets",
+      "status": 200,
+      "body": {
+        "created_version": 3,
+        "current_version": 3,
+        "lifecycle_state": "published",
+        "activated": true,
+        "rollback_scope": "content_and_filename_only"
+      }
+    },
+    {
+      "evidence_kind": "draft_contract_example_only",
+      "runtime_captured": false,
+      "reason": "v2_runtime_prohibited_before_m1_freeze",
+      "method": "POST",
+      "path": "/v2/assets",
+      "status": 403,
+      "body": {
+        "error": {
+          "code": "PERMISSION_DENIED",
+          "message": "Resource unavailable",
+          "retryable": false,
+          "request_id": "req-offline",
+          "details": {}
+        }
+      }
+    },
+    {
+      "evidence_kind": "draft_contract_example_only",
+      "runtime_captured": false,
+      "reason": "v2_runtime_prohibited_before_m1_freeze",
+      "method": "POST",
+      "path": "/v2/assets",
+      "status": 409,
+      "body": {
+        "error": {
+          "code": "IDEMPOTENCY_CONFLICT",
+          "message": "Conflict",
+          "retryable": false,
+          "request_id": "req-offline",
+          "details": {}
+        }
+      }
+    },
+    {
+      "evidence_kind": "draft_contract_example_only",
+      "runtime_captured": false,
+      "reason": "v2_runtime_prohibited_before_m1_freeze",
+      "method": "POST",
+      "path": "/v2/assets",
+      "status": 422,
+      "body": {
+        "error": {
+          "code": "TAMPERED_EXCERPT",
+          "message": "Evidence unavailable",
+          "retryable": false,
+          "request_id": "req-offline",
+          "details": {}
+        }
+      }
+    }
+  ]
+}

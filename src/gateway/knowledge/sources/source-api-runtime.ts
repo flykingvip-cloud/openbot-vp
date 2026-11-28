@@ -329,6 +329,20 @@ export function getApiSourceCatalog(
   };
 }
 
+/** RPC read path: same owner-or-authorized-KB-read gate as invoke/sync. */
+export function getAuthorizedApiSourceCatalog(
+  sourceId: string,
+  context: KnowledgeSourceContext,
+  options: ApiSourceRuntimeOptions = {},
+): ApiCatalog | null {
+  try {
+    authorizedSource(sourceId, context, options);
+  } catch {
+    return null;
+  }
+  return getApiSourceCatalog(sourceId, options);
+}
+
 export async function invokeApiSource(
   sourceId: string,
   requestPath: string,

@@ -247,11 +247,22 @@ export function listGovernanceTasks(params: {
   kbId?: string;
   status?: GovernanceTaskStatus;
   limit?: number;
+  allowedKbIds?: readonly string[];
 }): GovernanceTaskRecord[] {
   const limit = Math.min(Math.max(params.limit ?? 50, 1), 200);
   const clauses: string[] = [];
   const values: Array<string | number> = [];
-  if (params.kbId) {
+  if (params.allowedKbIds) {
+    if (params.kbId && !params.allowedKbIds.includes(params.kbId)) {
+      return [];
+    }
+    const scoped = params.kbId ? [params.kbId] : [...params.allowedKbIds];
+    if (scoped.length === 0) {
+      return [];
+    }
+    clauses.push(`kb_id IN (${scoped.map(() => "?").join(", ")})`);
+    values.push(...scoped);
+  } else if (params.kbId) {
     clauses.push("kb_id = ?");
     values.push(params.kbId);
   }
@@ -349,7 +360,23 @@ export function updateGovernanceTaskStatus(params: {
   return result.changes > 0;
 }
 
-export function countIndexedChunks(db: DatabaseSync, kbId?: string): number {
+export function countIndexedChunks(
+  db: DatabaseSync,
+  kbId?: string,
+  allowedKbIds?: readonly string[],
+): number {
+  const scoped = resolveScopedKbIds(kbId, allowedKbIds);
+  if (scoped !== null) {
+    if (scoped.length === 0) {
+      return 0;
+    }
+    const row = db
+      .prepare(
+        `SELECT COUNT(*) AS count FROM chunk_meta WHERE kb_id IN (${scoped.map(() => "?").join(", ")})`,
+      )
+      .get(...scoped) as { count: number };
+    return row.count;
+  }
   if (kbId) {
     const row = db
       .prepare(`SELECT COUNT(*) AS count FROM chunk_meta WHERE kb_id = ?`)
@@ -358,6 +385,19 @@ export function countIndexedChunks(db: DatabaseSync, kbId?: string): number {
   }
   const row = db.prepare(`SELECT COUNT(*) AS count FROM chunks`).get() as { count: number };
   return row.count;
+}
+
+function resolveScopedKbIds(
+  kbId: string | undefined,
+  allowedKbIds: readonly string[] | undefined,
+): string[] | null {
+  if (!allowedKbIds) {
+    return null;
+  }
+  if (kbId) {
+    return allowedKbIds.includes(kbId) ? [kbId] : [];
+  }
+  return [...allowedKbIds];
 }
 
 export function countChunkRelations(db: DatabaseSync, kbId: string): number {
@@ -706,9 +746,31 @@ export function computeKnowledgeHealthScore(
   return Math.max(0, Math.min(100, 100 - penalties));
 }
 
-export function getGovernanceSummary(db: DatabaseSync, kbId?: string): GovernanceSummary {
-  const kbClause = kbId ? " AND kb_id = ?" : "";
-  const params = kbId ? [kbId] : [];
+export function getGovernanceSummary(
+  db: DatabaseSync,
+  kbId?: string,
+  allowedKbIds?: readonly string[],
+): GovernanceSummary {
+  const scoped = resolveScopedKbIds(kbId, allowedKbIds);
+  const emptySummary: GovernanceSummary = {
+    openConflictCount: 0,
+    openClaimConflictCount: 0,
+    openDuplicateCount: 0,
+    openOrphanCount: 0,
+    openStaleCount: 0,
+    suppressedChunkCount: 0,
+    indexedChunkCount: 0,
+    llmUsage: getGovernanceLlmUsageStats(db, kbId, allowedKbIds),
+  };
+  if (scoped && scoped.length === 0) {
+    return emptySummary;
+  }
+  const kbClause = scoped
+    ? ` AND kb_id IN (${scoped.map(() => "?").join(", ")})`
+    : kbId
+      ? " AND kb_id = ?"
+      : "";
+  const params = scoped ? [...scoped] : kbId ? [kbId] : [];
   const countOpen = (taskType: GovernanceTaskType) => {
     const row = db
       .prepare(
@@ -719,13 +781,13 @@ export function getGovernanceSummary(db: DatabaseSync, kbId?: string): Governanc
     return row.count;
   };
   const suppressedRow = (
-    kbId
+    params.length > 0
       ? db
           .prepare(
             `SELECT COUNT(*) AS count FROM chunk_governance
-           WHERE governance_status = 'suppressed' AND kb_id = ?`,
+           WHERE governance_status = 'suppressed'${kbClause}`,
           )
-          .get(kbId)
+          .get(...params)
       : db
           .prepare(
             `SELECT COUNT(*) AS count FROM chunk_governance WHERE governance_status = 'suppressed'`,
@@ -739,8 +801,8 @@ export function getGovernanceSummary(db: DatabaseSync, kbId?: string): Governanc
     openOrphanCount: countOpen("orphan"),
     openStaleCount: countOpen("stale"),
     suppressedChunkCount: suppressedRow.count,
-    indexedChunkCount: countIndexedChunks(db, kbId),
-    llmUsage: getGovernanceLlmUsageStats(db, kbId),
+    indexedChunkCount: countIndexedChunks(db, kbId, allowedKbIds),
+    llmUsage: getGovernanceLlmUsageStats(db, kbId, allowedKbIds),
   };
 }
 
