@@ -94,38 +94,43 @@ type ManagedIconSpec = {
   sizes?: string;
 };
 
-function removeUnmanagedHeadIconLinks() {
-  if (typeof document === "undefined") {
-    return;
-  }
-  const nodes = document.head.querySelectorAll(
-    'link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]',
+function reconcileHeadIconLinks(specs: ManagedIconSpec[]) {
+  const existing = Array.from(
+    document.head.querySelectorAll<HTMLLinkElement>(
+      'link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]',
+    ),
   );
-  for (const node of nodes) {
-    if (!(node instanceof HTMLLinkElement)) {
-      continue;
+  const retained = new Set<HTMLLinkElement>();
+  for (const spec of specs) {
+    // Reuse matching current-generation nodes; remove duplicates and stale assets below.
+    const link =
+      existing.find(
+        (node) =>
+          !retained.has(node) &&
+          node.rel === spec.rel &&
+          node.getAttribute("href") === spec.href &&
+          node.type === (spec.type ?? "") &&
+          (node.getAttribute("sizes") ?? "") === (spec.sizes ?? ""),
+      ) ?? document.createElement("link");
+    link.rel = spec.rel;
+    link.dataset.openbotBrand = spec.marker;
+    link.href = spec.href;
+    if (spec.type) {
+      link.type = spec.type;
     }
-    // Drop static index.html icons and any previous brand links; we reinstall a clean set.
-    node.remove();
+    if (spec.sizes) {
+      link.setAttribute("sizes", spec.sizes);
+    }
+    if (!link.isConnected) {
+      document.head.append(link);
+    }
+    retained.add(link);
   }
-}
-
-function installManagedHeadLink(spec: ManagedIconSpec): HTMLLinkElement | null {
-  if (typeof document === "undefined") {
-    return null;
+  for (const node of existing) {
+    if (!retained.has(node)) {
+      node.remove();
+    }
   }
-  const link = document.createElement("link");
-  link.rel = spec.rel;
-  link.dataset.openbotBrand = spec.marker;
-  link.href = spec.href;
-  if (spec.type) {
-    link.type = spec.type;
-  }
-  if (spec.sizes) {
-    link.setAttribute("sizes", spec.sizes);
-  }
-  document.head.append(link);
-  return link;
 }
 
 /**
@@ -141,7 +146,7 @@ export function syncBrandHeadAssets(
     return;
   }
 
-  removeUnmanagedHeadIconLinks();
+  const specs: ManagedIconSpec[] = [];
 
   const custom = resolveCustomBrandLogoSrc(settings);
   if (custom) {
@@ -150,48 +155,50 @@ export function syncBrandHeadAssets(
       : custom.startsWith("data:image/png")
         ? "image/png"
         : undefined;
-    installManagedHeadLink({
+    specs.push({
       marker: "icon",
       rel: "icon",
       href: custom,
       type,
     });
-    installManagedHeadLink({
+    specs.push({
       marker: "touch",
       rel: "apple-touch-icon",
       href: custom,
       sizes: "180x180",
     });
+    reconcileHeadIconLinks(specs);
     return;
   }
 
   // Default brand pack: same generation, versioned paths, no competing unmanaged links.
-  installManagedHeadLink({
+  specs.push({
     marker: "icon-ico",
     rel: "icon",
     href: withBrandFaviconVersion(resolveBundledAsset(basePath, "favicon.ico")),
     sizes: "any",
   });
-  installManagedHeadLink({
+  specs.push({
     marker: "icon",
     rel: "icon",
     href: withBrandFaviconVersion(resolveBundledAsset(basePath, "favicon.svg")),
     type: "image/svg+xml",
   });
-  installManagedHeadLink({
+  specs.push({
     marker: "icon-32",
     rel: "icon",
     href: withBrandFaviconVersion(resolveBundledAsset(basePath, "favicon-32.png")),
     type: "image/png",
     sizes: "32x32",
   });
-  installManagedHeadLink({
+  specs.push({
     marker: "touch",
     rel: "apple-touch-icon",
     href: withBrandFaviconVersion(resolveBundledAsset(basePath, "apple-touch-icon.png")),
     type: "image/png",
     sizes: "180x180",
   });
+  reconcileHeadIconLinks(specs);
 }
 
 function isSupportedImageFile(file: File): boolean {
