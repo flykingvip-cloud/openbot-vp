@@ -35,3 +35,13 @@ export {
 } from "./revocation-purge-receipt.js";
 
 export { canonicalJsonBytes, canonicalJsonText, canonicalSha256Hex } from "./canonical-json.js";
+
+export {
+  PRE03_AUTH_V21_04_PRODUCTION_EXPORT_AUTHORIZED,
+  PRE03_ZERO_PII_VALIDATOR_IO,
+  validatePre03Candidate,
+} from "./pre03-zero-pii-validator.js";
+export {
+  PRE04_LEAVER_POLICY_GUARD_ENABLED_DEFAULT,
+  evaluatePre04LeaverPolicy,
+} from "./pre04-leaver-policy-guard.js";
