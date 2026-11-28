@@ -86,7 +86,7 @@ describe("public homepage helpers", () => {
       },
       useBootstrapAuth: true,
       forcePublicHomepage: false,
-      pageUrl: "https://www.openbot.love/",
+      pageUrl: "https://openbot.love/",
     });
 
     expect(result).toMatchObject({
