@@ -18,6 +18,15 @@
  * T-01–T-27 acceptance.
  */
 export const SPACE_FAVORITES_V7_ADAPTER_ENABLED_DEFAULT = false;
+
+/** Official process-env name. Default is unset / not "true" (stays off). */
+export const SPACE_FAVORITES_V7_ADAPTER_ENABLED_ENV = "SPACE_FAVORITES_V7_ADAPTER_ENABLED";
+
+export function isSpaceFavoritesV7AdapterEnvEnabled(
+  env: NodeJS.ProcessEnv | Record<string, string | undefined> = process.env,
+): boolean {
+  return env[SPACE_FAVORITES_V7_ADAPTER_ENABLED_ENV] === "true";
+}
 export const FORMAL_T01_T27_ACCEPTED = false;
 export const SCHEMA_V7_PROD_MIGRATION_AUTHORIZED = false;
 

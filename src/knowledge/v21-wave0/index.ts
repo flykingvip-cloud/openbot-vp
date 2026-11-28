@@ -50,6 +50,21 @@ export {
   SCHEMA_V7_PROD_MIGRATION_AUTHORIZED,
   SPACE_C03_PHASE_ONE_ORG_TEAM_TO_TEAM_SPACE,
   SPACE_FAVORITES_V7_ADAPTER_ENABLED_DEFAULT,
+  SPACE_FAVORITES_V7_ADAPTER_ENABLED_ENV,
   addFavorite,
+  isSpaceFavoritesV7AdapterEnvEnabled,
   resolveAuthorizedFavorites,
 } from "./space-favorites-v7-adapter.js";
+
+export {
+  BRIDGE_ZERO_IO,
+  OFFICIAL_X_V21_TRACE_HEADER_NAMES,
+  OPENBOT_KNOWLEDGE_SDK_V2_ENABLED_ENV,
+  SPACE_FAVORITES_V7_ACTIONS,
+  SPACE_FAVORITES_V7_GATEWAY_BRIDGE_ENABLED_DEFAULT,
+  dispatchSpaceFavoritesV7Action,
+  isKnowledgeSdkV2EnvEnabled,
+  isSpaceFavoritesV7GatewayBridgeEnabled,
+  readDualSpaceFavoritesV7Switches,
+  requireOfficialXv21Headers,
+} from "./space-favorites-v7-gateway-bridge.js";
