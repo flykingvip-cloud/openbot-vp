@@ -45,3 +45,11 @@ export {
   PRE04_LEAVER_POLICY_GUARD_ENABLED_DEFAULT,
   evaluatePre04LeaverPolicy,
 } from "./pre04-leaver-policy-guard.js";
+export {
+  FORMAL_T01_T27_ACCEPTED,
+  SCHEMA_V7_PROD_MIGRATION_AUTHORIZED,
+  SPACE_C03_PHASE_ONE_ORG_TEAM_TO_TEAM_SPACE,
+  SPACE_FAVORITES_V7_ADAPTER_ENABLED_DEFAULT,
+  addFavorite,
+  resolveAuthorizedFavorites,
+} from "./space-favorites-v7-adapter.js";
