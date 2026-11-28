@@ -30,10 +30,15 @@ describe("syncBrandHeadAssets", () => {
     );
     expect(managed).toBe(current);
     expect(legacy.isConnected).toBe(false);
+    expect(document.head.querySelectorAll("link[data-openbot-brand]")).toHaveLength(4);
+    const duplicate = current.cloneNode(true) as HTMLLinkElement;
+    document.head.append(duplicate);
 
     syncBrandHeadAssets({}, "");
     expect(
       document.head.querySelector<HTMLLinkElement>('link[rel="icon"][data-openbot-brand="icon"]'),
     ).toBe(current);
+    expect(duplicate.isConnected).toBe(false);
+    expect(document.head.querySelectorAll("link[data-openbot-brand]")).toHaveLength(4);
   });
 });
