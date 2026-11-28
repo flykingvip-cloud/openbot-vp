@@ -1,0 +1,11 @@
+{
+  "name": "knowledge-sdk-v21-reuse-v1",
+  "private": true,
+  "version": "0.0.0-draft",
+  "type": "module",
+  "description": "Draft Wave-V21-0 contracts. Not a runtime package and not a frozen M1 asset.",
+  "devDependencies": {
+    "@types/node": "20.16.11",
+    "typescript": "5.6.3"
+  }
+}

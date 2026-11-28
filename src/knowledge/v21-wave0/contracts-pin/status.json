@@ -1,0 +1,12 @@
+{
+  "work_item": "WAVE-V21-0-VA-1",
+  "status": "FROZEN_V21_REUSE_V1",
+  "schema_v7_ddl_authorized": false,
+  "schema_v8_v9_ddl_authorized": false,
+  "final_alignment_frozen": false,
+  "prod_shadow_migration_cutover_authorized": false,
+  "semantic_object_dual_write_prohibited": true,
+  "duplicate_runtime_or_connector_build_prohibited": true,
+  "mounted_v3_runtime": false,
+  "formal_t01_t27": "NOT_RUN_NOT_ACCEPTED"
+}

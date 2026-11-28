@@ -1,0 +1,131 @@
+{
+  "pack": "ai-execution-trace",
+  "schema": "ai-execution-trace.schema.json",
+  "vectors": [
+    {
+      "expect": "accept",
+      "id": "TR-POS-01",
+      "payload": {
+        "agent_id": "syn_agent",
+        "cost_attribution": {
+          "component": "ikc",
+          "quantity": 1,
+          "system": "knowledge_sdk",
+          "units": "calls"
+        },
+        "plan_id": "syn_plan",
+        "policy_generation": 9,
+        "run_id": "syn_run",
+        "tenant_id": "syn_org",
+        "trace_id": "syn_trace",
+        "user_id": "syn_user"
+      },
+      "schema": "AIExecutionTrace"
+    },
+    {
+      "code": "VALIDATION_ERROR",
+      "expect": "reject",
+      "id": "TR-NEG-MISSING-RUN",
+      "payload": {
+        "agent_id": "syn_agent",
+        "cost_attribution": {
+          "component": "ikc",
+          "quantity": 1,
+          "system": "knowledge_sdk",
+          "units": "calls"
+        },
+        "plan_id": "syn_plan",
+        "policy_generation": 9,
+        "tenant_id": "syn_org",
+        "trace_id": "syn_trace",
+        "user_id": "syn_user"
+      },
+      "schema": "AIExecutionTrace"
+    },
+    {
+      "code": "VALIDATION_ERROR",
+      "expect": "reject",
+      "id": "TR-NEG-POLICY-STR",
+      "payload": {
+        "agent_id": "syn_agent",
+        "cost_attribution": {
+          "component": "ikc",
+          "quantity": 1,
+          "system": "knowledge_sdk",
+          "units": "calls"
+        },
+        "plan_id": "syn_plan",
+        "policy_generation": "9",
+        "run_id": "syn_run",
+        "tenant_id": "syn_org",
+        "trace_id": "syn_trace",
+        "user_id": "syn_user"
+      },
+      "schema": "AIExecutionTrace"
+    },
+    {
+      "code": "CREDENTIAL_FORBIDDEN",
+      "expect": "reject",
+      "id": "TR-NEG-EXTRA-SECRET",
+      "payload": {
+        "agent_id": "syn_agent",
+        "bearer_token": "abc",
+        "cost_attribution": {
+          "component": "ikc",
+          "quantity": 1,
+          "system": "knowledge_sdk",
+          "units": "calls"
+        },
+        "plan_id": "syn_plan",
+        "policy_generation": 9,
+        "run_id": "syn_run",
+        "tenant_id": "syn_org",
+        "trace_id": "syn_trace",
+        "user_id": "syn_user"
+      },
+      "schema": "AIExecutionTrace"
+    },
+    {
+      "code": "VALIDATION_ERROR",
+      "expect": "reject",
+      "id": "TR-NEG-BAD-SYSTEM",
+      "payload": {
+        "agent_id": "syn_agent",
+        "cost_attribution": {
+          "component": "ikc",
+          "quantity": 1,
+          "system": "unknown",
+          "units": "calls"
+        },
+        "plan_id": "syn_plan",
+        "policy_generation": 9,
+        "run_id": "syn_run",
+        "tenant_id": "syn_org",
+        "trace_id": "syn_trace",
+        "user_id": "syn_user"
+      },
+      "schema": "AIExecutionTrace"
+    },
+    {
+      "code": "VALIDATION_ERROR",
+      "expect": "reject",
+      "id": "TR-NEG-POLICY-RANGE",
+      "payload": {
+        "agent_id": "syn_agent",
+        "cost_attribution": {
+          "component": "stage4",
+          "quantity": 2,
+          "system": "aor",
+          "units": "ms"
+        },
+        "plan_id": "syn_plan",
+        "policy_generation": 9007199254740992,
+        "run_id": "syn_run",
+        "tenant_id": "syn_org",
+        "trace_id": "syn_trace",
+        "user_id": "syn_user"
+      },
+      "schema": "AIExecutionTrace"
+    }
+  ]
+}

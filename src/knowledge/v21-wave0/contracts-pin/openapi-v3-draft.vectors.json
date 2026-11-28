@@ -1,0 +1,92 @@
+{
+  "pack": "openapi-v3-draft",
+  "schema": "openapi-v3-draft.yaml",
+  "vectors": [
+    {
+      "expect": "accept",
+      "id": "V3-POS-ERROR",
+      "payload": {
+        "error": {
+          "code": "MODE_UNMATCHED",
+          "message": "request_rejected"
+        }
+      },
+      "schema": "ErrorEnvelope"
+    },
+    {
+      "expect": "accept",
+      "id": "V3-POS-REDACTED-VIEW",
+      "payload": {
+        "redacted_unauthorized_count": 2,
+        "redaction_code": "0123456789abcdef",
+        "view": "agent"
+      },
+      "schema": "RedactedPlanView"
+    },
+    {
+      "expect": "accept",
+      "id": "V3-POS-AUDIT-VIEW",
+      "payload": {
+        "resources_excluded": [
+          {
+            "permission_denied": "TENANT_MISMATCH",
+            "resource_id": "syn_doc_9"
+          }
+        ],
+        "view": "audit"
+      },
+      "schema": "AuditPlanView"
+    },
+    {
+      "code": "VALIDATION_ERROR",
+      "expect": "reject",
+      "id": "V3-NEG-USER-LEAK",
+      "payload": {
+        "redacted_unauthorized_count": 1,
+        "redaction_code": "0123456789abcdef",
+        "resources_excluded": [
+          {
+            "permission_denied": "TENANT_MISMATCH",
+            "resource_id": "syn_doc_9"
+          }
+        ],
+        "view": "end_user"
+      },
+      "schema": "RedactedPlanView"
+    },
+    {
+      "code": "SPACE_PATH_FORBIDDEN",
+      "expect": "reject",
+      "id": "V3-NEG-SPACE-PATH",
+      "payload": {
+        "path": "/v3/spaces"
+      },
+      "schema": "OpenApiPath"
+    },
+    {
+      "code": "VALIDATION_ERROR",
+      "expect": "reject",
+      "id": "V3-NEG-ERROR-DETAIL",
+      "payload": {
+        "error": {
+          "code": "UNAUTHORIZED",
+          "message": "user syn_user cannot read syn_doc_9"
+        }
+      },
+      "schema": "ErrorEnvelope"
+    },
+    {
+      "code": "PARTIAL_PUBLICATION_FORBIDDEN",
+      "expect": "reject",
+      "id": "V3-NEG-PARTIAL",
+      "payload": {
+        "job_id": "syn_job",
+        "status": "published",
+        "tenant_id": "syn_org",
+        "visibility": "partial_available",
+        "whole_document_atomic_publication": true
+      },
+      "schema": "ProductionJob"
+    }
+  ]
+}

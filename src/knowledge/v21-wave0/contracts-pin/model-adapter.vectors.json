@@ -1,0 +1,385 @@
+{
+  "pack": "model-adapter",
+  "schema": "model-adapter.schema.json",
+  "vectors": [
+    {
+      "expect": "accept",
+      "id": "MA-POS-LLM-01",
+      "payload": {
+        "agent_id": "syn_agent",
+        "max_output_tokens": 64,
+        "messages": [
+          {
+            "role": "user",
+            "text": "syn summary request"
+          }
+        ],
+        "plan_id": "syn_plan",
+        "policy_generation": 7,
+        "provider": {
+          "handle": "slot:openbot_llm",
+          "model_id": "syn-llm",
+          "track": "openbot_public_execution"
+        },
+        "run_id": "syn_run",
+        "tenant_id": "syn_org",
+        "trace_id": "syn_trace",
+        "user_id": "syn_user"
+      },
+      "schema": "LLMInvokeRequest"
+    },
+    {
+      "expect": "accept",
+      "id": "MA-POS-LLM-02",
+      "payload": {
+        "agent_id": "syn_agent",
+        "messages": [
+          {
+            "role": "system",
+            "text": "syn policy"
+          },
+          {
+            "role": "user",
+            "text": "syn ask"
+          }
+        ],
+        "plan_id": "syn_plan",
+        "policy_generation": 7,
+        "provider": {
+          "handle": "slot:openbot_llm_fallback",
+          "model_id": "syn-llm",
+          "track": "openbot_fallback"
+        },
+        "run_id": "syn_run",
+        "tenant_id": "syn_org",
+        "trace_id": "syn_trace",
+        "user_id": "syn_user"
+      },
+      "schema": "LLMInvokeRequest"
+    },
+    {
+      "expect": "accept",
+      "id": "MA-POS-LLM-RESP",
+      "payload": {
+        "fallback_used": true,
+        "provider": {
+          "handle": "slot:openbot_llm_fallback",
+          "model_id": "syn-llm",
+          "track": "openbot_fallback"
+        },
+        "run_id": "syn_run",
+        "tenant_id": "syn_org",
+        "text": "syn ok",
+        "trace_id": "syn_trace",
+        "usage": {
+          "input_tokens": 3,
+          "output_tokens": 2
+        }
+      },
+      "schema": "LLMInvokeResponse"
+    },
+    {
+      "expect": "accept",
+      "id": "MA-POS-EMB-PROXY",
+      "payload": {
+        "inputs": [
+          "syn doc a"
+        ],
+        "policy_generation": 7,
+        "provider": {
+          "handle": "slot:openbot_embed",
+          "model_id": "syn-embed",
+          "track": "openbot_models_embed_proxy"
+        },
+        "tenant_id": "syn_org"
+      },
+      "schema": "EmbedRequest"
+    },
+    {
+      "expect": "accept",
+      "id": "MA-POS-EMB-HOST",
+      "payload": {
+        "inputs": [
+          "syn doc a",
+          "syn doc b"
+        ],
+        "policy_generation": 7,
+        "provider": {
+          "handle": "slot:host_embed",
+          "model_id": "syn-embed",
+          "track": "host_injected_external_provider"
+        },
+        "tenant_id": "syn_org"
+      },
+      "schema": "EmbedRequest"
+    },
+    {
+      "expect": "accept",
+      "id": "MA-POS-EMB-RESP",
+      "payload": {
+        "dim": 2,
+        "provider": {
+          "handle": "slot:host_embed",
+          "model_id": "syn-embed",
+          "track": "host_injected_external_provider"
+        },
+        "tenant_id": "syn_org",
+        "vectors": [
+          [
+            0.1,
+            0.2
+          ],
+          [
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "schema": "EmbedResponse"
+    },
+    {
+      "expect": "accept",
+      "id": "MA-POS-RR",
+      "payload": {
+        "candidates": [
+          {
+            "candidate_id": "syn_c1",
+            "text": "syn hit"
+          }
+        ],
+        "policy_generation": 7,
+        "provider": {
+          "handle": "slot:openbot_rerank",
+          "model_id": "syn-rerank",
+          "track": "openbot_models_rerank_proxy"
+        },
+        "query": "syn q",
+        "tenant_id": "syn_org"
+      },
+      "schema": "RerankRequest"
+    },
+    {
+      "expect": "accept",
+      "id": "MA-POS-RR-RESP",
+      "payload": {
+        "provider": {
+          "handle": "slot:openbot_rerank",
+          "model_id": "syn-rerank",
+          "track": "openbot_models_rerank_proxy"
+        },
+        "rankings": [
+          {
+            "candidate_id": "syn_c1",
+            "score": 0.5
+          }
+        ],
+        "tenant_id": "syn_org"
+      },
+      "schema": "RerankResponse"
+    },
+    {
+      "code": "CREDENTIAL_FORBIDDEN",
+      "expect": "reject",
+      "id": "MA-NEG-API-KEY",
+      "payload": {
+        "agent_id": "syn_agent",
+        "api_key": "sk-secret",
+        "messages": [
+          {
+            "role": "user",
+            "text": "x"
+          }
+        ],
+        "plan_id": "syn_plan",
+        "policy_generation": 7,
+        "provider": {
+          "handle": "slot:openbot_llm",
+          "model_id": "syn-llm",
+          "track": "openbot_public_execution"
+        },
+        "run_id": "syn_run",
+        "tenant_id": "syn_org",
+        "trace_id": "syn_trace",
+        "user_id": "syn_user"
+      },
+      "schema": "LLMInvokeRequest"
+    },
+    {
+      "code": "CREDENTIAL_FORBIDDEN",
+      "expect": "reject",
+      "id": "MA-NEG-PROVIDER-TOKEN",
+      "payload": {
+        "inputs": [
+          "syn"
+        ],
+        "policy_generation": 7,
+        "provider": {
+          "api_token": "secret",
+          "handle": "slot:host_embed",
+          "track": "host_injected_external_provider"
+        },
+        "tenant_id": "syn_org"
+      },
+      "schema": "EmbedRequest"
+    },
+    {
+      "code": "VALIDATION_ERROR",
+      "expect": "reject",
+      "id": "MA-NEG-POLICY-BOOL",
+      "payload": {
+        "agent_id": "syn_agent",
+        "messages": [
+          {
+            "role": "user",
+            "text": "syn"
+          }
+        ],
+        "plan_id": "syn_plan",
+        "policy_generation": true,
+        "provider": {
+          "handle": "slot:openbot_llm",
+          "model_id": "syn-llm",
+          "track": "openbot_public_execution"
+        },
+        "run_id": "syn_run",
+        "tenant_id": "syn_org",
+        "trace_id": "syn_trace",
+        "user_id": "syn_user"
+      },
+      "schema": "LLMInvokeRequest"
+    },
+    {
+      "code": "VALIDATION_ERROR",
+      "expect": "reject",
+      "id": "MA-NEG-POLICY-STR",
+      "payload": {
+        "inputs": [
+          "syn"
+        ],
+        "policy_generation": "7",
+        "provider": {
+          "handle": "slot:openbot_embed",
+          "model_id": "syn-embed",
+          "track": "openbot_models_embed_proxy"
+        },
+        "tenant_id": "syn_org"
+      },
+      "schema": "EmbedRequest"
+    },
+    {
+      "code": "VALIDATION_ERROR",
+      "expect": "reject",
+      "id": "MA-NEG-POLICY-FLOAT",
+      "payload": {
+        "candidates": [
+          {
+            "candidate_id": "syn_c1",
+            "text": "syn"
+          }
+        ],
+        "policy_generation": 7.5,
+        "provider": {
+          "handle": "slot:openbot_rerank",
+          "model_id": "syn-rerank",
+          "track": "openbot_models_rerank_proxy"
+        },
+        "query": "syn",
+        "tenant_id": "syn_org"
+      },
+      "schema": "RerankRequest"
+    },
+    {
+      "code": "VALIDATION_ERROR",
+      "expect": "reject",
+      "id": "MA-NEG-POLICY-MISSING",
+      "payload": {
+        "agent_id": "syn_agent",
+        "messages": [
+          {
+            "role": "user",
+            "text": "syn"
+          }
+        ],
+        "plan_id": "syn_plan",
+        "provider": {
+          "handle": "slot:openbot_llm",
+          "model_id": "syn-llm",
+          "track": "openbot_public_execution"
+        },
+        "run_id": "syn_run",
+        "tenant_id": "syn_org",
+        "trace_id": "syn_trace",
+        "user_id": "syn_user"
+      },
+      "schema": "LLMInvokeRequest"
+    },
+    {
+      "code": "VALIDATION_ERROR",
+      "expect": "reject",
+      "id": "MA-NEG-EMPTY-TENANT",
+      "payload": {
+        "agent_id": "syn_agent",
+        "messages": [
+          {
+            "role": "user",
+            "text": "syn"
+          }
+        ],
+        "plan_id": "syn_plan",
+        "policy_generation": 7,
+        "provider": {
+          "handle": "slot:openbot_llm",
+          "model_id": "syn-llm",
+          "track": "openbot_public_execution"
+        },
+        "run_id": "syn_run",
+        "tenant_id": "",
+        "trace_id": "syn_trace",
+        "user_id": "syn_user"
+      },
+      "schema": "LLMInvokeRequest"
+    },
+    {
+      "code": "VALIDATION_ERROR",
+      "expect": "reject",
+      "id": "MA-NEG-BAD-TRACK",
+      "payload": {
+        "inputs": [
+          "syn"
+        ],
+        "policy_generation": 7,
+        "provider": {
+          "handle": "slot:x",
+          "track": "paid_direct_sdk_call"
+        },
+        "tenant_id": "syn_org"
+      },
+      "schema": "EmbedRequest"
+    },
+    {
+      "code": "VALIDATION_ERROR",
+      "expect": "reject",
+      "id": "MA-NEG-HANDLE-SECRET",
+      "payload": {
+        "agent_id": "syn_agent",
+        "messages": [
+          {
+            "role": "user",
+            "text": "syn"
+          }
+        ],
+        "plan_id": "syn_plan",
+        "policy_generation": 7,
+        "provider": {
+          "handle": "sk-live-secret",
+          "track": "openbot_public_execution"
+        },
+        "run_id": "syn_run",
+        "tenant_id": "syn_org",
+        "trace_id": "syn_trace",
+        "user_id": "syn_user"
+      },
+      "schema": "LLMInvokeRequest"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+
+ RUN  v4.0.18 /Users/daniel/.codex/worktrees/knowledge-sdk-alignment/openbot
+
+ ✓ src/gateway/knowledge/knowledge-base-members.test.ts > knowledge-base-members > invites and lists pending members for a knowledge base 2ms
+ ✓ src/gateway/knowledge/knowledge-base-members.test.ts > knowledge-base-members > returns the same pending invite for duplicate email 1ms
+ ✓ src/gateway/knowledge/knowledge-base-members.test.ts > knowledge-base-members > rejects invalid email 0ms
+ ✓ src/gateway/knowledge/knowledge-base-permissions.test.ts > knowledge-base-permissions > grants owner full read/write/admin 2ms
+ ✓ src/gateway/knowledge/knowledge-base-permissions.test.ts > knowledge-base-permissions > grants admin member write and admin but not ownership 2ms
+ ✓ src/gateway/knowledge/knowledge-base-permissions.test.ts > knowledge-base-permissions > grants editor write but not admin 1ms
+ ✓ src/gateway/knowledge/knowledge-base-permissions.test.ts > knowledge-base-permissions > grants viewer read only 1ms
+ ✓ src/gateway/knowledge/knowledge-base-permissions.test.ts > knowledge-base-permissions > denies pending members write access 1ms
+ ✓ src/gateway/knowledge/knowledge-base-permissions.test.ts > knowledge-base-permissions > denies a tenant-matched bound robot when the user lacks access 1ms
+ ✓ src/gateway/knowledge/knowledge-base-permissions.test.ts > knowledge-base-permissions > does not grant robot read across tenants 1ms
+ ✓ src/gateway/knowledge/knowledge-base-permissions.test.ts > knowledge-base-permissions > intersects user and agent access: 'authorized owner and bound agent' 1ms
+ ✓ src/gateway/knowledge/knowledge-base-permissions.test.ts > knowledge-base-permissions > intersects user and agent access: 'nonmember with bound agent' 1ms
+ ✓ src/gateway/knowledge/knowledge-base-permissions.test.ts > knowledge-base-permissions > intersects user and agent access: 'authorized owner with unbound agent' 1ms
+ ✓ src/gateway/knowledge/knowledge-base-permissions.test.ts > knowledge-base-permissions > intersects user and agent access: 'owner in a different tenant' 0ms
+ ✓ src/gateway/knowledge/knowledge-base-permissions.test.ts > knowledge-base-permissions > intersects user and agent access: 'missing user' 0ms
+ ✓ src/gateway/knowledge/knowledge-base-permissions.test.ts > knowledge-base-permissions > intersects user and agent access: 'missing tenant' 1ms
+ ✓ src/gateway/knowledge/knowledge-base-permissions.test.ts > knowledge-base-permissions > uses stable member IDs for agent reads and denies revoked or email-only grants 0ms
+ ✓ src/retrieval/sources/knowledge-source.test.ts > knowledge-source > returns empty evidence for unauthorized caller (private kb) 37ms
+ ✓ src/retrieval/sources/knowledge-source.test.ts > knowledge-source > returns KnowledgeEvidence for authorized owner with kb title and sourceUri 27ms
+ ✓ src/retrieval/sources/knowledge-source.test.ts > knowledge-source > recalls multiple tenant knowledge bases in one index db group 332ms
+ ✓ src/retrieval/sources/knowledge-source.test.ts > knowledge-source > registers onto the retrieval service singleton 36ms
+ ✓ src/retrieval/sources/knowledge-source.test.ts > knowledge-source > requires user authorization even for a tenant-matched bound robot 52ms
+
+ Test Files  3 passed (3)
+      Tests  22 passed (22)
+   Start at  08:47:45
+   Duration  4.93s (transform 3.08s, setup 484ms, import 4.28s, tests 503ms, environment 0ms)
+

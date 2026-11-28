@@ -1,0 +1,353 @@
+{
+  "$defs": {
+    "EmbedRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "inputs": {
+          "items": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array"
+        },
+        "policy_generation": {
+          "description": "Strict positive safe integer. Reject bool, string, float, null, missing, or out of range.",
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "provider": {
+          "$ref": "#/$defs/provider_ref"
+        },
+        "tenant_id": {
+          "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "policy_generation",
+        "provider",
+        "inputs"
+      ],
+      "type": "object"
+    },
+    "EmbedResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "dim": {
+          "maximum": 4096,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "provider": {
+          "$ref": "#/$defs/provider_ref"
+        },
+        "tenant_id": {
+          "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+          "type": "string"
+        },
+        "vectors": {
+          "items": {
+            "items": {
+              "type": "number"
+            },
+            "maxItems": 4096,
+            "minItems": 1,
+            "type": "array"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "provider",
+        "vectors",
+        "dim"
+      ],
+      "type": "object"
+    },
+    "LLMInvokeRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "agent_id": {
+          "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+          "type": "string"
+        },
+        "max_output_tokens": {
+          "maximum": 4096,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "messages": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "role": {
+                "enum": [
+                  "system",
+                  "user",
+                  "assistant"
+                ]
+              },
+              "text": {
+                "maxLength": 4000,
+                "minLength": 1,
+                "pattern": "^[^\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f]+$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "role",
+              "text"
+            ],
+            "type": "object"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "type": "array"
+        },
+        "plan_id": {
+          "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+          "type": "string"
+        },
+        "policy_generation": {
+          "description": "Strict positive safe integer. Reject bool, string, float, null, missing, or out of range.",
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "provider": {
+          "$ref": "#/$defs/provider_ref"
+        },
+        "run_id": {
+          "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+          "type": "string"
+        },
+        "tenant_id": {
+          "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+          "type": "string"
+        },
+        "trace_id": {
+          "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+          "type": "string"
+        },
+        "user_id": {
+          "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "user_id",
+        "agent_id",
+        "trace_id",
+        "run_id",
+        "plan_id",
+        "policy_generation",
+        "provider",
+        "messages"
+      ],
+      "type": "object"
+    },
+    "LLMInvokeResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "fallback_used": {
+          "type": "boolean"
+        },
+        "provider": {
+          "$ref": "#/$defs/provider_ref"
+        },
+        "run_id": {
+          "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+          "type": "string"
+        },
+        "tenant_id": {
+          "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+          "type": "string"
+        },
+        "text": {
+          "maxLength": 8000,
+          "type": "string"
+        },
+        "trace_id": {
+          "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+          "type": "string"
+        },
+        "usage": {
+          "additionalProperties": false,
+          "properties": {
+            "input_tokens": {
+              "maximum": 1000000,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "output_tokens": {
+              "maximum": 1000000,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "input_tokens",
+            "output_tokens"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "trace_id",
+        "run_id",
+        "provider",
+        "text",
+        "fallback_used",
+        "usage"
+      ],
+      "type": "object"
+    },
+    "RerankRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "candidates": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "candidate_id": {
+                "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+                "type": "string"
+              },
+              "text": {
+                "maxLength": 2000,
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "candidate_id",
+              "text"
+            ],
+            "type": "object"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array"
+        },
+        "policy_generation": {
+          "description": "Strict positive safe integer. Reject bool, string, float, null, missing, or out of range.",
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "provider": {
+          "$ref": "#/$defs/provider_ref"
+        },
+        "query": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "tenant_id": {
+          "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "policy_generation",
+        "provider",
+        "query",
+        "candidates"
+      ],
+      "type": "object"
+    },
+    "RerankResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "$ref": "#/$defs/provider_ref"
+        },
+        "rankings": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "candidate_id": {
+                "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+                "type": "string"
+              },
+              "score": {
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              }
+            },
+            "required": [
+              "candidate_id",
+              "score"
+            ],
+            "type": "object"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array"
+        },
+        "tenant_id": {
+          "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "provider",
+        "rankings"
+      ],
+      "type": "object"
+    },
+    "policy_generation": {
+      "description": "Strict positive safe integer. Reject bool, string, float, null, missing, or out of range.",
+      "maximum": 9007199254740991,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "provider_ref": {
+      "additionalProperties": false,
+      "properties": {
+        "handle": {
+          "description": "Named injection slot. Never a credential, token, or network secret.",
+          "pattern": "^slot:[a-z0-9_.-]{1,64}$",
+          "type": "string"
+        },
+        "model_id": {
+          "pattern": "^[a-zA-Z0-9._:/-]{1,128}$",
+          "type": "string"
+        },
+        "track": {
+          "enum": [
+            "openbot_public_execution",
+            "openbot_fallback",
+            "openbot_models_embed_proxy",
+            "openbot_models_rerank_proxy",
+            "host_injected_external_provider"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "track",
+        "handle"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://knowledge-sdk.local/contracts/v21-reuse-v1/model-adapter.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Reuse OpenBot public execution and Fallback interfaces. Embed/Rerank are dual-track: future OpenBot models.embed/models.rerank proxy, or host-injected external provider. Hardcoded model credentials and implicit paid calls are forbidden inside the SDK.",
+  "status": "DRAFT_WAVE_V21_0_NOT_FROZEN",
+  "title": "V21 Model and Embedding/Rerank Adapter"
+}

@@ -1,0 +1,539 @@
+openapi: 3.1.0
+info:
+  title: Knowledge SDK vNext draft APIs (Wave-V21-0)
+  version: 0.0.0-draft
+  description: |
+    DRAFT_WAVE_V21_0_NOT_FROZEN. Plans IKC, KSG, Resource Registry, KRDR, and EDKI
+    semantic-bridge APIs under /v3/*. Mandatory Idempotency-Key on write operations,
+    cursor pagination, and desensitized error codes (M-06). Space v7 remains a
+    /v2/spaces compatible evolution with zero conflict; this draft does not define
+    /v3/spaces and MUST NOT be mounted on the production HTTP application.
+servers:
+  - url: https://sdk.example.invalid
+    description: Non-production draft only; not mounted.
+tags:
+  - name: ikc
+  - name: ksg
+  - name: resource-registry
+  - name: krdr
+  - name: edki
+paths:
+  /v3/ikc/intake-jobs:
+    post:
+      tags: [ikc]
+      operationId: createIntakeJob
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IntakeJobRequest'
+      responses:
+        '200':
+          description: Created or exact idempotent replay.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntakeJob'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '400':
+          $ref: '#/components/responses/DesensitizedError'
+    get:
+      tags: [ikc]
+      operationId: listIntakeJobs
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Cursor page.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntakeJobPage'
+        '400':
+          $ref: '#/components/responses/DesensitizedError'
+  /v3/ikc/production-jobs:
+    post:
+      tags: [ikc]
+      operationId: createProductionJob
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductionJobRequest'
+      responses:
+        '200':
+          description: Created or exact idempotent replay.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductionJob'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '400':
+          $ref: '#/components/responses/DesensitizedError'
+  /v3/ikc/production-jobs/{job_id}/publish:
+    post:
+      tags: [ikc]
+      operationId: publishProduction
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublishRequest'
+      responses:
+        '200':
+          description: Blue-green switch of active_published_production_id after approval.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductionJob'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '400':
+          $ref: '#/components/responses/DesensitizedError'
+  /v3/ksg/validations:
+    post:
+      tags: [ksg]
+      operationId: validateGovernance
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KSGValidationRequest'
+      responses:
+        '200':
+          description: Validation decision. Fail-closed on high-risk partial publication.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KSGValidationDecision'
+        '400':
+          $ref: '#/components/responses/DesensitizedError'
+  /v3/resources:
+    get:
+      tags: [resource-registry]
+      operationId: listResources
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Cursor page of KnowledgeResource records. Capabilities are not inlined.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourcePage'
+        '400':
+          $ref: '#/components/responses/DesensitizedError'
+    post:
+      tags: [resource-registry]
+      operationId: registerResource
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KnowledgeResource'
+      responses:
+        '200':
+          description: Registered resource (not a capability).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeResource'
+        '400':
+          $ref: '#/components/responses/DesensitizedError'
+  /v3/resources/{resource_id}/bindings:
+    post:
+      tags: [resource-registry]
+      operationId: bindCapability
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: resource_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResourceCapabilityBinding'
+      responses:
+        '200':
+          description: Binding created. Resource and Capability remain distinct objects.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceCapabilityBinding'
+        '400':
+          $ref: '#/components/responses/DesensitizedError'
+  /v3/krdr/plans:
+    post:
+      tags: [krdr]
+      operationId: createRetrievalPlan
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KnowledgeRetrievalPlanRequest'
+      responses:
+        '200':
+          description: Plan created. View selected by caller role, never mixed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeRetrievalPlanView'
+        '400':
+          $ref: '#/components/responses/DesensitizedError'
+  /v3/edki/semantic-references:
+    post:
+      tags: [edki]
+      operationId: createSemanticReference
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SemanticReference'
+      responses:
+        '200':
+          description: Read-only semantic_object_key binding. Physical connector fields are rejected.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SemanticReference'
+        '400':
+          $ref: '#/components/responses/DesensitizedError'
+    get:
+      tags: [edki]
+      operationId: listSemanticReferences
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Cursor page of read-only references.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SemanticReferencePage'
+        '400':
+          $ref: '#/components/responses/DesensitizedError'
+  /v3/revocations:
+    post:
+      tags: [edki]
+      operationId: startRevocation
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RevocationRequest'
+      responses:
+        '200':
+          description: RevocationPurgeReceipt. purged is true only if all four channels succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevocationPurgeReceipt'
+        '400':
+          $ref: '#/components/responses/DesensitizedError'
+components:
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 128
+        pattern: '^[A-Za-z0-9._:-]{8,128}$'
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      schema:
+        type: string
+        maxLength: 256
+        description: Opaque cursor. Not a resource identifier leak.
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+  responses:
+    DesensitizedError:
+      description: Fail-closed desensitized error (M-06). No PII, secrets, or unauthorized resource identifiers.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    Conflict:
+      description: Idempotency or state conflict.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+  schemas:
+    ErrorEnvelope:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum:
+                - VALIDATION_ERROR
+                - IDEMPOTENCY_CONFLICT
+                - POLICY_GENERATION_STALE
+                - MODE_UNMATCHED
+                - TEXT_TO_SQL_FORBIDDEN
+                - CREDENTIAL_FORBIDDEN
+                - PARTIAL_PUBLICATION_FORBIDDEN
+                - CHANNEL_INCOMPLETE
+                - SEMANTIC_WRITE_FORBIDDEN
+                - UNAUTHORIZED
+            message:
+              type: string
+              enum:
+                - request_rejected
+                - conflict
+                - stale_policy
+                - not_authorized
+    PageMeta:
+      type: object
+      additionalProperties: false
+      required: [next_cursor, limit]
+      properties:
+        next_cursor:
+          type: [string, 'null']
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+    IntakeJobRequest:
+      type: object
+      additionalProperties: false
+      required: [tenant_id, source_kind, policy_generation, compliance_class]
+      properties:
+        tenant_id: {type: string}
+        source_kind: {type: string, enum: [upload, connector_snapshot]}
+        policy_generation: {type: integer, minimum: 1, maximum: 9007199254740991}
+        compliance_class: {type: string, enum: [standard, high_risk, strong_compliance]}
+    IntakeJob:
+      type: object
+      additionalProperties: false
+      required: [job_id, tenant_id, status]
+      properties:
+        job_id: {type: string}
+        tenant_id: {type: string}
+        status: {type: string, enum: [queued, validating, accepted, rejected, cancelled]}
+    IntakeJobPage:
+      type: object
+      additionalProperties: false
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/IntakeJob'}
+        page: {$ref: '#/components/schemas/PageMeta'}
+    ProductionJobRequest:
+      type: object
+      additionalProperties: false
+      required: [tenant_id, intake_job_id, pipeline_version, policy_generation, compliance_class]
+      properties:
+        tenant_id: {type: string}
+        intake_job_id: {type: string}
+        pipeline_version: {type: string}
+        policy_generation: {type: integer, minimum: 1, maximum: 9007199254740991}
+        compliance_class: {type: string, enum: [standard, high_risk, strong_compliance]}
+        whole_document_atomic_publication: {type: boolean}
+    ProductionJob:
+      type: object
+      additionalProperties: false
+      required: [job_id, tenant_id, status, whole_document_atomic_publication, visibility]
+      properties:
+        job_id: {type: string}
+        tenant_id: {type: string}
+        status: {type: string, enum: [queued, parsing, chunking, indexing, awaiting_approval, published, failed, cancelled]}
+        whole_document_atomic_publication: {type: boolean}
+        visibility: {type: string, enum: [hidden, published]}
+        active_published_production_id: {type: [string, 'null']}
+    PublishRequest:
+      type: object
+      additionalProperties: false
+      required: [tenant_id, policy_generation]
+      properties:
+        tenant_id: {type: string}
+        policy_generation: {type: integer, minimum: 1, maximum: 9007199254740991}
+    KSGValidationRequest:
+      type: object
+      additionalProperties: false
+      required: [tenant_id, operation, policy_generation, payload]
+      properties:
+        tenant_id: {type: string}
+        operation: {type: string, enum: [submit_for_review, approve_release, publish_release, resolve_evidence_issue]}
+        policy_generation: {type: integer, minimum: 1, maximum: 9007199254740991}
+        payload:
+          type: object
+          additionalProperties: true
+    KSGValidationDecision:
+      type: object
+      additionalProperties: false
+      required: [allowed, reason_code]
+      properties:
+        allowed: {type: boolean}
+        reason_code: {type: string}
+    KnowledgeResource:
+      type: object
+      additionalProperties: false
+      required: [tenant_id, resource_id, resource_type]
+      properties:
+        tenant_id: {type: string}
+        resource_id: {type: string}
+        resource_type: {type: string, enum: [document, knowledge_base, agent_memory, materialized_snapshot]}
+        label: {type: string}
+    ResourceCapabilityBinding:
+      type: object
+      additionalProperties: false
+      required: [tenant_id, resource_id, capability_id, policy_generation]
+      properties:
+        tenant_id: {type: string}
+        resource_id: {type: string}
+        capability_id: {type: string}
+        policy_generation: {type: integer, minimum: 1, maximum: 9007199254740991}
+    ResourcePage:
+      type: object
+      additionalProperties: false
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/KnowledgeResource'}
+        page: {$ref: '#/components/schemas/PageMeta'}
+    KnowledgeRetrievalPlanRequest:
+      type: object
+      additionalProperties: false
+      required: [tenant_id, viewer, policy_generation]
+      properties:
+        tenant_id: {type: string}
+        viewer: {type: string, enum: [audit, governance, agent, end_user]}
+        policy_generation: {type: integer, minimum: 1, maximum: 9007199254740991}
+    KnowledgeRetrievalPlanView:
+      oneOf:
+        - $ref: '#/components/schemas/AuditPlanView'
+        - $ref: '#/components/schemas/RedactedPlanView'
+    AuditPlanView:
+      type: object
+      additionalProperties: false
+      required: [view, resources_excluded]
+      properties:
+        view: {type: string, enum: [audit, governance]}
+        resources_excluded:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [resource_id, permission_denied]
+            properties:
+              resource_id: {type: string}
+              permission_denied: {type: string}
+    RedactedPlanView:
+      type: object
+      additionalProperties: false
+      required: [view, redacted_unauthorized_count, redaction_code]
+      properties:
+        view: {type: string, enum: [agent, end_user]}
+        redacted_unauthorized_count: {type: integer, minimum: 0}
+        redaction_code: {type: string, pattern: '^[a-f0-9]{16}$'}
+    SemanticReference:
+      type: object
+      additionalProperties: false
+      required: [tenant_id, semantic_object_key, concept_ids, policy_clause_ids]
+      properties:
+        tenant_id: {type: string}
+        semantic_object_key: {type: string, description: 'Read-only pointer to OpenBot semantic object. Not a connector field.'}
+        concept_ids:
+          type: array
+          items: {type: string}
+        policy_clause_ids:
+          type: array
+          items: {type: string}
+    SemanticReferencePage:
+      type: object
+      additionalProperties: false
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/SemanticReference'}
+        page: {$ref: '#/components/schemas/PageMeta'}
+    RevocationRequest:
+      type: object
+      additionalProperties: false
+      required: [tenant_id, subject_id, policy_generation]
+      properties:
+        tenant_id: {type: string}
+        subject_id: {type: string}
+        policy_generation: {type: integer, minimum: 1, maximum: 9007199254740991}
+    RevocationPurgeReceipt:
+      type: object
+      additionalProperties: false
+      required: [task_id, tenant_id, purged, channels, hash_algorithm, receipt_hash]
+      properties:
+        task_id: {type: string}
+        tenant_id: {type: string}
+        purged: {type: boolean}
+        hash_algorithm: {const: sha256}
+        receipt_hash: {type: string, pattern: '^[a-f0-9]{64}$'}
+        channels:
+          type: array
+          minItems: 4
+          maxItems: 4
+          items:
+            type: object
+            additionalProperties: false
+            required: [channel, status]
+            properties:
+              channel: {type: string, enum: [primary_storage_acl, vector_fts_index, cache_materialized_snapshot, agent_history_cogniweave]}
+              status: {type: string, enum: [success, failed, timeout, missing]}

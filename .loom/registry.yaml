@@ -16612,7 +16612,11 @@ landingStreams:
     landingPolicy: serial
     paths:
       - src/knowledge/adapter/**
+      - src/knowledge/v21-wave0/**
       - docs/architecture/knowledge-sdk-alignment/**
+      - docs/architecture/v21-audit/**
+      - .github/workflows/v21-wave0-contract-vectors.yml
+      - .loom/registry.yaml
       - src/gateway/knowledge/knowledge-base-permissions.ts
       - src/gateway/knowledge/knowledge-base-permissions.test.ts
       - src/gateway/knowledge/knowledge-base-members.ts
@@ -16645,6 +16649,7 @@ landingStreams:
     canLandWith: []
     metadata:
       legacyTitle: User-authorized M2-B isolated contract adapter and safety remediation
+      v21Wave0: Official-field A-D audits, default-off adapters, local contract CI on Track 2 only.
   - id: delivery-acceptance-integration-20261122
     landingPolicy: serial
     paths:

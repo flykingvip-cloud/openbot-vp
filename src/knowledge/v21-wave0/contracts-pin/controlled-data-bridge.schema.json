@@ -1,0 +1,290 @@
+{
+  "$defs": {
+    "ControlledDataBridgeDeclaration": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ModeADeclaration"
+        },
+        {
+          "$ref": "#/$defs/ModeBDeclaration"
+        },
+        {
+          "$ref": "#/$defs/ModeCDeclaration"
+        }
+      ]
+    },
+    "ModeADeclaration": {
+      "additionalProperties": false,
+      "properties": {
+        "freshness_ts": {
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
+          "type": "string"
+        },
+        "masking_receipt": {
+          "$ref": "#/$defs/masking_receipt"
+        },
+        "mode": {
+          "const": "A"
+        },
+        "policy_generation": {
+          "description": "Strict positive safe integer. Reject bool, string, float, null, missing, or out of range.",
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "query_kind": {
+          "enum": [
+            "structured_select",
+            "object_get",
+            "snapshot_read"
+          ],
+          "type": "string"
+        },
+        "tenant_id": {
+          "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+          "type": "string"
+        },
+        "tombstone": {
+          "$ref": "#/$defs/tombstone"
+        },
+        "user_delegation_handle": {
+          "pattern": "^deleg:[a-z0-9_.-]{1,64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "mode",
+        "tenant_id",
+        "policy_generation",
+        "freshness_ts",
+        "masking_receipt",
+        "tombstone",
+        "user_delegation_handle",
+        "query_kind"
+      ],
+      "type": "object"
+    },
+    "ModeBDeclaration": {
+      "additionalProperties": false,
+      "properties": {
+        "freshness_ts": {
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
+          "type": "string"
+        },
+        "masking_receipt": {
+          "$ref": "#/$defs/masking_receipt"
+        },
+        "mode": {
+          "const": "B"
+        },
+        "policy_generation": {
+          "description": "Strict positive safe integer. Reject bool, string, float, null, missing, or out of range.",
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "query_kind": {
+          "const": "structured_select"
+        },
+        "row_level_predicate": {
+          "$ref": "#/$defs/row_predicate"
+        },
+        "service_credential_handle": {
+          "description": "Handle only; raw service secrets never appear in this contract.",
+          "pattern": "^svc:[a-z0-9_.-]{1,64}$",
+          "type": "string"
+        },
+        "tenant_id": {
+          "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+          "type": "string"
+        },
+        "tombstone": {
+          "$ref": "#/$defs/tombstone"
+        }
+      },
+      "required": [
+        "mode",
+        "tenant_id",
+        "policy_generation",
+        "freshness_ts",
+        "masking_receipt",
+        "tombstone",
+        "service_credential_handle",
+        "row_level_predicate",
+        "query_kind"
+      ],
+      "type": "object"
+    },
+    "ModeCDeclaration": {
+      "additionalProperties": false,
+      "properties": {
+        "freshness_ts": {
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
+          "type": "string"
+        },
+        "masking_receipt": {
+          "$ref": "#/$defs/masking_receipt"
+        },
+        "mode": {
+          "const": "C"
+        },
+        "policy_generation": {
+          "description": "Strict positive safe integer. Reject bool, string, float, null, missing, or out of range.",
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "query_kind": {
+          "const": "snapshot_read"
+        },
+        "snapshot_id": {
+          "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+          "type": "string"
+        },
+        "tenant_id": {
+          "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+          "type": "string"
+        },
+        "tombstone": {
+          "$ref": "#/$defs/tombstone"
+        }
+      },
+      "required": [
+        "mode",
+        "tenant_id",
+        "policy_generation",
+        "freshness_ts",
+        "masking_receipt",
+        "tombstone",
+        "snapshot_id",
+        "query_kind"
+      ],
+      "type": "object"
+    },
+    "common": {
+      "freshness_ts": {
+        "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
+        "type": "string"
+      },
+      "masking_receipt": {
+        "$ref": "#/$defs/masking_receipt"
+      },
+      "policy_generation": {
+        "description": "Strict positive safe integer. Reject bool, string, float, null, missing, or out of range.",
+        "maximum": 9007199254740991,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "query_kind": {
+        "description": "structured_select is a named allowlisted query, never free-form Text-to-SQL.",
+        "enum": [
+          "structured_select",
+          "object_get",
+          "snapshot_read"
+        ],
+        "type": "string"
+      },
+      "tenant_id": {
+        "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+        "type": "string"
+      },
+      "tombstone": {
+        "$ref": "#/$defs/tombstone"
+      }
+    },
+    "masking_receipt": {
+      "additionalProperties": false,
+      "properties": {
+        "hash_algorithm": {
+          "const": "sha256"
+        },
+        "profile": {
+          "enum": [
+            "none",
+            "standard",
+            "strict"
+          ],
+          "type": "string"
+        },
+        "receipt_hash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "receipt_id": {
+          "pattern": "^syn_[a-z0-9_.:-]{1,120}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "receipt_id",
+        "profile",
+        "hash_algorithm",
+        "receipt_hash"
+      ],
+      "type": "object"
+    },
+    "policy_generation": {
+      "description": "Strict positive safe integer. Reject bool, string, float, null, missing, or out of range.",
+      "maximum": 9007199254740991,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "row_predicate": {
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "enum": [
+            "org_id",
+            "tenant_id",
+            "owner_id",
+            "classification"
+          ],
+          "type": "string"
+        },
+        "op": {
+          "enum": [
+            "eq",
+            "in"
+          ],
+          "type": "string"
+        },
+        "value": {
+          "maxLength": 128,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "field",
+        "op",
+        "value"
+      ],
+      "type": "object"
+    },
+    "tombstone": {
+      "additionalProperties": false,
+      "properties": {
+        "active": {
+          "type": "boolean"
+        },
+        "revoked_at": {
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "active",
+        "revoked_at"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://knowledge-sdk.local/contracts/v21-reuse-v1/controlled-data-bridge.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Mode A user-delegated passthrough, Mode B tenant-controlled service credential handle plus mandatory row-level predicate, Mode C offline controlled materialized snapshot. Unmatched mode Fail-Closed (M-03). Free-form Text-to-SQL is forbidden in MVP. policy_generation, masking_receipt, freshness_ts, and tombstone are mandatory.",
+  "status": "DRAFT_WAVE_V21_0_NOT_FROZEN",
+  "title": "V21 Controlled Data Bridge"
+}

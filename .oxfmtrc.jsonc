@@ -22,6 +22,8 @@
     // Frozen / governance-protected records: must not be rewritten, not even whitespace.
     ".kiro/specs/constitutional-governance-discovery/",
     "packages/constitutional-contracts/",
+    // Frozen Team A Sync-W2-1 golden fixture; raw bytes must remain SHA-256 f8033a90...
+    "src/knowledge/v21-wave0/interop-fixtures/",
     // Generated outputs: regenerate via their scripts instead of formatting by hand.
     ".kiro/specs/gateway-plugins-monolith-decomposition/baseline/",
     "docs/zh-CN/",
