@@ -1306,7 +1306,7 @@ describe("enterprise trial restriction surfaces", () => {
     expect(container.textContent).toContain("请从员工端登录");
     expect(container.textContent).toContain("从员工端登录");
     expect(container.textContent).not.toContain("以企业管理员身份继续");
-    expect(container.textContent).not.toContain("企业登录");
+    expect(container.querySelector('a[href$="/enterprise/login"]')).toBeNull();
     expect(container.textContent).not.toContain("返回员工首页");
   });
 

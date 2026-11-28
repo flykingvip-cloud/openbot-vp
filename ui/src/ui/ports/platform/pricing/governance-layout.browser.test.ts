@@ -4,6 +4,7 @@ import { render } from "lit";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { i18n } from "../../../../i18n/index.ts";
 import { zh_CN } from "../../../../i18n/locales/zh-CN.ts";
+import { handleCatalogPolicyRpc, handlePlanBundleAuxRpc } from "./browser-test-helpers.ts";
 import { renderPlatformPricingSurface } from "./page.ts";
 
 beforeAll(async () => {
@@ -18,7 +19,16 @@ afterEach(() => {
 
 function client() {
   return {
-    request: vi.fn(async (method: string) => {
+    connected: true,
+    request: vi.fn(async (method: string, params?: Record<string, unknown>) => {
+      const catalog = handleCatalogPolicyRpc(method, [], params);
+      if (catalog !== undefined) {
+        return catalog;
+      }
+      const aux = handlePlanBundleAuxRpc(method);
+      if (aux !== undefined) {
+        return aux;
+      }
       if (method === "platform-plan-bundle.overview") {
         return {
           catalog: ["ollama/llama3.2"],
@@ -69,11 +79,12 @@ describe("platform pricing governance editor layout", () => {
     document.body.appendChild(container);
     window.history.replaceState({}, "", "/platform/pricing/new");
 
+    const gateway = client();
     render(
       renderPlatformPricingSurface({
         tab: "platformPricing",
         basePath: "",
-        client: client(),
+        client: gateway,
         readModel: {} as never,
         channelsProps: {} as never,
         actions: {} as never,
@@ -81,7 +92,20 @@ describe("platform pricing governance editor layout", () => {
       container,
     );
 
+    const refresh = () =>
+      render(
+        renderPlatformPricingSurface({
+          tab: "platformPricing",
+          basePath: "",
+          client: gateway,
+          readModel: {} as never,
+          channelsProps: {} as never,
+          actions: {} as never,
+        }),
+        container,
+      );
     await vi.waitFor(() => {
+      refresh();
       expect(container.querySelector('[data-testid="create-plan-page"]')).toBeTruthy();
       expect(container.querySelector('[data-testid="create-governance-editor"]')).toBeTruthy();
     });

@@ -190,11 +190,13 @@ describe("platform key-account P2 interactions", () => {
     expect(reason).not.toBeNull();
     setValue(select!, "active");
     setValue(reason!, "演示确认合作");
-    app.querySelector<HTMLButtonElement>("[data-ka-status-submit]")!.click();
+    await app.updateComplete;
+    app.querySelector<HTMLButtonElement>("[data-ka-status-submit]")!.form!.requestSubmit();
     await app.updateComplete;
     expect(app.querySelector("[data-ka-status-confirm='ready']")?.textContent).toContain("合作中");
     expect(app.querySelector("[data-ka-partner-status]")?.textContent).toContain("意向");
-    app.querySelector<HTMLButtonElement>("[data-ka-status-submit]")!.click();
+    await app.updateComplete;
+    app.querySelector<HTMLButtonElement>("[data-ka-status-submit]")!.form!.requestSubmit();
     await app.updateComplete;
     expect(
       app.querySelector("[data-ka-partner-status]")?.getAttribute("data-ka-partner-status"),

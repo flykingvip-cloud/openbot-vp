@@ -109,7 +109,7 @@ describe("platform observation shell", () => {
       "openbot-observation-workbench",
     ) as OpenBotObservationWorkbench;
     await workbench.updateComplete;
-    expect(container.textContent).toContain("近 7 天跨租户视图来自企业目录摘要");
+    expect(container.textContent).toContain("精确任务查询");
     expect(container.textContent).toContain("壳层目录企业");
     expect(container.textContent).toContain("平台观测");
     expect(container.textContent).toContain("平台健康与覆盖");
@@ -152,7 +152,9 @@ describe("platform observation shell", () => {
     await workbench.updateComplete;
     expect(workbench.querySelector('[data-testid="obs-access-notice"]')).toBeNull();
     expect(workbench.textContent).not.toContain("当前租户授权尚未确认");
-    expect(workbench.textContent).toContain("所选企业暂无已映射运行事件");
+    // Platform overview exposes precise authorized queries, not the enterprise analysis tabs.
+    expect(workbench.querySelector(".obs-query-submit")).not.toBeNull();
+    expect(workbench.textContent).toContain("精确任务查询");
 
     tenant.value = "tenant-none";
     tenant.dispatchEvent(new Event("change"));
@@ -211,7 +213,9 @@ describe("platform observation shell", () => {
     expect(workbench.querySelector('[data-testid="obs-access-notice"]')).toBeNull();
     expect(workbench.textContent).not.toContain("当前租户授权尚未确认");
     expect(workbench.textContent).not.toContain("当前租户筛选无授权");
-    expect(workbench.textContent).toContain("所选企业暂无已映射运行事件");
+    // Platform overview exposes precise authorized queries, not the enterprise analysis tabs.
+    expect(workbench.querySelector(".obs-query-submit")).not.toBeNull();
+    expect(workbench.textContent).toContain("精确任务查询");
 
     tenant.value = "tenant-unknown";
     tenant.dispatchEvent(new Event("change"));
